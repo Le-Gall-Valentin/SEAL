@@ -30,4 +30,15 @@
         <Class name="fr.vlegall.seal.security.web.CsrfController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+
+    <!--
+      SERVLET_HEADER_USER_AGENT : l'agent peut être falsifié, et SEAL ne s'en sert pour aucune décision. Il est
+      rangé assaini et tronqué à 512 caractères dans security_events (SEC-20, colonne user_agent du CDC), comme
+      simple indication (ADR 0011). Exclusion limitée à cette méthode.
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.security.journal.SecurityJournal"/>
+        <Method name="userAgent"/>
+        <Bug pattern="SERVLET_HEADER_USER_AGENT"/>
+    </Match>
 </FindBugsFilter>

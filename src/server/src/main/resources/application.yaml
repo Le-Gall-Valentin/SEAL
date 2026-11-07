@@ -42,6 +42,11 @@ server:
     include-binding-errors: never
     include-exception: false
 
+logging:
+  pattern:
+    # SEC-21 : l'identifiant de corrélation de la requête (CorrelationIdFilter) ouvre chaque ligne.
+    correlation: "[%X{correlationId:-}] "
+
 # A02 : Actuator limité à health, sur un port de gestion interne au conteneur, jamais publié.
 management:
   server:
