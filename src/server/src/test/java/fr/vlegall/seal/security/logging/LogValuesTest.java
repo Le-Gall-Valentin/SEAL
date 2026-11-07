@@ -35,9 +35,16 @@ class LogValuesTest {
     }
 
     @Test
-    @DisplayName("SEC-21 : un identifiant saisi est masqué s'il ressemble à un courriel, assaini sinon")
-    void identifierMasksEmailsAndSanitisesTheRest() {
+    @DisplayName("SEC-21 : un identifiant saisi est gardé s'il a la forme d'un identifiant (AUTH-01), masqué sinon")
+    void sec21IdentifierKeepsOnlyWhatCouldBeAUsername() {
         assertThat(LogValues.identifier("Bob@Exemple.ca")).isEqualTo("B***@Exemple.ca");
-        assertThat(LogValues.identifier("bob\n")).isEqualTo("bob_");
+        assertThat(LogValues.identifier("valentin.le.gall")).isEqualTo("valentin.le.gall");
+    }
+
+    @Test
+    @DisplayName("SEC-21 : un mot de passe tapé dans le champ identifiant n'est jamais journalisé")
+    void sec21PasswordTypedAsIdentifierIsMasked() {
+        assertThat(LogValues.identifier("Correct Horse Battery Staple")).isEqualTo("***");
+        assertThat(LogValues.identifier("bob\n")).isEqualTo("***");
     }
 }

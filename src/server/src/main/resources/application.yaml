@@ -13,6 +13,11 @@ spring:
     url: ${SEAL_DB_URL:jdbc:postgresql://localhost:5432/seal}
     username: ${SEAL_DB_USER:seal}
     password: ${SEAL_DB_PASSWORD:}
+    hikari:
+      data-source-properties:
+        # SEC-21 : le pilote PostgreSQL ne recopie pas le détail du serveur (« Key (email)=(…) already exists »)
+        # dans ses exceptions, qui finiraient dans les traces avec un courriel en clair.
+        logServerErrorDetail: false
   jpa:
     open-in-view: false
     hibernate:
