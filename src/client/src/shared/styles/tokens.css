@@ -1,0 +1,28 @@
+/*
+ * Jetons de design de la maquette, repris tels quels du bloc <helmet> de chaque écran
+ * (reference/maquette/project/*.dc.html). Toute couleur ou police de l'interface passe par eux.
+ */
+:root {
+  --bg: #f7f8f3;
+  --surface: #ffffff;
+  --sunken: #f1f3ea;
+  --line: #e3e6da;
+  --line-strong: #cdd2c0;
+  --ink: #1b1f14;
+  --ink-2: #4a5040;
+  --ink-3: #5f6553;
+  --on-accent: #ffffff;
+  --accent: #66741c;
+  --accent-hover: #525e15;
+  --accent-soft: #eef1e2;
+  --accent-soft-2: #e5ead3;
+  --accent-text: #525e15;
+  --danger: #b3261e;
+  --warning: #8a5a00;
+  --fp-bg: #eef1e2;
+  --fp-a: #4f5b14;
+  --fp-b: #94a257;
+  --fp-c: #d3dbb5;
+  --sans: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'DM Mono', ui-monospace, Menlo, Consolas, monospace;
+}

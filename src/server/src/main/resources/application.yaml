@@ -1,0 +1,56 @@
+# Configuration commune de SEAL. Les secrets viennent de l'environnement (.env, SEC-22), jamais de ce fichier.
+spring:
+  application:
+    name: seal
+  profiles:
+    # Sans profil explicite, SEAL démarre en profil demo, celui de la démonstration et de docker compose.
+    default: demo
+    # TLS (TRN-01) est actif en demo comme en prod ; les tests n'activent que le profil test, sans TLS.
+    group:
+      demo: tls
+      prod: tls
+  datasource:
+    url: ${SEAL_DB_URL:jdbc:postgresql://localhost:5432/seal}
+    username: ${SEAL_DB_USER:seal}
+    password: ${SEAL_DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # DATA-01 : Flyway seul fait évoluer le schéma, Hibernate ne fait que le vérifier.
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+
+server:
+  # TRN-02 : origine unique https://localhost:8443 pour le client, l'API et la WebSocket.
+  port: 8443
+  error:
+    # A02 : aucune trace de pile ni message interne dans les réponses.
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+    include-exception: false
+
+# A02 : Actuator limité à health, sur un port de gestion interne au conteneur, jamais publié.
+management:
+  server:
+    port: 8081
+    address: 127.0.0.1
+    ssl:
+      enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health
+      discovery:
+        enabled: false
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+
+seal:
+  origin: https://localhost:8443
+  security:
+    # TRN-03 : valeur du profil demo, surchargée par application-prod.yaml.
+    hsts-max-age: 300s

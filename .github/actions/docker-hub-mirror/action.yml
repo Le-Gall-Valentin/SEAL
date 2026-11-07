@@ -1,0 +1,19 @@
+name: Docker Hub par mirror.gcr.io
+description: >
+  Docker Hub limite les téléchargements anonymes par adresse, et un runner hébergé partage la sienne
+  avec d'autres jobs (réponses 429 Too Many Requests). Le démon Docker télécharge d'abord les images
+  de Docker Hub depuis le miroir de Google, puis depuis Docker Hub ce que le miroir n'a pas. Les noms
+  d'images ne changent pas : docker build, compose et Testcontainers passent tous par le démon.
+runs:
+  using: composite
+  steps:
+    - name: Images de Docker Hub par mirror.gcr.io
+      shell: bash
+      run: |
+        config=/etc/docker/daemon.json
+        current='{}'
+        if sudo test -s "$config"; then current=$(sudo cat "$config"); fi
+        echo "$current" | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' \
+          | sudo tee "$config" > /dev/null
+        sudo systemctl restart docker
+        docker info --format 'Miroirs : {{.RegistryConfig.Mirrors}}'

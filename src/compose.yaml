@@ -1,0 +1,58 @@
+# SEAL en local : ./scripts/gen-certs.sh, puis docker compose up --build.
+# Client et API sur https://localhost:8443, courriels capturés sur http://localhost:8025.
+name: seal
+
+services:
+  db:
+    image: postgres:18.6-alpine3.24
+    environment:
+      POSTGRES_DB: seal
+      POSTGRES_USER: seal
+      POSTGRES_PASSWORD: ${SEAL_DB_PASSWORD:?SEAL_DB_PASSWORD est vide, lancez scripts/gen-certs.sh}
+    volumes:
+      - db-data:/var/lib/postgresql
+    # Réseau interne seulement : la base n'est jamais joignable hors de Docker (section 4 du CDC).
+    networks: [internal]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U seal -d seal']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  mail:
+    image: axllent/mailpit:v1.33.0
+    ports:
+      - '127.0.0.1:8025:8025'
+    networks: [internal, edge]
+
+  app:
+    build: .
+    image: seal:local
+    depends_on:
+      db:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: demo
+      SEAL_DB_URL: jdbc:postgresql://db:5432/seal
+      SEAL_DB_USER: seal
+      SEAL_DB_PASSWORD: ${SEAL_DB_PASSWORD:?SEAL_DB_PASSWORD est vide, lancez scripts/gen-certs.sh}
+      SEAL_DATA_KEY: ${SEAL_DATA_KEY:?SEAL_DATA_KEY est vide, lancez scripts/gen-certs.sh}
+      SEAL_TLS_CERTIFICATE: file:/certs/localhost.pem
+      SEAL_TLS_PRIVATE_KEY: file:/certs/localhost-key.pem
+    ports:
+      - '127.0.0.1:8443:8443'
+    volumes:
+      - ./certs:/certs:ro
+      - app-data:/data
+    networks: [internal, edge]
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+
+volumes:
+  db-data:
+  app-data:

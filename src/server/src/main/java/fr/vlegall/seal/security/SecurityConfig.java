@@ -1,0 +1,56 @@
+package fr.vlegall.seal.security;
+
+import fr.vlegall.seal.common.SealProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy;
+import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+
+/**
+ * Chaîne de filtres de Spring Security : tout est refusé par défaut et ouvert route par route (A01), et chaque réponse
+ * porte les en-têtes de la section 12.3 du CDC (TRN-20).
+ */
+@Configuration
+@EnableWebSecurity
+class SecurityConfig {
+
+    static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+
+    /** TRN-20, TRN-21 : aucune ressource tierce, aucun script ni style en ligne. */
+    static String contentSecurityPolicy(SealProperties seal) {
+        return "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
+                + "font-src 'self'; connect-src 'self' " + seal.webSocketOrigin() + "; manifest-src 'self'; "
+                + "base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'";
+    }
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http, SealProperties seal) {
+        http.authorizeHttpRequests(requests -> requests
+                        // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
+                        .permitAll()
+                        .requestMatchers("/error")
+                        .permitAll()
+                        // Sonde de santé du conteneur, sur le port de gestion interne (A02).
+                        .requestMatchers(HttpMethod.GET, "/actuator/health")
+                        .permitAll()
+                        .anyRequest()
+                        .denyAll())
+                .headers(headers -> headers.contentSecurityPolicy(
+                                csp -> csp.policyDirectives(contentSecurityPolicy(seal)))
+                        // TRN-03 : sans includeSubDomains, pour ne pas imposer HTTPS aux autres services locaux.
+                        .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(false)
+                                .maxAgeInSeconds(seal.security().hstsMaxAge().toSeconds()))
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
+                        .permissionsPolicyHeader(permissions -> permissions.policy(PERMISSIONS_POLICY))
+                        .crossOriginOpenerPolicy(coop -> coop.policy(CrossOriginOpenerPolicy.SAME_ORIGIN))
+                        .crossOriginResourcePolicy(corp -> corp.policy(CrossOriginResourcePolicy.SAME_ORIGIN))
+                        .frameOptions(frame -> frame.deny()));
+        return http.build();
+    }
+}

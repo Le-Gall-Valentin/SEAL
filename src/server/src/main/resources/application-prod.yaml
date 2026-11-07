@@ -1,0 +1,4 @@
+seal:
+  security:
+    # TRN-03 : un an en profil prod.
+    hsts-max-age: 365d

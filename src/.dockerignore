@@ -1,0 +1,16 @@
+# Seuls client/ et server/ entrent dans l'image ; jamais de secret ni d'artefact local.
+**/node_modules
+client/dist
+client/coverage
+client/playwright-report
+client/test-results
+server/target
+certs
+data
+docs
+protocol
+scripts
+.env
+.env.*
+compose.yaml
+Dockerfile
