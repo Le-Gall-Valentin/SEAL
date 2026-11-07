@@ -28,22 +28,55 @@ class ErrorDispatchIT {
     @LocalServerPort
     private int port;
 
-    @Test
-    @DisplayName(
-            "ADR 0010 : une URL refusée par le pare-feu de Spring Security répond en Problem Details REQUEST_REJECTED")
-    void firewallRejectionIsAProblemDetail() throws Exception {
-        HttpResponse<String> response;
+    private HttpResponse<String> send(String method, String path) throws Exception {
         try (HttpClient client = HttpClient.newHttpClient()) {
-            response = client.send(
-                    HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/a;b"))
-                            .GET()
+            return client.send(
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                            .method(method, HttpRequest.BodyPublishers.noBody())
                             .build(),
                     HttpResponse.BodyHandlers.ofString());
         }
+    }
+
+    private static void expectSecurityHeaders(HttpResponse<String> response) {
+        assertThat(response.headers().firstValue("Content-Security-Policy"))
+                .hasValueSatisfying(csp -> assertThat(csp).startsWith("default-src 'none'"));
+        assertThat(response.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
+        assertThat(response.headers().firstValue("X-Frame-Options")).contains("DENY");
+        assertThat(response.headers().firstValue("Referrer-Policy")).contains("no-referrer");
+        assertThat(response.headers().firstValue("Permissions-Policy")).isPresent();
+        assertThat(response.headers().firstValue("Cross-Origin-Opener-Policy")).contains("same-origin");
+        assertThat(response.headers().firstValue("Cross-Origin-Resource-Policy"))
+                .contains("same-origin");
+        assertThat(response.headers().firstValue("Cache-Control"))
+                .hasValueSatisfying(cache -> assertThat(cache).contains("no-store"));
+    }
+
+    @Test
+    @DisplayName(
+            "ADR 0010 : une URL refusée par le pare-feu de Spring Security répond en Problem Details REQUEST_REJECTED")
+    void adr0010FirewallRejectionIsAProblemDetail() throws Exception {
+        HttpResponse<String> response = send("GET", "/api/v1/a;b");
 
         assertThat(response.statusCode()).isEqualTo(400);
         assertThat(response.headers().firstValue("Content-Type"))
                 .hasValueSatisfying(type -> assertThat(type).startsWith("application/problem+json"));
         assertThat(response.body()).contains("\"code\":\"REQUEST_REJECTED\"");
+        assertThat(response.body()).contains("\"instance\":\"/api/v1/a;b\"");
+    }
+
+    @Test
+    @DisplayName("TRN-20 : une requête refusée par le pare-feu reçoit les en-têtes de sécurité")
+    void trn20FirewallRejectionCarriesTheSecurityHeaders() throws Exception {
+        expectSecurityHeaders(send("GET", "/api/v1/a;b"));
+    }
+
+    @Test
+    @DisplayName("TRN-20 : une requête TRACE refusée reçoit les en-têtes de sécurité")
+    void trn20TraceRejectionCarriesTheSecurityHeaders() throws Exception {
+        HttpResponse<String> response = send("TRACE", "/");
+
+        assertThat(response.statusCode()).isEqualTo(405);
+        expectSecurityHeaders(response);
     }
 }

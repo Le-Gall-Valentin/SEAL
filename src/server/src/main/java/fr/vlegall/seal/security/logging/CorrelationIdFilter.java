@@ -17,14 +17,27 @@ public final class CorrelationIdFilter extends OncePerRequestFilter {
 
     public static final String MDC_KEY = "correlationId";
 
+    /** Attribut de requête qui garde l'identifiant pour le dispatch d'erreur de la même requête (ADR 0013, point 9). */
+    static final String REQUEST_ATTRIBUTE = CorrelationIdFilter.class.getName() + ".id";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        MDC.put(MDC_KEY, UUID.randomUUID().toString());
+        String correlationId = request.getAttribute(REQUEST_ATTRIBUTE) instanceof String existing
+                ? existing
+                : UUID.randomUUID().toString();
+        request.setAttribute(REQUEST_ATTRIBUTE, correlationId);
+        MDC.put(MDC_KEY, correlationId);
         try {
             chain.doFilter(request, response);
         } finally {
             MDC.remove(MDC_KEY);
         }
+    }
+
+    /** Le dispatch d'erreur reprend l'identifiant de la requête : ses lignes de journal restent reliées. */
+    @Override
+    protected boolean shouldNotFilterErrorDispatch() {
+        return false;
     }
 }

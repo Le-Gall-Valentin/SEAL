@@ -4,9 +4,11 @@ import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -17,8 +19,10 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -35,6 +39,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(SealException.class)
     ResponseEntity<ProblemDetail> handleSealException(SealException exception) {
+        if (exception.code().status() >= 500) {
+            LOG.error("Erreur interne signalée par le code", exception);
+        }
         ResponseEntity<ProblemDetail> response = problem(
                 exception.code(), HttpStatusCode.valueOf(exception.code().status()));
         return exception
@@ -86,6 +93,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         }
         if (exception instanceof MethodArgumentNotValidException invalid) {
             problem.setProperty(FIELDS, fieldsInError(invalid));
+        } else if (exception instanceof HandlerMethodValidationException invalid) {
+            problem.setProperty(FIELDS, parametersInError(invalid));
         }
         return super.handleExceptionInternal(exception, problem, headers, status, request);
     }
@@ -96,6 +105,24 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .distinct()
                 .sorted()
                 .toList();
+    }
+
+    /** ADR 0010 : nom du paramètre de requête en erreur, celui de {@code @RequestParam} s'il est donné. */
+    private static List<String> parametersInError(HandlerMethodValidationException exception) {
+        return exception.getParameterValidationResults().stream()
+                .map(result -> parameterName(result.getMethodParameter()))
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private static @Nullable String parameterName(MethodParameter parameter) {
+        RequestParam requestParam = parameter.getParameterAnnotation(RequestParam.class);
+        if (requestParam != null && !requestParam.name().isEmpty()) {
+            return requestParam.name();
+        }
+        return parameter.getParameterName();
     }
 
     private static ResponseEntity<ProblemDetail> problem(ErrorCode code, HttpStatusCode status) {

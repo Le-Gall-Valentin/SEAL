@@ -14,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -26,6 +27,9 @@ class CsrfIT {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     private String csrfToken() throws Exception {
         Cookie cookie = mvc.perform(get("/api/v1/csrf").secure(true))
@@ -45,6 +49,22 @@ class CsrfIT {
                 .andExpect(cookie().httpOnly(CSRF_COOKIE, false))
                 .andExpect(cookie().secure(CSRF_COOKIE, true))
                 .andExpect(cookie().path(CSRF_COOKIE, "/"));
+    }
+
+    @Test
+    @DisplayName("QA-05 : GET /api/v1/csrf, première route de tout client anonyme, ne crée aucune session")
+    void qa05CsrfEndpointCreatesNoSession() throws Exception {
+        long before = jdbc.sql("SELECT count(*) FROM spring_session")
+                .query(Long.class)
+                .single();
+
+        MvcResult result = mvc.perform(get("/api/v1/csrf").secure(true)).andReturn();
+
+        assertThat(jdbc.sql("SELECT count(*) FROM spring_session")
+                        .query(Long.class)
+                        .single())
+                .isEqualTo(before);
+        assertThat(result.getResponse().getCookie("__Host-seal_sid")).isNull();
     }
 
     @Test

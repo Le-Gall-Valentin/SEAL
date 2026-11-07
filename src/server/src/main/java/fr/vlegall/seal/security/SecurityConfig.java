@@ -3,9 +3,12 @@ package fr.vlegall.seal.security;
 import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.session.AbsoluteSessionTimeoutFilter;
 import fr.vlegall.seal.security.web.ProblemDetailsSecurityHandler;
+import jakarta.servlet.DispatcherType;
 import java.time.Clock;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -32,6 +35,16 @@ class SecurityConfig {
         return "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
                 + "font-src 'self'; connect-src 'self' " + seal.webSocketOrigin() + "; manifest-src 'self'; "
                 + "base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'";
+    }
+
+    /** TRN-20 : en-têtes de la section 12.3 sur les réponses du dispatch d'erreur (ADR 0014, point 1). */
+    @Bean
+    FilterRegistrationBean<ErrorDispatchHeadersFilter> errorDispatchHeadersFilter(SealProperties seal) {
+        FilterRegistrationBean<ErrorDispatchHeadersFilter> registration =
+                new FilterRegistrationBean<>(new ErrorDispatchHeadersFilter(seal));
+        registration.setDispatcherTypes(DispatcherType.ERROR);
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
+        return registration;
     }
 
     @Bean

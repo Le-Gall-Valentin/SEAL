@@ -2,6 +2,7 @@ package fr.vlegall.seal.security.logging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import jakarta.servlet.DispatcherType;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,5 +33,24 @@ class CorrelationIdFilterTest {
         assertThat(first).matches(UUID_FORM);
         assertThat(MDC.get(CorrelationIdFilter.MDC_KEY)).isNull();
         assertThat(correlationIdSeenByTheChain()).matches(UUID_FORM).isNotEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("SEC-21 : le dispatch d'erreur d'une requête reprend son identifiant de corrélation")
+    void sec21ErrorDispatchKeepsTheCorrelationId() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        AtomicReference<String> seen = new AtomicReference<>();
+        filter.doFilter(
+                request, new MockHttpServletResponse(), (r, s) -> seen.set(MDC.get(CorrelationIdFilter.MDC_KEY)));
+        request.setDispatcherType(DispatcherType.ERROR);
+        AtomicReference<String> seenOnError = new AtomicReference<>();
+
+        filter.doFilter(
+                request,
+                new MockHttpServletResponse(),
+                (r, s) -> seenOnError.set(MDC.get(CorrelationIdFilter.MDC_KEY)));
+
+        assertThat(seenOnError.get()).isEqualTo(seen.get());
+        assertThat(MDC.get(CorrelationIdFilter.MDC_KEY)).isNull();
     }
 }

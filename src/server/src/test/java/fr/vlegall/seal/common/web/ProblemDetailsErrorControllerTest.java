@@ -66,4 +66,17 @@ class ProblemDetailsErrorControllerTest {
         assertThat(response.getStatusCode().value()).isEqualTo(500);
         assertThat(codeOf(response)).isEqualTo("INTERNAL_ERROR");
     }
+
+    @Test
+    @DisplayName("ADR 0010 : instance porte le chemin demandé, pas « /error »")
+    void instanceIsTheRequestedPath() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/error");
+        request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, 400);
+        request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, "/api/v1/a;b");
+
+        ResponseEntity<ProblemDetail> response = controller.error(request);
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getInstance()).hasToString("/api/v1/a;b");
+    }
 }

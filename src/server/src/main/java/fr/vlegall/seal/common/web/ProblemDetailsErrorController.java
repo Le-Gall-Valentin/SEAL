@@ -3,6 +3,9 @@ package fr.vlegall.seal.common.web;
 import fr.vlegall.seal.common.ErrorCode;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.webmvc.error.ErrorController;
@@ -35,6 +38,19 @@ class ProblemDetailsErrorController implements ErrorController {
         }
         ProblemDetail problem = ProblemDetail.forStatus(status);
         problem.setProperty(ApiExceptionHandler.CODE, errorCode.name());
+        requestedPath(request).ifPresent(problem::setInstance);
         return ResponseEntity.status(HttpStatusCode.valueOf(status)).body(problem);
+    }
+
+    /** ADR 0010 : le chemin demandé plutôt que {@code /error} ; absent s'il n'est pas une URI valide. */
+    private static Optional<URI> requestedPath(HttpServletRequest request) {
+        if (!(request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI) instanceof String path)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(new URI(path));
+        } catch (URISyntaxException e) {
+            return Optional.empty();
+        }
     }
 }

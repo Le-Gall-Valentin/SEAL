@@ -30,7 +30,7 @@
         <Class name="fr.vlegall.seal.security.web.CsrfController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
-    <!-- /error, dispatch d'erreur du conteneur, sans donnée ni effet (ADR 0010) : ErrorDispatchIT. -->
+    <!-- /error, dispatch d'erreur du conteneur, sans donnée ni effet (ADR 0011) : CsrfIT.auth60ErrorEndpointIsCsrfProtected. -->
     <Match>
         <Class name="fr.vlegall.seal.common.web.ProblemDetailsErrorController"/>
         <Bug pattern="SPRING_ENDPOINT"/>

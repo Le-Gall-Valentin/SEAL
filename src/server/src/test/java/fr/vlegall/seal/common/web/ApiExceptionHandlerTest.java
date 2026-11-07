@@ -17,6 +17,7 @@ import fr.vlegall.seal.security.ratelimit.RateLimit;
 import fr.vlegall.seal.security.ratelimit.RateLimitExceededException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 class ApiExceptionHandlerTest {
@@ -59,12 +61,24 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("Une SealException garde son code et son statut")
+    @DisplayName("ADR 0010 : une SealException garde son code, sans le déduire du statut")
     void sealExceptionKeepsItsCode() throws Exception {
-        mvc.perform(get("/probe/missing"))
-                .andExpect(status().isNotFound())
+        // REQUEST_REJECTED a le statut 400 : un code déduit du statut donnerait VALIDATION_FAILED.
+        mvc.perform(get("/probe/rejected"))
+                .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(PROBLEM_JSON))
-                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("REQUEST_REJECTED"));
+    }
+
+    @Test
+    @DisplayName("ADR 0010 : un paramètre invalide répond 400 VALIDATION_FAILED et liste le paramètre")
+    void adr0010InvalidParameterListsTheField() throws Exception {
+        mvc.perform(get("/probe/check").param("u", "ab"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields", contains("u")))
+                .andExpect(content().string(not(containsString("\"ab\""))));
     }
 
     @Test
@@ -146,9 +160,14 @@ class ApiExceptionHandlerTest {
             return "ok";
         }
 
-        @GetMapping("/missing")
-        String missing() {
-            throw new SealException(ErrorCode.NOT_FOUND);
+        @GetMapping("/rejected")
+        String rejected() {
+            throw new SealException(ErrorCode.REQUEST_REJECTED);
+        }
+
+        @GetMapping("/check")
+        String check(@RequestParam @Size(min = 3) String u) {
+            return u;
         }
 
         @GetMapping("/unauthenticated")
