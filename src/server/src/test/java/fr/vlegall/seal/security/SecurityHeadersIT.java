@@ -53,7 +53,8 @@ class SecurityHeadersIT {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/v1/unknown", "/actuator/env", "/ws"})
+    // /ws n'y figure pas : au lot 4, sa poignée de main refusera en 403 (TRN-11), pas en 401.
+    @ValueSource(strings = {"/api/v1/unknown", "/actuator/env"})
     @DisplayName(
             "A01, QA-05 : toute route non ouverte explicitement est refusée, 401 sans session, 403 sans jeton CSRF")
     void everyRouteNotExplicitlyOpenedIsDenied(String path) throws Exception {

@@ -1,6 +1,6 @@
 package fr.vlegall.archfixture.alpha.infrastructure.web;
 
-import fr.vlegall.archfixture.alpha.infrastructure.persistence.AlphaJpaRepository;
+import fr.vlegall.archfixture.alpha.infrastructure.persistence.repository.AlphaJpaRepository;
 
 /** Interdit : un contrôleur qui appelle un dépôt au lieu d'un cas d'usage. */
 public class ControllerUsingRepository {

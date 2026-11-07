@@ -12,8 +12,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Test d'intégration de SEAL : contexte complet, MockMvc, PostgreSQL jetable et horloge réglable. Tous les tests
- * d'intégration partagent cette configuration, donc un seul contexte Spring et un seul conteneur.
+ * Test d'intégration de SEAL : contexte complet, MockMvc, PostgreSQL jetable et horloge réglable. Les tests
+ * d'intégration qui passent par MockMvc partagent cette configuration, donc un seul contexte Spring et un seul
+ * conteneur ; seuls ceux qui ont besoin du vrai serveur (dispatch d'erreur de Tomcat, comme {@code ErrorDispatchIT})
+ * démarrent un second contexte.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
