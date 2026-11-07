@@ -1,0 +1,32 @@
+# Secrets et données locales (SEC-22) : jamais dans Git
+.env
+.env.*
+!.env.example
+src/certs/
+src/data/
+*.pem
+*.key
+*.p8
+*.p12
+
+# Serveur
+src/server/target/
+
+# Client
+node_modules/
+src/client/dist/
+src/client/coverage/
+src/client/playwright-report/
+src/client/test-results/
+*.tsbuildinfo
+
+# Livrable produit par scripts/package.sh
+projet.zip
+
+# Outils locaux
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.log
