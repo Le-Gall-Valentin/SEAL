@@ -69,7 +69,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(ErrorCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    /** Exceptions de Spring MVC : 400 devient {@code VALIDATION_FAILED}, 404 {@code NOT_FOUND}, le reste {@code REQUEST_REJECTED}. */
+    /** Exceptions de Spring MVC : le code découle du statut ({@link ErrorCode#forStatus}), et tout 5xx est journalisé. */
     @Override
     protected @Nullable ResponseEntity<Object> handleExceptionInternal(
             Exception exception,
@@ -79,21 +79,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             WebRequest request) {
         ProblemDetail problem = body instanceof ProblemDetail detail ? detail : ProblemDetail.forStatus(status);
         problem.setDetail(null);
-        problem.setProperty(CODE, codeFor(status).name());
+        problem.setProperty(CODE, ErrorCode.forStatus(status.value()).name());
+        if (status.is5xxServerError()) {
+            // Spring ne journalise pas les exceptions qu'il résout : un bogue du serveur resterait invisible.
+            LOG.error("Erreur interne résolue par Spring MVC", exception);
+        }
         if (exception instanceof MethodArgumentNotValidException invalid) {
             problem.setProperty(FIELDS, fieldsInError(invalid));
         }
         return super.handleExceptionInternal(exception, problem, headers, status, request);
-    }
-
-    private static ErrorCode codeFor(HttpStatusCode status) {
-        if (status.value() == HttpStatus.BAD_REQUEST.value()) {
-            return ErrorCode.VALIDATION_FAILED;
-        }
-        if (status.value() == HttpStatus.NOT_FOUND.value()) {
-            return ErrorCode.NOT_FOUND;
-        }
-        return ErrorCode.REQUEST_REJECTED;
     }
 
     private static List<String> fieldsInError(MethodArgumentNotValidException exception) {

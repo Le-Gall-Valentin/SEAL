@@ -96,6 +96,14 @@ class CsrfIT {
     }
 
     @Test
+    @DisplayName("AUTH-60 : une requête non sûre envoyée directement sur /error est refusée par le filtre CSRF")
+    void auth60ErrorEndpointIsCsrfProtected() throws Exception {
+        mvc.perform(post("/error").secure(true))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
     @DisplayName("A01 : le point de déconnexion par défaut de Spring Security n'existe pas")
     void a01DefaultLogoutEndpointDoesNotExist() throws Exception {
         String token = csrfToken();

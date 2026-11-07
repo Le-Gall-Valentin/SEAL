@@ -115,7 +115,22 @@ class ApiExceptionHandlerTest {
                 .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
     }
 
+    @Test
+    @DisplayName("A10 : une réponse impossible à écrire est une erreur interne, 500 INTERNAL_ERROR")
+    void unwritableResponseIsAnInternalError() throws Exception {
+        mvc.perform(get("/probe/unwritable"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+    }
+
     record ProbeRequest(@NotBlank String name) {}
+
+    /** Objet que Jackson ne sait pas écrire : son accesseur lève une exception. */
+    static class Unwritable {
+        public String getValue() {
+            throw new IllegalStateException("secret interne");
+        }
+    }
 
     @RestController
     @RequestMapping("/probe")
@@ -151,6 +166,11 @@ class ApiExceptionHandlerTest {
             throw new RateLimitExceededException(
                     RateLimit.REGISTRATIONS_PER_IP,
                     Duration.ofMinutes(14).plusSeconds(30).plusMillis(200));
+        }
+
+        @GetMapping("/unwritable")
+        Unwritable unwritable() {
+            return new Unwritable();
         }
 
         @GetMapping("/boom")

@@ -24,4 +24,19 @@ public enum ErrorCode {
     public int status() {
         return status;
     }
+
+    /**
+     * Code d'une erreur dont on ne connaît que le statut (exception de Spring MVC, dispatch d'erreur du conteneur) :
+     * tout 5xx est une erreur interne, un 4xx sans code dédié une requête rejetée (ADR 0010).
+     */
+    public static ErrorCode forStatus(int status) {
+        return switch (status) {
+            case 400 -> VALIDATION_FAILED;
+            case 401 -> UNAUTHENTICATED;
+            case 403 -> FORBIDDEN;
+            case 404 -> NOT_FOUND;
+            case 429 -> RATE_LIMITED;
+            default -> status >= 500 ? INTERNAL_ERROR : REQUEST_REJECTED;
+        };
+    }
 }
