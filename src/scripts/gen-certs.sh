@@ -16,10 +16,15 @@ fi
 # Sous Linux, Chrome et Chromium ne lisent pas le magasin du système mais leur base NSS
 # (~/.pki/nssdb), créée à leur premier lancement : sans elle, mkcert ne peut pas y installer
 # l'autorité et le navigateur refuse le certificat. On la crée si elle manque (ADR 0004).
-if [ "$(uname -s)" = Linux ] && [ ! -d "$HOME/.pki/nssdb" ] && command -v certutil >/dev/null 2>&1; then
-  mkdir -p "$HOME/.pki/nssdb"
-  certutil -d "sql:$HOME/.pki/nssdb" -N --empty-password
-  echo "Base de certificats de Chrome créée : ~/.pki/nssdb"
+if [ "$(uname -s)" = Linux ] && [ ! -d "$HOME/.pki/nssdb" ]; then
+  if command -v certutil >/dev/null 2>&1; then
+    mkdir -p "$HOME/.pki/nssdb"
+    certutil -d "sql:$HOME/.pki/nssdb" -N --empty-password
+    echo "Base de certificats de Chrome créée : ~/.pki/nssdb"
+  else
+    echo "Attention : certutil est introuvable (paquet libnss3-tools) ; Chrome et Chromium ne reconnaîtront pas" >&2
+    echo "le certificat. Installez-le, puis relancez ce script." >&2
+  fi
 fi
 
 mkdir -p certs
@@ -29,10 +34,12 @@ mkcert -cert-file certs/localhost.pem -key-file certs/localhost-key.pem localhos
 # Elle ne protège que ce certificat localhost ; la clé de l'autorité mkcert reste dans son dossier privé.
 chmod 644 certs/localhost-key.pem
 
+# SEC-22 (ADR 0014) : .env n'est jamais lisible par un autre compte, pas même un instant.
 if [ ! -f .env ]; then
-  cp .env.example .env
+  (umask 077 && cp .env.example .env)
   echo ".env créé à partir de .env.example"
 fi
+chmod 600 .env
 
 # Remplit NOM= s'il est vide ; ne touche jamais une valeur déjà présente.
 fill_secret() {
@@ -54,6 +61,5 @@ random_base64() {
 fill_secret SEAL_DATA_KEY "$(random_base64 32)"
 # Sans + ni / ni =, pour rester sûr dans une URL JDBC ou une ligne de commande.
 fill_secret SEAL_DB_PASSWORD "$(random_base64 32 | tr -d '+/=')"
-chmod 600 .env
 
 echo "Prêt : lancez docker compose up --build, puis ouvrez https://localhost:8443"

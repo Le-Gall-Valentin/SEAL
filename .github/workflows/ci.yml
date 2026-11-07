@@ -9,13 +9,15 @@ on:
 permissions:
   contents: read
 
+# Une nouvelle poussée annule l'analyse en cours d'une pull request, jamais celle d'un commit de main (ADR 0014).
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   server:
     name: Serveur (./mvnw verify)
+    timeout-minutes: 30
     # Runner épinglé : l'image change quand une pull request le décide, pas au gré de GitHub.
     runs-on: ubuntu-26.04
     defaults:
@@ -37,6 +39,7 @@ jobs:
 
   protocol:
     name: Protocole (vecteurs à jour)
+    timeout-minutes: 5
     runs-on: ubuntu-26.04
     defaults:
       run:
@@ -50,6 +53,7 @@ jobs:
 
   client:
     name: Client (lint, tests, audit)
+    timeout-minutes: 15
     runs-on: ubuntu-26.04
     defaults:
       run:
@@ -76,6 +80,7 @@ jobs:
 
   dependency-check:
     name: OWASP Dependency-Check (serveur)
+    timeout-minutes: 45
     runs-on: ubuntu-26.04
     defaults:
       run:
@@ -118,6 +123,7 @@ jobs:
 
   compose:
     name: Lancement par docker compose et bout en bout
+    timeout-minutes: 30
     runs-on: ubuntu-26.04
     defaults:
       run:
