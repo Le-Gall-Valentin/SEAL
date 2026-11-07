@@ -24,4 +24,14 @@
         <cve>CVE-2026-54399</cve>
         <cve>CVE-2026-54428</cve>
     </suppress>
+    <suppress until="2026-12-22Z">
+        <notes><![CDATA[
+        ADR 0005. httpcore5-h2 5.3.6 recopié dans docker-java-transport-zerodep 3.7.1 (Testcontainers,
+        tests seulement) : docker-java parle HTTP/1.1 au démon Docker local par socket Unix ; absent du
+        jar livré. Aucune version corrigée de docker-java au 2026-11-07.
+        ]]></notes>
+        <sha1>498f1e71fffc835edc3e9a42b3bcfcf2a804f0f4</sha1>
+        <cve>CVE-2026-54399</cve>
+        <cve>CVE-2026-54428</cve>
+    </suppress>
 </suppressions>
