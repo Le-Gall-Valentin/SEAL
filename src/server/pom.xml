@@ -26,6 +26,8 @@
     <findsecbugs.version>1.14.0</findsecbugs.version>
     <jacoco.version>0.8.16</jacoco.version>
     <dependency-check.version>13.0.0</dependency-check.version>
+    <!-- Bibliothèques absentes du BOM de Spring Boot. Bucket4j : 8.21.0, la 8.22.0 ayant moins de deux semaines (A03). -->
+    <bucket4j.version>8.21.0</bucket4j.version>
   </properties>
 
   <dependencies>
@@ -68,6 +70,12 @@
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
+    </dependency>
+    <!-- SEC-10 : limitation de débit par seaux à jetons, en mémoire. -->
+    <dependency>
+      <groupId>com.bucket4j</groupId>
+      <artifactId>bucket4j_jdk17-core</artifactId>
+      <version>${bucket4j.version}</version>
     </dependency>
 
     <dependency>

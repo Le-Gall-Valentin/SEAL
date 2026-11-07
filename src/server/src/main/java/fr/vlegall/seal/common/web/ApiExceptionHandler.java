@@ -2,6 +2,7 @@ package fr.vlegall.seal.common.web;
 
 import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
+import java.time.Duration;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -34,7 +35,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(SealException.class)
     ResponseEntity<ProblemDetail> handleSealException(SealException exception) {
-        return problem(exception.code(), HttpStatusCode.valueOf(exception.code().status()));
+        ResponseEntity<ProblemDetail> response = problem(
+                exception.code(), HttpStatusCode.valueOf(exception.code().status()));
+        return exception
+                .retryAfter()
+                .map(delay -> ResponseEntity.status(response.getStatusCode())
+                        .header(HttpHeaders.RETRY_AFTER, Long.toString(secondsRoundedUp(delay)))
+                        .body(response.getBody()))
+                .orElse(response);
+    }
+
+    /** SEC-10 : {@code Retry-After} s'exprime en secondes entières ; on arrondit au-dessus pour ne jamais inviter trop tôt. */
+    static long secondsRoundedUp(Duration delay) {
+        return delay.toSeconds() + (delay.toNanosPart() > 0 ? 1 : 0);
     }
 
     /** QA-05 : sans session valide. */

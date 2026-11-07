@@ -7,13 +7,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
+import fr.vlegall.seal.security.ratelimit.RateLimit;
+import fr.vlegall.seal.security.ratelimit.RateLimitExceededException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -100,6 +104,17 @@ class ApiExceptionHandlerTest {
                 .andExpect(content().string(not(containsString("secret interne"))));
     }
 
+    @Test
+    @DisplayName(
+            "SEC-10 : un dépassement de limite répond 429 RATE_LIMITED avec Retry-After en secondes arrondies au-dessus")
+    void rateLimitedResponseCarriesRetryAfter() throws Exception {
+        mvc.perform(get("/probe/rate-limited"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "871"))
+                .andExpect(content().contentType(PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+    }
+
     record ProbeRequest(@NotBlank String name) {}
 
     @RestController
@@ -129,6 +144,13 @@ class ApiExceptionHandlerTest {
         @GetMapping("/forbidden")
         String forbidden() {
             throw new AccessDeniedException("accès refusé");
+        }
+
+        @GetMapping("/rate-limited")
+        String rateLimited() {
+            throw new RateLimitExceededException(
+                    RateLimit.REGISTRATIONS_PER_IP,
+                    Duration.ofMinutes(14).plusSeconds(30).plusMillis(200));
         }
 
         @GetMapping("/boom")
