@@ -4,25 +4,19 @@ import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import fr.vlegall.seal.TestcontainersConfiguration;
+import fr.vlegall.seal.support.SealIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
-@Import(TestcontainersConfiguration.class)
+@SealIntegrationTest
 class SecurityHeadersIT {
 
     /** Valeur exacte de la section 12.3 du CDC, recopiée plutôt que recalculée. */
@@ -55,14 +49,20 @@ class SecurityHeadersIT {
     @Test
     @DisplayName("TRN-20 : une réponse refusée porte aussi les en-têtes")
     void trn20RefusedResponseCarriesTheSecurityHeaders() throws Exception {
-        expectSecurityHeaders(mvc.perform(get("/api/v1/unknown").secure(true)).andExpect(status().isForbidden()));
+        expectSecurityHeaders(mvc.perform(get("/api/v1/unknown").secure(true)).andExpect(status().isUnauthorized()));
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/v1/unknown", "/actuator/env", "/ws"})
-    @DisplayName("A01 : toute route non ouverte explicitement est refusée")
+    // /ws n'y figure pas : au lot 4, sa poignée de main refusera en 403 (TRN-11), pas en 401.
+    @ValueSource(strings = {"/api/v1/unknown", "/actuator/env"})
+    @DisplayName(
+            "A01, QA-05 : toute route non ouverte explicitement est refusée, 401 sans session, 403 sans jeton CSRF")
     void everyRouteNotExplicitlyOpenedIsDenied(String path) throws Exception {
-        mvc.perform(get(path).secure(true)).andExpect(status().isForbidden());
-        mvc.perform(post(path).secure(true)).andExpect(status().isForbidden());
+        mvc.perform(get(path).secure(true))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        mvc.perform(post(path).secure(true))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 }

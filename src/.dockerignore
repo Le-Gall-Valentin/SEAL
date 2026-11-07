@@ -10,7 +10,7 @@ data
 docs
 protocol
 scripts
-.env
-.env.*
+**/.env
+**/.env.*
 compose.yaml
 Dockerfile

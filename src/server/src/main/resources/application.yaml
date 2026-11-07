@@ -13,6 +13,11 @@ spring:
     url: ${SEAL_DB_URL:jdbc:postgresql://localhost:5432/seal}
     username: ${SEAL_DB_USER:seal}
     password: ${SEAL_DB_PASSWORD:}
+    hikari:
+      data-source-properties:
+        # SEC-21 : le pilote PostgreSQL ne recopie pas le détail du serveur (« Key (email)=(…) already exists »)
+        # dans ses exceptions, qui finiraient dans les traces avec un courriel en clair.
+        logServerErrorDetail: false
   jpa:
     open-in-view: false
     hibernate:
@@ -20,6 +25,17 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration
+  session:
+    # AUTH-52 : 30 minutes d'inactivité, appliquées que le serveur soit embarqué ou non ; la limite de 12 heures est
+    # celle d'AbsoluteSessionTimeoutFilter. Le cookie (AUTH-51) est fixé par SessionCookieConfiguration.
+    timeout: 30m
+    jdbc:
+      # Tables créées par Flyway (V1__schema_initial.sql), jamais par Spring Session.
+      initialize-schema: never
+  jackson:
+    deserialization:
+      # Section 14 du CDC : aucun champ inconnu accepté dans une requête.
+      fail-on-unknown-properties: true
 
 server:
   # TRN-02 : origine unique https://localhost:8443 pour le client, l'API et la WebSocket.
@@ -30,6 +46,11 @@ server:
     include-message: never
     include-binding-errors: never
     include-exception: false
+
+logging:
+  pattern:
+    # SEC-21 : l'identifiant de corrélation de la requête (CorrelationIdFilter) ouvre chaque ligne.
+    correlation: "[%X{correlationId:-}] "
 
 # A02 : Actuator limité à health, sur un port de gestion interne au conteneur, jamais publié.
 management:
@@ -54,3 +75,6 @@ seal:
   security:
     # TRN-03 : valeur du profil demo, surchargée par application-prod.yaml.
     hsts-max-age: 300s
+  session:
+    # AUTH-52 : une session expire 12 heures après sa création, même active (AbsoluteSessionTimeoutFilter).
+    absolute-timeout: 12h

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -78,8 +77,32 @@ class ProfilesConfigurationTest {
 
         assertThat(binder.bind("spring.jpa.hibernate.ddl-auto", String.class).get())
                 .isEqualTo("validate");
+    }
+
+    @Test
+    @DisplayName("A02 : Actuator n'expose que health, sans détail, sur le port de gestion lié à 127.0.0.1")
+    void a02ActuatorIsLimitedToHealthOnTheLoopback() throws IOException {
+        Binder binder = binderFor("application.yaml");
+
         assertThat(binder.bind("management.endpoints.web.exposure.include", String[].class)
                         .get())
-                .isEqualTo(List.of("health").toArray(String[]::new));
+                .containsExactly("health");
+        assertThat(binder.bind("management.server.address", String.class).get()).isEqualTo("127.0.0.1");
+        assertThat(binder.bind("management.endpoint.health.show-details", String.class)
+                        .get())
+                .isEqualTo("never");
+        assertThat(binder.bind("management.endpoint.health.show-components", String.class)
+                        .get())
+                .isEqualTo("never");
+    }
+
+    @Test
+    @DisplayName("AUTH-52 : une session expire 12 heures après sa création")
+    void auth52AbsoluteTimeoutIsTwelveHours() throws IOException {
+        Binder binder = binderFor("application.yaml");
+
+        assertThat(binder.bind("seal.session.absolute-timeout", java.time.Duration.class)
+                        .get())
+                .hasHours(12);
     }
 }

@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -50,13 +51,27 @@ class CanonicalVectorsTest {
         };
     }
 
-    /** Un u64 hors de la plage du long de Java ne peut même pas être passé à l'encodeur : il est rejeté. */
+    /** Un u64 hors de la plage du long de Java ne peut même pas être passé à l'encodeur : {@code ArithmeticException}. */
     private static long toLong(String decimal) {
-        BigInteger value = new BigInteger(decimal);
-        if (value.bitLength() > 63) {
-            throw new IllegalArgumentException("hors de la plage d'un long : " + decimal);
+        return new BigInteger(decimal).longValueExact();
+    }
+
+    /** Vrai si le descripteur contient un u64 que le long de Java ne peut pas représenter. */
+    private static boolean exceedsLong(JsonNode descriptor) {
+        if ("u64".equals(descriptor.path("type").asString(""))
+                && new BigInteger(descriptor.get("value").asString()).bitLength() > 63) {
+            return true;
         }
-        return value.longValue();
+        for (String field : List.of("items", "parts", "fields")) {
+            if (descriptor.has(field)) {
+                for (JsonNode child : descriptor.get(field)) {
+                    if (exceedsLong(child)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static List<JsonNode> children(JsonNode descriptor, String field) {
@@ -89,13 +104,23 @@ class CanonicalVectorsTest {
     @DisplayName("ADR 0006 : chaque cas hors domaine est rejeté")
     Stream<DynamicTest> invalidCases() throws IOException {
         List<DynamicTest> tests = new ArrayList<>();
-        vectors()
-                .get("invalid")
-                .forEach(vector -> tests.add(DynamicTest.dynamicTest(
-                        vector.get("name").asString(),
-                        () -> assertThatThrownBy(() -> encode(vector.get("input")))
-                                .isInstanceOf(IllegalArgumentException.class))));
+        vectors().get("invalid").forEach(vector -> {
+            JsonNode input = vector.get("input");
+            // ADR 0006 : l'encodeur lève CanonicalEncodingException ; un u64 au-delà d'un long n'arrive même
+            // pas jusqu'à lui, la conversion en long le refuse avant.
+            Class<? extends RuntimeException> expected =
+                    exceedsLong(input) ? ArithmeticException.class : CanonicalEncodingException.class;
+            tests.add(DynamicTest.dynamicTest(
+                    vector.get("name").asString(),
+                    () -> assertThatThrownBy(() -> encode(input)).isInstanceOf(expected)));
+        });
         assertThat(tests).isNotEmpty();
         return tests.stream();
+    }
+
+    @Test
+    @DisplayName("MSG-02 : le fichier de vecteurs annonce le format seal-vectors-v1")
+    void msg02VectorsDeclareTheirFormat() throws IOException {
+        assertThat(vectors().get("format").asString()).isEqualTo("seal-vectors-v1");
     }
 }

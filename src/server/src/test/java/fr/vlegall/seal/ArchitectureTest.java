@@ -19,12 +19,14 @@ import java.security.Signature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Règles d'architecture de l'ADR 0001, vérifiées à chaque build. */
+/** Règles d'architecture des ADR 0001 et 0008 (mise à jour d'après NIDO), vérifiées à chaque build. */
 class ArchitectureTest {
+
+    private static final String ROOT = "fr.vlegall.seal";
 
     private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages("fr.vlegall.seal");
+            .importPackages(ROOT);
 
     private static final DescribedPredicate<JavaClass> JCA_PRIMITIVES = resideInAnyPackage(
                     "javax.crypto..", "java.security.spec..", "java.security.interfaces..")
@@ -51,41 +53,79 @@ class ArchitectureTest {
     }
 
     @Test
-    @DisplayName("ADR 0001 : le domaine ignore Spring, JPA et Hibernate")
-    void theDomainIgnoresFrameworks() {
-        noClasses()
-                .that()
-                .resideInAPackage("fr.vlegall.seal..domain..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("org.springframework..", "jakarta.persistence..", "org.hibernate..")
-                .allowEmptyShould(true)
-                .check(CLASSES);
+    @DisplayName("ADR 0008, règles 1 et 2 : couches du domaine et de l'application")
+    void layersPointDownwards() {
+        ContextRules.domainIgnoresFrameworks(ROOT).check(CLASSES);
+        ContextRules.domainDependsOnNothingAbove(ROOT).check(CLASSES);
+        ContextRules.applicationIgnoresInfrastructure(ROOT).check(CLASSES);
     }
 
     @Test
-    @DisplayName("ADR 0001 : le domaine ne dépend ni de l'application ni de l'infrastructure")
-    void theDomainDependsOnNothingAboveIt() {
-        noClasses()
-                .that()
-                .resideInAPackage("fr.vlegall.seal..domain..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("fr.vlegall.seal..application..", "fr.vlegall.seal..infrastructure..")
-                .allowEmptyShould(true)
-                .check(CLASSES);
+    @DisplayName(
+            "ADR 0008, règle 3 : l'application ne dépend de Spring que pour les transactions, par @ApplicationService")
+    void applicationLayerConventions() {
+        ContextRules.applicationUsesSpringOnlyForTransactions(ROOT).check(CLASSES);
+        ContextRules.applicationServicesLiveInHandlers(ROOT).check(CLASSES);
+        ContextRules.handlersAreApplicationServices(ROOT).check(CLASSES);
     }
 
     @Test
-    @DisplayName("ADR 0001 : l'application ne dépend pas de l'infrastructure")
-    void theApplicationDoesNotDependOnInfrastructure() {
-        noClasses()
-                .that()
-                .resideInAPackage("fr.vlegall.seal..application..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("fr.vlegall.seal..infrastructure..")
-                .allowEmptyShould(true)
-                .check(CLASSES);
+    @DisplayName("ADR 0008, règle 4 : ports en interfaces, adaptateurs qui implémentent un port")
+    void portsAndAdapters() {
+        ContextRules.inboundPortsAreInterfaces(ROOT).check(CLASSES);
+        ContextRules.outboundPortsAreInterfaces(ROOT).check(CLASSES);
+        ContextRules.adaptersImplementAnOutboundPort(ROOT).check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("ADR 0008, règles 5 et 6 : couche web et entités JPA")
+    void webAndPersistence() {
+        ContextRules.controllersUseOnlyUseCases(ROOT).check(CLASSES);
+        ContextRules.entitiesResideInPersistenceEntity(ROOT).check(CLASSES);
+        ContextRules.onlyInfrastructureUsesEntities(ROOT).check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("ADR 0008, règle 7 : les contextes ne se parlent que par leurs cas d'usage")
+    void contextsTalkThroughInboundPorts() {
+        ContextRules.contextsTalkThroughInboundPorts(ROOT).check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("ADR 0008, règle 8 : packages transverses indépendants des contextes, crypto en Java pur")
+    void transversePackages() {
+        ContextRules.onlyInfrastructureUsesSecurity(ROOT).check(CLASSES);
+        ContextRules.transversePackagesIgnoreContexts(ROOT).check(CLASSES);
+        ContextRules.cryptoDependsOnlyOnTheJdk(ROOT).check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("ADR 0008, règle 9 : aucun cycle entre packages de premier niveau")
+    void noCycles() {
+        ContextRules.firstLevelPackagesHaveNoCycles(ROOT).check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("ADR 0008, règle 10 : horloge injectée")
+    void clockIsInjected() {
+        ContextRules.clockIsInjected(ROOT).check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("ADR 0008, règle 11 : @ConfigurationProperties dans common")
+    void configurationPropertiesLiveInCommon() {
+        ContextRules.configurationPropertiesLiveInCommon(ROOT).check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("ADR 0008, règle 12 : seul le contexte authentication manipule les mots de passe")
+    void onlyAuthenticationHandlesPasswords() {
+        ContextRules.onlyAuthenticationHandlesPasswords(ROOT).check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("TRN-02, ADR 0008, règle 13 : aucune ouverture CORS")
+    void noCors() {
+        ContextRules.noCors(ROOT).check(CLASSES);
     }
 }

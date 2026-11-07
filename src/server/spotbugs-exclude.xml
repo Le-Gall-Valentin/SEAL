@@ -19,4 +19,40 @@
         <Method name="text"/>
         <Bug pattern="IMPROPER_UNICODE"/>
     </Match>
+
+    <!--
+      SPRING_ENDPOINT n'est pas une faille : FindSecBugs l'émet sur chaque contrôleur pour qu'il soit relu
+      (ADR 0011). Une entrée par contrôleur relu, avec le test qui vérifie son contrôle d'accès (QA-05) ;
+      jamais d'exclusion globale.
+    -->
+    <!-- GET /api/v1/csrf, public par nature (AUTH-60) : CsrfIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.security.web.CsrfController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <!-- /error, dispatch d'erreur du conteneur, sans donnée ni effet (ADR 0011) : CsrfIT.auth60ErrorEndpointIsCsrfProtected. -->
+    <Match>
+        <Class name="fr.vlegall.seal.common.web.ProblemDetailsErrorController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <!--
+      SPRING_CSRF_UNRESTRICTED_REQUEST_MAPPING : /error accepte toutes les méthodes, car le conteneur y renvoie la
+      requête d'origine avec sa méthode. Aucun effet de bord ; le filtre CSRF refuse déjà toute requête non sûre
+      envoyée directement sur /error (CsrfIT). Exclusion limitée à cette classe (ADR 0011).
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.common.web.ProblemDetailsErrorController"/>
+        <Bug pattern="SPRING_CSRF_UNRESTRICTED_REQUEST_MAPPING"/>
+    </Match>
+
+    <!--
+      SERVLET_HEADER_USER_AGENT : l'agent peut être falsifié, et SEAL ne s'en sert pour aucune décision. Il est
+      rangé assaini et tronqué à 512 caractères dans security_events (SEC-20, colonne user_agent du CDC), comme
+      simple indication (ADR 0011). Exclusion limitée à cette méthode.
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.security.journal.SecurityJournal"/>
+        <Method name="userAgent"/>
+        <Bug pattern="SERVLET_HEADER_USER_AGENT"/>
+    </Match>
 </FindBugsFilter>

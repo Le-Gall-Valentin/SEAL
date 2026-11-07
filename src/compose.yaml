@@ -47,6 +47,15 @@ services:
       - ./certs:/certs:ro
       - app-data:/data
     networks: [internal, edge]
+    # ADR 0014 : système de fichiers en lecture seule (Tomcat écrit dans /tmp), aucune capacité Linux, aucune
+    # élévation de privilèges.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 networks:
   internal:

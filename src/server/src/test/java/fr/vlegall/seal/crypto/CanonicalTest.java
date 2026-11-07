@@ -43,7 +43,7 @@ class CanonicalTest {
     }
 
     @Test
-    @DisplayName("bytes copie son entrée : la modifier ensuite ne change pas l'encodage")
+    @DisplayName("MSG-01 : bytes copie son entrée, la modifier ensuite ne change pas l'encodage")
     void bytesCopiesItsInput() {
         byte[] input = {1, 2, 3};
         byte[] encoded = Canonical.bytes(input);
@@ -54,7 +54,7 @@ class CanonicalTest {
     }
 
     @Test
-    @DisplayName("list encode le nombre d'éléments puis chaque élément avec l'encodeur donné")
+    @DisplayName("MSG-01 : list encode le nombre d'éléments puis chaque élément avec l'encodeur donné")
     void listEncodesCountThenEachElement() {
         byte[] encoded = Canonical.list(Canonical::u64, List.of(1L, 2L));
 
@@ -69,7 +69,7 @@ class CanonicalTest {
     }
 
     @Test
-    @DisplayName("Une valeur nulle est refusée, jamais encodée comme vide")
+    @DisplayName("ADR 0006 : une valeur nulle est refusée, jamais encodée comme vide")
     void nullIsRefused() {
         assertThatNullPointerException().isThrownBy(() -> Canonical.bytes(null));
         assertThatNullPointerException().isThrownBy(() -> Canonical.text(null));
