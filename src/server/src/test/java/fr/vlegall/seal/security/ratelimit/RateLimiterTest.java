@@ -1,6 +1,7 @@
 package fr.vlegall.seal.security.ratelimit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.Mockito.mock;
@@ -18,6 +19,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 class RateLimiterTest {
 
@@ -92,17 +94,50 @@ class RateLimiterTest {
     }
 
     @Test
-    @DisplayName("SEC-10 : vérifier une limite ne consomme rien, mais refuse une limite atteinte")
-    void ensureAvailableDoesNotConsume() {
-        for (int i = 0; i < 10; i++) {
-            limiter.ensureAvailable(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob");
-        }
+    @DisplayName("AUTH-22 : un jeton réservé puis rendu après un succès n'est pas compté comme un échec")
+    void auth22RefundGivesBackTheReservedToken() {
         consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob", 5);
 
-        RateLimitExceededException refused =
-                refusal(() -> limiter.ensureAvailable(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob"));
-        assertThat(refused).isNotNull();
-        assertThat(refused.retryAfter()).contains(Duration.ofMinutes(15));
+        limiter.refund(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob");
+
+        assertThatNoException().isThrownBy(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob"));
+        assertThat(refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob")))
+                .isNotNull();
+    }
+
+    @Test
+    @DisplayName("SEC-10 : rendre un jeton ne dépasse jamais la capacité du seau")
+    void refundNeverExceedsCapacity() {
+        limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob");
+        limiter.refund(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob");
+        limiter.refund(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob");
+
+        consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob", 5);
+        assertThat(refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob")))
+                .isNotNull();
+    }
+
+    @Test
+    @DisplayName("SEC-10 : rendre un jeton pour une clé inconnue ne crée aucun seau")
+    void refundOfAnUnknownKeyCreatesNoBucket() {
+        limiter.refund(RateLimit.LOGIN_FAILURES_PER_LOGIN, "inconnu");
+
+        assertThat(limiter.bucketCount()).isZero();
+    }
+
+    @Test
+    @DisplayName(
+            "SEC-10 : le limiteur refuse de tourner dans une transaction, qui garderait une connexion pendant le journal")
+    void limiterRefusesToRunInsideATransaction() {
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob"));
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> limiter.refund(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob"));
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
     }
 
     @Test
