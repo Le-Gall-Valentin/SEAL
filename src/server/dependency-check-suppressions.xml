@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Exemptions d'OWASP Dependency-Check (QA-08). Chacune vise une copie précise par son empreinte
+  SHA-1, nomme ses CVE une à une, dit pourquoi le risque est écarté et expire d'elle-même.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <suppress until="2026-12-22Z">
+        <notes><![CDATA[
+        ADR 0005. httpclient5 5.5.1 recopié dans docker-java-transport-zerodep 3.7.1 (Testcontainers,
+        tests seulement) : ne parle qu'au démon Docker local par socket Unix, sans TLS ; absent du jar
+        livré. Aucune version corrigée de docker-java au 2026-11-07.
+        ]]></notes>
+        <sha1>65c367c5802c3ad030ef79fef924296d8e4990f4</sha1>
+        <cve>CVE-2026-71290</cve>
+        <cve>CVE-2026-64607</cve>
+    </suppress>
+    <suppress until="2026-12-22Z">
+        <notes><![CDATA[
+        ADR 0005. httpcore5 5.3.6 recopié dans docker-java-transport-zerodep 3.7.1 (Testcontainers,
+        tests seulement) : ne parle qu'au démon Docker local par socket Unix ; absent du jar livré.
+        Aucune version corrigée de docker-java au 2026-11-07.
+        ]]></notes>
+        <sha1>6cb5345bd550735be72fd0ece15bd2ca1ed27595</sha1>
+        <cve>CVE-2026-54399</cve>
+        <cve>CVE-2026-54428</cve>
+    </suppress>
+</suppressions>
