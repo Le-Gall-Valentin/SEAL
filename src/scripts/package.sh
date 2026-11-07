@@ -47,7 +47,8 @@ fi
 cp -p README.md presentation.pdf "$stage/chat/"
 
 rm -f projet.zip
-(cd "$stage" && zip -q -r -X "$root/projet.zip" chat)
+# -D : aucune entrée de dossier, seulement des fichiers.
+(cd "$stage" && zip -q -r -X -D "$root/projet.zip" chat)
 
 # Vérification de l'archive avant livraison.
 entries=$(unzip -Z1 projet.zip)
@@ -60,4 +61,4 @@ for required in chat/README.md chat/presentation.pdf chat/src/client/package.jso
   printf '%s\n' "$entries" | grep -qx "$required" || fail "$required manque dans l'archive"
 done
 
-echo "projet.zip créé : $(printf '%s\n' "$entries" | grep -cv '/$') fichiers sous chat/"
+echo "projet.zip créé : $(printf '%s\n' "$entries" | wc -l | tr -d ' ') fichiers sous chat/"
