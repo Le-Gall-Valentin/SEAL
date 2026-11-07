@@ -115,10 +115,14 @@ jobs:
       - uses: ./.github/actions/docker-hub-mirror
 
       # Ce que fait le correcteur en suivant le README : le script, puis docker compose.
+      # Chromium ne lit pas le magasin du système mais sa base NSS (~/.pki/nssdb), qu'il crée à son
+      # premier lancement : absente sur un runner neuf, mkcert ne pourrait pas y installer l'autorité.
       - name: Certificats et secrets
         run: |
           sudo apt-get update
           sudo apt-get install -y mkcert libnss3-tools
+          mkdir -p ~/.pki/nssdb
+          certutil -d "sql:$HOME/.pki/nssdb" -N --empty-password
           ./scripts/gen-certs.sh
 
       - name: Démarrage
