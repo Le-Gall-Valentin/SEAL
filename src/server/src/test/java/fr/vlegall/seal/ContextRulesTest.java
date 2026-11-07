@@ -76,6 +76,7 @@ class ContextRulesTest {
                         ContextRules.onlyAuthenticationHandlesPasswords(ROOT).check(FIXTURES))
                 .isInstanceOf(AssertionError.class)
                 .hasMessageContaining("PasswordAdapter")
+                .hasMessageContaining("Argon2Adapter")
                 .hasMessageNotContaining("HashingAdapter");
         assertThatCode(() ->
                         ContextRules.onlyAuthenticationHandlesPasswords(ROOT).check(only(HashingAdapter.class)))

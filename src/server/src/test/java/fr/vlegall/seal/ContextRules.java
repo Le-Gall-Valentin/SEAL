@@ -76,7 +76,14 @@ final class ContextRules {
                 .resideOutsideOfPackage(root + ".authentication..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("org.springframework.security.crypto.password..")
+                .resideInAnyPackage(
+                        // Interface et délégation, puis chaque famille d'encodeurs : un appel direct à
+                        // Argon2PasswordEncoder ne dépend que de son propre package.
+                        "org.springframework.security.crypto.password..",
+                        "org.springframework.security.crypto.factory..",
+                        "org.springframework.security.crypto.argon2..",
+                        "org.springframework.security.crypto.bcrypt..",
+                        "org.springframework.security.crypto.scrypt..")
                 .allowEmptyShould(true);
     }
 
