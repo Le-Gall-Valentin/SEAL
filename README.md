@@ -50,8 +50,10 @@ docker compose up --build
 ```
 
 `gen-certs` installe l'autorité locale de mkcert (une demande de mot de passe administrateur est
-possible), crée le certificat dans `certs/`, puis crée `.env` et y génère les secrets. Le premier
-lancement télécharge les images et compile SEAL, ce qui prend quelques minutes.
+possible), crée le certificat dans `certs/`, puis crée `.env` et y génère les secrets. Sous Linux,
+il crée au besoin la base de certificats de Chrome (`~/.pki/nssdb`). Si le navigateur était ouvert,
+redémarrez-le pour qu'il reconnaisse le certificat. Le premier lancement télécharge les images et
+compile SEAL, ce qui prend quelques minutes.
 
 Ouvrez ensuite :
 

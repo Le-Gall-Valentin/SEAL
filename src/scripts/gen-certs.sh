@@ -13,6 +13,15 @@ if ! command -v mkcert >/dev/null 2>&1; then
   exit 1
 fi
 
+# Sous Linux, Chrome et Chromium ne lisent pas le magasin du système mais leur base NSS
+# (~/.pki/nssdb), créée à leur premier lancement : sans elle, mkcert ne peut pas y installer
+# l'autorité et le navigateur refuse le certificat. On la crée si elle manque (ADR 0004).
+if [ "$(uname -s)" = Linux ] && [ ! -d "$HOME/.pki/nssdb" ] && command -v certutil >/dev/null 2>&1; then
+  mkdir -p "$HOME/.pki/nssdb"
+  certutil -d "sql:$HOME/.pki/nssdb" -N --empty-password
+  echo "Base de certificats de Chrome créée : ~/.pki/nssdb"
+fi
+
 mkdir -p certs
 mkcert -install
 mkcert -cert-file certs/localhost.pem -key-file certs/localhost-key.pem localhost 127.0.0.1 ::1
