@@ -1,7 +1,9 @@
 package fr.vlegall.seal.security;
 
 import fr.vlegall.seal.common.SealProperties;
+import fr.vlegall.seal.security.session.AbsoluteSessionTimeoutFilter;
 import fr.vlegall.seal.security.web.ProblemDetailsSecurityHandler;
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -10,6 +12,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy;
 import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
@@ -33,7 +36,7 @@ class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(
-            HttpSecurity http, SealProperties seal, ProblemDetailsSecurityHandler problemDetails) {
+            HttpSecurity http, SealProperties seal, ProblemDetailsSecurityHandler problemDetails, Clock clock) {
         http.authorizeHttpRequests(requests -> requests
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
@@ -58,6 +61,8 @@ class SecurityConfig {
                 .requestCache(RequestCacheConfigurer::disable)
                 // A01 : pas de /logout implicite ; la déconnexion sera POST /api/v1/auth/logout (AUTH-53).
                 .logout(LogoutConfigurer::disable)
+                // AUTH-52 : la session de plus de 12 heures est invalidée avant de charger le contexte de sécurité.
+                .addFilterBefore(new AbsoluteSessionTimeoutFilter(clock), SecurityContextHolderFilter.class)
                 .headers(headers -> headers.contentSecurityPolicy(
                                 csp -> csp.policyDirectives(contentSecurityPolicy(seal)))
                         // TRN-03 : sans includeSubDomains, pour ne pas imposer HTTPS aux autres services locaux.

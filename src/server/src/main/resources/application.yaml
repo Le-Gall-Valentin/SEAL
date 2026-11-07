@@ -20,6 +20,13 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration
+  session:
+    # AUTH-52 : 30 minutes d'inactivité, appliquées que le serveur soit embarqué ou non ; la limite de 12 heures est
+    # celle d'AbsoluteSessionTimeoutFilter. Le cookie (AUTH-51) est fixé par SessionCookieConfiguration.
+    timeout: 30m
+    jdbc:
+      # Tables créées par Flyway (V1__schema_initial.sql), jamais par Spring Session.
+      initialize-schema: never
   jackson:
     deserialization:
       # Section 14 du CDC : aucun champ inconnu accepté dans une requête.

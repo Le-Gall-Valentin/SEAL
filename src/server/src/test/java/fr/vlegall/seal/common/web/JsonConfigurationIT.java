@@ -2,19 +2,14 @@ package fr.vlegall.seal.common.web;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-import fr.vlegall.seal.TestcontainersConfiguration;
+import fr.vlegall.seal.support.SealIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import tools.jackson.databind.json.JsonMapper;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Import(TestcontainersConfiguration.class)
+@SealIntegrationTest
 class JsonConfigurationIT {
 
     @Autowired
