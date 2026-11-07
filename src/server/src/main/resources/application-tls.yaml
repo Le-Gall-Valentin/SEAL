@@ -1,0 +1,17 @@
+# TRN-01 : TLS 1.3 uniquement, certificat mkcert chargé par un SSL bundle PEM.
+# Chemins par défaut : src/certs/ vu depuis src/server/ ; docker compose les remplace par /certs/.
+server:
+  ssl:
+    bundle: seal-tls
+
+spring:
+  ssl:
+    bundle:
+      pem:
+        seal-tls:
+          keystore:
+            certificate: ${SEAL_TLS_CERTIFICATE:file:../certs/localhost.pem}
+            private-key: ${SEAL_TLS_PRIVATE_KEY:file:../certs/localhost-key.pem}
+          options:
+            # Avec un bundle, Spring Boot ignore server.ssl.enabled-protocols : le protocole se fixe ici.
+            enabled-protocols: TLSv1.3
