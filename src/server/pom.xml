@@ -129,6 +129,8 @@
         <configuration>
           <showDeprecation>true</showDeprecation>
           <showWarnings>true</showWarnings>
+          <!-- ADR 0014 : tout avertissement de -Xlint fait échouer la build. -->
+          <failOnWarning>true</failOnWarning>
           <compilerArgs>
             <arg>-Xlint:all,-processing,-serial</arg>
           </compilerArgs>

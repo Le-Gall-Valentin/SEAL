@@ -21,19 +21,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 public final class AbsoluteSessionTimeoutFilter extends OncePerRequestFilter {
 
-    public static final Duration MAX_AGE = Duration.ofHours(12);
-
     private final Clock clock;
+    private final Duration maxAge;
 
-    public AbsoluteSessionTimeoutFilter(Clock clock) {
+    /** @param maxAge durée de vie maximale d'une session, {@code seal.session.absolute-timeout} (12 heures) */
+    public AbsoluteSessionTimeoutFilter(Clock clock, Duration maxAge) {
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.maxAge = Objects.requireNonNull(maxAge, "maxAge");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         HttpSession session = request.getSession(false);
-        if (session != null && clock.millis() - session.getCreationTime() >= MAX_AGE.toMillis()) {
+        if (session != null && clock.millis() - session.getCreationTime() >= maxAge.toMillis()) {
             session.invalidate();
         }
         chain.doFilter(request, response);

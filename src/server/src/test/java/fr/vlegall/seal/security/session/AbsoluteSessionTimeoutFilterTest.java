@@ -22,7 +22,8 @@ class AbsoluteSessionTimeoutFilterTest {
         request.setSession(session);
         MutableClock clock = MutableClock.fixedAt(Instant.ofEpochMilli(session.getCreationTime()));
         clock.advance(age);
-        new AbsoluteSessionTimeoutFilter(clock).doFilter(request, new MockHttpServletResponse(), chain);
+        new AbsoluteSessionTimeoutFilter(clock, Duration.ofHours(12))
+                .doFilter(request, new MockHttpServletResponse(), chain);
     }
 
     @Test
@@ -46,7 +47,7 @@ class AbsoluteSessionTimeoutFilterTest {
     @Test
     @DisplayName("AUTH-52 : une requête sans session traverse le filtre sans en créer")
     void requestWithoutSessionIsUntouched() throws Exception {
-        new AbsoluteSessionTimeoutFilter(MutableClock.fixedAt(Instant.EPOCH))
+        new AbsoluteSessionTimeoutFilter(MutableClock.fixedAt(Instant.EPOCH), Duration.ofHours(12))
                 .doFilter(request, new MockHttpServletResponse(), chain);
 
         assertThat(request.getSession(false)).isNull();

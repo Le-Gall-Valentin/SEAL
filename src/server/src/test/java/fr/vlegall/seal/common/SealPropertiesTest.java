@@ -14,24 +14,35 @@ import org.junit.jupiter.params.provider.ValueSource;
 class SealPropertiesTest {
 
     private static final SealProperties.Security SECURITY = new SealProperties.Security(Duration.ofSeconds(300));
+    private static final SealProperties.Session SESSION = new SealProperties.Session(Duration.ofHours(12));
 
     @Test
     @DisplayName("TRN-02 : l'origine WebSocket dérive de l'origine HTTPS unique")
     void trn02WebSocketOriginDerivesFromTheHttpsOrigin() {
-        SealProperties properties = new SealProperties(URI.create("https://localhost:8443"), SECURITY);
+        SealProperties properties = new SealProperties(URI.create("https://localhost:8443"), SECURITY, SESSION);
 
         assertThat(properties.webSocketOrigin()).isEqualTo("wss://localhost:8443");
     }
 
     @ParameterizedTest
     @ValueSource(
-            strings = {"http://localhost:8443", "https://localhost:8443/app", "https://localhost:8443?x=1", "localhost"
+            strings = {
+                "http://localhost:8443",
+                "https://localhost:8443/app",
+                "https://localhost:8443/",
+                "https://localhost:8443?x=1",
+                "https://localhost:8443#fragment",
+                "https://u:p@localhost:8443",
+                "https://LOCALHOST:8443",
+                "https://localhost:443",
+                "https:opaque",
+                "localhost"
             })
-    @DisplayName("TRN-02 : seule une origine https sans chemin est acceptée")
+    @DisplayName("TRN-02 : seule une origine https canonique, sans chemin ni identifiants, est acceptée")
     void trn02RejectsAnythingButABareHttpsOrigin(String origin) {
         URI uri = URI.create(origin);
 
-        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties(uri, SECURITY));
+        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties(uri, SECURITY, SESSION));
     }
 
     @Test
@@ -42,12 +53,21 @@ class SealPropertiesTest {
     }
 
     @Test
-    @DisplayName("Les paramètres obligatoires manquants empêchent le démarrage")
+    @DisplayName("TRN-02, TRN-03, AUTH-52 : les paramètres obligatoires manquants empêchent le démarrage")
     void missingSettingsPreventStartup() {
         URI origin = URI.create("https://localhost:8443");
 
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties(null, SECURITY));
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, null));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(null, SECURITY, SESSION));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, null, SESSION));
         assertThatNullPointerException().isThrownBy(() -> new SealProperties.Security(null));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, null));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties.Session(null));
+    }
+
+    @Test
+    @DisplayName("AUTH-52 : la durée de vie absolue d'une session doit être positive")
+    void auth52RejectsANonPositiveAbsoluteTimeout() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties.Session(Duration.ZERO));
+        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties.Session(Duration.ofHours(-1)));
     }
 }

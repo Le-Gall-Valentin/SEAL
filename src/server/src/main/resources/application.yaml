@@ -75,3 +75,6 @@ seal:
   security:
     # TRN-03 : valeur du profil demo, surchargée par application-prod.yaml.
     hsts-max-age: 300s
+  session:
+    # AUTH-52 : une session expire 12 heures après sa création, même active (AbsoluteSessionTimeoutFilter).
+    absolute-timeout: 12h

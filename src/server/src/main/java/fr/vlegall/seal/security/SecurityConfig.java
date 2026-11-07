@@ -75,7 +75,9 @@ class SecurityConfig {
                 // A01 : pas de /logout implicite ; la déconnexion sera POST /api/v1/auth/logout (AUTH-53).
                 .logout(LogoutConfigurer::disable)
                 // AUTH-52 : la session de plus de 12 heures est invalidée avant de charger le contexte de sécurité.
-                .addFilterBefore(new AbsoluteSessionTimeoutFilter(clock), SecurityContextHolderFilter.class)
+                .addFilterBefore(
+                        new AbsoluteSessionTimeoutFilter(clock, seal.session().absoluteTimeout()),
+                        SecurityContextHolderFilter.class)
                 .headers(headers -> headers.contentSecurityPolicy(
                                 csp -> csp.policyDirectives(contentSecurityPolicy(seal)))
                         // TRN-03 : sans includeSubDomains, pour ne pas imposer HTTPS aux autres services locaux.
