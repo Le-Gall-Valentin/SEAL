@@ -19,4 +19,15 @@
         <Method name="text"/>
         <Bug pattern="IMPROPER_UNICODE"/>
     </Match>
+
+    <!--
+      SPRING_ENDPOINT n'est pas une faille : FindSecBugs l'émet sur chaque contrôleur pour qu'il soit relu
+      (ADR 0011). Une entrée par contrôleur relu, avec le test qui vérifie son contrôle d'accès (QA-05) ;
+      jamais d'exclusion globale.
+    -->
+    <!-- GET /api/v1/csrf, public par nature (AUTH-60) : CsrfIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.security.web.CsrfController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
 </FindBugsFilter>

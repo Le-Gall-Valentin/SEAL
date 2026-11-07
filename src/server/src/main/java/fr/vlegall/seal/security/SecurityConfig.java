@@ -1,11 +1,14 @@
 package fr.vlegall.seal.security;
 
 import fr.vlegall.seal.common.SealProperties;
+import fr.vlegall.seal.security.web.ProblemDetailsSecurityHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
+import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy;
 import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
@@ -29,10 +32,14 @@ class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, SealProperties seal) {
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http, SealProperties seal, ProblemDetailsSecurityHandler problemDetails) {
         http.authorizeHttpRequests(requests -> requests
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
+                        .permitAll()
+                        // AUTH-60 : jeton CSRF rechargé par le client.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/csrf")
                         .permitAll()
                         .requestMatchers("/error")
                         .permitAll()
@@ -41,6 +48,16 @@ class SecurityConfig {
                         .permitAll()
                         .anyRequest()
                         .denyAll())
+                // AUTH-60 : cookie XSRF-TOKEN lisible par le client, renvoyé dans l'en-tête X-XSRF-TOKEN.
+                .csrf(csrf -> csrf.spa())
+                // QA-05 : 401 sans session, 403 sans jeton CSRF ou sans droit, en Problem Details.
+                .exceptionHandling(exceptions ->
+                        exceptions.authenticationEntryPoint(problemDetails).accessDeniedHandler(problemDetails))
+                // Une requête anonyme refusée ne doit pas créer de session pour mémoriser son URL : sinon n'importe
+                // qui remplirait la table des sessions.
+                .requestCache(RequestCacheConfigurer::disable)
+                // A01 : pas de /logout implicite ; la déconnexion sera POST /api/v1/auth/logout (AUTH-53).
+                .logout(LogoutConfigurer::disable)
                 .headers(headers -> headers.contentSecurityPolicy(
                                 csp -> csp.policyDirectives(contentSecurityPolicy(seal)))
                         // TRN-03 : sans includeSubDomains, pour ne pas imposer HTTPS aux autres services locaux.

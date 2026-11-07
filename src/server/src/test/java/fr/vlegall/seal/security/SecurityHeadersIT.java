@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import fr.vlegall.seal.TestcontainersConfiguration;
@@ -55,14 +56,19 @@ class SecurityHeadersIT {
     @Test
     @DisplayName("TRN-20 : une réponse refusée porte aussi les en-têtes")
     void trn20RefusedResponseCarriesTheSecurityHeaders() throws Exception {
-        expectSecurityHeaders(mvc.perform(get("/api/v1/unknown").secure(true)).andExpect(status().isForbidden()));
+        expectSecurityHeaders(mvc.perform(get("/api/v1/unknown").secure(true)).andExpect(status().isUnauthorized()));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"/api/v1/unknown", "/actuator/env", "/ws"})
-    @DisplayName("A01 : toute route non ouverte explicitement est refusée")
+    @DisplayName(
+            "A01, QA-05 : toute route non ouverte explicitement est refusée, 401 sans session, 403 sans jeton CSRF")
     void everyRouteNotExplicitlyOpenedIsDenied(String path) throws Exception {
-        mvc.perform(get(path).secure(true)).andExpect(status().isForbidden());
-        mvc.perform(post(path).secure(true)).andExpect(status().isForbidden());
+        mvc.perform(get(path).secure(true))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        mvc.perform(post(path).secure(true))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 }
