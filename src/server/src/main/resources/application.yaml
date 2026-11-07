@@ -20,6 +20,10 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration
+  jackson:
+    deserialization:
+      # Section 14 du CDC : aucun champ inconnu accepté dans une requête.
+      fail-on-unknown-properties: true
 
 server:
   # TRN-02 : origine unique https://localhost:8443 pour le client, l'API et la WebSocket.
