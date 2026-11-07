@@ -30,3 +30,6 @@ projet.zip
 .DS_Store
 Thumbs.db
 *.log
+
+# Python
+__pycache__/

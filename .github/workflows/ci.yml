@@ -35,6 +35,19 @@ jobs:
       # Tests unitaires et d'intégration (Testcontainers), Spotless, SpotBugs, JaCoCo, ArchUnit.
       - run: ./mvnw -B verify
 
+  protocol:
+    name: Protocole (vecteurs à jour)
+    runs-on: ubuntu-26.04
+    defaults:
+      run:
+        working-directory: src/protocol
+    steps:
+      - uses: actions/checkout@v7
+
+      # MSG-02, ADR 0006 : les vecteurs relus par Java et TypeScript sont exactement ceux que produit
+      # le générateur Python indépendant.
+      - run: python3 tools/gen_vectors.py --check
+
   client:
     name: Client (lint, tests, audit)
     runs-on: ubuntu-26.04

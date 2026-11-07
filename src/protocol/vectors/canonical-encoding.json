@@ -1,0 +1,674 @@
+{
+  "format": "seal-vectors-v1",
+  "subject": "Encodage canonique : PROTOCOL.md, section 2 (MSG-01, MSG-02, ADR 0006)",
+  "generator": "src/protocol/tools/gen_vectors.py",
+  "valid": [
+    {
+      "name": "u8 : z\u00e9ro",
+      "input": {
+        "type": "u8",
+        "value": 0
+      },
+      "expected": "AA"
+    },
+    {
+      "name": "u8 : maximum 255",
+      "input": {
+        "type": "u8",
+        "value": 255
+      },
+      "expected": "_w"
+    },
+    {
+      "name": "u32 : z\u00e9ro",
+      "input": {
+        "type": "u32",
+        "value": 0
+      },
+      "expected": "AAAAAA"
+    },
+    {
+      "name": "u32 : gros-boutiste",
+      "input": {
+        "type": "u32",
+        "value": 16909060
+      },
+      "expected": "AQIDBA"
+    },
+    {
+      "name": "u32 : maximum 2^32-1",
+      "input": {
+        "type": "u32",
+        "value": 4294967295
+      },
+      "expected": "_____w"
+    },
+    {
+      "name": "u64 : z\u00e9ro",
+      "input": {
+        "type": "u64",
+        "value": "0"
+      },
+      "expected": "AAAAAAAAAAA"
+    },
+    {
+      "name": "u64 : millisecondes Unix, gros-boutiste",
+      "input": {
+        "type": "u64",
+        "value": "1794009600000"
+      },
+      "expected": "AAABobNOEAA"
+    },
+    {
+      "name": "u64 : au-del\u00e0 de 2^53, hors de port\u00e9e d'un number",
+      "input": {
+        "type": "u64",
+        "value": "9007199254740993"
+      },
+      "expected": "ACAAAAAAAAE"
+    },
+    {
+      "name": "u64 : maximum 2^63-1",
+      "input": {
+        "type": "u64",
+        "value": "9223372036854775807"
+      },
+      "expected": "f_________8"
+    },
+    {
+      "name": "bytes : vide",
+      "input": {
+        "type": "bytes",
+        "value": ""
+      },
+      "expected": "AAAAAA"
+    },
+    {
+      "name": "bytes : un octet nul",
+      "input": {
+        "type": "bytes",
+        "value": "AA"
+      },
+      "expected": "AAAAAQA"
+    },
+    {
+      "name": "bytes : longueur de 300, sur deux octets du pr\u00e9fixe",
+      "input": {
+        "type": "bytes",
+        "value": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn-AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq-wsbKztLW2t7i5uru8vb6_wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t_g4eLj5OXm5-jp6uvs7e7v8PHy8_T19vf4-fr7_P3-_wABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicoKSor"
+      },
+      "expected": "AAABLAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj9AQUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2BhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5_gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp-goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2-v8DBwsPExcbHyMnKy8zNzs_Q0dLT1NXW19jZ2tvc3d7f4OHi4-Tl5ufo6err7O3u7_Dx8vP09fb3-Pn6-_z9_v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKw"
+    },
+    {
+      "name": "text : vide",
+      "input": {
+        "type": "text",
+        "value": ""
+      },
+      "expected": "AAAAAA"
+    },
+    {
+      "name": "text : ASCII",
+      "input": {
+        "type": "text",
+        "value": "SEAL"
+      },
+      "expected": "AAAABFNFQUw"
+    },
+    {
+      "name": "text : \u00e9 pr\u00e9compos\u00e9",
+      "input": {
+        "type": "text",
+        "value": "\u00e9"
+      },
+      "expected": "AAAAAsOp"
+    },
+    {
+      "name": "text : e + accent combinant, normalis\u00e9 en \u00e9 pr\u00e9compos\u00e9",
+      "input": {
+        "type": "text",
+        "value": "e\u0301"
+      },
+      "expected": "AAAAAsOp"
+    },
+    {
+      "name": "text : signe \u00e5ngstr\u00f6m U+212B, normalis\u00e9 en \u00c5 U+00C5",
+      "input": {
+        "type": "text",
+        "value": "\u212b"
+      },
+      "expected": "AAAAAsOF"
+    },
+    {
+      "name": "text : jamos hangeul compos\u00e9s en une syllabe",
+      "input": {
+        "type": "text",
+        "value": "\u1100\u1161"
+      },
+      "expected": "AAAAA-qwgA"
+    },
+    {
+      "name": "text : ligature \ufb01 conserv\u00e9e (NFC, pas NFKC)",
+      "input": {
+        "type": "text",
+        "value": "\ufb01"
+      },
+      "expected": "AAAAA--sgQ"
+    },
+    {
+      "name": "text : phoque U+1F9AD, quatre octets UTF-8",
+      "input": {
+        "type": "text",
+        "value": "\ud83e\uddad"
+      },
+      "expected": "AAAABPCfpq0"
+    },
+    {
+      "name": "uuid : minuscules",
+      "input": {
+        "type": "uuid",
+        "value": "0192f7a2-3c4d-7e5f-8a6b-1c2d3e4f5a6b"
+      },
+      "expected": "AZL3ojxNfl-KaxwtPk9aaw"
+    },
+    {
+      "name": "uuid : majuscules, m\u00eames octets",
+      "input": {
+        "type": "uuid",
+        "value": "0192F7A2-3C4D-7E5F-8A6B-1C2D3E4F5A6B"
+      },
+      "expected": "AZL3ojxNfl-KaxwtPk9aaw"
+    },
+    {
+      "name": "uuid : nul",
+      "input": {
+        "type": "uuid",
+        "value": "00000000-0000-0000-0000-000000000000"
+      },
+      "expected": "AAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "name": "uuid : maximal",
+      "input": {
+        "type": "uuid",
+        "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+      },
+      "expected": "_____________________w"
+    },
+    {
+      "name": "list : vide",
+      "input": {
+        "type": "list",
+        "items": []
+      },
+      "expected": "AAAAAA"
+    },
+    {
+      "name": "list : deux uuid",
+      "input": {
+        "type": "list",
+        "items": [
+          {
+            "type": "uuid",
+            "value": "0192f7a1-ffff-7000-8000-000000000b0b"
+          },
+          {
+            "type": "uuid",
+            "value": "0192f7a1-ffff-7000-8000-00000000a11c"
+          }
+        ]
+      },
+      "expected": "AAAAAgGS96H__3AAgAAAAAAACwsBkveh__9wAIAAAAAAAKEc"
+    },
+    {
+      "name": "list : u64",
+      "input": {
+        "type": "list",
+        "items": [
+          {
+            "type": "u64",
+            "value": "1"
+          },
+          {
+            "type": "u64",
+            "value": "2"
+          },
+          {
+            "type": "u64",
+            "value": "3"
+          }
+        ]
+      },
+      "expected": "AAAAAwAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAw"
+    },
+    {
+      "name": "list : textes",
+      "input": {
+        "type": "list",
+        "items": [
+          {
+            "type": "text",
+            "value": "a"
+          },
+          {
+            "type": "text",
+            "value": ""
+          },
+          {
+            "type": "text",
+            "value": "e\u0301"
+          }
+        ]
+      },
+      "expected": "AAAAAwAAAAFhAAAAAAAAAALDqQ"
+    },
+    {
+      "name": "list : \u00e9l\u00e9ments compos\u00e9s, comme une entr\u00e9e de liste de r\u00e9vocation",
+      "input": {
+        "type": "list",
+        "items": [
+          {
+            "type": "concat",
+            "parts": [
+              {
+                "type": "bytes",
+                "value": "EBESExQVFhcYGRobHB0eHw"
+              },
+              {
+                "type": "u64",
+                "value": "1794009600000"
+              },
+              {
+                "type": "u8",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "expected": "AAAAAQAAABAQERITFBUWFxgZGhscHR4fAAABobNOEAAB"
+    },
+    {
+      "name": "concat : vide",
+      "input": {
+        "type": "concat",
+        "parts": []
+      },
+      "expected": ""
+    },
+    {
+      "name": "struct : \u00e9tiquette seule",
+      "input": {
+        "type": "struct",
+        "label": "SEAL-test-v1",
+        "fields": []
+      },
+      "expected": "AAAADFNFQUwtdGVzdC12MQ"
+    },
+    {
+      "name": "struct : tous les types, dans l'ordre",
+      "input": {
+        "type": "struct",
+        "label": "SEAL-test-v1",
+        "fields": [
+          {
+            "type": "u8",
+            "value": 1
+          },
+          {
+            "type": "u32",
+            "value": 2
+          },
+          {
+            "type": "u64",
+            "value": "3"
+          },
+          {
+            "type": "bytes",
+            "value": "BA"
+          },
+          {
+            "type": "text",
+            "value": "cinq"
+          },
+          {
+            "type": "uuid",
+            "value": "0192f7a2-3c4d-7e5f-8a6b-1c2d3e4f5a6b"
+          },
+          {
+            "type": "list",
+            "items": [
+              {
+                "type": "uuid",
+                "value": "0192f7a1-ffff-7000-8000-00000000a11c"
+              }
+            ]
+          },
+          {
+            "type": "bytes",
+            "value": ""
+          }
+        ]
+      },
+      "expected": "AAAADFNFQUwtdGVzdC12MQEAAAACAAAAAAAAAAMAAAABBAAAAARjaW5xAZL3ojxNfl-KaxwtPk9aawAAAAEBkveh__9wAIAAAAAAAKEcAAAAAA"
+    },
+    {
+      "name": "struct : forme de l'AAD d'un message (section 7.3)",
+      "input": {
+        "type": "struct",
+        "label": "SEAL-aad-v1",
+        "fields": [
+          {
+            "type": "u8",
+            "value": 1
+          },
+          {
+            "type": "text",
+            "value": "SEAL1-X25519-A256GCM-ED25519"
+          },
+          {
+            "type": "uuid",
+            "value": "0192f7a2-3c4d-7e5f-8a6b-1c2d3e4f5a6b"
+          },
+          {
+            "type": "uuid",
+            "value": "0192f7a2-0000-7abc-9def-000000000001"
+          },
+          {
+            "type": "uuid",
+            "value": "0192f7a1-ffff-7000-8000-00000000a11c"
+          },
+          {
+            "type": "bytes",
+            "value": "EBESExQVFhcYGRobHB0eHw"
+          }
+        ]
+      },
+      "expected": "AAAAC1NFQUwtYWFkLXYxAQAAABxTRUFMMS1YMjU1MTktQTI1NkdDTS1FRDI1NTE5AZL3ojxNfl-KaxwtPk9aawGS96IAAHq8ne8AAAAAAAEBkveh__9wAIAAAAAAAKEcAAAAEBAREhMUFRYXGBkaGxwdHh8"
+    },
+    {
+      "name": "struct : forme de l'enveloppe hach\u00e9e, avec une liste d'encapsulations (section 9)",
+      "input": {
+        "type": "struct",
+        "label": "SEAL-env-v1",
+        "fields": [
+          {
+            "type": "u8",
+            "value": 1
+          },
+          {
+            "type": "text",
+            "value": "SEAL1-X25519-A256GCM-ED25519"
+          },
+          {
+            "type": "uuid",
+            "value": "0192f7a2-3c4d-7e5f-8a6b-1c2d3e4f5a6b"
+          },
+          {
+            "type": "uuid",
+            "value": "0192f7a2-0000-7abc-9def-000000000001"
+          },
+          {
+            "type": "uuid",
+            "value": "0192f7a1-ffff-7000-8000-00000000a11c"
+          },
+          {
+            "type": "bytes",
+            "value": "EBESExQVFhcYGRobHB0eHw"
+          },
+          {
+            "type": "bytes",
+            "value": "AAAAAAAAAAAAAAAA"
+          },
+          {
+            "type": "bytes",
+            "value": "Y2hpZmZyZQ"
+          },
+          {
+            "type": "list",
+            "items": [
+              {
+                "type": "concat",
+                "parts": [
+                  {
+                    "type": "uuid",
+                    "value": "0192f7a1-ffff-7000-8000-000000000b0b"
+                  },
+                  {
+                    "type": "bytes",
+                    "value": "AAAAAAAAAAAAAAAAAAAAAA"
+                  },
+                  {
+                    "type": "bytes",
+                    "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  },
+                  {
+                    "type": "bytes",
+                    "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+                ]
+              },
+              {
+                "type": "concat",
+                "parts": [
+                  {
+                    "type": "uuid",
+                    "value": "0192f7a1-ffff-7000-8000-00000000a11c"
+                  },
+                  {
+                    "type": "bytes",
+                    "value": "AAAAAAAAAAAAAAAAAAAAAA"
+                  },
+                  {
+                    "type": "bytes",
+                    "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  },
+                  {
+                    "type": "bytes",
+                    "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": "AAAAC1NFQUwtZW52LXYxAQAAABxTRUFMMS1YMjU1MTktQTI1NkdDTS1FRDI1NTE5AZL3ojxNfl-KaxwtPk9aawGS96IAAHq8ne8AAAAAAAEBkveh__9wAIAAAAAAAKEcAAAAEBAREhMUFRYXGBkaGxwdHh8AAAAMAAAAAAAAAAAAAAAAAAAAB2NoaWZmcmUAAAACAZL3of__cACAAAAAAAALCwAAABAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGS96H__3AAgAAAAAAAoRwAAAAQAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "u8 : n\u00e9gatif",
+      "input": {
+        "type": "u8",
+        "value": -1
+      },
+      "reason": "u8 hors de 0..255"
+    },
+    {
+      "name": "u8 : 256",
+      "input": {
+        "type": "u8",
+        "value": 256
+      },
+      "reason": "u8 hors de 0..255"
+    },
+    {
+      "name": "u32 : n\u00e9gatif",
+      "input": {
+        "type": "u32",
+        "value": -1
+      },
+      "reason": "u32 hors de 0..2^32-1"
+    },
+    {
+      "name": "u32 : 2^32",
+      "input": {
+        "type": "u32",
+        "value": 4294967296
+      },
+      "reason": "u32 hors de 0..2^32-1"
+    },
+    {
+      "name": "u64 : n\u00e9gatif",
+      "input": {
+        "type": "u64",
+        "value": "-1"
+      },
+      "reason": "u64 hors de 0..2^63-1"
+    },
+    {
+      "name": "u64 : 2^63, hors du long de Java",
+      "input": {
+        "type": "u64",
+        "value": "9223372036854775808"
+      },
+      "reason": "u64 hors de 0..2^63-1"
+    },
+    {
+      "name": "u64 : 2^64-1",
+      "input": {
+        "type": "u64",
+        "value": "18446744073709551615"
+      },
+      "reason": "u64 hors de 0..2^63-1"
+    },
+    {
+      "name": "text : demi-caract\u00e8re haut isol\u00e9",
+      "input": {
+        "type": "text",
+        "value": "a\ud800b"
+      },
+      "reason": "demi-caract\u00e8re Unicode isol\u00e9"
+    },
+    {
+      "name": "text : demi-caract\u00e8re bas isol\u00e9",
+      "input": {
+        "type": "text",
+        "value": "\udc00"
+      },
+      "reason": "demi-caract\u00e8re Unicode isol\u00e9"
+    },
+    {
+      "name": "text : paire invers\u00e9e",
+      "input": {
+        "type": "text",
+        "value": "\udc00\ud800"
+      },
+      "reason": "demi-caract\u00e8re Unicode isol\u00e9"
+    },
+    {
+      "name": "uuid : vide",
+      "input": {
+        "type": "uuid",
+        "value": ""
+      },
+      "reason": "UUID hors de la forme 8-4-4-4-12"
+    },
+    {
+      "name": "uuid : sans tirets",
+      "input": {
+        "type": "uuid",
+        "value": "0192f7a23c4d7e5f8a6b1c2d3e4f5a6b"
+      },
+      "reason": "UUID hors de la forme 8-4-4-4-12"
+    },
+    {
+      "name": "uuid : entre accolades",
+      "input": {
+        "type": "uuid",
+        "value": "{0192f7a2-3c4d-7e5f-8a6b-1c2d3e4f5a6b}"
+      },
+      "reason": "UUID hors de la forme 8-4-4-4-12"
+    },
+    {
+      "name": "uuid : pr\u00e9fixe urn:uuid:",
+      "input": {
+        "type": "uuid",
+        "value": "urn:uuid:0192f7a2-3c4d-7e5f-8a6b-1c2d3e4f5a6b"
+      },
+      "reason": "UUID hors de la forme 8-4-4-4-12"
+    },
+    {
+      "name": "uuid : caract\u00e8re non hexad\u00e9cimal",
+      "input": {
+        "type": "uuid",
+        "value": "0192f7a2-3c4d-7e5f-8a6b-1c2d3e4f5a6g"
+      },
+      "reason": "UUID hors de la forme 8-4-4-4-12"
+    },
+    {
+      "name": "uuid : tiret d\u00e9plac\u00e9",
+      "input": {
+        "type": "uuid",
+        "value": "0192f7a23-c4d-7e5f-8a6b-1c2d3e4f5a6b"
+      },
+      "reason": "UUID hors de la forme 8-4-4-4-12"
+    },
+    {
+      "name": "uuid : groupes raccourcis accept\u00e9s par UUID.fromString",
+      "input": {
+        "type": "uuid",
+        "value": "1-2-3-4-5"
+      },
+      "reason": "UUID hors de la forme 8-4-4-4-12"
+    },
+    {
+      "name": "uuid : trop long",
+      "input": {
+        "type": "uuid",
+        "value": "0192f7a2-3c4d-7e5f-8a6b-1c2d3e4f5a6b0"
+      },
+      "reason": "UUID hors de la forme 8-4-4-4-12"
+    },
+    {
+      "name": "struct : \u00e9tiquette vide",
+      "input": {
+        "type": "struct",
+        "label": "",
+        "fields": [
+          {
+            "type": "u8",
+            "value": 1
+          }
+        ]
+      },
+      "reason": "\u00e9tiquette vide"
+    },
+    {
+      "name": "list : un \u00e9l\u00e9ment invalide rejette toute la liste",
+      "input": {
+        "type": "list",
+        "items": [
+          {
+            "type": "uuid",
+            "value": "0192f7a1-ffff-7000-8000-00000000a11c"
+          },
+          {
+            "type": "uuid",
+            "value": "pas-un-uuid"
+          }
+        ]
+      },
+      "reason": "UUID hors de la forme 8-4-4-4-12"
+    },
+    {
+      "name": "struct : un champ invalide rejette toute la structure",
+      "input": {
+        "type": "struct",
+        "label": "SEAL-test-v1",
+        "fields": [
+          {
+            "type": "u8",
+            "value": 1
+          },
+          {
+            "type": "text",
+            "value": "\ud800"
+          }
+        ]
+      },
+      "reason": "demi-caract\u00e8re Unicode isol\u00e9"
+    }
+  ]
+}

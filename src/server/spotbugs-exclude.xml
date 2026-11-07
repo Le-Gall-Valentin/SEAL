@@ -7,4 +7,16 @@
         xmlns="https://github.com/spotbugs/filter/3.0.0"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/3.1.0/spotbugs/etc/findbugsfilter.xsd">
+
+    <!--
+      IMPROPER_UNICODE signale tout appel à Normalizer.normalize. Le CDC (section 7.2) impose
+      text(s) = bytes(UTF-8(NFC(s))), et Canonical.text suit déjà l'ordre que la règle recommande :
+      normaliser d'abord, valider ensuite (encodeur UTF-8 strict, ADR 0006). Exclusion limitée à
+      cette méthode : tout autre appel à la normalisation reste signalé.
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.crypto.Canonical"/>
+        <Method name="text"/>
+        <Bug pattern="IMPROPER_UNICODE"/>
+    </Match>
 </FindBugsFilter>
