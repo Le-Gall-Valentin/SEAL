@@ -47,4 +47,30 @@ class LogValuesTest {
         assertThat(LogValues.identifier("Correct Horse Battery Staple")).isEqualTo("***");
         assertThat(LogValues.identifier("bob\n")).isEqualTo("***");
     }
+
+    @Test
+    @DisplayName("SEC-21 : un mot de passe contenant @ n'est pas pris pour un courriel et n'est pas journalisé")
+    void sec21PasswordWithAtSignIsMasked() {
+        assertThat(LogValues.identifier("Tr0ub4dor@Horse-Batt")).isEqualTo("***");
+        assertThat(LogValues.identifier("correct-horse@battery-staple")).isEqualTo("***");
+        assertThat(LogValues.identifier("MonP@ssphraseTresLongue2026")).isEqualTo("***");
+    }
+
+    @Test
+    @DisplayName("SEC-21 : seule une valeur de forme stricte est traitée comme un courriel")
+    void sec21OnlyAStrictEmailIsMaskedAsAnEmail() {
+        assertThat(LogValues.email("valentin@exemple.ca")).isEqualTo("v***@exemple.ca");
+        assertThat(LogValues.email("a@b@exemple.ca")).isEqualTo("***");
+        assertThat(LogValues.email("val entin@exemple.ca")).isEqualTo("***");
+        assertThat(LogValues.email("valentin@exemple")).isEqualTo("***");
+        assertThat(LogValues.email("valentin@exemple..ca")).isEqualTo("***");
+        assertThat(LogValues.email("v@" + "a".repeat(250) + ".ca")).isEqualTo("***");
+        assertThat(LogValues.identifier("Bob@Exemple.ca")).isEqualTo("B***@Exemple.ca");
+    }
+
+    @Test
+    @DisplayName("A05 : les caractères de direction Unicode sont neutralisés")
+    void a05DirectionalCharactersAreNeutralised() {
+        assertThat(LogValues.sanitize("a\u202Eb\u2066c\u202Ad\u2069")).isEqualTo("a_b_c_d_");
+    }
 }

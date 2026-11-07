@@ -162,7 +162,7 @@ class RateLimiterTest {
         refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob@exemple.ca"));
 
         ArgumentCaptor<SecurityEvent> recorded = ArgumentCaptor.forClass(SecurityEvent.class);
-        verify(journal).record(recorded.capture());
+        verify(journal).recordRefusal(recorded.capture());
         assertThat(recorded.getValue().type()).isEqualTo(SecurityEventType.RATE_LIMIT_EXCEEDED);
         assertThat(recorded.getValue().userId()).isNull();
         assertThat(recorded.getValue().details())

@@ -90,7 +90,7 @@ public class RateLimiter {
 
     private void refuse(RateLimit limit, String key, long nanosToWait) {
         String safeKey = LogValues.identifier(key);
-        journal.record(new SecurityEvent(
+        journal.recordRefusal(new SecurityEvent(
                 SecurityEventType.RATE_LIMIT_EXCEEDED, null, Map.of("limit", limit.name(), "key", safeKey)));
         // A09 : alerte sans aucune donnée variable ; la limite, la clé masquée et l'IP sont dans security_events
         // (SEC-21), à la même date que cette ligne.
