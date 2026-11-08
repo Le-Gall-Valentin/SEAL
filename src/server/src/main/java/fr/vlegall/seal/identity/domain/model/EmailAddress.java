@@ -44,7 +44,7 @@ public record EmailAddress(String value) {
 
     /**
      * Forme {@code partie-locale@domaine} : partie locale en « dot-atom » de la RFC 5322, étendue aux caractères non
-     * ASCII (RFC 6531) hors contrôle, espace et direction ; domaine en libellés ASCII (un nom internationalisé s'écrit
+     * ASCII (RFC 6531) hors contrôle, format, espace, demi-paire isolée, usage privé et point non attribué ; domaine en libellés ASCII (un nom internationalisé s'écrit
      * en punycode), au moins deux.
      */
     private static boolean isValid(String value) {
@@ -78,6 +78,9 @@ public record EmailAddress(String value) {
         }
         int type = Character.getType(c);
         return type != Character.CONTROL
+                && type != Character.SURROGATE
+                && type != Character.UNASSIGNED
+                && type != Character.PRIVATE_USE
                 && type != Character.FORMAT
                 && type != Character.LINE_SEPARATOR
                 && type != Character.PARAGRAPH_SEPARATOR

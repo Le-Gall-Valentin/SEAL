@@ -87,4 +87,12 @@ class EmailAddressTest {
                 .doesNotContain("valentin")
                 .doesNotContain("exemple");
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a\uD800@b.ca", "a\u0378@b.ca", "a\uE000@b.ca", "a\u200B@b.ca"})
+    @DisplayName(
+            "SEC-01 : la partie locale refuse les demi-paires isolées, les points non attribués, l'usage privé et les caractères de format")
+    void sec01LocalPartRefusesMalformedText(String raw) {
+        assertThat(EmailAddress.parse(raw)).isEmpty();
+    }
 }

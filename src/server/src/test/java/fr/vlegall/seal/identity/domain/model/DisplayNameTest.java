@@ -57,4 +57,33 @@ class DisplayNameTest {
     void sec01ControlAndDirectionCharactersAreRefused(String raw) {
         assertThat(DisplayName.parse(raw)).isEmpty();
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Bob\uD800", "\uDC00Bob", "Bob\u0378"})
+    @org.junit.jupiter.api.DisplayName(
+            "SEC-01 : une demi-paire de substitution isolée ou un point de code non attribué est refusé")
+    void sec01MalformedTextIsRefused(String raw) {
+        assertThat(DisplayName.parse(raw)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\u200B", "\u200B\u200D", "\u3164", "\u115F\u1160", "\uFFA0", "\u2800", "\u0301"})
+    @org.junit.jupiter.api.DisplayName("AUTH-10 : un nom fait seulement de caractères invisibles est refusé")
+    void auth10InvisibleNamesAreRefused(String raw) {
+        assertThat(DisplayName.parse(raw)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67",
+                "\u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645",
+                "\uD83E\uDDAD",
+                "\u00B7"
+            })
+    @org.junit.jupiter.api.DisplayName(
+            "AUTH-10 : les émojis composés (ZWJ) et les écritures qui emploient ZWNJ restent permis")
+    void auth10JoinersInLegitimateNamesArePermitted(String raw) {
+        assertThat(DisplayName.parse(raw)).isPresent();
+    }
 }
