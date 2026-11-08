@@ -2,3 +2,4 @@
 import './styles/global.css'
 
 export { App } from './App'
+export { rootErrorOptions } from './providers'

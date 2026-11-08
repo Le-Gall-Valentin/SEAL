@@ -9,7 +9,7 @@ interface ErrorPageProps {
 export function ErrorPage({ onRetry }: ErrorPageProps) {
   return (
     <main className={styles['page']}>
-      <LoadErrorState onRetry={onRetry} />
+      <LoadErrorState heading="h1" onRetry={onRetry} />
     </main>
   )
 }

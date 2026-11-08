@@ -1,11 +1,11 @@
-import { createMemoryRouter, type RouteObject } from 'react-router'
+import { createMemoryRouter, type InitialEntry, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { routes, withRootErrorBoundary } from './routes'
 
-async function renderAt(path: string, tree: RouteObject[] = routes) {
-  const router = createMemoryRouter(tree, { initialEntries: [path] })
+async function renderAt(entry: InitialEntry, tree: RouteObject[] = routes) {
+  const router = createMemoryRouter(tree, { initialEntries: [entry] })
   const screen = await render(<RouterProvider router={router} />)
   return { router, screen }
 }
@@ -66,5 +66,41 @@ describe('ADR 0012 : routeur de la couche app', () => {
     await screen.getByRole('button', { name: 'Réessayer' }).click()
 
     await expect.element(screen.getByText('Rétabli')).toBeVisible()
+  })
+
+  it("A10 : « Réessayer » remplace l'entrée d'historique et garde la requête, l'ancre et l'état", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { router, screen } = await renderAt(
+      { pathname: '/', search: '?q=1', hash: '#h', state: { s: 1 } },
+      withRootErrorBoundary([{ path: '/', Component: FlakyPage }]),
+    )
+    await expect.element(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible()
+
+    broken = false
+    await screen.getByRole('button', { name: 'Réessayer' }).click()
+
+    await expect.element(screen.getByText('Rétabli')).toBeVisible()
+    expect(router.state.historyAction).toBe('REPLACE')
+    expect(router.state.location).toMatchObject({
+      pathname: '/',
+      search: '?q=1',
+      hash: '#h',
+      state: { s: 1 },
+    })
+  })
+
+  it("A10 : si l'adresse courante est refusée par le routeur, « Réessayer » ramène à l'accueil", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { router, screen } = await renderAt(
+      '//evil.example/x',
+      withRootErrorBoundary([{ path: '*', Component: FlakyPage }]),
+    )
+    await expect.element(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible()
+
+    broken = false
+    await screen.getByRole('button', { name: 'Réessayer' }).click()
+
+    await expect.element(screen.getByText('Rétabli')).toBeVisible()
+    expect(router.state.location.pathname).toBe('/')
   })
 })

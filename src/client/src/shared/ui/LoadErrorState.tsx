@@ -3,14 +3,16 @@ import { t } from '@/shared/i18n'
 import styles from './LoadErrorState.module.css'
 
 interface LoadErrorStateProps {
+  /** Niveau du titre, selon l'endroit où l'état s'affiche : h1 quand il remplace la page. */
+  readonly heading: 'h1' | 'h2' | 'h3'
   readonly onRetry: () => void
 }
 
 /**
  * État « Erreur de chargement » de la maquette (écran Etats), sans la phrase sur le réseau, fausse pour une erreur de
- * rendu (ADR 0012). Annoncé dès son affichage ; il remplace la page, d'où son titre de niveau 1.
+ * rendu (ADR 0012). Annoncé dès son affichage.
  */
-export function LoadErrorState({ onRetry }: LoadErrorStateProps) {
+export function LoadErrorState({ heading: Heading, onRetry }: LoadErrorStateProps) {
   const titleId = useId()
   return (
     <section role="alert" aria-labelledby={titleId} className={styles['card']}>
@@ -28,9 +30,9 @@ export function LoadErrorState({ onRetry }: LoadErrorStateProps) {
           <path d="M12 7.5v5.2M12 16.2h.01" />
         </svg>
       </span>
-      <h1 id={titleId} className={styles['title']}>
+      <Heading id={titleId} className={styles['title']}>
         {t('loadError.title')}
-      </h1>
+      </Heading>
       <button type="button" className={styles['retry']} onClick={onRetry}>
         <svg
           width="18"

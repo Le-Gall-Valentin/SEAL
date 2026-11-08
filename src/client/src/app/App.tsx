@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
-import { ErrorBoundary } from './providers'
+import { ErrorBoundary, routerErrorHandler } from './providers'
 import { routes } from './router'
 
 const router = createBrowserRouter(routes)
@@ -8,7 +8,7 @@ const router = createBrowserRouter(routes)
 export function App() {
   return (
     <ErrorBoundary>
-      <RouterProvider router={router} />
+      <RouterProvider router={router} onError={routerErrorHandler(import.meta.env.PROD)} />
     </ErrorBoundary>
   )
 }
