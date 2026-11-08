@@ -11,6 +11,7 @@ public abstract sealed class IdentityException extends SealException
         permits IdentityException.UsernameInvalid,
                 IdentityException.UsernameReserved,
                 IdentityException.UsernameTaken,
+                IdentityException.PasswordTooWeak,
                 IdentityException.InvalidCode,
                 IdentityException.CodeExpired {
 
@@ -44,6 +45,15 @@ public abstract sealed class IdentityException extends SealException
 
         public UsernameTaken() {
             super(ErrorCode.USERNAME_TAKEN);
+        }
+    }
+
+    /** AUTH-11 : mot de passe refusé à l'inscription ; rien n'est créé. */
+    public static final class PasswordTooWeak extends IdentityException {
+        private static final long serialVersionUID = 1L;
+
+        public PasswordTooWeak() {
+            super(ErrorCode.PASSWORD_TOO_WEAK);
         }
     }
 

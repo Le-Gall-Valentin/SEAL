@@ -40,6 +40,12 @@
         <Class name="fr.vlegall.seal.security.web.CsrfController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- /api/v1/auth : me (toute session), register (anonyme), username-availability (anonyme ou session complète) :
+         RegistrationIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.identity.infrastructure.web.AuthController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /error, dispatch d'erreur du conteneur, sans donnée ni effet (ADR 0011) : CsrfIT.auth60ErrorEndpointIsCsrfProtected. -->
     <Match>
         <Class name="fr.vlegall.seal.common.web.ProblemDetailsErrorController"/>

@@ -43,20 +43,20 @@ public final class SessionEstablisher {
     }
 
     /** AUTH-16 : session restreinte, après l'inscription ou la connexion d'un compte non vérifié. */
-    public void openRestricted(UserId user, HttpServletRequest request, HttpServletResponse response) {
+    public Authentication openRestricted(UserId user, HttpServletRequest request, HttpServletResponse response) {
         List<GrantedAuthority> authorities = List.of(
                 new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL),
                 FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_PASSWORD)
                         .issuedAt(clock.instant())
                         .build());
-        establish(new SealPrincipal(user), authorities, request, response);
+        return establish(new SealPrincipal(user), authorities, request, response);
     }
 
     /**
      * AUTH-16 : la vérification réussie rend complète la session restreinte du même compte, qui garde ses facteurs et
      * leur date. Toute autre situation est une erreur de programmation : échec fermé.
      */
-    public void upgradeToFull(UserId user, HttpServletRequest request, HttpServletResponse response) {
+    public Authentication upgradeToFull(UserId user, HttpServletRequest request, HttpServletResponse response) {
         Authentication current = holder.getContext().getAuthentication();
         if (current == null
                 || !(current.getPrincipal() instanceof SealPrincipal principal)
@@ -70,7 +70,7 @@ public final class SessionEstablisher {
         current.getAuthorities().stream()
                 .filter(FactorGrantedAuthority.class::isInstance)
                 .forEach(authorities::add);
-        establish(principal, authorities, request, response);
+        return establish(principal, authorities, request, response);
     }
 
     /** Facteurs obtenus par la session, sans leur préfixe : {@code ["PASSWORD"]} au lot 1 ({@code GET /me}). */
@@ -83,7 +83,7 @@ public final class SessionEstablisher {
                 .toList();
     }
 
-    private void establish(
+    private Authentication establish(
             SealPrincipal principal,
             List<GrantedAuthority> authorities,
             HttpServletRequest request,
@@ -94,5 +94,6 @@ public final class SessionEstablisher {
         context.setAuthentication(authentication);
         holder.setContext(context);
         contexts.saveContext(context, request, response);
+        return authentication;
     }
 }

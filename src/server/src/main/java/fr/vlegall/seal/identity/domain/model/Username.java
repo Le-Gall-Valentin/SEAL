@@ -1,6 +1,7 @@
 package fr.vlegall.seal.identity.domain.model;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /** Identifiant d'un compte, définitif (AUTH-03) : la forme est vérifiée à la construction (AUTH-01). */
 public record Username(String value) {
@@ -18,6 +19,11 @@ public record Username(String value) {
     /** Identifiant saisi, accepté tel quel ou refusé : aucune normalisation, l'utilisateur voit ce qu'il obtient. */
     public static Username parse(String raw) {
         return new Username(raw);
+    }
+
+    /** Comme {@link #parse(String)}, mais vide au lieu d'une exception (disponibilité, AUTH-05). */
+    public static Optional<Username> tryParse(String raw) {
+        return isWellFormed(raw) ? Optional.of(new Username(raw)) : Optional.empty();
     }
 
     /**

@@ -14,7 +14,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class SetUpPasswordHandlerTest {
+class InitialPasswordHandlerTest {
 
     private static final UserId USER = new UserId(UUID.fromString("01900000-0000-7000-8000-000000000001"));
 
@@ -31,13 +31,13 @@ class SetUpPasswordHandlerTest {
             return encoded.equals(hash(password));
         }
     };
-    private final SetUpPasswordHandler handler =
-            new SetUpPasswordHandler(Set.of("correcthorsebatterystaple")::contains, hasher, credentials);
+    private final InitialPasswordHandler handler =
+            new InitialPasswordHandler(Set.of("correcthorsebatterystaple")::contains, hasher, credentials);
 
     @Test
     @DisplayName("AUTH-13 : un mot de passe accepté est enregistré haché, normalisé en NFKC")
     void auth13AcceptedPasswordIsStoredHashed() {
-        boolean accepted = handler.setUp(USER, "fjord-tuque-raquetteﬁ", List.of("valentin.le.gall", "valentin"));
+        boolean accepted = handler.establish(USER, "fjord-tuque-raquetteﬁ", List.of("valentin.le.gall", "valentin"));
 
         assertThat(accepted).isTrue();
         assertThat(stored).containsEntry(USER, "hash(fjord-tuque-raquettefi)");
@@ -46,9 +46,10 @@ class SetUpPasswordHandlerTest {
     @Test
     @DisplayName("AUTH-11 : un mot de passe refusé n'est ni haché ni enregistré")
     void auth11RejectedPasswordIsNotStored() {
-        assertThat(handler.setUp(USER, "valentin.le.gall2026!x", List.of("valentin.le.gall", "valentin")))
+        assertThat(handler.establish(USER, "valentin.le.gall2026!x", List.of("valentin.le.gall", "valentin")))
                 .isFalse();
-        assertThat(handler.setUp(USER, "CorrectHorseBatteryStaple", List.of())).isFalse();
+        assertThat(handler.establish(USER, "CorrectHorseBatteryStaple", List.of()))
+                .isFalse();
         assertThat(stored).isEmpty();
     }
 }

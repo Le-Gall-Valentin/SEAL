@@ -3,7 +3,7 @@ package fr.vlegall.seal.authentication.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import fr.vlegall.seal.authentication.application.port.in.SetUpPasswordUseCase;
+import fr.vlegall.seal.authentication.application.port.in.InitialPasswordUseCase;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import java.util.List;
@@ -19,7 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class CredentialStorageIT {
 
     @Autowired
-    private SetUpPasswordUseCase setUpPassword;
+    private InitialPasswordUseCase initialPassword;
 
     @Autowired
     private JdbcClient jdbc;
@@ -48,7 +48,7 @@ class CredentialStorageIT {
         UserId[] user = new UserId[1];
         transactions.executeWithoutResult(status -> {
             user[0] = insertUser("credential.un");
-            assertThat(setUpPassword.setUp(user[0], "fjord-tuque-raquette", List.of("credential.un")))
+            assertThat(initialPassword.establish(user[0], "fjord-tuque-raquette", List.of("credential.un")))
                     .isTrue();
             assertThat(storedHash(user[0])).startsWith("{argon2}$argon2id$");
             status.setRollbackOnly();
@@ -62,7 +62,7 @@ class CredentialStorageIT {
     void auth13SetUpRequiresATransaction() {
         UserId user = new UserId(UUID.randomUUID());
 
-        assertThatThrownBy(() -> setUpPassword.setUp(user, "fjord-tuque-raquette", List.of()))
+        assertThatThrownBy(() -> initialPassword.establish(user, "fjord-tuque-raquette", List.of()))
                 .isInstanceOf(IllegalTransactionStateException.class);
     }
 }
