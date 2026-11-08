@@ -11,11 +11,13 @@ const PER_PATH_THRESHOLDS = {
   'src/shared/crypto/**': { lines: 90, branches: 90 },
 }
 
-// Un seuil dont le glob ne trouve aucun fichier ne vérifierait plus rien, par exemple après un déplacement :
-// la configuration échoue plutôt que de laisser passer une couverture nulle (ADR 0012, point 4).
+// Un seuil dont le glob ne trouve aucun fichier mesuré ne vérifierait plus rien, par exemple après un déplacement :
+// la configuration échoue plutôt que de laisser passer une couverture nulle (ADR 0012, point 4). Comme dans
+// coverage.exclude, les tests et les déclarations ne comptent pas.
+const NOT_MEASURED = /\.test\.tsx?$|\.d\.ts$/
 for (const glob of Object.keys(PER_PATH_THRESHOLDS)) {
-  const files = globSync(glob, { cwd: CLIENT_ROOT, withFileTypes: true }).filter((entry) =>
-    entry.isFile(),
+  const files = globSync(glob, { cwd: CLIENT_ROOT, withFileTypes: true }).filter(
+    (entry) => entry.isFile() && !NOT_MEASURED.test(entry.name),
   )
   if (files.length === 0) {
     throw new Error(`Seuil de couverture sans aucun fichier : ${glob}`)

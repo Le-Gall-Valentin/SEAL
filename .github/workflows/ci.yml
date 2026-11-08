@@ -73,7 +73,7 @@ jobs:
       - run: npm run lint
 
       # ADR 0012, point 9 : les tests de composants tournent dans Chromium.
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps --only-shell chromium
 
       # Vitest avec les seuils de couverture de QA-10.
       - run: npm test
@@ -168,7 +168,7 @@ jobs:
         working-directory: src/client
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps --only-shell chromium
           npx playwright test
 
       - name: Archive de remise (OPS-02)

@@ -71,6 +71,7 @@ Il faut JDK 25 et Node.js 24 LTS (`sdk env` et `nvm use` lisent `.sdkmanrc` et `
 | --- | --- | --- |
 | Serveur, avec un PostgreSQL jetable (Testcontainers) | `src/server` | `./mvnw spring-boot:test-run` |
 | Client, sur <https://localhost:5173>, relayé vers le serveur | `src/client` | `npm ci`, puis `npm run dev` |
+| Navigateur des tests du client et de bout en bout, une fois après `npm ci` | `src/client` | `npx playwright install --with-deps --only-shell chromium` (sans `--with-deps` sur macOS et Windows) |
 | Tests, formatage, analyse statique et couverture du serveur | `src/server` | `./mvnw verify` |
 | Typage, lint, formatage et tests du client | `src/client` | `npm run lint && npm test` |
 | Tests de bout en bout, SEAL lancé par docker compose | `src/client` | `npx playwright test` |
