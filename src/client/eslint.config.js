@@ -87,8 +87,166 @@ function arbitraryValueProblem(token) {
   return bracket !== undefined && isDimension(bracket) ? null : 'value'
 }
 
+// ADR 0017 : un texte affiché ou lu (entre balises, ou dans un attribut lu par les aides techniques) passe par t().
+const TEXT_ATTRIBUTES = new Set([
+  'alt',
+  'aria-braillelabel',
+  'aria-brailleroledescription',
+  'aria-description',
+  'aria-label',
+  'aria-placeholder',
+  'aria-roledescription',
+  'aria-valuetext',
+  'label',
+  'placeholder',
+  'title',
+])
+// Props d'un composant qui ne portent jamais de texte affiché (Q1) ; toute autre prop à mots passe par t().
+const TECHNICAL_PROPS = new Set([
+  'as',
+  'autoComplete',
+  'className',
+  'dir',
+  'heading',
+  'href',
+  'htmlFor',
+  'id',
+  'inputMode',
+  'key',
+  'lang',
+  'language',
+  'method',
+  'name',
+  'rel',
+  'role',
+  'src',
+  'target',
+  'to',
+  'type',
+  'variant',
+])
+const BUTTON_INPUT_TYPES = new Set(['button', 'reset', 'submit'])
+const HAS_WORD = /[\p{L}\p{N}]/u
+
+// Un texte à mots, même enveloppé dans une expression : ternaire, &&, concaténation, tableau, as, satisfies, !.
+function hasWords(node) {
+  switch (node?.type) {
+    case 'Literal':
+      return typeof node.value === 'string' && HAS_WORD.test(node.value)
+    case 'TemplateLiteral':
+      return node.quasis.some((quasi) => HAS_WORD.test(quasi.value.raw))
+    case 'TaggedTemplateExpression':
+      return hasWords(node.quasi)
+    case 'ConditionalExpression':
+      return hasWords(node.consequent) || hasWords(node.alternate)
+    case 'LogicalExpression':
+      return hasWords(node.left) || hasWords(node.right)
+    case 'BinaryExpression':
+      return node.operator === '+' && (hasWords(node.left) || hasWords(node.right))
+    case 'ArrayExpression':
+      return node.elements.some((element) => hasWords(element))
+    case 'SequenceExpression':
+      return hasWords(node.expressions.at(-1))
+    case 'TSAsExpression':
+    case 'TSSatisfiesExpression':
+    case 'TSNonNullExpression':
+      return hasWords(node.expression)
+    default:
+      return false
+  }
+}
+
+function attributeValue(node) {
+  return node.value?.type === 'JSXExpressionContainer' ? node.value.expression : node.value
+}
+
+function isComponent(openingElement) {
+  const { name } = openingElement
+  return (
+    name.type === 'JSXMemberExpression' ||
+    (name.type === 'JSXIdentifier' && /^[A-Z]/.test(name.name))
+  )
+}
+
+function isButtonInput(openingElement) {
+  if (openingElement.name.type !== 'JSXIdentifier' || openingElement.name.name !== 'input')
+    return false
+  const type = openingElement.attributes.find(
+    (attribute) => attribute.type === 'JSXAttribute' && attribute.name.name === 'type',
+  )
+  const value = type === undefined ? undefined : attributeValue(type)
+  return value?.type === 'Literal' && BUTTON_INPUT_TYPES.has(value.value)
+}
+
+function isTextAttribute(node) {
+  if (node.name.type !== 'JSXIdentifier') return false
+  const name = node.name.name
+  if (TEXT_ATTRIBUTES.has(name)) return true
+  const element = node.parent
+  if (name === 'value') return isButtonInput(element)
+  if (!isComponent(element)) return false
+  return !(
+    TECHNICAL_PROPS.has(name) ||
+    name.startsWith('data-') ||
+    name.startsWith('on') ||
+    name.startsWith('aria-')
+  )
+}
+
+const noJsxLiteralText = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: {
+      text: 'Texte brut dans le JSX (ADR 0017) : passez par t(), avec les textes du segment i18n de la tranche.',
+    },
+  },
+  create(context) {
+    const report = (node) => context.report({ node, messageId: 'text' })
+    return {
+      JSXText: (node) => {
+        if (HAS_WORD.test(node.value)) report(node)
+      },
+      'JSXElement > JSXExpressionContainer, JSXFragment > JSXExpressionContainer': (node) => {
+        if (hasWords(node.expression)) report(node)
+      },
+      JSXAttribute: (node) => {
+        if (isTextAttribute(node) && hasWords(attributeValue(node))) report(node)
+      },
+    }
+  },
+}
+
+// ADR 0017 (Q2) : defineMessages ne s'importe que dans un segment i18n de tranche, un fichier *Messages.ts d'un
+// segment de shared autre que shared/i18n, ou un test.
+const MESSAGES_FILE =
+  /\/src\/(?:(?:pages|widgets|features|entities)\/[^/]+\/i18n\/|shared\/(?!i18n\/)[^/]+\/[^/]*Messages\.ts$)|\.test\.tsx?$/
+
+const messagesInI18n = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: {
+      place:
+        'Les textes se déclarent dans le segment i18n de la tranche, ou dans un fichier *Messages.ts du segment de shared qui les affiche (ADR 0017).',
+    },
+  },
+  create(context) {
+    if (MESSAGES_FILE.test(context.filename.replaceAll('\\', '/'))) return {}
+    return {
+      ImportSpecifier: (node) => {
+        const imported =
+          node.imported.type === 'Identifier' ? node.imported.name : node.imported.value
+        if (imported === 'defineMessages') context.report({ node, messageId: 'place' })
+      },
+    }
+  },
+}
+
 const sealPlugin = {
   rules: {
+    'messages-in-i18n': messagesInI18n,
+    'no-jsx-literal-text': noJsxLiteralText,
     'tailwind-arbitrary-values': {
       meta: {
         type: 'problem',
@@ -270,7 +428,7 @@ function restrictionsExcept(allowed) {
 // (boundaries/no-unknown-files) : un dossier non déclaré contournerait le sens ui → model → api.
 const LAYER_FOLDERS = { page: 'pages', widget: 'widgets', feature: 'features', entity: 'entities' }
 const SLICE_LAYERS = Object.keys(LAYER_FOLDERS)
-const SLICE_SEGMENTS = ['ui', 'model', 'api', 'lib', 'config']
+const SLICE_SEGMENTS = ['ui', 'model', 'api', 'lib', 'config', 'i18n']
 const SHARED_SEGMENTS = ['crypto', 'api', 'ws', 'i18n', 'ui', 'styles', 'lib', 'config']
 const SEGMENTS = SLICE_LAYERS.map((layer) => `${layer}-segment`)
 const segmentsOf = (layer) => (layer === 'entity' ? [...SLICE_SEGMENTS, '@x'] : SLICE_SEGMENTS)
@@ -352,6 +510,7 @@ export default defineConfig(
     plugins: { seal: sealPlugin },
     rules: {
       'seal/tailwind-arbitrary-values': 'error',
+      'seal/messages-in-i18n': 'error',
       'no-console': 'error',
       'no-eval': 'error',
       'no-new-func': 'error',
@@ -378,6 +537,13 @@ export default defineConfig(
     files: [`${folder}/**/*.test.{ts,tsx}`],
     rules: { 'no-restricted-globals': restrictedGlobals(name, { inTests: true }) },
   })),
+
+  // ADR 0017 : aucun texte brut dans le JSX livré ; les tests rendent librement leurs témoins.
+  {
+    files: ['src/**/*.tsx'],
+    ignores: ['src/**/*.test.tsx'],
+    rules: { 'seal/no-jsx-literal-text': 'error' },
+  },
 
   // ADR 0012 : frontières de Feature-Sliced Design et frontière entre cryptographie et réseau. Les politiques
   // s'appliquent dans l'ordre et la dernière qui correspond l'emporte : les interdictions viennent donc après les
@@ -487,6 +653,32 @@ export default defineConfig(
             { from: segment('ui'), disallow: { to: segment('api') } },
             { from: segment('model'), disallow: { to: segment('ui') } },
             { from: segment('api'), disallow: { to: [segment('ui'), segment('model')] } },
+            // ADR 0017 : i18n est une feuille privée de sa tranche. Il n'importe que shared/i18n ; seuls ui et model
+            // l'importent, jamais l'index.ts ni le @x qui l'exposeraient ; api, lib et config ne produisent pas de texte.
+            {
+              from: segment('i18n'),
+              disallow: {
+                to: [
+                  segment('!i18n'),
+                  publicApi(Object.values(LAYER_FOLDERS)),
+                  sharedSegment('!i18n'),
+                ],
+              },
+            },
+            {
+              from: [
+                segment('api'),
+                segment('lib'),
+                segment('config'),
+                segment('@x'),
+                publicApi(Object.values(LAYER_FOLDERS)),
+              ],
+              disallow: { to: segment('i18n') },
+            },
+            {
+              from: [segment('api'), segment('lib'), segment('config')],
+              disallow: { to: sharedSegment('i18n') },
+            },
             // lib et config sont des feuilles : sinon ui → lib → api sauterait model.
             {
               from: [segment('lib'), segment('config')],

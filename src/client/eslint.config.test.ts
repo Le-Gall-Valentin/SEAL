@@ -131,6 +131,51 @@ describe('ADR 0012 : couches de Feature-Sliced Design', () => {
     await expectAllowed('src/features/sign-in/lib/format.ts', '../config/limits')
   })
 
+  it("QA-10 : i18n est une feuille privée de sa tranche : seuls ui et model l'importent (ADR 0017)", async () => {
+    await expectAllowed('src/features/sign-in/ui/Form.ts', '../i18n/messages')
+    await expectAllowed('src/features/sign-in/model/useSignIn.ts', '../i18n/messages')
+    for (const from of [
+      'src/features/sign-in/api/signInRequest.ts',
+      'src/features/sign-in/lib/format.ts',
+      'src/features/sign-in/config/limits.ts',
+    ]) {
+      await expectRefused(from, '../i18n/messages')
+    }
+    await expectRefused('src/features/sign-in/index.ts', './i18n/messages')
+    await expectRefused('src/entities/user/@x/conversation.ts', '../i18n/messages')
+  })
+
+  it("QA-10 : i18n n'importe que shared/i18n, ni segment, ni API publique, ni @x (ADR 0017)", async () => {
+    await expectAllowed('src/features/sign-in/i18n/messages.ts', '@/shared/i18n')
+    for (const target of [
+      '../ui/Form',
+      '../model/useSignIn',
+      '../api/signInRequest',
+      '../lib/format',
+      '../config/limits',
+      '@/shared/ui',
+      '@/entities/user',
+    ]) {
+      await expectRefused('src/features/sign-in/i18n/messages.ts', target)
+    }
+    await expectRefused(
+      'src/entities/conversation/i18n/messages.ts',
+      '@/entities/user/@x/conversation',
+    )
+  })
+
+  it("QA-10 : api, lib et config d'une tranche ne produisent pas de texte : ni i18n ni shared/i18n (ADR 0017)", async () => {
+    for (const from of [
+      'src/features/sign-in/api/signInRequest.ts',
+      'src/features/sign-in/lib/format.ts',
+      'src/features/sign-in/config/limits.ts',
+    ]) {
+      await expectRefused(from, '@/shared/i18n')
+    }
+    await expectAllowed('src/features/sign-in/model/useSignIn.ts', '@/shared/i18n')
+    await expectAllowed('src/features/sign-in/ui/Form.ts', '@/shared/i18n')
+  })
+
   it('QA-10 : un fichier hors des couches, ou un import vers lui, est refusé', async () => {
     expect(await boundaryRules('src/misc/other.ts', 'export const other = 1\n')).toContain(
       'boundaries/no-unknown-files',
@@ -199,6 +244,8 @@ const SECURITY_RULES = new Set([
   'no-new-func',
   'no-script-url',
   'seal/tailwind-arbitrary-values',
+  'seal/no-jsx-literal-text',
+  'seal/messages-in-i18n',
 ])
 
 async function securityRules(file: string, code: string): Promise<string[]> {
@@ -207,8 +254,13 @@ async function securityRules(file: string, code: string): Promise<string[]> {
   return rules.filter((ruleId) => SECURITY_RULES.has(ruleId))
 }
 
-async function expectForbidden(file: string, code: string) {
-  expect(await securityRules(file, code), code).not.toEqual([])
+// La règle attendue, quand elle est nommée, doit être celle qui refuse : une autre règle ne masque pas sa disparition.
+async function expectForbidden(file: string, code: string, rule?: string) {
+  const rules = await securityRules(file, code)
+  expect(rules, code).not.toEqual([])
+  if (rule !== undefined) {
+    expect(rules, code).toContain(rule)
+  }
 }
 
 async function expectPermitted(file: string, code: string) {
@@ -321,10 +373,12 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
       await expectForbidden(
         file,
         'export const B = (h: string) => <div dangerouslySetInnerHTML={{ __html: h }} />\n',
+        'no-restricted-syntax',
       )
       await expectForbidden(
         file,
         'export const p = (h: string) => ({ dangerouslySetInnerHTML: { __html: h } })\n',
+        'no-restricted-syntax',
       )
     }
     for (const code of [
@@ -338,8 +392,8 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
       'export const f = (e: Element, h: string) => { e.setHTMLUnsafe(h) }\n',
       'export const f = (e: HTMLIFrameElement, h: string) => { e.srcdoc = h }\n',
     ]) {
-      await expectForbidden(SHARED_UI, code)
-      await expectForbidden(SHARED_CRYPTO, code)
+      await expectForbidden(SHARED_UI, code, 'no-restricted-properties')
+      await expectForbidden(SHARED_CRYPTO, code, 'no-restricted-properties')
     }
     await expectPermitted(
       SHARED_UI,
@@ -348,14 +402,26 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
     await expectPermitted(SHARED_UI, 'export const B = (t: string) => <div>{t}</div>\n')
     await expectForbidden(
       SHARED_UI,
-      "export const B = (h: string) => <iframe title='t' srcDoc={h} />\n",
+      'export const B = (h: string) => <iframe srcDoc={h} />\n',
+      'no-restricted-syntax',
     )
-    await expectForbidden(SHARED_UI, "export const B = () => <a href='javascript:void 0'>x</a>\n")
-    await expectPermitted(SHARED_UI, "export const B = () => <a href='/settings'>x</a>\n")
+    await expectForbidden(
+      SHARED_UI,
+      "export const B = () => <a href='javascript:void 0' />\n",
+      'no-script-url',
+    )
+    await expectPermitted(
+      SHARED_UI,
+      "const t = (key: string) => key\nexport const B = () => <a href='/settings'>{t('settings')}</a>\n",
+    )
   })
 
   it('TRN-21 : aucun style en ligne', async () => {
-    await expectForbidden(SHARED_UI, "export const B = () => <div style={{ color: 'red' }} />\n")
+    await expectForbidden(
+      SHARED_UI,
+      "export const B = () => <div style={{ color: 'red' }} />\n",
+      'no-restricted-syntax',
+    )
     await expectPermitted(SHARED_UI, "export const B = () => <div className='box' />\n")
   })
 
@@ -408,6 +474,103 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
       "import './home.css'\nexport const v = 1\n",
     )
     await expectPermitted('src/app/index.ts', "import './styles/global.css'\nexport const v = 1\n")
+  })
+
+  it('QA-10 : aucun texte brut dans le JSX, ni entre balises, ni dans une expression, ni dans un attribut lu (ADR 0017)', async () => {
+    for (const jsx of [
+      '<p>Bonjour</p>',
+      "<p>{'Bonjour'}</p>",
+      '<p>{`Bonjour ${n}`}</p>',
+      "<>{'Bonjour'}</>",
+      "<p>{c ? 'Envoyé' : 'Échec'}</p>",
+      "<p>{c && 'Chargement…'}</p>",
+      "<p>{'Bonjour ' + n}</p>",
+      "<p>{['Bonjour']}</p>",
+      "<p>{'Bonjour' as string}</p>",
+      '<svg><title>Logo</title></svg>',
+      '<button aria-label="Fermer" />',
+      "<button aria-label={c ? 'Ouvrir' : 'Fermer'} />",
+      "<img alt={'Logo'} src='/logo.svg' />",
+      '<input placeholder="Votre nom" />',
+      '<div title="Informations" />',
+      '<div aria-description="Détail" />',
+      '<div aria-placeholder="Nom" />',
+      '<div aria-roledescription="carrousel" />',
+      '<div aria-valuetext="moitié" />',
+      '<div aria-braillelabel="Fermer" />',
+      '<option label="Français" />',
+      '<input type="submit" value="Envoyer" />',
+    ]) {
+      await expectForbidden(
+        SHARED_UI,
+        `export const B = (c: boolean, n: string) => ${jsx}\n`,
+        'seal/no-jsx-literal-text',
+      )
+    }
+    for (const jsx of [
+      "<p>{t('title')}</p>",
+      "<p>{c ? t('sent') : t('failed')}</p>",
+      '<p> · </p>',
+      '<svg viewBox="0 0 24 24" aria-hidden="true" />',
+      '<div className="flex" role="alert" />',
+      "<input placeholder={t('name')} />",
+      '<input type="text" value={n} />',
+    ]) {
+      await expectPermitted(
+        SHARED_UI,
+        `const t = (key: string) => key\nexport const B = (c: boolean, n: string) => ${jsx}\n`,
+      )
+    }
+    await expectPermitted('src/shared/ui/Box.test.tsx', 'export const B = () => <p>Rétabli</p>\n')
+  })
+
+  it('QA-10 : un littéral à mots passé à un composant est refusé, sauf pour une prop technique (ADR 0017, Q1)', async () => {
+    for (const jsx of [
+      '<Field label="Courriel" />',
+      '<Card children="Bonjour" />',
+      '<Card message={`Envoyé`} />',
+    ]) {
+      await expectForbidden(
+        SHARED_UI,
+        `export const B = () => ${jsx}\n`,
+        'seal/no-jsx-literal-text',
+      )
+    }
+    for (const jsx of [
+      '<Link to="/parametres" className="flex" />',
+      '<LoadErrorState heading="h1" onRetry={() => undefined} />',
+      '<LanguageProvider language="fr" />',
+      '<Card variant="danger" aria-hidden="true" data-testid="carte" />',
+    ]) {
+      await expectPermitted(SHARED_UI, `export const B = () => ${jsx}\n`)
+    }
+  })
+
+  it('QA-10 : les textes ne se déclarent que dans un segment i18n ou un fichier *Messages.ts de shared (ADR 0017, Q2)', async () => {
+    const DECLARE =
+      "import { defineMessages } from '@/shared/i18n'\nexport const m = defineMessages({ fr: { a: 'b' } })\n"
+    for (const file of [
+      'src/features/sign-in/ui/Form.tsx',
+      'src/features/sign-in/model/useSignIn.ts',
+      'src/shared/ui/Box.tsx',
+      'src/shared/i18n/extra.ts',
+      'src/shared/i18n/extraMessages.ts',
+    ]) {
+      await expectForbidden(file, DECLARE, 'seal/messages-in-i18n')
+    }
+    await expectForbidden(
+      FEATURE_MODEL,
+      "import { defineMessages as dm } from '@/shared/i18n'\nexport const m = dm({ fr: { a: 'b' } })\n",
+      'seal/messages-in-i18n',
+    )
+    for (const file of [
+      'src/features/sign-in/i18n/messages.ts',
+      'src/entities/user/i18n/userMessages.ts',
+      'src/shared/ui/boxMessages.ts',
+      'src/shared/i18n/translate.test.ts',
+    ]) {
+      await expectPermitted(file, DECLARE)
+    }
   })
 
   it('A05 : ni eval ni Function', async () => {
