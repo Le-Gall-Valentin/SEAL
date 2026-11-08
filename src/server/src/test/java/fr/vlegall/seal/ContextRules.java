@@ -49,8 +49,7 @@ final class ContextRules {
                         "jakarta..",
                         "org.hibernate..",
                         "tools.jackson..",
-                        "com.fasterxml.jackson..")
-                .allowEmptyShould(true);
+                        "com.fasterxml.jackson..");
     }
 
     // Règle 2
@@ -60,8 +59,7 @@ final class ContextRules {
                 .resideInAPackage(root + "..domain..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage(root + "..application..", root + "..infrastructure..")
-                .allowEmptyShould(true);
+                .resideInAnyPackage(root + "..application..", root + "..infrastructure..");
     }
 
     static ArchRule applicationIgnoresInfrastructure(String root) {
@@ -70,8 +68,7 @@ final class ContextRules {
                 .resideInAPackage(root + "..application..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage(root + "..infrastructure..")
-                .allowEmptyShould(true);
+                .resideInAPackage(root + "..infrastructure..");
     }
 
     // Règle 3
@@ -83,8 +80,7 @@ final class ContextRules {
                 .dependOnClassesThat(DescribedPredicate.describe(
                         "appartiennent à Spring, hors org.springframework.transaction",
                         javaClass -> javaClass.getPackageName().startsWith("org.springframework.")
-                                && !javaClass.getPackageName().startsWith("org.springframework.transaction")))
-                .allowEmptyShould(true);
+                                && !javaClass.getPackageName().startsWith("org.springframework.transaction")));
     }
 
     static ArchRule applicationServicesLiveInHandlers(String root) {
@@ -94,8 +90,7 @@ final class ContextRules {
                 .and()
                 .areAnnotatedWith(ApplicationService.class)
                 .should()
-                .resideInAPackage(root + "..application.handler..")
-                .allowEmptyShould(true);
+                .resideInAPackage(root + "..application.handler..");
     }
 
     static ArchRule handlersAreApplicationServices(String root) {
@@ -105,8 +100,7 @@ final class ContextRules {
                 .and()
                 .haveSimpleNameEndingWith("Handler")
                 .should()
-                .beAnnotatedWith(ApplicationService.class)
-                .allowEmptyShould(true);
+                .beAnnotatedWith(ApplicationService.class);
     }
 
     // Règle 4
@@ -115,8 +109,7 @@ final class ContextRules {
                 .that()
                 .resideInAPackage(root + "..application.port.in..")
                 .should()
-                .beInterfaces()
-                .allowEmptyShould(true);
+                .beInterfaces();
     }
 
     static ArchRule outboundPortsAreInterfaces(String root) {
@@ -124,8 +117,7 @@ final class ContextRules {
                 .that()
                 .resideInAPackage(root + "..domain.port.out..")
                 .should()
-                .beInterfaces()
-                .allowEmptyShould(true);
+                .beInterfaces();
     }
 
     static ArchRule adaptersImplementAnOutboundPort(String root) {
@@ -139,8 +131,7 @@ final class ContextRules {
                 .should()
                 .implement(DescribedPredicate.describe(
                         "un port de domain/port/out",
-                        javaInterface -> javaInterface.getPackageName().contains(".domain.port.out")))
-                .allowEmptyShould(true);
+                        javaInterface -> javaInterface.getPackageName().contains(".domain.port.out")));
     }
 
     // Règle 5
@@ -153,8 +144,7 @@ final class ContextRules {
                 .resideInAnyPackage(
                         root + "..application.handler..",
                         root + "..infrastructure.persistence..",
-                        root + "..domain.port.out..")
-                .allowEmptyShould(true);
+                        root + "..domain.port.out..");
     }
 
     // Règle 6
@@ -165,8 +155,7 @@ final class ContextRules {
                 .and()
                 .areAnnotatedWith(Entity.class)
                 .should()
-                .resideInAPackage(root + "..infrastructure.persistence.entity..")
-                .allowEmptyShould(true);
+                .resideInAPackage(root + "..infrastructure.persistence.entity..");
     }
 
     static ArchRule onlyInfrastructureUsesEntities(String root) {
@@ -177,16 +166,12 @@ final class ContextRules {
                 .resideOutsideOfPackage(root + "..infrastructure..")
                 .should()
                 .dependOnClassesThat()
-                .areAnnotatedWith(Entity.class)
-                .allowEmptyShould(true);
+                .areAnnotatedWith(Entity.class);
     }
 
     // Règle 7
     static ArchRule contextsTalkThroughInboundPorts(String root) {
-        return classes()
-                .that(belongToAContext(root))
-                .should(onlyReachOtherContextsThroughInboundPorts(root))
-                .allowEmptyShould(true);
+        return classes().that(belongToAContext(root)).should(onlyReachOtherContextsThroughInboundPorts(root));
     }
 
     // Règle 8
@@ -197,8 +182,7 @@ final class ContextRules {
                 .resideOutsideOfPackage(root + "..infrastructure..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage(root + ".security..")
-                .allowEmptyShould(true);
+                .resideInAPackage(root + ".security..");
     }
 
     static ArchRule transversePackagesIgnoreContexts(String root) {
@@ -277,6 +261,30 @@ final class ContextRules {
                         "org.springframework.security.crypto.bcrypt..",
                         "org.springframework.security.crypto.scrypt..",
                         "org.springframework.security.crypto.password4j..");
+    }
+
+    // Règle 12, complétée par l'ADR 0018
+    static ArchRule noDirectBouncyCastle(String root) {
+        return noClasses()
+                .that()
+                .resideInAPackage(root + "..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("org.bouncycastle..")
+                .because("seul Argon2PasswordEncoder de Spring Security se sert de Bouncy Castle (ADR 0018)");
+    }
+
+    // Règle 14
+    static ArchRule onlyCommonMailSendsMail(String root) {
+        return noClasses()
+                .that()
+                .resideInAPackage(root + "..")
+                .and()
+                .resideOutsideOfPackage(root + ".common.mail..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("org.springframework.mail..", "jakarta.mail..")
+                .because("un courriel part après la validation de la transaction, par MailDispatcher (ADR 0019)");
     }
 
     // Règle 13

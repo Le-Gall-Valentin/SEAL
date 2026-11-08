@@ -124,6 +124,18 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("ADR 0018, règle 12 : aucune classe n'importe Bouncy Castle")
+    void noDirectBouncyCastle() {
+        ContextRules.noDirectBouncyCastle(ROOT).check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("ADR 0019, règle 14 : seul common.mail parle au serveur SMTP")
+    void onlyCommonMailSendsMail() {
+        ContextRules.onlyCommonMailSendsMail(ROOT).check(CLASSES);
+    }
+
+    @Test
     @DisplayName("TRN-02, ADR 0008, règle 13 : aucune ouverture CORS")
     void noCors() {
         ContextRules.noCors(ROOT).check(CLASSES);
