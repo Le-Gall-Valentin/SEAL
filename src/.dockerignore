@@ -1,4 +1,4 @@
-# Seuls client/ et server/ entrent dans l'image ; jamais de secret ni d'artefact local.
+# Seuls client/, server/ et la liste de blocage d'AUTH-11 entrent dans l'image ; jamais de secret ni d'artefact local.
 **/node_modules
 client/dist
 client/coverage
@@ -10,6 +10,7 @@ certs
 data
 docs
 protocol
+!protocol/password-blocklist.txt
 scripts
 **/.env
 **/.env.*
