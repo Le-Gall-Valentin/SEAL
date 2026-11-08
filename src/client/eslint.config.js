@@ -10,10 +10,35 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 const CRYPTO_ONLY =
-  'Seul src/crypto/ appelle WebCrypto et HPKE (ADR 0001) : passez par son API publique, src/crypto/index.ts.'
+  'Seul src/shared/crypto/ appelle WebCrypto et HPKE (ADR 0012) : passez par son API publique.'
+
+// ADR 0012 : couches de Feature-Sliced Design. Une tranche n'expose que son index.ts et se découpe en segments
+// déclarés, plus @x pour les entités ; shared se découpe en segments déclarés. Tout autre fichier est refusé
+// (boundaries/no-unknown-files) : un dossier non déclaré contournerait le sens ui → model → api.
+const LAYER_FOLDERS = { page: 'pages', widget: 'widgets', feature: 'features', entity: 'entities' }
+const SLICE_LAYERS = Object.keys(LAYER_FOLDERS)
+const SLICE_SEGMENTS = ['ui', 'model', 'api', 'lib', 'config']
+const SHARED_SEGMENTS = ['crypto', 'api', 'ws', 'i18n', 'ui', 'styles', 'lib', 'config']
+const SEGMENTS = SLICE_LAYERS.map((layer) => `${layer}-segment`)
+const segmentsOf = (layer) => (layer === 'entity' ? [...SLICE_SEGMENTS, '@x'] : SLICE_SEGMENTS)
+// Tranches des couches strictement inférieures, atteintes par leur index.ts ; shared, par l'index.ts d'un segment.
+const LOWER_SLICES = {
+  app: ['pages', 'widgets', 'features', 'entities'],
+  page: ['widgets', 'features', 'entities'],
+  widget: ['features', 'entities'],
+  feature: ['entities'],
+  entity: [],
+}
+const publicApi = (folders) => ({
+  file: { categories: 'public-api', captured: folders.map((layer) => ({ layer })) },
+})
+const sharedIndex = { element: { type: 'shared', fileInternalPath: 'index.ts' } }
+const sharedSegment = (segment) => ({ element: { type: 'shared', captured: { segment } } })
+const segment = (name) => ({ element: { type: SEGMENTS, captured: { segment: name } } })
 
 export default defineConfig(
-  globalIgnores(['dist', 'coverage', 'playwright-report', 'test-results']),
+  // eslint-fixtures/ : mini-projet témoin, linté par eslint.config.test.ts seulement.
+  globalIgnores(['dist', 'coverage', 'playwright-report', 'test-results', 'eslint-fixtures']),
 
   {
     files: ['**/*.js'],
@@ -50,10 +75,10 @@ export default defineConfig(
     languageOptions: { globals: globals.browser },
   },
 
-  // ADR 0001 : WebCrypto et HPKE ne sont accessibles que depuis src/crypto/.
+  // ADR 0012 : WebCrypto et HPKE ne sont accessibles que depuis src/shared/crypto/.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/crypto/**'],
+    ignores: ['src/shared/crypto/**'],
     rules: {
       'no-restricted-globals': ['error', { name: 'crypto', message: CRYPTO_ONLY }],
       'no-restricted-properties': [
@@ -69,60 +94,155 @@ export default defineConfig(
     },
   },
 
-  // ADR 0001 : frontières entre modules. crypto/ n'importe ni api/ ni ws/, et inversement.
+  // ADR 0012 : frontières de Feature-Sliced Design et frontière entre cryptographie et réseau. Les politiques
+  // s'appliquent dans l'ordre et la dernière qui correspond l'emporte : les interdictions viennent donc après les
+  // permissions qu'elles restreignent. Chaque frontière est éprouvée par eslint.config.test.ts.
   {
     files: ['src/**/*.{ts,tsx}'],
     plugins: { boundaries },
     settings: {
       'import/resolver': { typescript: { alwaysTryTypes: true } },
       'boundaries/elements': [
+        ...SLICE_LAYERS.map((layer) => ({
+          type: `${layer}-segment`,
+          pattern: `src/${LAYER_FOLDERS[layer]}/*/{${segmentsOf(layer).join(',')}}`,
+          capture: ['slice', 'segment'],
+          partialMatch: false,
+        })),
+        {
+          type: 'shared',
+          pattern: `src/shared/{${SHARED_SEGMENTS.join(',')}}`,
+          capture: ['segment'],
+          partialMatch: false,
+        },
         { type: 'app', pattern: 'src/app', partialMatch: false },
-        { type: 'feature', pattern: 'src/features/*', capture: ['slice'], partialMatch: false },
-        { type: 'crypto', pattern: 'src/crypto', partialMatch: false },
-        { type: 'api', pattern: 'src/api', partialMatch: false },
-        { type: 'ws', pattern: 'src/ws', partialMatch: false },
-        { type: 'i18n', pattern: 'src/i18n', partialMatch: false },
-        { type: 'shared', pattern: 'src/shared', partialMatch: false },
       ],
       'boundaries/files': [
         { pattern: 'src/main.tsx', category: 'entry' },
-        { pattern: 'src/crypto/index.ts', category: 'crypto-api' },
+        // Racine d'une tranche : son API publique, index.ts, et rien d'autre.
+        {
+          pattern: `src/{${Object.values(LAYER_FOLDERS).join(',')}}/*/index.ts`,
+          category: 'public-api',
+          capture: ['layer', 'slice'],
+        },
       ],
     },
     rules: {
-      // Tout fichier source appartient à un module de l'ADR 0001, sauf le point d'entrée.
+      // Tout fichier appartient à une couche, et aucun import ne vise un fichier hors des couches.
       'boundaries/no-unknown-files': 'error',
+      'boundaries/no-unknown-dependencies': 'error',
       'boundaries/dependencies': [
         'error',
         {
           default: 'disallow',
           policies: [
-            // Bibliothèques et modules de Node : encadrés par no-restricted-imports ci-dessus.
-            { allow: { to: { module: { origin: ['external', 'core'] } } } },
-            // Fichiers d'un même module.
+            // Fichiers d'un même élément.
             { allow: { dependency: { relationship: { to: 'internal' } } } },
+            // Le point d'entrée monte app.
             {
               from: { file: { categories: 'entry' } },
-              allow: { to: { element: { types: ['app', 'shared'] } } },
+              allow: { to: { element: { type: 'app' } } },
             },
-            {
-              from: { element: { type: 'app' } },
+            // Une tranche : ses segments se voient entre eux, et son index.ts les expose.
+            ...SLICE_LAYERS.map((layer) => ({
+              from: { element: { type: `${layer}-segment` } },
               allow: {
-                to: { element: { types: ['feature', 'api', 'ws', 'i18n', 'shared'] } },
+                to: {
+                  element: {
+                    type: `${layer}-segment`,
+                    captured: { slice: '{{ from.element.captured.slice }}' },
+                  },
+                },
+              },
+            })),
+            ...SLICE_LAYERS.map((layer) => ({
+              from: publicApi([LAYER_FOLDERS[layer]]),
+              allow: {
+                to: {
+                  element: {
+                    type: `${layer}-segment`,
+                    captured: { slice: '{{ from.file.captured.slice }}' },
+                  },
+                },
+              },
+            })),
+            // Couches strictement inférieures : l'index.ts d'une tranche, ou celui d'un segment de shared.
+            ...Object.entries(LOWER_SLICES).map(([layer, lowers]) => ({
+              from: { element: { type: layer === 'app' ? 'app' : `${layer}-segment` } },
+              allow: { to: lowers.length > 0 ? [publicApi(lowers), sharedIndex] : sharedIndex },
+            })),
+            // Segments de shared entre eux, par leur index.ts.
+            { from: { element: { type: 'shared' } }, allow: { to: sharedIndex } },
+            // Deux entités ne se parlent que par l'API @x dédiée.
+            {
+              from: { element: { type: 'entity-segment' } },
+              allow: {
+                to: {
+                  element: {
+                    type: 'entity-segment',
+                    captured: { segment: '@x' },
+                    fileInternalPath: '{{ from.element.captured.slice }}.ts',
+                  },
+                },
               },
             },
+            // Clean architecture dans une tranche : ui → model → api.
+            { from: segment('ui'), disallow: { to: segment('api') } },
+            { from: segment('model'), disallow: { to: segment('ui') } },
+            { from: segment('api'), disallow: { to: [segment('ui'), segment('model')] } },
+            // lib et config sont des feuilles : sinon ui → lib → api sauterait model.
             {
-              from: { element: { types: ['app', 'feature'] } },
-              allow: { to: { element: { type: 'crypto' }, file: { categories: 'crypto-api' } } },
+              from: [segment('lib'), segment('config')],
+              disallow: { to: [segment('ui'), segment('model'), segment('api')] },
             },
+            // Réseau : seul un segment api/ atteint shared/api et shared/ws.
             {
-              from: { element: { type: 'feature' } },
-              allow: { to: { element: { types: ['api', 'ws', 'i18n', 'shared'] } } },
+              from: { element: { type: [...SEGMENTS, 'app'] } },
+              disallow: { to: [sharedSegment('api'), sharedSegment('ws')] },
             },
+            { from: sharedSegment('!api'), disallow: { to: sharedSegment('api') } },
+            { from: sharedSegment('!ws'), disallow: { to: sharedSegment('ws') } },
             {
-              from: { element: { types: ['api', 'ws'] } },
-              allow: { to: { element: { type: 'shared' } } },
+              from: segment('api'),
+              allow: {
+                to: [
+                  {
+                    element: {
+                      type: 'shared',
+                      captured: { segment: 'api' },
+                      fileInternalPath: 'index.ts',
+                    },
+                  },
+                  {
+                    element: {
+                      type: 'shared',
+                      captured: { segment: 'ws' },
+                      fileInternalPath: 'index.ts',
+                    },
+                  },
+                ],
+              },
             },
+            // Cryptographie : shared/crypto ne s'atteint que depuis un segment model/ ou depuis app, et
+            // n'importe aucun autre segment.
+            {
+              from: { element: { type: SEGMENTS } },
+              disallow: { to: sharedSegment('crypto') },
+            },
+            { from: sharedSegment('!crypto'), disallow: { to: sharedSegment('crypto') } },
+            {
+              from: segment('model'),
+              allow: {
+                to: {
+                  element: {
+                    type: 'shared',
+                    captured: { segment: 'crypto' },
+                    fileInternalPath: 'index.ts',
+                  },
+                },
+              },
+            },
+            { from: sharedSegment('crypto'), disallow: { to: sharedSegment('!crypto') } },
           ],
         },
       ],
@@ -131,7 +251,7 @@ export default defineConfig(
 
   // Fichiers de configuration et tests de bout en bout : exécutés par Node.
   {
-    files: ['*.config.ts', 'e2e/**/*.ts'],
+    files: ['*.config.ts', 'eslint.config.test.ts', 'e2e/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
 

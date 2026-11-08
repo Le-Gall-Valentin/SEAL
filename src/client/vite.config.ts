@@ -17,10 +17,14 @@ const springBoot = 'https://localhost:8443'
 
 export default defineConfig({
   plugins: [react()],
+  // ADR 0012, point 5 : l'alias @/ vient des paths de tsconfig.app.json.
+  resolve: { tsconfigPaths: true },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: false,
+    // ADR 0012, point 11 : aucun fichier intégré en data: ; une police ainsi intégrée serait bloquée par font-src 'self'.
+    assetsInlineLimit: 0,
   },
   server: {
     port: 5173,

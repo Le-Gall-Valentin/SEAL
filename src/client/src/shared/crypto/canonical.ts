@@ -89,13 +89,14 @@ export function uuid(value: string): Uint8Array<ArrayBuffer> {
 
 /**
  * `list(T, xs)` : `u32(nombre d'éléments) || T(x1) || … || T(xn)`. Le tri éventuel des éléments
- * revient à la structure qui appelle.
+ * revient à la structure qui appelle. Chaque élément passe seul à son encodeur : `map(element)` lui
+ * passerait aussi l'index et le tableau, que `struct` prendrait pour des champs.
  */
 export function list<T>(
   element: (item: T) => Uint8Array,
   items: readonly T[],
 ): Uint8Array<ArrayBuffer> {
-  return concat(u32(items.length), ...items.map(element))
+  return concat(u32(items.length), ...items.map((item) => element(item)))
 }
 
 /** `a || b || …` : concaténation, pour les éléments composés d'une liste ou le texte clair d'un message. */

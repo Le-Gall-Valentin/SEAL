@@ -20,7 +20,7 @@ les tests Java et TypeScript.
 ## 2. Encodage canonique
 
 Toute structure signée ou hachée est encodée en octets selon la grammaire ci-dessous, identique en
-Java (`fr.vlegall.seal.crypto.Canonical`) et en TypeScript (`src/client/src/crypto/canonical.ts`).
+Java (`fr.vlegall.seal.crypto.Canonical`) et en TypeScript (`src/client/src/shared/crypto/canonical.ts`).
 Le JSON n'est jamais signé ni haché directement.
 
 ### 2.1 Primitives
