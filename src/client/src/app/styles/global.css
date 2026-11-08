@@ -1,16 +1,34 @@
+/*
+ * ADR 0016 : seule feuille d'entrée du client ; Tailwind, puis les jetons de la maquette et leur thème. Tailwind ne lit
+ * que les fichiers .ts et .tsx de src/, tests exclus : un Markdown, une configuration ou un extrait de test n'ajoute
+ * aucune classe à la feuille livrée.
+ */
+@import 'tailwindcss' source(none);
+@source '../../**/*.{ts,tsx}';
+@source not '../../**/*.test.{ts,tsx}';
 @import '../../shared/styles/tokens.css';
+@import '../../shared/styles/theme.css';
 
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--sans);
-}
+@layer base {
+  /* La maquette garde la hauteur de ligne par défaut, que le reset de Tailwind fixe à 1,5. */
+  html {
+    line-height: normal;
+  }
 
-a {
-  color: var(--accent-text);
-}
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+  }
 
-a:hover {
-  color: var(--accent-hover);
+  /* Le reset de Tailwind retire le soulignement des liens ; la maquette garde celui du navigateur. */
+  a {
+    color: var(--accent-text);
+    text-decoration-line: underline;
+  }
+
+  a:hover {
+    color: var(--accent-hover);
+  }
 }

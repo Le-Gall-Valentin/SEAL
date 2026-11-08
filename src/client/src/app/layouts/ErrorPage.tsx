@@ -1,5 +1,4 @@
 import { LoadErrorState } from '@/shared/ui'
-import styles from './ErrorPage.module.css'
 
 interface ErrorPageProps {
   readonly onRetry: () => void
@@ -8,7 +7,7 @@ interface ErrorPageProps {
 /** Page de repli des deux frontières d'erreur de app (A10) : l'état « Erreur de chargement », centré. */
 export function ErrorPage({ onRetry }: ErrorPageProps) {
   return (
-    <main className={styles['page']}>
+    <main className="grid min-h-screen place-items-center p-4">
       <LoadErrorState heading="h1" onRetry={onRetry} />
     </main>
   )

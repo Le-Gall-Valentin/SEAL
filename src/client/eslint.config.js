@@ -60,6 +60,66 @@ const CONSOLE =
 const GLOBAL_OBJECT =
   "L'objet global ne s'utilise que par un accès nommé, comme globalThis.addEventListener (ADR 0012) : un alias, un " +
   'accès calculé ou un passage en paramètre contourneraient les frontières de la cryptographie et du réseau.'
+// ADR 0016 (Q3) : une valeur arbitraire de Tailwind n'est qu'une dimension. Un jeton qui a la forme d'une classe
+// (variantes, utilitaire, valeur entre crochets ou parenthèses, ou propriété arbitraire) est examiné ; les autres
+// chaînes (textes, sélecteurs) ne le sont pas.
+const DIMENSION_UNITS =
+  'px|rem|em|%|vh|vw|dvh|svh|lvh|dvw|svw|lvw|vmin|vmax|ch|ex|lh|fr|deg|turn|ms|s'
+const CLASS_TOKEN =
+  /^(?:[a-z0-9-]+:)*!?(?:-?[a-z][a-z0-9.-]*-(?:\[([^\]]*)\]|\(([^)]*)\))|(\[[a-z-]+:[^\]]*\]))!?$/
+const NUMBER_WITH_UNIT = new RegExp(String.raw`-?\d*\.?\d+(?:${DIMENSION_UNITS})?`, 'g')
+
+function isDimension(value) {
+  const reduced = value
+    .replace(/var\(--[a-z0-9-]+\)/g, '0')
+    .replace(/\b(?:calc|min|max|clamp|repeat)\(/g, '(')
+    .replace(/\bauto\b/g, '0')
+    .replace(NUMBER_WITH_UNIT, '0')
+  return /^[0()+\-*/_,]*$/.test(reduced)
+}
+
+function arbitraryValueProblem(token) {
+  const match = CLASS_TOKEN.exec(token)
+  if (match === null) return null
+  const [, bracket, paren, property] = match
+  if (property !== undefined) return 'property'
+  if (paren !== undefined) return /^--[a-z0-9-]+$/.test(paren) ? null : 'value'
+  return bracket !== undefined && isDimension(bracket) ? null : 'value'
+}
+
+const sealPlugin = {
+  rules: {
+    'tailwind-arbitrary-values': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          value:
+            '« {{token}} » : une valeur arbitraire de Tailwind n’est qu’une dimension (ADR 0016) ; une couleur, une ombre ou une URL passe par les jetons du thème.',
+          property:
+            '« {{token}} » : aucune propriété arbitraire (ADR 0016) ; prenez une classe du thème.',
+        },
+      },
+      create(context) {
+        const check = (node, text) => {
+          for (const token of text.split(/\s+/)) {
+            const problem = arbitraryValueProblem(token)
+            if (problem !== null) context.report({ node, messageId: problem, data: { token } })
+          }
+        }
+        return {
+          Literal: (node) => {
+            if (typeof node.value === 'string') check(node, node.value)
+          },
+          TemplateElement: (node) => check(node, node.value.cooked ?? node.value.raw),
+        }
+      },
+    },
+  },
+}
+
+const CSS_FILE =
+  "Aucun fichier CSS de composant (ADR 0016) : classes Tailwind et jetons ; seul app importe sa feuille d'entrée."
 const COOKIE_STORE =
   'Aucun cookie par cookieStore (ADR 0012, KEY-41) : seul src/shared/api/ lit XSRF-TOKEN, par document.cookie.'
 const NODE_MODULES =
@@ -113,7 +173,8 @@ const SINK_SYNTAX = [
   { selector: "Property[key.name='dangerouslySetInnerHTML']", message: RAW_HTML },
   {
     selector: "JSXAttribute[name.name='style']",
-    message: 'Aucun style en ligne (TRN-21) : CSS Modules et jetons de la maquette.',
+    message:
+      'Aucun style en ligne (TRN-21) : classes Tailwind et jetons de la maquette (ADR 0016).',
   },
   {
     selector:
@@ -179,6 +240,7 @@ function restrictionsExcept(allowed) {
         ),
         patterns: [
           { regex: '(^|/)node_modules/', message: NODE_MODULES },
+          { regex: String.raw`(?<!^\./styles/global)\.css$`, message: CSS_FILE },
           // Un test exporterait console (permise dans les tests) et embarquerait Vitest dans l'application.
           {
             regex: String.raw`\.test(\.tsx?)?$`,
@@ -287,7 +349,9 @@ export default defineConfig(
     files: ['src/**/*.{ts,tsx}'],
     // Aucune directive eslint-disable en ligne ne lève une frontière ou un puits (audit).
     linterOptions: { noInlineConfig: true },
+    plugins: { seal: sealPlugin },
     rules: {
+      'seal/tailwind-arbitrary-values': 'error',
       'no-console': 'error',
       'no-eval': 'error',
       'no-new-func': 'error',

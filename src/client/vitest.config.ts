@@ -45,6 +45,7 @@ export default mergeConfig(
             // ADR 0012, point 9 : les composants se testent dans un vrai Chromium, sans jsdom.
             name: 'browser',
             include: ['src/**/*.test.tsx'],
+            setupFiles: ['./vitest.setup.browser.ts'],
             browser: {
               enabled: true,
               headless: true,

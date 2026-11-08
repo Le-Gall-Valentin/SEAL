@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
@@ -16,7 +17,8 @@ const https =
 const springBoot = 'https://localhost:8443'
 
 export default defineConfig({
-  plugins: [react()],
+  // ADR 0016 : Tailwind produit une feuille statique au build, compatible avec style-src 'self' (TRN-21).
+  plugins: [react(), tailwindcss()],
   // ADR 0012, point 5 : l'alias @/ vient des paths de tsconfig.app.json.
   resolve: { tsconfigPaths: true },
   build: {
