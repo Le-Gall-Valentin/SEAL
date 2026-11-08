@@ -60,6 +60,10 @@ const CONSOLE =
 const GLOBAL_OBJECT =
   "L'objet global ne s'utilise que par un accès nommé, comme globalThis.addEventListener (ADR 0012) : un alias, un " +
   'accès calculé ou un passage en paramètre contourneraient les frontières de la cryptographie et du réseau.'
+// Entre crochets : une couleur hexadécimale ou fonctionnelle (bg-[#fff], text-[rgb(…)], [box-shadow:…#000]).
+const ARBITRARY_COLOR = String.raw`/\[[^\]]*(#[0-9a-fA-F]{3,8}|(rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\()/`
+const ARBITRARY_COLOR_MESSAGE =
+  'Aucune couleur hors des jetons de la maquette (TRN-21, ADR 0016) : prenez une classe du thème (bg-surface, text-ink…).'
 const COOKIE_STORE =
   'Aucun cookie par cookieStore (ADR 0012, KEY-41) : seul src/shared/api/ lit XSRF-TOKEN, par document.cookie.'
 const NODE_MODULES =
@@ -113,8 +117,14 @@ const SINK_SYNTAX = [
   { selector: "Property[key.name='dangerouslySetInnerHTML']", message: RAW_HTML },
   {
     selector: "JSXAttribute[name.name='style']",
-    message: 'Aucun style en ligne (TRN-21) : CSS Modules et jetons de la maquette.',
+    message:
+      'Aucun style en ligne (TRN-21) : classes Tailwind et jetons de la maquette (ADR 0016).',
   },
+  // Une valeur arbitraire de Tailwind ne porte qu'une taille de la maquette, jamais une couleur (ADR 0016).
+  ...['Literal[value', 'TemplateElement[value.raw'].map((node) => ({
+    selector: `${node}=${ARBITRARY_COLOR}]`,
+    message: ARBITRARY_COLOR_MESSAGE,
+  })),
   {
     selector:
       'Identifier[name=/^(globalThis|window|self)$/]:not(MemberExpression[computed=false] > Identifier.object, ' +

@@ -358,6 +358,27 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
     await expectPermitted(SHARED_UI, "export const B = () => <div className='box' />\n")
   })
 
+  it('TRN-21 : aucune couleur hors des jetons de la maquette dans une classe Tailwind (ADR 0016)', async () => {
+    for (const code of [
+      'export const B = () => <div className="bg-[#ff0000]" />\n',
+      'export const B = () => <div className="p-2 text-[rgb(0,0,0)]" />\n',
+      'export const B = () => <div className="[box-shadow:0_0_0_1px_#000]" />\n',
+      'export const B = () => <div className="border-[oklch(0.7_0.1_120)]" />\n',
+      "export const c = 'fill-[hsl(10_50%_50%)]'\n",
+      'export const B = (x: string) => <div className={`${x} bg-[#fff]`} />\n',
+    ]) {
+      await expectForbidden(SHARED_UI, code)
+    }
+    await expectPermitted(
+      SHARED_UI,
+      'export const B = () => <div className="h-[236px] bg-surface text-[14.5px] inset-ring inset-ring-line" />\n',
+    )
+    await expectPermitted(
+      SHARED_UI,
+      'export const B = () => <div className="shadow-[inset_0_0_0_1px_var(--color-line)]" />\n',
+    )
+  })
+
   it('A05 : ni eval ni Function', async () => {
     await expectForbidden(SHARED_UI, "export const v: unknown = eval('1')\n")
     await expectForbidden(SHARED_UI, "export const v = new Function('return 1')\n")
