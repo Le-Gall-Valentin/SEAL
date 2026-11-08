@@ -11,14 +11,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param origin origine unique du client, de l'API et de la WebSocket (TRN-02), par exemple {@code https://localhost:8443}
  * @param security paramètres des en-têtes de sécurité
  * @param session durées de vie des sessions
+ * @param mail expédition des courriels
  */
 @ConfigurationProperties("seal")
-public record SealProperties(URI origin, Security security, Session session) {
+public record SealProperties(URI origin, Security security, Session session, Mail mail) {
 
     public SealProperties {
         Objects.requireNonNull(origin, "seal.origin est obligatoire");
         Objects.requireNonNull(security, "seal.security est obligatoire");
         Objects.requireNonNull(session, "seal.session est obligatoire");
+        Objects.requireNonNull(mail, "seal.mail est obligatoire");
         // TRN-02 : une origine HTTPS canonique, sans chemin ni identifiants, sert à la fois l'API, le client et la
         // WebSocket ; elle doit être écrite comme le navigateur l'envoie dans l'en-tête Origin (hôte en minuscules,
         // port
@@ -60,6 +62,17 @@ public record SealProperties(URI origin, Security security, Session session) {
             if (absoluteTimeout.isNegative() || absoluteTimeout.isZero()) {
                 throw new IllegalArgumentException(
                         "seal.session.absolute-timeout doit être positive : " + absoluteTimeout);
+            }
+        }
+    }
+
+    /** @param from expéditeur des courriels de SEAL (ADR 0019, point 8) */
+    public record Mail(String from) {
+
+        public Mail {
+            Objects.requireNonNull(from, "seal.mail.from est obligatoire");
+            if (from.isBlank()) {
+                throw new IllegalArgumentException("seal.mail.from ne doit pas être vide");
             }
         }
     }

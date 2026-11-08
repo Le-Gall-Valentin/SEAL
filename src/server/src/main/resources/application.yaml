@@ -32,6 +32,17 @@ spring:
     jdbc:
       # Tables créées par Flyway (V1__schema_initial.sql), jamais par Spring Session.
       initialize-schema: never
+  mail:
+    # AUTH-14 : Mailpit en local (service mail de compose.yaml) ; délais bornés à 5 secondes (A10).
+    host: ${SEAL_MAIL_HOST:localhost}
+    port: ${SEAL_MAIL_PORT:1025}
+    default-encoding: UTF-8
+    properties:
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+      # Parties locales non ASCII (RFC 6531), comme Valéntin.Le-Gall de l'exemple d'AUTH-04.
+      mail.mime.allowutf8: true
   jackson:
     deserialization:
       # Section 14 du CDC : aucun champ inconnu accepté dans une requête.
@@ -78,3 +89,6 @@ seal:
   session:
     # AUTH-52 : une session expire 12 heures après sa création, même active (AbsoluteSessionTimeoutFilter).
     absolute-timeout: 12h
+  mail:
+    # ADR 0019, point 8.
+    from: ${SEAL_MAIL_FROM:SEAL <noreply@seal.localhost>}
