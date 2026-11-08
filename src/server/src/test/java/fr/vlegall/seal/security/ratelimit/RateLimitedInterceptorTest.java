@@ -5,15 +5,23 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.Mockito.mock;
 
+import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.journal.SecurityJournal;
+import fr.vlegall.seal.security.session.SealPrincipal;
 import fr.vlegall.seal.support.MutableClock;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -37,6 +45,13 @@ class RateLimitedInterceptorTest {
     @AfterEach
     void clearRequest() {
         RequestContextHolder.resetRequestAttributes();
+        SecurityContextHolder.clearContext();
+    }
+
+    private static void authenticate(UserId user) {
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        UsernamePasswordAuthenticationToken.authenticated(new SealPrincipal(user), null, List.of()));
     }
 
     @Test
@@ -74,8 +89,29 @@ class RateLimitedInterceptorTest {
     }
 
     @Test
-    @DisplayName("ADR 0013 : l'annotation n'accepte que des limites par IP")
-    void adr0013OnlyIpLimitsAreDeclarative() {
+    @DisplayName(
+            "AUTH-14 : une limite par utilisateur s'applique à l'utilisateur de la session ; le 4e renvoi est refusé")
+    void auth14UserLimitAppliesToTheAuthenticatedUser() {
+        UserId user = new UserId(UUID.fromString("0190f1d2-7e3a-7b4c-8d5e-6f7a8b9c0d1e"));
+        authenticate(user);
+        for (int i = 0; i < 3; i++) {
+            assertThat(probe.resend()).isEqualTo("renvoyé");
+        }
+
+        assertThatExceptionOfType(RateLimitExceededException.class).isThrownBy(probe::resend);
+        assertThat(limiter.remaining(RateLimit.EMAIL_CODE_RESENDS_PER_USER, user))
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("ADR 0013 : sans utilisateur authentifié, une limite par utilisateur refuse l'appel (échec fermé)")
+    void adr0013UserLimitWithoutUserFailsClosed() {
         assertThatIllegalStateException().isThrownBy(probe::resend);
+
+        SecurityContextHolder.getContext()
+                .setAuthentication(new AnonymousAuthenticationToken(
+                        "clé", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
+        assertThatIllegalStateException().isThrownBy(probe::resend);
+        assertThat(limiter.bucketCount()).isZero();
     }
 }

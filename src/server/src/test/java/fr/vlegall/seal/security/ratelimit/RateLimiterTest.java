@@ -280,4 +280,23 @@ class RateLimiterTest {
 
         verifyNoInteractions(journal);
     }
+
+    @Test
+    @DisplayName(
+            "AUTH-14 : les renvois restants partent de la capacité, sans créer de seau, et baissent à chaque renvoi")
+    void auth14RemainingStartsAtCapacityAndDecreases() {
+        UserId user = new UserId(UUID.fromString("0190f1d2-7e3a-7b4c-8d5e-6f7a8b9c0d1f"));
+
+        assertThat(limiter.remaining(RateLimit.EMAIL_CODE_RESENDS_PER_USER, user))
+                .isEqualTo(3);
+        assertThat(limiter.bucketCount()).isZero();
+        for (int expected = 2; expected >= 0; expected--) {
+            limiter.consume(RateLimit.EMAIL_CODE_RESENDS_PER_USER, user);
+            assertThat(limiter.remaining(RateLimit.EMAIL_CODE_RESENDS_PER_USER, user))
+                    .isEqualTo(expected);
+        }
+        clock.advance(Duration.ofHours(1));
+        assertThat(limiter.remaining(RateLimit.EMAIL_CODE_RESENDS_PER_USER, user))
+                .isEqualTo(3);
+    }
 }
