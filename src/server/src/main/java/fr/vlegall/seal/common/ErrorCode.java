@@ -12,7 +12,20 @@ public enum ErrorCode {
     RATE_LIMITED(429),
     INTERNAL_ERROR(500),
     /** Requête mal formée au niveau HTTP (405, 406, 413, 415) : la réponse garde le statut choisi par Spring. */
-    REQUEST_REJECTED(400);
+    REQUEST_REJECTED(400),
+    // Comptes : statuts fixés par l'ADR 0019.
+    /** AUTH-01 : identifiant hors du format imposé. */
+    USERNAME_INVALID(400),
+    /** AUTH-02 : identifiant déjà pris, même par un compte en attente ou supprimé (AUTH-03). */
+    USERNAME_TAKEN(409),
+    /** AUTH-02 : identifiant de la liste des noms réservés. */
+    USERNAME_RESERVED(422),
+    /** AUTH-11 : mot de passe refusé par l'une des règles, longueur maximale comprise. */
+    PASSWORD_TOO_WEAK(422),
+    /** AUTH-14 : code de vérification erroné ; l'essai est compté. */
+    INVALID_CODE(422),
+    /** AUTH-14 : aucun code vivant (expiré, consommé, remplacé ou épuisé par les 5 essais). */
+    CODE_EXPIRED(422);
 
     private final int status;
 

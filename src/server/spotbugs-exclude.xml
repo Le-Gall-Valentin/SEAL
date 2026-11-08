@@ -21,6 +21,16 @@
     </Match>
 
     <!--
+      IMPROPER_UNICODE, même raison : Unicode regroupe les transformations de SEAL (NFC de SEC-01, NFKC d'AUTH-11,
+      minuscules et pliage d'AUTH-04), et chaque appelant valide la valeur transformée, jamais la saisie brute.
+      Exclusion limitée à cette classe : tout appel à la normalisation hors d'elle reste signalé.
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.common.Unicode"/>
+        <Bug pattern="IMPROPER_UNICODE"/>
+    </Match>
+
+    <!--
       SPRING_ENDPOINT n'est pas une faille : FindSecBugs l'émet sur chaque contrôleur pour qu'il soit relu
       (ADR 0011). Une entrée par contrôleur relu, avec le test qui vérifie son contrôle d'accès (QA-05) ;
       jamais d'exclusion globale.

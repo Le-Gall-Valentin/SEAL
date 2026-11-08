@@ -20,4 +20,14 @@ public final class Digests {
             throw new IllegalStateException("SHA-256 absent de la JCA", e);
         }
     }
+
+    /**
+     * Compare deux empreintes en temps constant (A04) : la durée ne dépend pas de la position du premier octet
+     * différent, donc une mesure du temps de réponse ne révèle pas un préfixe correct.
+     */
+    public static boolean equal(byte[] expected, byte[] actual) {
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(actual, "actual");
+        return MessageDigest.isEqual(expected, actual);
+    }
 }

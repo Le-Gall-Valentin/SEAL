@@ -24,4 +24,14 @@ class DigestsTest {
         assertThat(HexFormat.of().formatHex(Digests.sha256(new byte[0])))
                 .isEqualTo("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     }
+
+    @Test
+    @DisplayName("ADR 0008 : deux empreintes égales se comparent en temps constant")
+    void equalComparesDigests() {
+        byte[] digest = Digests.sha256(new byte[] {1});
+
+        assertThat(Digests.equal(digest, Digests.sha256(new byte[] {1}))).isTrue();
+        assertThat(Digests.equal(digest, Digests.sha256(new byte[] {2}))).isFalse();
+        assertThat(Digests.equal(digest, new byte[0])).isFalse();
+    }
 }
