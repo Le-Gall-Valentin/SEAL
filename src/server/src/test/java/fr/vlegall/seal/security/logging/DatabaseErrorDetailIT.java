@@ -22,8 +22,9 @@ class DatabaseErrorDetailIT {
     @Autowired
     private TransactionTemplate transactions;
 
+    /** Deux comptes actifs ne peuvent partager une adresse (index partiel {@code users_verified_email}, ADR 0019). */
     private void insertUser(String username) {
-        jdbc.sql("INSERT INTO users (username, display_name, email) VALUES (?, 'Valentin', ?)")
+        jdbc.sql("INSERT INTO users (username, display_name, email, status) VALUES (?, 'Valentin', ?, 'ACTIVE')")
                 .params(username, EMAIL)
                 .update();
     }
@@ -38,7 +39,7 @@ class DatabaseErrorDetailIT {
             return catchThrowableOfType(DataAccessException.class, () -> insertUser("detail.deux"));
         });
 
-        assertThat(failure).isNotNull();
+        assertThat(failure).isNotNull().hasMessageContaining("users_verified_email");
         assertThat(failure.getMessage()).doesNotContain(EMAIL);
         assertThat(failure.getMostSpecificCause().getMessage()).doesNotContain(EMAIL);
     }
