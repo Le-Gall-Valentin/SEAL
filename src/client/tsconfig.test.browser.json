@@ -6,6 +6,6 @@
   },
   // Tests de composants exécutés dans Chromium (projet « browser » de Vitest) : sans les types de Node, absents du
   // navigateur.
-  "include": ["src/**/*.test.tsx"],
+  "include": ["src/**/*.test.tsx", "vitest.setup.browser.ts"],
   "exclude": []
 }
