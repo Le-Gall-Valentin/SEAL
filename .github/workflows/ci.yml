@@ -72,6 +72,9 @@ jobs:
       # Typage (tsc -b), ESLint et Prettier.
       - run: npm run lint
 
+      # ADR 0012, point 9 : les tests de composants tournent dans Chromium.
+      - run: npx playwright install --with-deps chromium
+
       # Vitest avec les seuils de couverture de QA-10.
       - run: npm test
 

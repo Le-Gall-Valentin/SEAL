@@ -1,5 +1,6 @@
 import { globSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { playwright } from '@vitest/browser-playwright'
 import { defineConfig, mergeConfig } from 'vitest/config'
 import viteConfig from './vite.config.ts'
 
@@ -25,10 +26,32 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      // eslint.config.test.ts éprouve les frontières de l'ADR 0012 sur le mini-projet eslint-fixtures/.
-      include: ['src/**/*.test.{ts,tsx}', 'eslint.config.test.ts'],
-      // Node fournit WebCrypto (Ed25519, X25519, AES-GCM) : le noyau cryptographique s'y teste tel quel.
-      environment: 'node',
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: 'node',
+            // Node fournit WebCrypto (Ed25519, X25519, AES-GCM) : le noyau cryptographique s'y teste tel quel.
+            // eslint.config.test.ts éprouve les règles de l'ADR 0012 sur le mini-projet eslint-fixtures/.
+            include: ['src/**/*.test.ts', 'eslint.config.test.ts'],
+            environment: 'node',
+          },
+        },
+        {
+          extends: true,
+          test: {
+            // ADR 0012, point 9 : les composants se testent dans un vrai Chromium, sans jsdom.
+            name: 'browser',
+            include: ['src/**/*.test.tsx'],
+            browser: {
+              enabled: true,
+              headless: true,
+              provider: playwright(),
+              instances: [{ browser: 'chromium' }],
+            },
+          },
+        },
+      ],
       coverage: {
         provider: 'v8',
         include: ['src/**/*.{ts,tsx}'],

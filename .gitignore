@@ -18,6 +18,7 @@ src/client/dist/
 src/client/coverage/
 src/client/playwright-report/
 src/client/test-results/
+src/client/.vitest/
 *.tsbuildinfo
 
 # Livrable produit par scripts/package.sh

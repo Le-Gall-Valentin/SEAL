@@ -4,6 +4,7 @@ client/dist
 client/coverage
 client/playwright-report
 client/test-results
+client/.vitest
 server/target
 certs
 data
