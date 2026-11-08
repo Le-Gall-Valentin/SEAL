@@ -4,6 +4,7 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
     "types": ["vite/client", "node"]
   },
-  "include": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  // Tests exécutés sous Node (projet « node » de Vitest).
+  "include": ["src/**/*.test.ts"],
   "exclude": []
 }

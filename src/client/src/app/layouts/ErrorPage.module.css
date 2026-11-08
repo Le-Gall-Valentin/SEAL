@@ -1,0 +1,7 @@
+.page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 16px;
+  display: grid;
+  place-items: center;
+}

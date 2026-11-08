@@ -14,7 +14,7 @@ import {
 } from './canonical'
 
 // MSG-02 : vecteurs produits par src/protocol/tools/gen_vectors.py, relus aussi par les tests Java.
-const VECTORS = new URL('../../../protocol/vectors/canonical-encoding.json', import.meta.url)
+const VECTORS = new URL('../../../../protocol/vectors/canonical-encoding.json', import.meta.url)
 
 type Descriptor =
   | { type: 'u8' | 'u32'; value: number }
@@ -121,7 +121,7 @@ describe('MSG-02 : vecteurs de l’encodage canonique', () => {
   const valid = parseVectors('valid')
   const invalid = parseVectors('invalid')
 
-  it('le fichier de vecteurs contient des cas valides et des cas à rejeter', () => {
+  it('MSG-02 : le fichier de vecteurs contient des cas valides et des cas à rejeter', () => {
     expect(valid.length).toBeGreaterThan(0)
     expect(invalid.length).toBeGreaterThan(0)
   })
@@ -163,7 +163,7 @@ describe('encodeur canonique, cas propres à TypeScript', () => {
     },
   )
 
-  it('bytes copie son entrée : la modifier ensuite ne change pas l’encodage', () => {
+  it('MSG-01 : bytes copie son entrée : la modifier ensuite ne change pas l’encodage', () => {
     const input = Uint8Array.of(1, 2, 3)
     const encoded = bytes(input)
 
@@ -172,11 +172,16 @@ describe('encodeur canonique, cas propres à TypeScript', () => {
     expect(hex(encoded)).toBe('00000003010203')
   })
 
-  it('list encode le nombre d’éléments puis chaque élément avec l’encodeur donné', () => {
+  it('MSG-01 : list encode le nombre d’éléments puis chaque élément avec l’encodeur donné', () => {
     expect(hex(list(u64, [1n, 2n]))).toBe('0000000200000000000000010000000000000002')
   })
 
-  it('CanonicalEncodingError se reconnaît par son nom', () => {
+  it('MSG-01 : list passe chaque élément seul à son encodeur, sans son index ni le tableau', () => {
+    // map(struct) passerait l'index et le tableau comme champs de la structure.
+    expect(list(struct, ['a', 'b'])).toEqual(concat(u32(2), struct('a'), struct('b')))
+  })
+
+  it('ADR 0006 : CanonicalEncodingError se reconnaît par son nom', () => {
     expect(() => u8(-1)).toThrow(expect.objectContaining({ name: 'CanonicalEncodingError' }))
   })
 })

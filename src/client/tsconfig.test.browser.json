@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.browser.tsbuildinfo",
+    "types": ["vite/client"]
+  },
+  // Tests de composants exécutés dans Chromium (projet « browser » de Vitest) : sans les types de Node, absents du
+  // navigateur.
+  "include": ["src/**/*.test.tsx"],
+  "exclude": []
+}
