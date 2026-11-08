@@ -1,5 +1,6 @@
 import { useId } from 'react'
-import { t } from '@/shared/i18n'
+import { useMessages } from '@/shared/i18n'
+import { loadErrorStateMessages } from './loadErrorStateMessages'
 
 interface LoadErrorStateProps {
   /** Niveau du titre, selon l'endroit où l'état s'affiche : h1 quand il remplace la page. */
@@ -13,6 +14,7 @@ interface LoadErrorStateProps {
  */
 export function LoadErrorState({ heading: Heading, onRetry }: LoadErrorStateProps) {
   const titleId = useId()
+  const t = useMessages(loadErrorStateMessages)
   return (
     <section
       role="alert"
@@ -37,7 +39,7 @@ export function LoadErrorState({ heading: Heading, onRetry }: LoadErrorStateProp
         </svg>
       </span>
       <Heading id={titleId} className="mt-3.5 text-[18px] font-bold tracking-[-0.01em]">
-        {t('loadError.title')}
+        {t('title')}
       </Heading>
       <button
         type="button"
@@ -57,7 +59,7 @@ export function LoadErrorState({ heading: Heading, onRetry }: LoadErrorStateProp
         >
           <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4" />
         </svg>
-        {t('loadError.retry')}
+        {t('retry')}
       </button>
     </section>
   )

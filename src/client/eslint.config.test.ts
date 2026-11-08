@@ -131,6 +131,16 @@ describe('ADR 0012 : couches de Feature-Sliced Design', () => {
     await expectAllowed('src/features/sign-in/lib/format.ts', '../config/limits')
   })
 
+  it("ADR 0017 : i18n est une feuille que ui et model importent, et qui n'importe que shared/i18n", async () => {
+    await expectAllowed('src/features/sign-in/ui/Form.ts', '../i18n/messages')
+    await expectAllowed('src/features/sign-in/model/useSignIn.ts', '../i18n/messages')
+    await expectAllowed('src/features/sign-in/i18n/messages.ts', '@/shared/i18n')
+    await expectRefused('src/features/sign-in/api/signInRequest.ts', '../i18n/messages')
+    await expectRefused('src/features/sign-in/lib/format.ts', '../i18n/messages')
+    await expectRefused('src/features/sign-in/i18n/messages.ts', '../model/useSignIn')
+    await expectRefused('src/features/sign-in/i18n/messages.ts', '@/shared/ui')
+  })
+
   it('QA-10 : un fichier hors des couches, ou un import vers lui, est refusé', async () => {
     expect(await boundaryRules('src/misc/other.ts', 'export const other = 1\n')).toContain(
       'boundaries/no-unknown-files',
@@ -199,6 +209,7 @@ const SECURITY_RULES = new Set([
   'no-new-func',
   'no-script-url',
   'seal/tailwind-arbitrary-values',
+  'seal/no-jsx-literal-text',
 ])
 
 async function securityRules(file: string, code: string): Promise<string[]> {
@@ -351,7 +362,10 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
       "export const B = (h: string) => <iframe title='t' srcDoc={h} />\n",
     )
     await expectForbidden(SHARED_UI, "export const B = () => <a href='javascript:void 0'>x</a>\n")
-    await expectPermitted(SHARED_UI, "export const B = () => <a href='/settings'>x</a>\n")
+    await expectPermitted(
+      SHARED_UI,
+      "const t = (key: string) => key\nexport const B = () => <a href='/settings'>{t('settings')}</a>\n",
+    )
   })
 
   it('TRN-21 : aucun style en ligne', async () => {
@@ -408,6 +422,33 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
       "import './home.css'\nexport const v = 1\n",
     )
     await expectPermitted('src/app/index.ts', "import './styles/global.css'\nexport const v = 1\n")
+  })
+
+  it('ADR 0017 : aucun texte brut dans le JSX, ni entre balises ni dans un attribut lu ou affiché', async () => {
+    for (const jsx of [
+      '<p>Bonjour</p>',
+      "<p>{'Bonjour'}</p>",
+      '<p>Réessayer dans 5 minutes</p>',
+      '<button aria-label="Fermer" />',
+      '<img alt="Logo de SEAL" src="/logo.svg" />',
+      '<input placeholder="Votre nom" />',
+      '<div title="Informations" />',
+    ]) {
+      await expectForbidden(SHARED_UI, `export const B = () => ${jsx}\n`)
+    }
+    for (const jsx of [
+      "<p>{t('title')}</p>",
+      '<p> · </p>',
+      '<svg viewBox="0 0 24 24" aria-hidden="true" />',
+      '<div className="flex" role="alert" />',
+      "<input placeholder={t('name')} />",
+    ]) {
+      await expectPermitted(
+        SHARED_UI,
+        `const t = (key: string) => key\nexport const B = () => ${jsx}\n`,
+      )
+    }
+    await expectPermitted('src/shared/ui/Box.test.tsx', 'export const B = () => <p>Rétabli</p>\n')
   })
 
   it('A05 : ni eval ni Function', async () => {
