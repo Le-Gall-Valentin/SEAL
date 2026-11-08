@@ -198,6 +198,7 @@ const SECURITY_RULES = new Set([
   'no-eval',
   'no-new-func',
   'no-script-url',
+  'seal/tailwind-arbitrary-values',
 ])
 
 async function securityRules(file: string, code: string): Promise<string[]> {
@@ -358,25 +359,55 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
     await expectPermitted(SHARED_UI, "export const B = () => <div className='box' />\n")
   })
 
-  it('TRN-21 : aucune couleur hors des jetons de la maquette dans une classe Tailwind (ADR 0016)', async () => {
-    for (const code of [
-      'export const B = () => <div className="bg-[#ff0000]" />\n',
-      'export const B = () => <div className="p-2 text-[rgb(0,0,0)]" />\n',
-      'export const B = () => <div className="[box-shadow:0_0_0_1px_#000]" />\n',
-      'export const B = () => <div className="border-[oklch(0.7_0.1_120)]" />\n',
-      "export const c = 'fill-[hsl(10_50%_50%)]'\n",
-      'export const B = (x: string) => <div className={`${x} bg-[#fff]`} />\n',
+  it("ADR 0016 : une valeur arbitraire de Tailwind n'est qu'une dimension, jamais une couleur, une URL ni une propriété", async () => {
+    for (const className of [
+      'bg-[#ff0000]',
+      'p-2 text-[rgb(0,0,0)]',
+      'border-[oklch(0.7_0.1_120)]',
+      'bg-[red]',
+      'text-[white]',
+      'text-[RGB(255,0,0)]',
+      'bg-[color-mix(in_srgb,red,blue)]',
+      'bg-[light-dark(red,blue)]',
+      'bg-[Canvas]',
+      'shadow-[0_0_0_1px_red]',
+      'shadow-[inset_0_0_0_1px_var(--color-line)]',
+      'bg-(--nope,#ff0000)',
+      'w-[var(--x,10px)]',
+      'bg-[url(https://localhost:9999/x.png)]',
+      '[box-shadow:0_0_0_1px_#000]',
+      'md:[color:tomato]',
+      'hover:!bg-[red]',
     ]) {
-      await expectForbidden(SHARED_UI, code)
+      await expectForbidden(SHARED_UI, `export const B = () => <div className="${className}" />\n`)
     }
-    await expectPermitted(
+    await expectForbidden(SHARED_UI, "export const c = 'fill-[hsl(10_50%_50%)]'\n")
+    await expectForbidden(
       SHARED_UI,
-      'export const B = () => <div className="h-[236px] bg-surface text-[14.5px] inset-ring inset-ring-line" />\n',
+      'export const B = (x: string) => <div className={`${x} bg-[#fff]`} />\n',
     )
-    await expectPermitted(
+    for (const className of [
+      'h-[236px] bg-surface text-[14.5px] inset-ring inset-ring-line',
+      'rounded-[18px] tracking-[-0.01em] w-[min(100%,380px)] max-h-[calc(100vh-2rem)]',
+      'w-[var(--sidebar-width)] h-(--header-height) grid-cols-[repeat(3,1fr)] translate-x-[-50%]',
+      'md:h-[44px] hover:w-[clamp(200px,50%,400px)]',
+    ]) {
+      await expectPermitted(SHARED_UI, `export const B = () => <div className="${className}" />\n`)
+    }
+    await expectPermitted(SHARED_UI, "export const t = 'Échec de la vérification [#2026]'\n")
+    await expectPermitted(SHARED_UI, 'export const q = \'[href="#abc"]\'\n')
+  })
+
+  it("ADR 0016 : aucun fichier CSS de composant ; seul app importe la feuille d'entrée", async () => {
+    await expectForbidden(
       SHARED_UI,
-      'export const B = () => <div className="shadow-[inset_0_0_0_1px_var(--color-line)]" />\n',
+      "import styles from './Card.module.css'\nexport const s = styles\n",
     )
+    await expectForbidden(
+      'src/pages/home/ui/HomePage.tsx',
+      "import './home.css'\nexport const v = 1\n",
+    )
+    await expectPermitted('src/app/index.ts', "import './styles/global.css'\nexport const v = 1\n")
   })
 
   it('A05 : ni eval ni Function', async () => {
