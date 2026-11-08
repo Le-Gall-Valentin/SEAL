@@ -3,7 +3,7 @@ import { render } from 'vitest-browser-react'
 import { ErrorPage } from './ErrorPage'
 
 describe('ADR 0012 : page de repli des frontières d’erreur', () => {
-  it('TRN-21 : la page centre l’état d’erreur avec des marges de 16 px, sur le fond et l’encre de la maquette', async () => {
+  it('ADR 0016 : la page centre l’état d’erreur avec des marges de 16 px, sur le fond et l’encre de la maquette', async () => {
     const screen = await render(<ErrorPage onRetry={() => undefined} />)
     const page = screen.getByRole('main').element()
 

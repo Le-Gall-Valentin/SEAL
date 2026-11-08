@@ -1,10 +1,29 @@
 /*
  * ADR 0016 : expose à Tailwind les jetons de tokens.css, seule source des couleurs et des polices de la maquette
- * (--color-surface donne bg-surface, text-surface…). La palette par défaut de Tailwind est retirée : une couleur hors
- * de la maquette n'a pas de classe.
+ * (--color-surface donne bg-surface, text-surface…). La palette, les ombres et la police serif par défaut de Tailwind
+ * sont retirées : une couleur, une ombre ou une police hors de la maquette n'a pas de classe. Tout est en px, comme
+ * la maquette : l'échelle d'espacement et les rayons nommés ne dépendent pas de la police du navigateur.
  */
 @theme inline {
   --color-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+  --font-serif: initial;
+  --text-*: initial;
+  --container-*: initial;
+  --radius-*: initial;
+
+  --spacing: 4px;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-4xl: 32px;
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);

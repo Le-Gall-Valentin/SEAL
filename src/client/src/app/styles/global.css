@@ -1,9 +1,10 @@
 /*
  * ADR 0016 : seule feuille d'entrée du client ; Tailwind, puis les jetons de la maquette et leur thème. Tailwind ne lit
- * que le code de src/, tests exclus : les extraits des tests (des classes interdites, par exemple) n'entrent jamais dans
- * la feuille livrée.
+ * que les fichiers .ts et .tsx de src/, tests exclus : un Markdown, une configuration ou un extrait de test n'ajoute
+ * aucune classe à la feuille livrée.
  */
-@import 'tailwindcss' source('../..');
+@import 'tailwindcss' source(none);
+@source '../../**/*.{ts,tsx}';
 @source not '../../**/*.test.{ts,tsx}';
 @import '../../shared/styles/tokens.css';
 @import '../../shared/styles/theme.css';
@@ -21,8 +22,10 @@
     font-family: var(--sans);
   }
 
+  /* Le reset de Tailwind retire le soulignement des liens ; la maquette garde celui du navigateur. */
   a {
     color: var(--accent-text);
+    text-decoration-line: underline;
   }
 
   a:hover {

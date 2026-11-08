@@ -39,7 +39,7 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
   })
 
   // Valeurs de l'écran Etats de la maquette (bloc <helmet> et styles de l'état « Erreur de chargement »).
-  it('TRN-21 : la carte, l’icône, le titre et le bouton reprennent les dimensions et les jetons de la maquette', async () => {
+  it('ADR 0016 : la carte, l’icône, le titre et le bouton reprennent les dimensions et les jetons de la maquette', async () => {
     const screen = await render(<LoadErrorState heading="h1" onRetry={() => undefined} />)
     const card = screen.getByRole('alert').element()
     const icon = card.querySelector('[aria-hidden="true"]')
@@ -59,6 +59,9 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
     })
     expect(getComputedStyle(icon)).toMatchObject({
       display: 'grid',
+      alignItems: 'center',
+      justifyItems: 'center',
+      flexShrink: '0',
       width: '44px',
       height: '44px',
       borderRadius: '12px',
@@ -93,5 +96,43 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
     expect(visibleShadows(card)).toEqual(['rgb(227, 230, 218) 0px 0px 0px 1px inset'])
     expect(visibleShadows(icon)).toEqual(['rgb(239, 197, 190) 0px 0px 0px 1px inset'])
     expect(visibleShadows(button)).toEqual(['rgb(205, 210, 192) 0px 0px 0px 1px inset'])
+  })
+
+  it("ADR 0012 : la carte fait au plus 380 px de large, et toute la largeur d'un conteneur plus étroit", async () => {
+    for (const [width, expected] of [
+      ['600px', 380],
+      ['200px', 200],
+    ] as const) {
+      const container = document.body.appendChild(document.createElement('div'))
+      container.style.width = width
+      const screen = await render(<LoadErrorState heading="h1" onRetry={() => undefined} />, {
+        container,
+      })
+
+      expect(screen.getByRole('alert').element().getBoundingClientRect().width).toBe(expected)
+      await screen.unmount()
+      container.remove()
+    }
+  })
+
+  it('ADR 0016 : les dimensions restent celles de la maquette quand la police du navigateur grandit', async () => {
+    document.documentElement.style.fontSize = '24px'
+    try {
+      const screen = await render(<LoadErrorState heading="h1" onRetry={() => undefined} />)
+      const card = screen.getByRole('alert').element()
+      const icon = card.querySelector('[aria-hidden="true"]')
+      if (icon === null) throw new Error('icône absente')
+
+      expect(getComputedStyle(card)).toMatchObject({ height: '236px', padding: '22px' })
+      expect(getComputedStyle(icon)).toMatchObject({ width: '44px', borderRadius: '12px' })
+      expect(getComputedStyle(screen.getByRole('heading').element()).marginTop).toBe('14px')
+      expect(getComputedStyle(screen.getByRole('button').element())).toMatchObject({
+        height: '44px',
+        paddingRight: '16px',
+        gap: '8px',
+      })
+    } finally {
+      document.documentElement.style.fontSize = ''
+    }
   })
 })

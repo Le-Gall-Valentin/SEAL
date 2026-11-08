@@ -3,7 +3,7 @@ import { render } from 'vitest-browser-react'
 import { HomePage } from './HomePage'
 
 describe("ADR 0012 : page d'accueil provisoire", () => {
-  it('TRN-21 : le nom est centré dans la page, avec les styles du mot-symbole de la maquette', async () => {
+  it('ADR 0016 : le nom est centré dans la page, avec les styles du mot-symbole de la maquette', async () => {
     const screen = await render(<HomePage />)
     const page = screen.getByRole('main').element()
     const wordmark = screen.getByRole('heading', { level: 1, name: 'SEAL' }).element()

@@ -4,7 +4,7 @@ import { t } from '@/shared/i18n'
 export function HomePage() {
   return (
     <main className="flex min-h-screen items-center justify-center">
-      <h1 className="m-0 text-[34px] leading-none font-extrabold tracking-[-0.05em]">
+      <h1 className="text-[34px] leading-none font-extrabold tracking-tighter">
         {t('home.wordmark')}
       </h1>
     </main>
