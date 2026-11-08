@@ -10,6 +10,9 @@ import fr.vlegall.seal.identity.domain.model.Username;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
 import fr.vlegall.seal.identity.infrastructure.persistence.entity.UserEntity;
 import fr.vlegall.seal.identity.infrastructure.persistence.repository.UserJpaRepository;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
@@ -28,6 +31,9 @@ public class UserRepositoryAdapter implements UserRepository {
 
     /** AUTH-02 : contrainte d'unicité de la colonne {@code username}, nommée par PostgreSQL. */
     static final String USERNAME_CONSTRAINT = "users_username_key";
+
+    /** AUTH-15 : index partiel qui réserve une adresse au seul compte actif (ADR 0019). */
+    static final String VERIFIED_EMAIL_INDEX = "users_verified_email";
 
     private final UserJpaRepository jpa;
     private final JdbcClient jdbc;
@@ -58,6 +64,35 @@ public class UserRepositoryAdapter implements UserRepository {
     @Override
     public Optional<Account> findById(UserId id) {
         return jpa.findById(id.value()).map(UserRepositoryAdapter::toAccount);
+    }
+
+    @Override
+    public Optional<Account> lockById(UserId id) {
+        return jpa.findForUpdate(id.value()).map(UserRepositoryAdapter::toAccount);
+    }
+
+    @Override
+    public void activate(UserId id, Instant verifiedAt) {
+        try {
+            jdbc.sql("UPDATE users SET status = 'ACTIVE', email_verified_at = :verifiedAt "
+                            + "WHERE id = :id AND status = 'PENDING_EMAIL'")
+                    .param("verifiedAt", OffsetDateTime.ofInstant(verifiedAt, ZoneOffset.UTC))
+                    .param("id", id.value())
+                    .update();
+        } catch (DuplicateKeyException e) {
+            if (violates(e, VERIFIED_EMAIL_INDEX)) {
+                throw new IdentityException.CodeExpired();
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public void changeEmail(UserId id, EmailAddress email) {
+        jdbc.sql("UPDATE users SET email = CAST(:email AS citext) WHERE id = :id AND status = 'PENDING_EMAIL'")
+                .param("email", email.value())
+                .param("id", id.value())
+                .update();
     }
 
     @Override

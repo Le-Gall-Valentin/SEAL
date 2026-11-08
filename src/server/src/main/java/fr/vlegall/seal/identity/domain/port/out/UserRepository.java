@@ -6,6 +6,7 @@ import fr.vlegall.seal.identity.domain.model.DisplayName;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.IdentityException;
 import fr.vlegall.seal.identity.domain.model.Username;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
@@ -21,6 +22,19 @@ public interface UserRepository {
     UserId createPending(Username username, DisplayName displayName, EmailAddress email);
 
     Optional<Account> findById(UserId id);
+
+    /** Lit le compte en verrouillant sa ligne jusqu'à la fin de la transaction : les gestes concurrents attendent. */
+    Optional<Account> lockById(UserId id);
+
+    /**
+     * AUTH-16 : courriel vérifié, compte actif.
+     *
+     * @throws IdentityException.CodeExpired si un autre compte actif vient d'obtenir l'adresse (ADR 0019, point 1)
+     */
+    void activate(UserId id, Instant verifiedAt);
+
+    /** AUTH-17 : nouveau courriel d'un compte en attente. */
+    void changeEmail(UserId id, EmailAddress email);
 
     /** AUTH-15 : vrai si un compte actif possède cette adresse, sans tenir compte de la casse. */
     boolean activeAccountOwns(EmailAddress email);

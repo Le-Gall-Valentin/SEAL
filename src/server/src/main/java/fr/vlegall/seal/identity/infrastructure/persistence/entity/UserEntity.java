@@ -9,8 +9,8 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Ligne de {@code users}. L'insertion passe par SQL, pour que PostgreSQL attribue l'UUIDv7 (DATA-03) ; l'entité sert
- * aux lectures et aux mises à jour.
+ * Ligne de {@code users}, en lecture : l'insertion passe par SQL, pour que PostgreSQL attribue l'UUIDv7 (DATA-03), et les
+ * mises à jour aussi, pour qu'un refus de l'index partiel survienne dans le handler et non au commit (ADR 0019).
  */
 @Entity
 @Table(name = "users")
@@ -31,6 +31,10 @@ public class UserEntity {
 
     @Column(name = "email_verified_at")
     private @Nullable Instant emailVerifiedAt;
+
+    public @Nullable Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
 
     @Column(name = "status", nullable = false)
     private String status;
@@ -61,16 +65,5 @@ public class UserEntity {
 
     public String getStatus() {
         return status;
-    }
-
-    /** AUTH-16 : courriel vérifié, compte actif. */
-    public void activate(Instant verifiedAt) {
-        this.status = "ACTIVE";
-        this.emailVerifiedAt = verifiedAt;
-    }
-
-    /** AUTH-17 : courriel d'un compte en attente remplacé. */
-    public void changeEmail(String newEmail) {
-        this.email = newEmail;
     }
 }

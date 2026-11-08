@@ -1,0 +1,299 @@
+package fr.vlegall.seal.identity.infrastructure.web;
+
+import static fr.vlegall.seal.support.AuthClient.body;
+import static fr.vlegall.seal.support.AuthClient.sessionOf;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import fr.vlegall.seal.support.AuthClient;
+import fr.vlegall.seal.support.AuthClient.Registered;
+import fr.vlegall.seal.support.MutableClock;
+import fr.vlegall.seal.support.RecordingMailSender;
+import fr.vlegall.seal.support.SealIntegrationTest;
+import jakarta.servlet.http.Cookie;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
+/** Vérification, renvoi et changement du courriel, de bout en bout dans le contexte complet. */
+@SealIntegrationTest
+class EmailVerificationIT {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private JdbcClient jdbc;
+
+    @Autowired
+    private RecordingMailSender mail;
+
+    @Autowired
+    private MutableClock clock;
+
+    private AuthClient client;
+
+    @BeforeEach
+    void setUp() {
+        client = new AuthClient(mvc, mail);
+    }
+
+    @AfterEach
+    void reset() {
+        mail.reset();
+        clock.reset();
+    }
+
+    private MockHttpServletRequestBuilder verifyRequest(Cookie session, String code) throws Exception {
+        return client.unsafe(post("/api/v1/auth/verify-email"), session, Map.of("code", code));
+    }
+
+    private String wrongCode(String right) {
+        return right.equals("000000") ? "111111" : "000000";
+    }
+
+    @Test
+    @DisplayName("AUTH-16 : le bon code active le compte et rend la session complète, sous un nouvel identifiant")
+    void auth16RightCodeMakesTheSessionFull() throws Exception {
+        Registered account = client.register("parcours@exemple.ca", "parcours");
+
+        MvcResult result = mvc.perform(verifyRequest(account.session(), client.codeSentTo("parcours@exemple.ca")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.verification").value(nullValue()))
+                .andReturn();
+
+        Cookie full = sessionOf(result);
+        assertThat(full.getValue()).isNotEqualTo(account.session().getValue());
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(account.session()))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(client.from(get("/api/v1/auth/username-availability").param("u", "libre"))
+                        .cookie(full))
+                .andExpect(status().isOk());
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(full))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("AUTH-14 : 5 mauvais codes répondent INVALID_CODE, puis même le bon répond CODE_EXPIRED")
+    void auth14FiveWrongCodesExhaustTheCode() throws Exception {
+        Registered account = client.register("essais@exemple.ca", "essais");
+        String code = client.codeSentTo("essais@exemple.ca");
+
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(verifyRequest(account.session(), wrongCode(code)))
+                    .andExpect(status().isUnprocessableContent())
+                    .andExpect(jsonPath("$.code").value("INVALID_CODE"));
+        }
+
+        mvc.perform(verifyRequest(account.session(), code))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
+    }
+
+    @Test
+    @DisplayName("AUTH-14 : un code expire au bout de 10 minutes")
+    void auth14CodeExpiresAfterTenMinutes() throws Exception {
+        Registered account = client.register("expire@exemple.ca", "expire");
+        String code = client.codeSentTo("expire@exemple.ca");
+        clock.advance(Duration.ofMinutes(10));
+
+        mvc.perform(verifyRequest(account.session(), code))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
+    }
+
+    @Test
+    @DisplayName("AUTH-14 : un renvoi remplace le code ; l'ancien ne vaut plus")
+    void auth14ResendReplacesTheCode() throws Exception {
+        Registered account = client.register("renvoi@exemple.ca", "renvoi");
+        String first = client.codeSentTo("renvoi@exemple.ca");
+
+        mvc.perform(client.unsafe(post("/api/v1/auth/verify-email/resend"), account.session(), null))
+                .andExpect(status().isNoContent());
+        mail.awaitSent(2);
+        String second = client.codeSentTo("renvoi@exemple.ca");
+
+        if (!second.equals(first)) {
+            mvc.perform(verifyRequest(account.session(), first))
+                    .andExpect(jsonPath("$.code").value("INVALID_CODE"));
+        }
+        mvc.perform(verifyRequest(account.session(), second)).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("AUTH-17 : le changement remplace l'adresse, est journalisé et envoie le code à la nouvelle adresse")
+    void auth17ChangeReplacesTheAddress() throws Exception {
+        Registered account = client.register("ancienne@exemple.ca", "changement");
+
+        mvc.perform(client.unsafe(
+                        post("/api/v1/auth/verify-email/change"),
+                        account.session(),
+                        Map.of("email", "nouvelle@exemple.ca")))
+                .andExpect(status().isNoContent());
+
+        String code = client.codeSentTo("nouvelle@exemple.ca");
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(account.session()))
+                .andExpect(jsonPath("$.email").value("nouvelle@exemple.ca"));
+        assertThat(jdbc.sql("SELECT details::text FROM security_events WHERE user_id = ? AND type = 'EMAIL_CHANGED'")
+                        .param(account.id())
+                        .query(String.class)
+                        .single())
+                .contains("n***@exemple.ca")
+                .doesNotContain("nouvelle@");
+        mvc.perform(verifyRequest(account.session(), code)).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("SEC-10 : renvoi et changement partagent 3 essais par heure ; le 4e répond 429")
+    void sec10ResendAndChangeShareThreePerHour() throws Exception {
+        Registered account = client.register("quota@exemple.ca", "quota");
+        mvc.perform(client.unsafe(post("/api/v1/auth/verify-email/resend"), account.session(), null))
+                .andExpect(status().isNoContent());
+        mvc.perform(client.unsafe(
+                        post("/api/v1/auth/verify-email/change"),
+                        account.session(),
+                        Map.of("email", "quota2@exemple.ca")))
+                .andExpect(status().isNoContent());
+        mvc.perform(client.unsafe(post("/api/v1/auth/verify-email/resend"), account.session(), null))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(client.unsafe(post("/api/v1/auth/verify-email/resend"), account.session(), null))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(account.session()))
+                .andExpect(jsonPath("$.verification.resendsRemaining").value(0));
+    }
+
+    @Test
+    @DisplayName("SEC-01 : un code qui n'a pas 6 chiffres répond 400 VALIDATION_FAILED, sans compter d'essai")
+    void sec01MalformedCodeIsAValidationError() throws Exception {
+        Registered account = client.register("format@exemple.ca", "format");
+
+        mvc.perform(verifyRequest(account.session(), "12345a"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields[0]").value("code"));
+        assertThat(jdbc.sql("SELECT attempts FROM email_codes WHERE user_id = ?")
+                        .param(account.id())
+                        .query(Integer.class)
+                        .single())
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("QA-05 : sans session, la vérification, le renvoi et le changement répondent 401")
+    void qa05RoutesRequireASession() throws Exception {
+        for (String path : List.of(
+                "/api/v1/auth/verify-email", "/api/v1/auth/verify-email/resend", "/api/v1/auth/verify-email/change")) {
+            mvc.perform(client.unsafe(post(path), null, Map.of()))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        }
+    }
+
+    @Test
+    @DisplayName("QA-05 : sans jeton CSRF, la vérification, le renvoi et le changement répondent 403")
+    void qa05RoutesRequireACsrfToken() throws Exception {
+        Registered account = client.register("sanscsrf2@exemple.ca", "sanscsrf2");
+        for (String path : List.of(
+                "/api/v1/auth/verify-email", "/api/v1/auth/verify-email/resend", "/api/v1/auth/verify-email/change")) {
+            mvc.perform(client.from(post(path))
+                            .cookie(account.session())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
+    }
+
+    @Test
+    @DisplayName("AUTH-16 : une session complète ne peut plus vérifier, renvoyer ni changer (403)")
+    void auth16FullSessionCannotUseTheVerificationRoutes() throws Exception {
+        Cookie full = client.verify(client.register("complete@exemple.ca", "complete"));
+        for (String path : List.of(
+                "/api/v1/auth/verify-email", "/api/v1/auth/verify-email/resend", "/api/v1/auth/verify-email/change")) {
+            mvc.perform(client.unsafe(post(path), full, Map.of("code", "123456", "email", "x@exemple.ca")))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
+    }
+
+    @Test
+    @DisplayName("A06 : deux vérifications simultanées du bon code donnent un succès et un CODE_EXPIRED")
+    void a06ConcurrentVerificationsSucceedOnce() throws Exception {
+        Registered account = client.register("course.verif@exemple.ca", "course.verif");
+        String code = client.codeSentTo("course.verif@exemple.ca");
+        List<MockHttpServletRequestBuilder> requests =
+                List.of(verifyRequest(account.session(), code), verifyRequest(account.session(), code));
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<MvcResult>> futures = new ArrayList<>();
+            for (MockHttpServletRequestBuilder request : requests) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    return mvc.perform(request).andReturn();
+                }));
+            }
+            start.countDown();
+            List<Integer> statuses = new ArrayList<>();
+            List<String> bodies = new ArrayList<>();
+            for (Future<MvcResult> future : futures) {
+                MvcResult result = future.get(30, TimeUnit.SECONDS);
+                statuses.add(result.getResponse().getStatus());
+                bodies.add(result.getResponse().getContentAsString());
+            }
+            assertThat(statuses).containsExactlyInAnyOrder(200, 422);
+            assertThat(bodies).anyMatch(text -> text.contains("CODE_EXPIRED"));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("AUTH-15 : l'activation d'un compte retire le code d'un autre compte en attente à la même adresse")
+    void auth15ActivationRetiresTheOtherPendingCode() throws Exception {
+        Registered squatter = client.register("partagee@exemple.ca", "squatteur");
+        String squatterCode = client.codeSentTo("partagee@exemple.ca");
+        AuthClient owner = new AuthClient(mvc, mail);
+        Registered account = owner.register("Partagee@Exemple.ca", "proprietaire");
+        mail.awaitSent(2);
+        String ownerCode = owner.codeSentTo("Partagee@Exemple.ca");
+
+        mvc.perform(owner.unsafe(post("/api/v1/auth/verify-email"), account.session(), Map.of("code", ownerCode)))
+                .andExpect(status().isOk());
+
+        mvc.perform(verifyRequest(squatter.session(), squatterCode))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
+        assertThat(body(mvc.perform(client.from(get("/api/v1/auth/me")).cookie(squatter.session()))
+                                .andReturn())
+                        .get("status")
+                        .asString())
+                .isEqualTo("PENDING_EMAIL");
+    }
+}

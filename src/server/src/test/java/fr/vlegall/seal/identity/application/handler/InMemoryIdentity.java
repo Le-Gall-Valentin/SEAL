@@ -3,9 +3,11 @@ package fr.vlegall.seal.identity.application.handler;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.domain.model.Account;
 import fr.vlegall.seal.identity.domain.model.AccountStatus;
+import fr.vlegall.seal.identity.domain.model.CodePolicy;
 import fr.vlegall.seal.identity.domain.model.DisplayName;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.IdentityException;
+import fr.vlegall.seal.identity.domain.model.LiveCode;
 import fr.vlegall.seal.identity.domain.model.Username;
 import fr.vlegall.seal.identity.domain.model.VerificationCode;
 import fr.vlegall.seal.identity.domain.port.out.AccountMailPort;
@@ -36,7 +38,17 @@ final class InMemoryIdentity {
     static final Instant NOW = Instant.parse("2026-11-08T12:00:00Z");
 
     /** Code enregistré, tel que la table {@code email_codes} le garderait. */
-    record StoredCode(UserId user, byte[] hash, Instant issuedAt, Instant expiresAt, boolean consumed) {}
+    record StoredCode(
+            UUID id, UserId user, byte[] hash, Instant issuedAt, Instant expiresAt, int attempts, boolean consumed) {
+
+        StoredCode consume() {
+            return new StoredCode(id, user, hash, issuedAt, expiresAt, attempts, true);
+        }
+
+        StoredCode failedAttempt() {
+            return new StoredCode(id, user, hash, issuedAt, expiresAt, attempts + 1, consumed);
+        }
+    }
 
     final MutableClock clock = MutableClock.fixedAt(NOW);
     final Map<UserId, Account> accounts = new LinkedHashMap<>();
@@ -78,6 +90,29 @@ final class InMemoryIdentity {
             }
 
             @Override
+            public Optional<Account> lockById(UserId id) {
+                return findById(id);
+            }
+
+            @Override
+            public void activate(UserId id, Instant verifiedAt) {
+                Account account = accounts.get(id);
+                if (activeAccountOwns(account.email())) {
+                    throw new IdentityException.CodeExpired();
+                }
+                accounts.put(
+                        id,
+                        new Account(
+                                id, account.username(), account.displayName(), account.email(), AccountStatus.ACTIVE));
+            }
+
+            @Override
+            public void changeEmail(UserId id, EmailAddress email) {
+                Account account = accounts.get(id);
+                accounts.put(id, new Account(id, account.username(), account.displayName(), email, account.status()));
+            }
+
+            @Override
             public boolean activeAccountOwns(EmailAddress email) {
                 return accounts.values().stream()
                         .anyMatch(account -> account.status() == AccountStatus.ACTIVE
@@ -105,10 +140,8 @@ final class InMemoryIdentity {
         return new EmailCodeRepository() {
             @Override
             public void renew(UserId user, byte[] codeHash, Instant issuedAt, Instant expiresAt) {
-                codes.replaceAll(code -> code.user().equals(user) && !code.consumed()
-                        ? new StoredCode(code.user(), code.hash(), code.issuedAt(), code.expiresAt(), true)
-                        : code);
-                codes.add(new StoredCode(user, codeHash, issuedAt, expiresAt, false));
+                codes.replaceAll(code -> code.user().equals(user) && !code.consumed() ? code.consume() : code);
+                codes.add(new StoredCode(UUID.randomUUID(), user, codeHash, issuedAt, expiresAt, 0, false));
             }
 
             @Override
@@ -117,6 +150,40 @@ final class InMemoryIdentity {
                         .filter(code -> code.user().equals(user) && !code.consumed())
                         .map(StoredCode::expiresAt)
                         .reduce((first, second) -> second);
+            }
+
+            @Override
+            public Optional<LiveCode> findLive(UserId user, Instant now) {
+                return codes.stream()
+                        .filter(code -> code.user().equals(user)
+                                && !code.consumed()
+                                && code.expiresAt().isAfter(now)
+                                && code.attempts() < CodePolicy.MAX_ATTEMPTS)
+                        .map(code -> new LiveCode(code.id(), code.hash()))
+                        .reduce((first, second) -> second);
+            }
+
+            @Override
+            public void countFailedAttempt(UUID id) {
+                codes.replaceAll(code -> code.id().equals(id) ? code.failedAttempt() : code);
+            }
+
+            @Override
+            public void consume(UUID id, Instant now) {
+                codes.replaceAll(code -> code.id().equals(id) ? code.consume() : code);
+            }
+
+            @Override
+            public void retireOthersForAddress(EmailAddress email, UserId owner, Instant now) {
+                codes.replaceAll(code -> {
+                    Account account = accounts.get(code.user());
+                    boolean other = !code.user().equals(owner)
+                            && account != null
+                            && account.status() == AccountStatus.PENDING_EMAIL
+                            && account.email() != null
+                            && account.email().value().equalsIgnoreCase(email.value());
+                    return other && !code.consumed() ? code.consume() : code;
+                });
             }
         };
     }
@@ -169,5 +236,20 @@ final class InMemoryIdentity {
 
     CodeDelivery codeDelivery() {
         return new CodeDelivery(users(), emailCodes(), mail(), random(), clock);
+    }
+
+    /** Code émis pour un compte, comme le ferait l'inscription. */
+    String issueCode(Account account, String digitsOfCode) {
+        this.digits.clear();
+        this.digits.add(digitsOfCode);
+        codeDelivery().issue(account.id(), account.username(), account.email());
+        return digitsOfCode;
+    }
+
+    StoredCode lastCodeOf(UserId user) {
+        return codes.stream()
+                .filter(code -> code.user().equals(user))
+                .reduce((first, second) -> second)
+                .orElseThrow();
     }
 }

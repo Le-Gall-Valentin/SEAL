@@ -1,5 +1,9 @@
 package fr.vlegall.seal.identity.infrastructure.web;
 
+import static fr.vlegall.seal.support.AuthClient.CSRF_COOKIE;
+import static fr.vlegall.seal.support.AuthClient.CSRF_HEADER;
+import static fr.vlegall.seal.support.AuthClient.body;
+import static fr.vlegall.seal.support.AuthClient.sessionOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
@@ -11,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import fr.vlegall.seal.crypto.Digests;
+import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
@@ -18,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,10 +33,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,13 +52,7 @@ import tools.jackson.databind.json.JsonMapper;
 @SealIntegrationTest
 class RegistrationIT {
 
-    static final String SESSION_COOKIE = "__Host-seal_sid";
-    static final String CSRF_COOKIE = "XSRF-TOKEN";
-    static final String CSRF_HEADER = "X-XSRF-TOKEN";
-    static final String PASSWORD = "fjord-tuque-raquette";
-    private static final Pattern CODE = Pattern.compile("code de vérification SEAL : ([0-9]{6})\\.");
     private static final JsonMapper JSON = JsonMapper.shared();
-    private static final AtomicInteger NEXT_IP = new AtomicInteger(1);
 
     @Autowired
     private MockMvc mvc;
@@ -67,8 +63,16 @@ class RegistrationIT {
     @Autowired
     private RecordingMailSender mail;
 
+    private AuthClient client;
+
     /** Une adresse IP par test : les seaux de limitation de débit vivent le temps du contexte. */
-    private final String ip = "198.51.100." + NEXT_IP.getAndIncrement();
+    private String ip;
+
+    @BeforeEach
+    void setUp() {
+        client = new AuthClient(mvc, mail);
+        ip = client.ip();
+    }
 
     @AfterEach
     void resetMail() {
@@ -76,6 +80,11 @@ class RegistrationIT {
     }
 
     // ---- outils ----
+
+    /** Adresse IP d'un autre client, pour une seconde inscription dans le même test. */
+    private String otherIp() {
+        return new AuthClient(mvc, mail).ip();
+    }
 
     MockHttpServletRequestBuilder from(MockHttpServletRequestBuilder request, String address) {
         return request.secure(true).with(r -> {
@@ -85,12 +94,7 @@ class RegistrationIT {
     }
 
     String csrfToken() throws Exception {
-        Cookie cookie = mvc.perform(from(get("/api/v1/csrf"), ip))
-                .andReturn()
-                .getResponse()
-                .getCookie(CSRF_COOKIE);
-        assertThat(cookie).isNotNull();
-        return cookie.getValue();
+        return client.csrfToken(null);
     }
 
     static String json(Map<String, ?> body) {
@@ -98,12 +102,7 @@ class RegistrationIT {
     }
 
     static Map<String, Object> registration(String email, String username) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("email", email);
-        body.put("username", username);
-        body.put("displayName", "Valentin");
-        body.put("password", PASSWORD);
-        return body;
+        return AuthClient.registration(email, username);
     }
 
     MockHttpServletRequestBuilder registerRequest(Map<String, ?> body, String address) throws Exception {
@@ -121,22 +120,8 @@ class RegistrationIT {
                 .andReturn();
     }
 
-    static Cookie sessionOf(MvcResult result) {
-        Cookie cookie = result.getResponse().getCookie(SESSION_COOKIE);
-        assertThat(cookie).as("cookie de session").isNotNull();
-        return cookie;
-    }
-
-    static JsonNode body(MvcResult result) throws Exception {
-        return JSON.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
-    }
-
     String codeSentTo(String address) {
-        mail.awaitSent(1);
-        SimpleMailMessage message = mail.sentTo(address).getLast();
-        Matcher matcher = CODE.matcher(message.getText() == null ? "" : message.getText());
-        assertThat(matcher.find()).as("code dans le courriel").isTrue();
-        return matcher.group(1);
+        return client.codeSentTo(address);
     }
 
     long count(String sql, Object... params) {
@@ -366,8 +351,7 @@ class RegistrationIT {
                 .update();
 
         MvcResult taken = register("titulaire.it@EXEMPLE.ca", "squat.it");
-        MvcResult free = mvc.perform(registerRequest(
-                        registration("libre.it@exemple.ca", "libre.it"), "203.0.113." + NEXT_IP.getAndIncrement()))
+        MvcResult free = mvc.perform(registerRequest(registration("libre.it@exemple.ca", "libre.it"), otherIp()))
                 .andExpect(status().isCreated())
                 .andReturn();
 
@@ -398,9 +382,7 @@ class RegistrationIT {
     void a06ConcurrentRegistrationsOfTheSameUsername() throws Exception {
         List<MockHttpServletRequestBuilder> requests = new ArrayList<>();
         for (int i = 0; i < 2; i++) {
-            requests.add(registerRequest(
-                    registration("course" + i + ".it@exemple.ca", "course.it"),
-                    "203.0.113." + NEXT_IP.getAndIncrement()));
+            requests.add(registerRequest(registration("course" + i + ".it@exemple.ca", "course.it"), otherIp()));
         }
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(2);
