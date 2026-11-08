@@ -19,6 +19,7 @@ describe('ADR 0012 : page de repli des frontières d’erreur', () => {
       margin: '0px',
       backgroundColor: 'rgb(247, 248, 243)',
       color: 'rgb(27, 31, 20)',
+      lineHeight: 'normal',
     })
     expect(getComputedStyle(document.body).fontFamily).toContain('Schibsted Grotesk')
   })

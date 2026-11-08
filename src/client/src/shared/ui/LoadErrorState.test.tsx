@@ -2,6 +2,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { LoadErrorState } from './LoadErrorState'
 
+// Tailwind compose box-shadow avec des ombres transparentes et nulles, sans effet à l'écran : seules les autres comptent.
+function visibleShadows(element: Element): string[] {
+  return getComputedStyle(element)
+    .boxShadow.split(/,(?![^(]*\))/)
+    .map((shadow) => shadow.trim())
+    .filter((shadow) => shadow !== 'rgba(0, 0, 0, 0) 0px 0px 0px 0px')
+}
+
 describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Etats)', () => {
   it('A10 : annonce le titre de la maquette et propose « Réessayer », sans la phrase sur le réseau', async () => {
     const screen = await render(<LoadErrorState heading="h1" onRetry={() => undefined} />)
@@ -48,7 +56,6 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
       padding: '22px',
       borderRadius: '18px',
       backgroundColor: 'rgb(255, 255, 255)',
-      boxShadow: 'rgb(227, 230, 218) 0px 0px 0px 1px inset',
     })
     expect(getComputedStyle(icon)).toMatchObject({
       display: 'grid',
@@ -56,7 +63,6 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
       height: '44px',
       borderRadius: '12px',
       backgroundColor: 'rgb(251, 237, 234)',
-      boxShadow: 'rgb(239, 197, 190) 0px 0px 0px 1px inset',
       color: 'rgb(179, 38, 30)',
     })
     expect(getComputedStyle(title)).toMatchObject({
@@ -65,6 +71,7 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
       fontSize: '18px',
       fontWeight: '700',
       letterSpacing: '-0.18px',
+      lineHeight: 'normal',
     })
     // Élément d'un conteneur flex : son inline-flex est calculé en flex, et margin-top: auto le pose en bas de la carte.
     expect(card.getBoundingClientRect().bottom - button.getBoundingClientRect().bottom).toBe(22)
@@ -77,11 +84,14 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
       borderTopWidth: '0px',
       borderRadius: '10px',
       backgroundColor: 'rgb(255, 255, 255)',
-      boxShadow: 'rgb(205, 210, 192) 0px 0px 0px 1px inset',
       color: 'rgb(27, 31, 20)',
       fontSize: '14.5px',
       fontWeight: '600',
+      lineHeight: 'normal',
     })
     expect(getComputedStyle(button).fontFamily).toContain('Schibsted Grotesk')
+    expect(visibleShadows(card)).toEqual(['rgb(227, 230, 218) 0px 0px 0px 1px inset'])
+    expect(visibleShadows(icon)).toEqual(['rgb(239, 197, 190) 0px 0px 0px 1px inset'])
+    expect(visibleShadows(button)).toEqual(['rgb(205, 210, 192) 0px 0px 0px 1px inset'])
   })
 })

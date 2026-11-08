@@ -1,6 +1,5 @@
 import { useId } from 'react'
 import { t } from '@/shared/i18n'
-import styles from './LoadErrorState.module.css'
 
 interface LoadErrorStateProps {
   /** Niveau du titre, selon l'endroit où l'état s'affiche : h1 quand il remplace la page. */
@@ -15,8 +14,15 @@ interface LoadErrorStateProps {
 export function LoadErrorState({ heading: Heading, onRetry }: LoadErrorStateProps) {
   const titleId = useId()
   return (
-    <section role="alert" aria-labelledby={titleId} className={styles['card']}>
-      <span aria-hidden="true" className={styles['icon']}>
+    <section
+      role="alert"
+      aria-labelledby={titleId}
+      className="box-border flex h-[236px] w-[min(100%,380px)] flex-col items-start rounded-[18px] bg-surface p-[22px] inset-ring inset-ring-line"
+    >
+      <span
+        aria-hidden="true"
+        className="grid size-11 flex-none place-items-center rounded-xl bg-danger-soft text-danger inset-ring inset-ring-danger-line"
+      >
         <svg
           width="22"
           height="22"
@@ -30,10 +36,14 @@ export function LoadErrorState({ heading: Heading, onRetry }: LoadErrorStateProp
           <path d="M12 7.5v5.2M12 16.2h.01" />
         </svg>
       </span>
-      <Heading id={titleId} className={styles['title']}>
+      <Heading id={titleId} className="mt-3.5 mb-0 text-[18px] font-bold tracking-[-0.01em]">
         {t('loadError.title')}
       </Heading>
-      <button type="button" className={styles['retry']} onClick={onRetry}>
+      <button
+        type="button"
+        className="mt-auto inline-flex h-11 items-center gap-2 rounded-[10px] border-0 bg-surface py-0 pr-4 pl-3 font-sans text-[14.5px] font-semibold text-ink inset-ring inset-ring-line-strong"
+        onClick={onRetry}
+      >
         <svg
           width="18"
           height="18"
