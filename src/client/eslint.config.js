@@ -19,10 +19,12 @@ const CAPABILITIES = {
       'Seul src/shared/crypto/ appelle WebCrypto, HPKE et IndexedDB (ADR 0012, KEY-40) : passez par son API publique.',
     globals: ['crypto', 'indexedDB'],
     properties: [],
+    // navigator.storage.persist() protège le coffre de l'éviction (ADR 0012, audit, Q6).
+    qualifiedProperties: [{ object: 'navigator', property: 'storage' }],
     importPaths: ['crypto', 'node:crypto', 'idb'],
-    importPatterns: ['@hpke/*', '@noble/*'],
+    importPatterns: ['@hpke/*', '@noble/*', 'idb/*'],
     // Mêmes cibles pour import(), que no-restricted-imports ne voit pas (esquery n'admet pas « / » dans un motif).
-    dynamicImport: String.raw`/^(node:)?crypto$|^idb$|^@(hpke|noble)\b/`,
+    dynamicImport: String.raw`/^(node:)?crypto$|^idb\b|^@(hpke|noble)\b/`,
   },
   // Toutes les voies HTTP du navigateur, et le cookie XSRF-TOKEN que le client HTTP renvoie en en-tête.
   http: {
@@ -31,6 +33,7 @@ const CAPABILITIES = {
       'Seul src/shared/api/ appelle le réseau HTTP (ADR 0012) : passez par le segment api/ de la tranche.',
     globals: ['fetch', 'XMLHttpRequest', 'EventSource', 'WebTransport'],
     properties: ['sendBeacon', 'cookie'],
+    qualifiedProperties: [],
     importPaths: [],
     importPatterns: [],
     dynamicImport: null,
@@ -41,6 +44,7 @@ const CAPABILITIES = {
       'Seul src/shared/ws/ ouvre une WebSocket (ADR 0012) : passez par le segment api/ de la tranche.',
     globals: ['WebSocket'],
     properties: [],
+    qualifiedProperties: [],
     importPaths: [],
     importPatterns: [],
     dynamicImport: null,
@@ -56,19 +60,30 @@ const CONSOLE =
 const GLOBAL_OBJECT =
   "L'objet global ne s'utilise que par un accès nommé, comme globalThis.addEventListener (ADR 0012) : un alias, un " +
   'accès calculé ou un passage en paramètre contourneraient les frontières de la cryptographie et du réseau.'
+const COOKIE_STORE =
+  'Aucun cookie par cookieStore (ADR 0012, KEY-41) : seul src/shared/api/ lit XSRF-TOKEN, par document.cookie.'
+const NODE_MODULES =
+  'Une bibliothèque s’importe par son nom, jamais par son chemin dans node_modules (ADR 0012) : sinon les frontières ne la voient pas.'
+// Autres noms de la fenêtre : SEAL n'est jamais encadré, donc frames, top, parent et opener désignent l'objet global.
+const WINDOW_NAMES = ['frames', 'top', 'parent', 'opener']
 
 // ADR 0012, point 2 : puits interdits dans tout le code du navigateur, shared compris.
 const SINK_GLOBALS = [
   ...['localStorage', 'sessionStorage', 'caches'].map((name) => ({ name, message: STORAGE })),
   { name: 'RTCPeerConnection', message: PEER_TO_PEER },
+  { name: 'cookieStore', message: COOKIE_STORE },
+  ...WINDOW_NAMES.map((name) => ({ name, message: GLOBAL_OBJECT })),
 ]
+// Comme valeur, console ne sert qu'à l'espionner dans un test (vi.spyOn) : la règle des tests l'omet.
+const CONSOLE_GLOBAL = { name: 'console', message: CONSOLE }
 const SINK_PROPERTIES = [
   ...['localStorage', 'sessionStorage', 'caches'].map((property) => ({
     property,
     message: STORAGE,
   })),
-  { object: 'navigator', property: 'storage', message: STORAGE },
+  { property: 'getDirectory', message: STORAGE },
   { property: 'RTCPeerConnection', message: PEER_TO_PEER },
+  { property: 'cookieStore', message: COOKIE_STORE },
   ...[
     'innerHTML',
     'outerHTML',
@@ -76,11 +91,19 @@ const SINK_PROPERTIES = [
     'setHTMLUnsafe',
     'createContextualFragment',
     'parseFromString',
+    'parseHTMLUnsafe',
     'srcdoc',
   ].map((property) => ({ property, message: RAW_HTML })),
   ...['write', 'writeln'].map((property) => ({ object: 'document', property, message: RAW_HTML })),
   { property: 'console', message: CONSOLE },
-  { property: 'defaultView', message: GLOBAL_OBJECT },
+  ...['defaultView', 'window', 'self', 'globalThis', 'frames', 'contentWindow'].map((property) => ({
+    property,
+    message: GLOBAL_OBJECT,
+  })),
+  // Pas sur tout objet : rect.top et node.parent sont légitimes.
+  ...['window', 'self', 'globalThis'].flatMap((object) =>
+    WINDOW_NAMES.map((property) => ({ object, property, message: GLOBAL_OBJECT })),
+  ),
 ]
 const SINK_SYNTAX = [
   {
@@ -103,27 +126,50 @@ const SINK_SYNTAX = [
     message:
       'Un import dynamique nomme sa cible en clair (ADR 0012) : sinon les frontières ne la voient pas.',
   },
+  { selector: 'ImportExpression[source.value=/node_modules/]', message: NODE_MODULES },
+  {
+    selector: "MemberExpression[object.type='MetaProperty'][property.name='glob']",
+    message:
+      'import.meta.glob est refusé (ADR 0012) : il chargerait des fichiers sans passer par les frontières.',
+  },
+  {
+    selector:
+      ':matches(ExportAllDeclaration, ExportNamedDeclaration)[source.value=/shared.crypto/]',
+    message:
+      'shared/crypto ne se réexporte pas (ADR 0012) : seul un segment model/ ou app l’atteint, par son index.ts.',
+  },
 ]
+
+const deniedTo = (allowed) =>
+  Object.entries(CAPABILITIES)
+    .filter(([name]) => name !== allowed)
+    .map(([, capability]) => capability)
+
+function restrictedGlobals(allowed, { inTests }) {
+  return [
+    'error',
+    ...SINK_GLOBALS,
+    ...(inTests ? [] : [CONSOLE_GLOBAL]),
+    ...deniedTo(allowed).flatMap(({ globals, message }) =>
+      globals.map((name) => ({ name, message })),
+    ),
+  ]
+}
 
 // Règles d'une zone : les puits, plus les capacités des autres segments. Un bloc par zone, car ESLint remplace les
 // options d'une règle d'un bloc à l'autre au lieu de les fusionner.
 function restrictionsExcept(allowed) {
-  const denied = Object.entries(CAPABILITIES)
-    .filter(([name]) => name !== allowed)
-    .map(([, capability]) => capability)
+  const denied = deniedTo(allowed)
   return {
-    'no-restricted-globals': [
-      'error',
-      ...SINK_GLOBALS,
-      ...denied.flatMap(({ globals, message }) => globals.map((name) => ({ name, message }))),
-    ],
+    'no-restricted-globals': restrictedGlobals(allowed, { inTests: false }),
     // Sans objet : window.fetch, globalThis.crypto ou globalThis.window.crypto sont tous refusés.
     'no-restricted-properties': [
       'error',
       ...SINK_PROPERTIES,
-      ...denied.flatMap(({ globals, properties, message }) =>
-        [...globals, ...properties].map((property) => ({ property, message })),
-      ),
+      ...denied.flatMap(({ globals, properties, qualifiedProperties, message }) => [
+        ...[...globals, ...properties].map((property) => ({ property, message })),
+        ...qualifiedProperties.map((qualified) => ({ ...qualified, message })),
+      ]),
     ],
     'no-restricted-imports': [
       'error',
@@ -131,9 +177,12 @@ function restrictionsExcept(allowed) {
         paths: denied.flatMap(({ importPaths, message }) =>
           importPaths.map((name) => ({ name, message })),
         ),
-        patterns: denied.flatMap(({ importPatterns, message }) =>
-          importPatterns.map((pattern) => ({ group: [pattern], message })),
-        ),
+        patterns: [
+          { regex: '(^|/)node_modules/', message: NODE_MODULES },
+          ...denied.flatMap(({ importPatterns, message }) =>
+            importPatterns.map((pattern) => ({ group: [pattern], message })),
+          ),
+        ],
       },
     ],
     'no-restricted-syntax': [
@@ -182,6 +231,22 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
 
+  // QA-10 (ADR 0012, audit) : sous src/, seulement du TypeScript ; un .mts ou un .js échapperait aux règles ci-dessous.
+  {
+    files: ['src/**/*.{js,jsx,mjs,cjs,mts,cts}'],
+    languageOptions: { parser: tseslint.parser },
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Program',
+          message:
+            'Sous src/, seuls les fichiers .ts et .tsx sont admis (ADR 0012) : les autres échapperaient aux frontières.',
+        },
+      ],
+    },
+  },
+
   // QA-10 : analyse statique typée et stricte, aucun any.
   {
     files: ['**/*.{ts,tsx}'],
@@ -214,11 +279,14 @@ export default defineConfig(
   // ADR 0012, points 2 et 3 : puits interdits, rigueur, et capacités du navigateur réservées à leur segment.
   {
     files: ['src/**/*.{ts,tsx}'],
+    // Aucune directive eslint-disable en ligne ne lève une frontière ou un puits (audit).
+    linterOptions: { noInlineConfig: true },
     rules: {
       'no-console': 'error',
       'no-eval': 'error',
       'no-new-func': 'error',
       'no-script-url': 'error',
+      'import-x/no-relative-packages': 'error',
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
     },
   },
@@ -230,6 +298,15 @@ export default defineConfig(
   ...Object.entries(CAPABILITIES).map(([name, { folder }]) => ({
     files: [`${folder}/**/*.{ts,tsx}`],
     rules: restrictionsExcept(name),
+  })),
+  {
+    files: ['src/**/*.test.{ts,tsx}'],
+    ignores: Object.values(CAPABILITIES).map(({ folder }) => `${folder}/**`),
+    rules: { 'no-restricted-globals': restrictedGlobals(null, { inTests: true }) },
+  },
+  ...Object.entries(CAPABILITIES).map(([name, { folder }]) => ({
+    files: [`${folder}/**/*.test.{ts,tsx}`],
+    rules: { 'no-restricted-globals': restrictedGlobals(name, { inTests: true }) },
   })),
 
   // ADR 0012 : frontières de Feature-Sliced Design et frontière entre cryptographie et réseau. Les politiques
@@ -279,7 +356,7 @@ export default defineConfig(
             // Le point d'entrée monte app.
             {
               from: { file: { categories: 'entry' } },
-              allow: { to: { element: { type: 'app' } } },
+              allow: { to: { element: { type: 'app', fileInternalPath: 'index.ts' } } },
             },
             // Une tranche : ses segments se voient entre eux, et son index.ts les expose.
             ...SLICE_LAYERS.map((layer) => ({
@@ -320,6 +397,18 @@ export default defineConfig(
                     type: 'entity-segment',
                     captured: { segment: '@x' },
                     fileInternalPath: '{{ from.element.captured.slice }}.ts',
+                  },
+                },
+              },
+            },
+            // Une entité n'importe pas son propre @x, qui servirait de relais vers api/ (audit).
+            {
+              from: { element: { type: 'entity-segment' } },
+              disallow: {
+                to: {
+                  element: {
+                    type: 'entity-segment',
+                    captured: { slice: '{{ from.element.captured.slice }}', segment: '@x' },
                   },
                 },
               },

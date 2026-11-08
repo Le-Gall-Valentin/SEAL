@@ -290,7 +290,7 @@ describe('ADR 0012, point 2 : capacités du navigateur réservées à un segment
       }
     }
     await expectPermitted(FEATURE_MODEL, "window.addEventListener('online', () => undefined)\n")
-    await expectPermitted(FEATURE_MODEL, 'export const o = { window: 1 }.window\n')
+    await expectPermitted(FEATURE_MODEL, 'export const o = { window: 1 }\n')
   })
 
   it('QA-10 : seul shared/crypto importe une bibliothèque cryptographique, même dynamiquement', async () => {
@@ -410,5 +410,172 @@ describe('ADR 0012, point 3 : rigueur', () => {
         typedEslint,
       ),
     ).not.toContain('@typescript-eslint/switch-exhaustiveness-check')
+  })
+})
+
+describe('Audit de la branche : frontières éprouvées par un cas refusé', () => {
+  it('QA-10 : une tranche ne lit pas le segment d’une autre tranche de sa couche, même par son index.ts', async () => {
+    await expectRefused('src/features/invite/model/x.ts', '@/features/sign-in/model/useSignIn')
+    await expectRefused('src/features/sign-in/index.ts', '@/features/invite/model/invite')
+  })
+
+  it("QA-10 : l'API @x d'une entité est réservée à l'entité qu'elle nomme", async () => {
+    await expectRefused(
+      'src/entities/conversation/model/conversation.ts',
+      '@/entities/user/@x/message',
+    )
+  })
+
+  it('QA-10 : la couche widgets voit features, pas pages ni un autre widget ; features ne voit pas widgets', async () => {
+    await expectAllowed('src/widgets/panel/ui/Panel.ts', '@/features/sign-in')
+    await expectRefused('src/widgets/panel/ui/Panel.ts', '@/widgets/board')
+    await expectRefused('src/widgets/panel/ui/Panel.ts', '@/pages/home')
+    await expectRefused('src/features/sign-in/model/useSignIn.ts', '@/widgets/panel')
+  })
+
+  it("QA-10 : un segment n'importe pas l'index.ts de sa propre tranche, ni api/ le segment ui/", async () => {
+    await expectRefused('src/features/sign-in/ui/Form.ts', '../index')
+    await expectRefused('src/features/sign-in/api/signInRequest.ts', '../ui/Form')
+  })
+
+  it('QA-10 : ni shared/ui ni app n’atteignent le réseau ; api/ entre dans shared/ws par son index.ts', async () => {
+    await expectRefused('src/shared/ui/Button.ts', '@/shared/api')
+    await expectRefused('src/shared/ui/Button.ts', '@/shared/ws')
+    await expectRefused('src/app/providers/Providers.ts', '@/shared/api')
+    await expectRefused('src/features/sign-in/api/signInRequest.ts', '@/shared/ws/socket')
+  })
+
+  it("QA-10 : un segment model/ n'entre dans shared/crypto que par son index.ts", async () => {
+    await expectRefused('src/features/sign-in/model/useSignIn.ts', '@/shared/crypto/canonical')
+  })
+
+  it("QA-10 : le point d'entrée n'importe que l'index.ts de app", async () => {
+    await expectAllowed('src/main.tsx', '@/app')
+    await expectRefused('src/main.tsx', '@/app/router')
+  })
+
+  it("QA-10 : une entité n'importe pas son propre @x, qui servirait de relais vers api/", async () => {
+    await expectRefused('src/entities/user/model/user.ts', '../@x/conversation')
+    await expectRefused('src/entities/user/ui/Card.ts', '../@x/conversation')
+    await expectAllowed(
+      'src/entities/conversation/model/conversation.ts',
+      '@/entities/user/@x/conversation',
+    )
+  })
+})
+
+describe('Audit de la branche : contournements de l’outillage fermés', () => {
+  it('QA-10 : sous src/, tout fichier de code autre que .ts et .tsx est refusé', async () => {
+    for (const file of [
+      'src/shared/lib/escape.mts',
+      'src/shared/lib/escape.cts',
+      'src/shared/lib/escape.js',
+    ]) {
+      expect(await ruleIds(file, "export const r = fetch('/x')\n")).toContain(
+        'no-restricted-syntax',
+      )
+    }
+  })
+
+  it('QA-10 : import.meta.glob est refusé, il passerait sous toutes les frontières', async () => {
+    await expectForbidden(
+      SHARED_API,
+      "export const m = import.meta.glob('../crypto/*.ts', { eager: true })\n",
+    )
+    await expectForbidden(FEATURE_MODEL, "export const m = import.meta.glob('../api/*.ts')\n")
+  })
+
+  it('KEY-41 : cookieStore est refusé partout, shared/api compris', async () => {
+    for (const file of [FEATURE_MODEL, SHARED_API, SHARED_CRYPTO]) {
+      await expectForbidden(file, "export const t = cookieStore.get('XSRF-TOKEN')\n")
+      await expectForbidden(file, "export const t = window.cookieStore.set('k', 'v')\n")
+    }
+  })
+
+  it('QA-10 : aucune autre référence à la fenêtre ne rouvre un accès calculé à l’objet global', async () => {
+    for (const code of [
+      "const k = 'crypto'\nexport const c = window.window[k]\n",
+      "const k = 'crypto'\nexport const c = globalThis.self[k]\n",
+      "export const c = frames['cry' + 'pto']\n",
+      "export const c = Reflect.get(top, 'fetch')\n",
+      "const n = 'indexedDB'\nexport const c = parent[n]\n",
+      "const k = 'fetch'\nexport const c = window.top[k]\n",
+      'export const c = opener\n',
+      "const k = 'crypto'\nexport const c = (f: HTMLIFrameElement) => f.contentWindow?.[k]\n",
+    ]) {
+      await expectForbidden(SHARED_API, code)
+    }
+    await expectPermitted(FEATURE_MODEL, 'export const y = (rect: DOMRect) => rect.top\n')
+    await expectPermitted(
+      FEATURE_MODEL,
+      'export const y = (rect: DOMRect) => { const { top } = rect; return top }\n',
+    )
+    await expectPermitted(
+      FEATURE_MODEL,
+      'export const p = (node: { parent: number }) => node.parent\n',
+    )
+  })
+
+  it('QA-10 : shared/crypto ne se réexporte pas, ni par l’alias ni par un chemin relatif', async () => {
+    await expectForbidden(FEATURE_MODEL, "export * from '@/shared/crypto'\n")
+    await expectForbidden(FEATURE_MODEL, "export { value } from '../../../shared/crypto'\n")
+  })
+
+  it('KEY-40 : une bibliothèque ne s’atteint pas par son chemin dans node_modules', async () => {
+    await expectForbidden(
+      SHARED_API,
+      "import * as h from '../../../node_modules/@hpke/core/esm/mod.js'\nexport const v = h\n",
+    )
+    await expectForbidden(
+      SHARED_API,
+      "export const v = import('@/../node_modules/idb/build/index.js')\n",
+    )
+    await expectForbidden(
+      FEATURE_MODEL,
+      "import { openDB } from 'idb/with-async-ittr'\nexport const o = openDB\n",
+    )
+    await expectForbidden(FEATURE_MODEL, "export const o = import('idb/with-async-ittr')\n")
+    await expectPermitted(
+      SHARED_CRYPTO,
+      "import { openDB } from 'idb/with-async-ittr'\nexport const o = openDB\n",
+    )
+  })
+
+  it('SEC-21 : la console ne s’atteint pas par une décomposition ni un alias, sauf pour l’espionner dans un test', async () => {
+    await expectForbidden(SHARED_UI, "const { error } = console\nerror('x')\nexport const v = 1\n")
+    await expectForbidden(SHARED_CRYPTO, "const out = console\nout.info('x')\nexport const v = 1\n")
+    await expectPermitted(
+      'src/shared/ui/Box.test.tsx',
+      "import { vi } from 'vitest'\nexport const spy = vi.spyOn(console, 'error')\n",
+    )
+    await expectPermitted(
+      'src/shared/crypto/keys.test.ts',
+      "import { vi } from 'vitest'\nexport const spy = vi.spyOn(console, 'error')\n",
+    )
+  })
+
+  it('QA-10 : une directive eslint-disable en ligne ne lève aucune règle', async () => {
+    const rules = await ruleIds(
+      FEATURE_MODEL,
+      "// eslint-disable-next-line no-restricted-globals\nexport const r = fetch('/x')\n",
+    )
+    expect(rules).toContain('no-restricted-globals')
+  })
+
+  it('KEY-41 : OPFS reste interdit sur tout objet ; navigator.storage.persist() est permis dans shared/crypto seulement', async () => {
+    await expectForbidden(
+      FEATURE_MODEL,
+      'export const d = window.navigator.storage.getDirectory()\n',
+    )
+    await expectForbidden(SHARED_CRYPTO, 'export const d = navigator.storage.getDirectory()\n')
+    await expectForbidden(FEATURE_MODEL, 'export const p = navigator.storage.persist()\n')
+    await expectPermitted(SHARED_CRYPTO, 'export const p = navigator.storage.persist()\n')
+  })
+
+  it('SEC-02 : Document.parseHTMLUnsafe est un puits HTML', async () => {
+    await expectForbidden(
+      SHARED_UI,
+      'export const f = (h: string) => Document.parseHTMLUnsafe(h)\n',
+    )
   })
 })
