@@ -9,8 +9,144 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
-const CRYPTO_ONLY =
-  'Seul src/shared/crypto/ appelle WebCrypto et HPKE (ADR 0012) : passez par son API publique.'
+// ADR 0012, point 2 : chaque capacité sensible du navigateur n'est atteinte que depuis son segment de shared. Une
+// globale est aussi refusée comme propriété de n'importe quel objet (window.fetch, globalThis.window.crypto).
+const CAPABILITIES = {
+  // WebCrypto, HPKE et le coffre des clés en IndexedDB (KEY-40, KEY-41).
+  crypto: {
+    folder: 'src/shared/crypto',
+    message:
+      'Seul src/shared/crypto/ appelle WebCrypto, HPKE et IndexedDB (ADR 0012, KEY-40) : passez par son API publique.',
+    globals: ['crypto', 'indexedDB'],
+    properties: [],
+    importPaths: ['crypto', 'node:crypto', 'idb'],
+    importPatterns: ['@hpke/*', '@noble/*'],
+    // Mêmes cibles pour import(), que no-restricted-imports ne voit pas (esquery n'admet pas « / » dans un motif).
+    dynamicImport: String.raw`/^(node:)?crypto$|^idb$|^@(hpke|noble)\b/`,
+  },
+  // Toutes les voies HTTP du navigateur, et le cookie XSRF-TOKEN que le client HTTP renvoie en en-tête.
+  http: {
+    folder: 'src/shared/api',
+    message:
+      'Seul src/shared/api/ appelle le réseau HTTP (ADR 0012) : passez par le segment api/ de la tranche.',
+    globals: ['fetch', 'XMLHttpRequest', 'EventSource', 'WebTransport'],
+    properties: ['sendBeacon', 'cookie'],
+    importPaths: [],
+    importPatterns: [],
+    dynamicImport: null,
+  },
+  ws: {
+    folder: 'src/shared/ws',
+    message:
+      'Seul src/shared/ws/ ouvre une WebSocket (ADR 0012) : passez par le segment api/ de la tranche.',
+    globals: ['WebSocket'],
+    properties: [],
+    importPaths: [],
+    importPatterns: [],
+    dynamicImport: null,
+  },
+}
+const PEER_TO_PEER =
+  'Aucun canal pair à pair (ADR 0012) : la CSP ne borne pas WebRTC, qui contournerait shared/api et shared/ws.'
+const STORAGE =
+  'Aucun stockage web persistant (KEY-41) : ni texte clair ni secret hors du coffre IndexedDB de shared/crypto.'
+const RAW_HTML = 'Aucun rendu HTML brut (SEC-02, A05) : affichez du texte, React l’échappe.'
+const CONSOLE =
+  'Aucune écriture dans la console (SEC-21) : elle pourrait révéler un secret ou un texte clair.'
+const GLOBAL_OBJECT =
+  "L'objet global ne s'utilise que par un accès nommé, comme globalThis.addEventListener (ADR 0012) : un alias, un " +
+  'accès calculé ou un passage en paramètre contourneraient les frontières de la cryptographie et du réseau.'
+
+// ADR 0012, point 2 : puits interdits dans tout le code du navigateur, shared compris.
+const SINK_GLOBALS = [
+  ...['localStorage', 'sessionStorage', 'caches'].map((name) => ({ name, message: STORAGE })),
+  { name: 'RTCPeerConnection', message: PEER_TO_PEER },
+]
+const SINK_PROPERTIES = [
+  ...['localStorage', 'sessionStorage', 'caches'].map((property) => ({
+    property,
+    message: STORAGE,
+  })),
+  { object: 'navigator', property: 'storage', message: STORAGE },
+  { property: 'RTCPeerConnection', message: PEER_TO_PEER },
+  ...[
+    'innerHTML',
+    'outerHTML',
+    'insertAdjacentHTML',
+    'setHTMLUnsafe',
+    'createContextualFragment',
+    'parseFromString',
+    'srcdoc',
+  ].map((property) => ({ property, message: RAW_HTML })),
+  ...['write', 'writeln'].map((property) => ({ object: 'document', property, message: RAW_HTML })),
+  { property: 'console', message: CONSOLE },
+  { property: 'defaultView', message: GLOBAL_OBJECT },
+]
+const SINK_SYNTAX = [
+  {
+    selector: 'JSXAttribute[name.name=/^(dangerouslySetInnerHTML|srcDoc)$/]',
+    message: RAW_HTML,
+  },
+  { selector: "Property[key.name='dangerouslySetInnerHTML']", message: RAW_HTML },
+  {
+    selector: "JSXAttribute[name.name='style']",
+    message: 'Aucun style en ligne (TRN-21) : CSS Modules et jetons de la maquette.',
+  },
+  {
+    selector:
+      'Identifier[name=/^(globalThis|window|self)$/]:not(MemberExpression[computed=false] > Identifier.object, ' +
+      'MemberExpression[computed=false] > Identifier.property, Property > Identifier.key)',
+    message: GLOBAL_OBJECT,
+  },
+  {
+    selector: "ImportExpression[source.type!='Literal']",
+    message:
+      'Un import dynamique nomme sa cible en clair (ADR 0012) : sinon les frontières ne la voient pas.',
+  },
+]
+
+// Règles d'une zone : les puits, plus les capacités des autres segments. Un bloc par zone, car ESLint remplace les
+// options d'une règle d'un bloc à l'autre au lieu de les fusionner.
+function restrictionsExcept(allowed) {
+  const denied = Object.entries(CAPABILITIES)
+    .filter(([name]) => name !== allowed)
+    .map(([, capability]) => capability)
+  return {
+    'no-restricted-globals': [
+      'error',
+      ...SINK_GLOBALS,
+      ...denied.flatMap(({ globals, message }) => globals.map((name) => ({ name, message }))),
+    ],
+    // Sans objet : window.fetch, globalThis.crypto ou globalThis.window.crypto sont tous refusés.
+    'no-restricted-properties': [
+      'error',
+      ...SINK_PROPERTIES,
+      ...denied.flatMap(({ globals, properties, message }) =>
+        [...globals, ...properties].map((property) => ({ property, message })),
+      ),
+    ],
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: denied.flatMap(({ importPaths, message }) =>
+          importPaths.map((name) => ({ name, message })),
+        ),
+        patterns: denied.flatMap(({ importPatterns, message }) =>
+          importPatterns.map((pattern) => ({ group: [pattern], message })),
+        ),
+      },
+    ],
+    'no-restricted-syntax': [
+      'error',
+      ...SINK_SYNTAX,
+      ...denied.flatMap(({ dynamicImport, message }) =>
+        dynamicImport
+          ? [{ selector: `ImportExpression[source.value=${dynamicImport}]`, message }]
+          : [],
+      ),
+    ],
+  }
+}
 
 // ADR 0012 : couches de Feature-Sliced Design. Une tranche n'expose que son index.ts et se découpe en segments
 // déclarés, plus @x pour les entités ; shared se découpe en segments déclarés. Tout autre fichier est refusé
@@ -75,24 +211,26 @@ export default defineConfig(
     languageOptions: { globals: globals.browser },
   },
 
-  // ADR 0012 : WebCrypto et HPKE ne sont accessibles que depuis src/shared/crypto/.
+  // ADR 0012, points 2 et 3 : puits interdits, rigueur, et capacités du navigateur réservées à leur segment.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/shared/crypto/**'],
     rules: {
-      'no-restricted-globals': ['error', { name: 'crypto', message: CRYPTO_ONLY }],
-      'no-restricted-properties': [
-        'error',
-        { object: 'window', property: 'crypto', message: CRYPTO_ONLY },
-        { object: 'globalThis', property: 'crypto', message: CRYPTO_ONLY },
-        { object: 'self', property: 'crypto', message: CRYPTO_ONLY },
-      ],
-      'no-restricted-imports': [
-        'error',
-        { patterns: [{ group: ['@hpke/*'], message: CRYPTO_ONLY }] },
-      ],
+      'no-console': 'error',
+      'no-eval': 'error',
+      'no-new-func': 'error',
+      'no-script-url': 'error',
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
     },
   },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: Object.values(CAPABILITIES).map(({ folder }) => `${folder}/**`),
+    rules: restrictionsExcept(null),
+  },
+  ...Object.entries(CAPABILITIES).map(([name, { folder }]) => ({
+    files: [`${folder}/**/*.{ts,tsx}`],
+    rules: restrictionsExcept(name),
+  })),
 
   // ADR 0012 : frontières de Feature-Sliced Design et frontière entre cryptographie et réseau. Les politiques
   // s'appliquent dans l'ordre et la dernière qui correspond l'emporte : les interdictions viennent donc après les

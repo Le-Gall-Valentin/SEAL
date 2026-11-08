@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "tsc -b && eslint . && prettier --check .",
+    "lint": "tsc -b && eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
