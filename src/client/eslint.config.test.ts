@@ -554,6 +554,17 @@ describe('Audit de la branche : contournements de l’outillage fermés', () => 
     )
   })
 
+  it("SEC-21 : aucun fichier n'importe un test, qui sortirait console et Vitest de leur exemption", async () => {
+    await expectForbidden(
+      FEATURE_MODEL,
+      "import { out } from './leak.test'\nexport const v = out\n",
+    )
+    await expectForbidden(
+      SHARED_UI,
+      "import { out } from '@/shared/ui/Box.test.tsx'\nexport const v = out\n",
+    )
+  })
+
   it('QA-10 : une directive eslint-disable en ligne ne lève aucune règle', async () => {
     const rules = await ruleIds(
       FEATURE_MODEL,

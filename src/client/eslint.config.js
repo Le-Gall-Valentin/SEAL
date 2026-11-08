@@ -179,6 +179,12 @@ function restrictionsExcept(allowed) {
         ),
         patterns: [
           { regex: '(^|/)node_modules/', message: NODE_MODULES },
+          // Un test exporterait console (permise dans les tests) et embarquerait Vitest dans l'application.
+          {
+            regex: String.raw`\.test(\.tsx?)?$`,
+            message:
+              "Aucun fichier n'importe un test (ADR 0012) : il en sortirait console et Vitest.",
+          },
           ...denied.flatMap(({ importPatterns, message }) =>
             importPatterns.map((pattern) => ({ group: [pattern], message })),
           ),
