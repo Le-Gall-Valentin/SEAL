@@ -28,6 +28,8 @@
     <dependency-check.version>13.0.0</dependency-check.version>
     <!-- Bibliothèques absentes du BOM de Spring Boot. Bucket4j : 8.21.0, la 8.22.0 ayant moins de deux semaines (A03). -->
     <bucket4j.version>8.21.0</bucket4j.version>
+    <!-- ADR 0018 : Bouncy Castle, utilisé seulement par Argon2PasswordEncoder de Spring Security (AUTH-13). -->
+    <bouncycastle.version>1.86</bouncycastle.version>
   </properties>
 
   <dependencies>
@@ -77,6 +79,12 @@
       <artifactId>bucket4j_jdk17-core</artifactId>
       <version>${bucket4j.version}</version>
     </dependency>
+    <!-- AUTH-13, ADR 0018 : Argon2id par Argon2PasswordEncoder ; aucune classe de SEAL ne l'importe (ArchUnit). -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <version>${bouncycastle.version}</version>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -118,6 +126,18 @@
 
   <build>
     <finalName>seal-server</finalName>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- AUTH-11 : liste de blocage partagée avec le client (PROTOCOL.md, section 3.1), jamais recopiée. -->
+      <resource>
+        <directory>../protocol</directory>
+        <includes>
+          <include>password-blocklist.txt</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>

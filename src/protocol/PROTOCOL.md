@@ -103,3 +103,35 @@ dépendance, indépendante de Java et de TypeScript. Pour les régénérer, depu
 python3 tools/gen_vectors.py           # réécrit vectors/canonical-encoding.json
 python3 tools/gen_vectors.py --check   # échoue si le fichier n'est pas à jour (CI)
 ```
+
+## 3. Mots de passe (AUTH-11)
+
+Client et serveur DOIVENT appliquer la même politique : le client affiche les règles en direct, le
+serveur refuse (`PASSWORD_TOO_WEAK`). Algorithme (ADR 0019, point 2) :
+
+1. `p` = mot de passe normalisé en NFKC ; sa longueur en points de code est comprise entre 15 et 128.
+2. `m` = `p` en minuscules, par la correspondance de casse par défaut d'Unicode (`Locale.ROOT` en
+   Java, `toLowerCase()` en TypeScript). `m` ne figure pas dans la liste de blocage, dont chaque
+   entrée est normalisée de la même façon.
+3. Mots du contexte : l'identifiant, la partie locale du courriel (avant le premier `+` ou `@`),
+   `seal` et `uqac`, normalisés comme `m` ; un mot de moins de 3 points de code est ignoré.
+4. On retire de `m` chaque occurrence de chaque mot, jusqu'à ce qu'il n'en reste aucune ; il reste
+   au moins 15 points de code.
+
+### 3.1 Liste de blocage
+
+`password-blocklist.txt` compte les 10 000 premiers mots de passe de 15 caractères ou plus, dans
+l'ordre de `Passwords/Common-Credentials/xato-net-10-million-passwords-1000000.txt` de
+[SecLists](https://github.com/danielmiessler/SecLists) (ADR 0007, point 4), qui en compte 10 908.
+Une entrée par ligne, en UTF-8, fins de ligne `\n`, toutes en ASCII.
+
+| Élément | Valeur |
+| --- | --- |
+| Fichier source, SHA-256 | `424a3e03a17df0a2bc2b3ca749d81b04e79d59cb7aeec8876a5a3f308d0caf51` |
+| `password-blocklist.txt`, SHA-256 | `0e44bfef3adb46364f09225c8e8bc2299169b1df1f020c49538a6aeafe12006d` |
+| Taille | 176 195 octets, 10 000 lignes |
+| Licence | MIT, copyright 2018 Daniel Miessler (`password-blocklist.LICENSE`) |
+
+Le serveur l'embarque comme ressource Maven et un test vérifie son empreinte ; le client la charge
+sur l'écran d'inscription seulement.
+

@@ -1,0 +1,68 @@
+package fr.vlegall.seal.authentication.infrastructure.persistence;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import fr.vlegall.seal.authentication.application.port.in.SetUpPasswordUseCase;
+import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.support.SealIntegrationTest;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.support.TransactionTemplate;
+
+@SealIntegrationTest
+class CredentialStorageIT {
+
+    @Autowired
+    private SetUpPasswordUseCase setUpPassword;
+
+    @Autowired
+    private JdbcClient jdbc;
+
+    @Autowired
+    private TransactionTemplate transactions;
+
+    private UserId insertUser(String username) {
+        return new UserId(jdbc.sql("INSERT INTO users (username, display_name) VALUES (?, 'Nom') RETURNING id")
+                .param(username)
+                .query(UUID.class)
+                .single());
+    }
+
+    private String storedHash(UserId user) {
+        return jdbc.sql("SELECT password_hash FROM user_credentials WHERE user_id = ?")
+                .param(user.value())
+                .query(String.class)
+                .optional()
+                .orElse(null);
+    }
+
+    @Test
+    @DisplayName("AUTH-13 : le haché est écrit dans la transaction de l'appelant, annulé avec elle")
+    void auth13CredentialIsWrittenInTheCallerTransaction() {
+        UserId[] user = new UserId[1];
+        transactions.executeWithoutResult(status -> {
+            user[0] = insertUser("credential.un");
+            assertThat(setUpPassword.setUp(user[0], "fjord-tuque-raquette", List.of("credential.un")))
+                    .isTrue();
+            assertThat(storedHash(user[0])).startsWith("{argon2}$argon2id$");
+            status.setRollbackOnly();
+        });
+
+        assertThat(storedHash(user[0])).isNull();
+    }
+
+    @Test
+    @DisplayName("AUTH-13 : hors d'une transaction, l'enregistrement du mot de passe est refusé")
+    void auth13SetUpRequiresATransaction() {
+        UserId user = new UserId(UUID.randomUUID());
+
+        assertThatThrownBy(() -> setUpPassword.setUp(user, "fjord-tuque-raquette", List.of()))
+                .isInstanceOf(IllegalTransactionStateException.class);
+    }
+}
