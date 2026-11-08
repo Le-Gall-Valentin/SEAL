@@ -2,6 +2,10 @@
 spring:
   application:
     name: seal
+  autoconfigure:
+    # SEC-21 : pas d'utilisateur par défaut de Spring Boot, dont le mot de passe généré serait journalisé au
+    # démarrage ; les comptes de SEAL vivent dans users et user_credentials.
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   profiles:
     # Sans profil explicite, SEAL démarre en profil demo, celui de la démonstration et de docker compose.
     default: demo
