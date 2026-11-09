@@ -214,9 +214,12 @@ final class ContextRules {
                 .ignoreDependency(crossContextAdapter(root), contextUseCase(root));
     }
 
-    /** Classe rangée dans un sous-package de {@code <contexte>/infrastructure/} autre que le nom du contexte. */
+    /**
+     * Classe rangée dans un sous-package de {@code <contexte>/infrastructure/} qui ne porte pas le nom du contexte. Le
+     * prédicat ne distingue pas un adaptateur vers un autre contexte d'un contrôleur : la règle 7 borne ce chemin.
+     */
     private static DescribedPredicate<JavaClass> crossContextAdapter(String root) {
-        return DescribedPredicate.describe("un adaptateur de infrastructure/<autre contexte>/", type -> {
+        return DescribedPredicate.describe("une classe d'un sous-package de infrastructure/", type -> {
             String[] parts = relativePackage(root, type);
             return parts.length >= 3 && parts[1].equals("infrastructure") && !parts[2].equals(parts[0]);
         });
