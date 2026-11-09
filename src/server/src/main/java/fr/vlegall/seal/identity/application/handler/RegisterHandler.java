@@ -30,9 +30,9 @@ public class RegisterHandler implements RegisterUseCase {
      * point 3) : Argon2id ne retient aucune connexion à la base. Les refus gardent leur ordre : identifiant invalide,
      * réservé, pris, puis mot de passe trop faible ; un identifiant pris l'est sans calcul d'Argon2id.
      *
-     * <p>Volontairement sans {@code @Transactional}, même {@code NEVER} : toute portée transactionnelle, même vide,
-     * active la synchronisation, et la connexion prise par {@code users.exists} resterait liée au fil pendant le
-     * hachage. {@code InitialPasswordUseCase.prepare} refuse déjà d'être appelé dans une transaction.
+     * <p>Sans {@code @Transactional} : rien ici n'a à être atomique, et {@code InitialPasswordUseCase.prepare} refuse
+     * déjà d'être appelé dans une transaction. Sans portée transactionnelle, la connexion prise par {@code users.exists}
+     * est rendue aussitôt ; l'ADR 0020 garantit qu'il en irait de même sous {@code NEVER}.
      */
     @Override
     public UserId register(RegisterCommand command) {
