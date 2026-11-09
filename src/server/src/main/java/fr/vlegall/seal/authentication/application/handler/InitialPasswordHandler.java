@@ -28,7 +28,7 @@ public class InitialPasswordHandler implements InitialPasswordUseCase {
 
     /**
      * {@code NEVER} : un appel dans une transaction échoue au lieu de garder une connexion pendant le hachage. La portée
-     * vide que {@code NEVER} ouvre ne doit toucher aucune base : une connexion y resterait liée jusqu'à la fin du calcul.
+     * que {@code NEVER} ouvre n'est pas synchronisée (ADR 0020) : elle ne lie aucune connexion au fil.
      */
     @Override
     @Transactional(propagation = Propagation.NEVER)
