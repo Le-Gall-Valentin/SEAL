@@ -13,5 +13,7 @@ public enum SecurityEventType {
     /** SEC-20 : connexion refusée (AUTH-21) ; la saisie est filtrée (SEC-21). */
     LOGIN_FAILED,
     /** SEC-20 : déconnexion (AUTH-53). */
-    LOGOUT
+    LOGOUT,
+    /** SEC-20 : sessions d'un compte révoquées (AUTH-16, AUTH-70), avec leur nombre. */
+    SESSION_REVOKED
 }
