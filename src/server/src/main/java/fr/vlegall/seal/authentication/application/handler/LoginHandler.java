@@ -44,12 +44,12 @@ public class LoginHandler implements LoginUseCase {
         Optional<String> hash = account.flatMap(credentials::findHash);
         if (account.isEmpty() || hash.isEmpty()) {
             hasher.verifyDecoy(candidate);
-            journal.loginFailed(login, account.orElse(null));
+            journal.loginFailed(account.orElse(null));
             return new LoginOutcome.Rejected();
         }
         UserId user = account.get();
         if (!hasher.matches(candidate, hash.get())) {
-            journal.loginFailed(login, user);
+            journal.loginFailed(user);
             return new LoginOutcome.Rejected();
         }
         journal.loginSucceeded(user);

@@ -523,15 +523,19 @@ class LoginIT {
     }
 
     @Test
-    @DisplayName("SEC-21 : un mot de passe tapé dans le champ identifiant n'est jamais journalisé, même en 429")
+    @DisplayName(
+            "SEC-21 : un mot de passe tapé dans le champ identifiant n'est jamais journalisé, même en forme de courriel"
+                    + " ou en 429")
     void sec21PasswordTypedAsLoginIsNeverJournaled() throws Exception {
-        String typed = "MonMotDePasse" + UUID.randomUUID().toString().substring(0, 6);
-        for (int i = 0; i < 6; i++) {
-            login(new AuthClient(mvc, mail), typed, "peu-importe-le-mot-de-passe");
+        String marker = UUID.randomUUID().toString().substring(0, 8);
+        for (String typed : List.of("MonMotDePasse" + marker, "P@ssw0rd" + marker + ".2026")) {
+            for (int i = 0; i < 6; i++) {
+                login(new AuthClient(mvc, mail), typed, "peu-importe-le-mot-de-passe");
+            }
         }
 
         assertThat(jdbc.sql("SELECT count(*) FROM security_events WHERE lower(details::text) LIKE ?")
-                        .param("%" + typed.toLowerCase(java.util.Locale.ROOT) + "%")
+                        .param("%" + marker + "%")
                         .query(Long.class)
                         .single())
                 .isZero();
@@ -552,12 +556,13 @@ class LoginIT {
                 .query(String.class)
                 .list();
         assertThat(types).containsExactly("LOGIN_FAILED", "LOGIN_SUCCEEDED", "LOGOUT");
-        assertThat(jdbc.sql("SELECT details->>'login' FROM security_events WHERE user_id = ? AND type = 'LOGIN_FAILED'")
+        assertThat(jdbc.sql("SELECT details->>'login' IS NULL FROM security_events WHERE user_id = ?"
+                                + " AND type = 'LOGIN_FAILED'")
                         .param(id)
-                        .query(String.class)
+                        .query(Boolean.class)
                         .single())
-                .as("la saisie n'est pas recopiée ; le compte suffit (ADR 0013)")
-                .isEqualTo("***");
+                .as("la saisie n'est pas recopiée ; le compte suffit (ADR 0021)")
+                .isTrue();
         assertThat(jdbc.sql("SELECT count(*) FROM security_events WHERE details::text LIKE ?")
                         .param("%" + PASSWORD + "%")
                         .query(Long.class)

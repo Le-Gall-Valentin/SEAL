@@ -9,10 +9,11 @@ public interface SecurityEventPort {
     void loginSucceeded(UserId user);
 
     /**
-     * @param login saisie, filtrée avant d'être écrite (SEC-21)
+     * La saisie n'est jamais écrite : ce pourrait être un mot de passe tapé dans le champ identifiant (SEC-21).
+     *
      * @param user compte que désigne la saisie, s'il existe
      */
-    void loginFailed(String login, @Nullable UserId user);
+    void loginFailed(@Nullable UserId user);
 
     void loggedOut(UserId user);
 }

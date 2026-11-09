@@ -5,7 +5,6 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.journal.SecurityEvent;
 import fr.vlegall.seal.security.journal.SecurityEventType;
 import fr.vlegall.seal.security.journal.SecurityJournal;
-import fr.vlegall.seal.security.logging.LogValues;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -25,14 +24,10 @@ public class AuthenticationJournalAdapter implements SecurityEventPort {
         journal.recordStandalone(new SecurityEvent(SecurityEventType.LOGIN_SUCCEEDED, user, Map.of()));
     }
 
-    /**
-     * SEC-21 : seule une saisie en forme de courriel est gardée, masquée ; toute autre devient {@code ***}, car elle
-     * pourrait être un mot de passe tapé dans le champ identifiant. Le compte, s'il existe, est noté (ADR 0013).
-     */
+    /** SEC-21 : seul le compte, s'il existe, est noté ; la saisie ne l'est jamais (ADR 0021, mise à jour). */
     @Override
-    public void loginFailed(String login, @Nullable UserId user) {
-        journal.recordStandalone(
-                new SecurityEvent(SecurityEventType.LOGIN_FAILED, user, Map.of("login", LogValues.email(login))));
+    public void loginFailed(@Nullable UserId user) {
+        journal.recordStandalone(new SecurityEvent(SecurityEventType.LOGIN_FAILED, user, Map.of()));
     }
 
     @Override

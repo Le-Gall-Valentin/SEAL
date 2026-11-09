@@ -85,8 +85,8 @@ class LoginHandlerTest {
         }
 
         @Override
-        public void loginFailed(String login, UserId user) {
-            events.add("refusée:" + login + ":" + (user == null ? "aucun" : user.value()));
+        public void loginFailed(UserId user) {
+            events.add("refusée:" + (user == null ? "aucun" : user.value()));
         }
 
         @Override
@@ -132,7 +132,7 @@ class LoginHandlerTest {
     void auth21UnknownLoginVerifiesTheDecoy() {
         assertThat(handler.login("inconnu", PASSWORD)).isEqualTo(new LoginOutcome.Rejected());
         assertThat(verifications).containsExactly("leurre");
-        assertThat(events).containsExactly("refusée:inconnu:aucun");
+        assertThat(events).containsExactly("refusée:aucun");
     }
 
     @Test
@@ -151,7 +151,7 @@ class LoginHandlerTest {
 
         assertThat(handler.login("valentin", "mauvais-mot-de-passe")).isEqualTo(new LoginOutcome.Rejected());
         assertThat(verifications).containsExactly("réelle");
-        assertThat(events).containsExactly("refusée:valentin:" + user.value());
+        assertThat(events).containsExactly("refusée:" + user.value());
     }
 
     @Test

@@ -264,19 +264,19 @@ class RateLimiterTest {
         verify(journal, times(3)).recordStandalone(recorded.capture());
         assertThat(recorded.getAllValues())
                 .extracting(event -> event.details().get("key"))
-                .containsExactly("b***@exemple.ca", "***", "2001:db8::1");
+                .containsExactly(null, "***", "2001:db8::1");
     }
 
     @Test
     @DisplayName(
-            "SEC-21 : une saisie qui n'est pas un courriel n'est jamais journalisée, même en forme d'identifiant (ADR 0013)")
-    void sec21EnteredKeyThatIsNotAnEmailIsMasked() {
-        consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "monmotdepassesecret", 5);
-        refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "monmotdepassesecret"));
+            "SEC-21 : une saisie du champ identifiant n'est jamais journalisée, même en forme de courriel (ADR 0021)")
+    void sec21EnteredKeyIsNeverJournaled() {
+        consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "p@ssw0rd.2026", 5);
+        refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "p@ssw0rd.2026"));
 
         ArgumentCaptor<SecurityEvent> recorded = ArgumentCaptor.forClass(SecurityEvent.class);
         verify(journal).recordStandalone(recorded.capture());
-        assertThat(recorded.getValue().details()).containsEntry("key", "***");
+        assertThat(recorded.getValue().details()).doesNotContainKey("key");
     }
 
     @Test

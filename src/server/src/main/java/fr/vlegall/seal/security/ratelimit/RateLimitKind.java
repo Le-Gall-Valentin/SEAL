@@ -7,7 +7,7 @@ public enum RateLimitKind {
      * {@code ip} du journal porte l'adresse entière.
      */
     IP,
-    /** Identifiant saisi : masqué s'il a la forme d'un courriel, {@code ***} sinon (ADR 0021, mise à jour). */
+    /** Identifiant saisi : jamais journalisé, ce pourrait être un mot de passe (SEC-21, ADR 0021, mise à jour). */
     ENTERED,
     /** Courriel saisi : masqué s'il en a la forme, {@code ***} sinon. */
     EMAIL,
