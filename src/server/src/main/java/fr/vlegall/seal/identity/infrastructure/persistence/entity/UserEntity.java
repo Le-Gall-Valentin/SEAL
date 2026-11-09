@@ -4,7 +4,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
@@ -28,13 +27,6 @@ public class UserEntity {
 
     @Column(name = "email", columnDefinition = "citext")
     private @Nullable String email;
-
-    @Column(name = "email_verified_at")
-    private @Nullable Instant emailVerifiedAt;
-
-    public @Nullable Instant getEmailVerifiedAt() {
-        return emailVerifiedAt;
-    }
 
     @Column(name = "status", nullable = false)
     private String status;

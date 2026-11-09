@@ -6,7 +6,6 @@ import fr.vlegall.seal.identity.domain.model.LiveCode;
 import fr.vlegall.seal.identity.domain.port.out.EmailCodeRepository;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -29,14 +28,14 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
     @Override
     public void renew(UserId user, byte[] codeHash, Instant issuedAt, Instant expiresAt) {
         jdbc.sql("UPDATE email_codes SET consumed_at = :now WHERE user_id = :user AND consumed_at IS NULL")
-                .param("now", utc(issuedAt))
+                .param("now", SqlSupport.utc(issuedAt))
                 .param("user", user.value())
                 .update();
         jdbc.sql("INSERT INTO email_codes (user_id, purpose, code_hash, expires_at) "
                         + "VALUES (:user, 'VERIFY_EMAIL', :hash, :expiresAt)")
                 .param("user", user.value())
                 .param("hash", codeHash)
-                .param("expiresAt", utc(expiresAt))
+                .param("expiresAt", SqlSupport.utc(expiresAt))
                 .update();
     }
 
@@ -44,7 +43,7 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
     public Optional<Instant> liveExpiry(UserId user, Instant now) {
         return jdbc.sql("SELECT expires_at FROM email_codes WHERE " + LIVE + " ORDER BY id DESC LIMIT 1")
                 .param("user", user.value())
-                .param("now", utc(now))
+                .param("now", SqlSupport.utc(now))
                 .param("maxAttempts", CodePolicy.MAX_ATTEMPTS)
                 .query(OffsetDateTime.class)
                 .optional()
@@ -55,7 +54,7 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
     public Optional<LiveCode> findLive(UserId user, Instant now) {
         return jdbc.sql("SELECT id, code_hash FROM email_codes WHERE " + LIVE + " ORDER BY id DESC LIMIT 1")
                 .param("user", user.value())
-                .param("now", utc(now))
+                .param("now", SqlSupport.utc(now))
                 .param("maxAttempts", CodePolicy.MAX_ATTEMPTS)
                 .query((row, number) -> new LiveCode(row.getObject("id", UUID.class), row.getBytes("code_hash")))
                 .optional();
@@ -63,20 +62,20 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
 
     @Override
     public void countFailedAttempt(UUID code) {
-        jdbc.sql("UPDATE email_codes SET attempts = attempts + 1 WHERE id = :id")
-                .param("id", code)
-                .update();
+        SqlSupport.requireOneRow(
+                jdbc.sql("UPDATE email_codes SET attempts = attempts + 1 WHERE id = :id")
+                        .param("id", code)
+                        .update(),
+                "essai manqué");
     }
 
     @Override
     public void consume(UUID code, Instant now) {
-        jdbc.sql("UPDATE email_codes SET consumed_at = :now WHERE id = :id AND consumed_at IS NULL")
-                .param("now", utc(now))
-                .param("id", code)
-                .update();
-    }
-
-    static OffsetDateTime utc(Instant instant) {
-        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
+        SqlSupport.requireOneRow(
+                jdbc.sql("UPDATE email_codes SET consumed_at = :now WHERE id = :id AND consumed_at IS NULL")
+                        .param("now", SqlSupport.utc(now))
+                        .param("id", code)
+                        .update(),
+                "consommation du code");
     }
 }

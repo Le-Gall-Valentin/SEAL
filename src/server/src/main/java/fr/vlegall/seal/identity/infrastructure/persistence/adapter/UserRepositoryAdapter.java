@@ -11,8 +11,6 @@ import fr.vlegall.seal.identity.domain.port.out.UserRepository;
 import fr.vlegall.seal.identity.infrastructure.persistence.entity.UserEntity;
 import fr.vlegall.seal.identity.infrastructure.persistence.repository.UserJpaRepository;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
@@ -54,7 +52,7 @@ public class UserRepositoryAdapter implements UserRepository {
                     .query(UUID.class)
                     .single());
         } catch (DuplicateKeyException e) {
-            if (violates(e, USERNAME_CONSTRAINT)) {
+            if (SqlSupport.violates(e, USERNAME_CONSTRAINT)) {
                 throw new IdentityException.UsernameTaken();
             }
             throw e;
@@ -74,13 +72,15 @@ public class UserRepositoryAdapter implements UserRepository {
     @Override
     public void activate(UserId id, Instant verifiedAt) {
         try {
-            jdbc.sql("UPDATE users SET status = 'ACTIVE', email_verified_at = :verifiedAt "
-                            + "WHERE id = :id AND status = 'PENDING_EMAIL'")
-                    .param("verifiedAt", OffsetDateTime.ofInstant(verifiedAt, ZoneOffset.UTC))
-                    .param("id", id.value())
-                    .update();
+            SqlSupport.requireOneRow(
+                    jdbc.sql("UPDATE users SET status = 'ACTIVE', email_verified_at = :verifiedAt "
+                                    + "WHERE id = :id AND status = 'PENDING_EMAIL'")
+                            .param("verifiedAt", SqlSupport.utc(verifiedAt))
+                            .param("id", id.value())
+                            .update(),
+                    "activation du compte");
         } catch (DuplicateKeyException e) {
-            if (violates(e, VERIFIED_EMAIL_INDEX)) {
+            if (SqlSupport.violates(e, VERIFIED_EMAIL_INDEX)) {
                 throw new IdentityException.CodeExpired();
             }
             throw e;
@@ -89,10 +89,12 @@ public class UserRepositoryAdapter implements UserRepository {
 
     @Override
     public void changeEmail(UserId id, EmailAddress email) {
-        jdbc.sql("UPDATE users SET email = CAST(:email AS citext) WHERE id = :id AND status = 'PENDING_EMAIL'")
-                .param("email", email.value())
-                .param("id", id.value())
-                .update();
+        SqlSupport.requireOneRow(
+                jdbc.sql("UPDATE users SET email = CAST(:email AS citext) WHERE id = :id AND status = 'PENDING_EMAIL'")
+                        .param("email", email.value())
+                        .param("id", id.value())
+                        .update(),
+                "changement de l'adresse en attente");
     }
 
     @Override
@@ -131,12 +133,5 @@ public class UserRepositoryAdapter implements UserRepository {
                 new DisplayName(entity.getDisplayName()),
                 email == null ? null : new EmailAddress(email),
                 AccountStatus.valueOf(entity.getStatus()));
-    }
-
-    /** Le nom de la contrainte figure dans le message de PostgreSQL, même sans le détail retiré par SEC-21. */
-    private static boolean violates(DuplicateKeyException exception, String constraint) {
-        Throwable cause = exception.getMostSpecificCause();
-        String message = cause.getMessage();
-        return message != null && message.contains("\"" + constraint + "\"");
     }
 }
