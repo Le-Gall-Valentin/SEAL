@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,8 +34,12 @@ public final class Argon2PasswordHasher implements PasswordHasher {
     private static final String PREFIX =
             "{" + ENCODING_ID + "}$argon2id$v=19$m=" + MEMORY_KIB + ",t=" + ITERATIONS + ",p=" + PARALLELISM + "$";
 
+    /** Mot de passe du haché leurre : il n'a rien de secret, son résultat n'est jamais lu (AUTH-21). */
+    private static final String DECOY_PASSWORD = "leurre-de-temps-constant-AUTH-21";
+
     private final PasswordEncoder encoder;
     private final Semaphore permits;
+    private volatile @Nullable String decoy;
 
     public Argon2PasswordHasher() {
         this(
@@ -45,6 +50,8 @@ public final class Argon2PasswordHasher implements PasswordHasher {
                                 new Argon2PasswordEncoder(
                                         SALT_LENGTH, HASH_LENGTH, PARALLELISM, MEMORY_KIB, ITERATIONS))),
                 defaultPermits());
+        // AUTH-21 : le leurre est prêt avant la première connexion, qui coûte alors une seule vérification.
+        decoy();
     }
 
     Argon2PasswordHasher(PasswordEncoder encoder, int permits) {
@@ -79,6 +86,26 @@ public final class Argon2PasswordHasher implements PasswordHasher {
         }
         String[] saltAndHash = encoded.substring(PREFIX.length()).split("\\$", -1);
         return saltAndHash.length == 2 && !saltAndHash[0].isEmpty() && !saltAndHash[1].isEmpty();
+    }
+
+    @Override
+    public void verifyDecoy(Password password) {
+        matches(password, decoy());
+    }
+
+    /** Haché leurre, calculé une seule fois, au même coût qu'un vrai haché. */
+    private String decoy() {
+        String current = decoy;
+        if (current == null) {
+            synchronized (this) {
+                current = decoy;
+                if (current == null) {
+                    current = hash(Password.fromInput(DECOY_PASSWORD));
+                    decoy = current;
+                }
+            }
+        }
+        return current;
     }
 
     private <T> T bounded(Supplier<T> computation) {

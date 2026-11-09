@@ -42,6 +42,12 @@ public class PasswordHashingProbeConfiguration {
                     public boolean recognises(String encoded) {
                         return hasher.recognises(encoded);
                     }
+
+                    @Override
+                    public void verifyDecoy(Password password) {
+                        probe.getObject().observe();
+                        hasher.verifyDecoy(password);
+                    }
                 };
             }
         };
