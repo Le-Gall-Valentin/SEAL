@@ -52,6 +52,12 @@ spring:
     deserialization:
       # Section 14 du CDC : aucun champ inconnu accepté dans une requête.
       fail-on-unknown-properties: true
+  mvc:
+    formcontent:
+      filter:
+        # SEC-01 : FormContentFilter lirait tout le corps d'un formulaire PUT, PATCH ou DELETE avant la limite de 16 Kio
+        # de RequestBodyLimitFilter (ADR 0019, point 5). L'API ne reçoit que du JSON.
+        enabled: false
 
 server:
   # TRN-02 : origine unique https://localhost:8443 pour le client, l'API et la WebSocket.

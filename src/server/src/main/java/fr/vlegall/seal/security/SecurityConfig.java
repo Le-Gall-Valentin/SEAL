@@ -122,8 +122,8 @@ class SecurityConfig {
                 .addFilterBefore(
                         new AbsoluteSessionTimeoutFilter(clock, seal.session().absoluteTimeout()),
                         SecurityContextHolderFilter.class)
-                // SEC-01 : corps borné avant toute lecture (jeton CSRF de formulaire compris), après les en-têtes,
-                // que le refus porte aussi.
+                // SEC-01 : corps borné avant toute lecture par la chaîne (jeton CSRF de formulaire compris), après les
+                // en-têtes, que le refus porte aussi. FormContentFilter, placé avant, est désactivé (application.yaml).
                 .addFilterAfter(
                         new RequestBodyLimitFilter(
                                 PathPatternRequestMatcher.withDefaults().matcher("/api/v1/auth/**"),

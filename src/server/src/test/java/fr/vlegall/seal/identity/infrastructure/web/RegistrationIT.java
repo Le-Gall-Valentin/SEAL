@@ -42,6 +42,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.MailSendException;
@@ -50,6 +51,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.web.filter.FormContentFilter;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -71,6 +73,9 @@ class RegistrationIT {
 
     @Autowired
     private PasswordHashingProbe hashing;
+
+    @Autowired
+    private ApplicationContext context;
 
     private AuthClient client;
 
@@ -311,6 +316,13 @@ class RegistrationIT {
                 .andExpect(header().exists("Content-Security-Policy"));
         assertThat(count("SELECT count(*) FROM users WHERE username = ?", "taille2.it"))
                 .isZero();
+    }
+
+    @Test
+    @DisplayName("SEC-01 : aucun filtre ne lit un formulaire PUT, PATCH ou DELETE avant la limite de 16 Kio")
+    void sec01NoFilterReadsAFormBodyBeforeTheLimit() {
+        // FormContentFilter s'exécute avant Spring Security et lirait tout le corps ; l'API ne reçoit que du JSON.
+        assertThat(context.getBeanNamesForType(FormContentFilter.class)).isEmpty();
     }
 
     /** JSON complété d'espaces, valides après la valeur, jusqu'à {@code bytes} octets. */
