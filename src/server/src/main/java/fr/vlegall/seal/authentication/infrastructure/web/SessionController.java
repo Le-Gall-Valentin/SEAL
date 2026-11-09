@@ -76,9 +76,14 @@ public class SessionController {
         } catch (AuthenticationException e) {
             throw new SealException(ErrorCode.INVALID_CREDENTIALS);
         }
+        if (!(authenticated.getPrincipal() instanceof SealPrincipal principal)) {
+            // Échec fermé : le seul fournisseur rend toujours un compte SEAL ; autre chose est une erreur de
+            // programmation.
+            throw new IllegalStateException("authentification sans compte SEAL");
+        }
         limiter.refund(RateLimit.LOGIN_FAILURES_PER_IP, ip);
         limiter.refund(RateLimit.LOGIN_FAILURES_PER_LOGIN, entered);
-        UserId user = ((SealPrincipal) authenticated.getPrincipal()).userId();
+        UserId user = principal.userId();
         boolean verified = authenticated.getAuthorities().stream()
                 .anyMatch(authority -> SealAuthorities.ACCOUNT_ACTIVE.equals(authority.getAuthority()));
         if (verified) {
