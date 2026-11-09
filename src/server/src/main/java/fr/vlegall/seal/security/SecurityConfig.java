@@ -4,6 +4,7 @@ import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.session.AbsoluteSessionTimeoutFilter;
 import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.web.ProblemDetailsSecurityHandler;
+import fr.vlegall.seal.security.web.RequestBodyLimitFilter;
 import jakarta.servlet.DispatcherType;
 import java.time.Clock;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -22,9 +23,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.header.HeaderWriterFilter;
 import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy;
 import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 /**
  * Chaîne de filtres de Spring Security : tout est refusé par défaut et ouvert route par route (A01), et chaque réponse
@@ -35,6 +38,9 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 class SecurityConfig {
 
     static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+
+    /** SEC-01, A06 : 16 Kio au plus pour un corps sous {@code /api/v1/auth/} (ADR 0019, point 5). */
+    static final int AUTH_BODY_LIMIT = 16 * 1024;
 
     /** TRN-20, TRN-21 : aucune ressource tierce, aucun script ni style en ligne. */
     static String contentSecurityPolicy(SealProperties seal) {
@@ -116,6 +122,14 @@ class SecurityConfig {
                 .addFilterBefore(
                         new AbsoluteSessionTimeoutFilter(clock, seal.session().absoluteTimeout()),
                         SecurityContextHolderFilter.class)
+                // SEC-01 : corps borné avant toute lecture (jeton CSRF de formulaire compris), après les en-têtes,
+                // que le refus porte aussi.
+                .addFilterAfter(
+                        new RequestBodyLimitFilter(
+                                PathPatternRequestMatcher.withDefaults().matcher("/api/v1/auth/**"),
+                                AUTH_BODY_LIMIT,
+                                problemDetails::rejectTooLarge),
+                        HeaderWriterFilter.class)
                 .headers(headers -> headers.contentSecurityPolicy(
                                 csp -> csp.policyDirectives(contentSecurityPolicy(seal)))
                         // TRN-03 : sans includeSubDomains, pour ne pas imposer HTTPS aux autres services locaux.

@@ -289,6 +289,27 @@ class RegistrationIT {
     }
 
     @Test
+    @DisplayName("SEC-01 : un corps de plus de 16 Kio répond 413 REQUEST_REJECTED, avec les en-têtes, sans rien créer")
+    void sec01BodyOver16KibIsRejected() throws Exception {
+        Map<String, Object> atLimit = registration("taille.it@exemple.ca", "taille.it");
+        Map<String, Object> overLimit = registration("taille2.it@exemple.ca", "taille2.it");
+
+        mvc.perform(registerRequest(atLimit, ip).content(paddedTo(json(atLimit), 16_384)))
+                .andExpect(status().isCreated());
+        mvc.perform(registerRequest(overLimit, otherIp()).content(paddedTo(json(overLimit), 16_385)))
+                .andExpect(status().isContentTooLarge())
+                .andExpect(jsonPath("$.code").value("REQUEST_REJECTED"))
+                .andExpect(header().exists("Content-Security-Policy"));
+        assertThat(count("SELECT count(*) FROM users WHERE username = ?", "taille2.it"))
+                .isZero();
+    }
+
+    /** JSON complété d'espaces, valides après la valeur, jusqu'à {@code bytes} octets. */
+    private static String paddedTo(String json, int bytes) {
+        return json + " ".repeat(bytes - json.getBytes(StandardCharsets.UTF_8).length);
+    }
+
+    @Test
     @DisplayName("SEC-01 : courriel, nom affiché et longueurs sont validés ; VALIDATION_FAILED nomme les champs")
     void sec01InvalidFieldsAreNamed() throws Exception {
         Map<String, Object> body = registration("pas-un-courriel", "champs.it");
