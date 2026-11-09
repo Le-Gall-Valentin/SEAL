@@ -12,7 +12,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Test d'intégration de SEAL : contexte complet, MockMvc, PostgreSQL jetable, horloge réglable et faux serveur SMTP. Les tests
+ * Test d'intégration de SEAL : contexte complet, MockMvc, PostgreSQL jetable, horloge réglable, faux serveur SMTP et
+ * sonde du hachage des mots de passe. Les tests
  * d'intégration qui passent par MockMvc partagent cette configuration, donc un seul contexte Spring et un seul
  * conteneur ; seuls ceux qui ont besoin du vrai serveur (dispatch d'erreur de Tomcat, comme {@code ErrorDispatchIT})
  * démarrent un second contexte.
@@ -23,5 +24,10 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import({TestcontainersConfiguration.class, MutableClockConfiguration.class, MailTestConfiguration.class})
+@Import({
+    TestcontainersConfiguration.class,
+    MutableClockConfiguration.class,
+    MailTestConfiguration.class,
+    PasswordHashingProbeConfiguration.class
+})
 public @interface SealIntegrationTest {}

@@ -26,7 +26,10 @@ public class InitialPasswordHandler implements InitialPasswordUseCase {
         this.credentials = credentials;
     }
 
-    /** {@code NEVER} : un appel dans une transaction échoue au lieu de garder une connexion pendant le hachage. */
+    /**
+     * {@code NEVER} : un appel dans une transaction échoue au lieu de garder une connexion pendant le hachage. La portée
+     * vide que {@code NEVER} ouvre ne doit toucher aucune base : une connexion y resterait liée jusqu'à la fin du calcul.
+     */
     @Override
     @Transactional(propagation = Propagation.NEVER)
     public Optional<String> prepare(String password, List<String> personalWords) {

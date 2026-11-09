@@ -11,8 +11,6 @@ import fr.vlegall.seal.identity.domain.model.Username;
 import fr.vlegall.seal.identity.domain.port.out.InitialPasswordPort;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
 import java.util.List;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 @ApplicationService
 public class RegisterHandler implements RegisterUseCase {
@@ -31,9 +29,12 @@ public class RegisterHandler implements RegisterUseCase {
      * Le mot de passe est vérifié et haché avant la transaction, qui ne s'ouvre qu'une fois tout validé (ADR 0019,
      * point 3) : Argon2id ne retient aucune connexion à la base. Les refus gardent leur ordre : identifiant invalide,
      * réservé, pris, puis mot de passe trop faible ; un identifiant pris l'est sans calcul d'Argon2id.
+     *
+     * <p>Volontairement sans {@code @Transactional}, même {@code NEVER} : toute portée transactionnelle, même vide,
+     * active la synchronisation, et la connexion prise par {@code users.exists} resterait liée au fil pendant le
+     * hachage. {@code InitialPasswordUseCase.prepare} refuse déjà d'être appelé dans une transaction.
      */
     @Override
-    @Transactional(propagation = Propagation.NEVER)
     public UserId register(RegisterCommand command) {
         Username username = Username.parse(command.username());
         if (ReservedUsernames.contains(username.value())) {

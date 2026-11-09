@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import fr.vlegall.seal.crypto.Digests;
 import fr.vlegall.seal.support.AuthClient;
+import fr.vlegall.seal.support.PasswordHashingProbe;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
@@ -67,6 +68,9 @@ class RegistrationIT {
 
     @Autowired
     private RecordingMailSender mail;
+
+    @Autowired
+    private PasswordHashingProbe hashing;
 
     private AuthClient client;
 
@@ -325,6 +329,16 @@ class RegistrationIT {
         assertThat(output.getAll())
                 .contains("Échec de l'envoi du courriel : MailSendException")
                 .doesNotContain("panne.it@");
+    }
+
+    @Test
+    @DisplayName("AUTH-13 : l'inscription hache le mot de passe sans tenir aucune connexion à la base (A06, ADR 0019)")
+    void auth13RegistrationHashesWithoutHoldingAConnection() throws Exception {
+        hashing.reset();
+
+        register("connexion.it@exemple.ca", "connexion.it");
+
+        assertThat(hashing.observations()).containsExactly(new PasswordHashingProbe.Observation(false, 0));
     }
 
     @Test
