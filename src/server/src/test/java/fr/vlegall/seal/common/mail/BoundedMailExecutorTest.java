@@ -3,10 +3,12 @@ package fr.vlegall.seal.common.mail;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -52,16 +54,43 @@ class BoundedMailExecutorTest {
     }
 
     @Test
-    @DisplayName("AUTH-14 : à l'arrêt, les courriels déjà programmés partent avant la fermeture")
+    @DisplayName("AUTH-14 : à l'arrêt, le courriel en cours et ceux de la file partent avant la fermeture")
     void auth14ShutdownSendsQueuedMails() throws Exception {
         BoundedMailExecutor executor = new BoundedMailExecutor();
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         CountDownLatch sent = new CountDownLatch(2);
+        executor.execute(() -> {
+            started.countDown();
+            awaitQuietly(release);
+            sent.countDown();
+        });
         executor.execute(sent::countDown);
-        executor.execute(sent::countDown);
+        assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
 
-        executor.destroy();
+        Thread stopping = new Thread(() -> {
+            try {
+                executor.destroy();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        stopping.start();
+        // L'arrêt a commencé dès que la file refuse un nouvel envoi ; le premier courriel est encore en cours.
+        Awaitility.await().atMost(Duration.ofSeconds(5)).until(() -> refuses(executor));
+        release.countDown();
+        stopping.join(10_000);
 
         assertThat(sent.getCount()).isZero();
+    }
+
+    private static boolean refuses(BoundedMailExecutor executor) {
+        try {
+            executor.execute(() -> {});
+            return false;
+        } catch (RejectedExecutionException e) {
+            return true;
+        }
     }
 
     private static void awaitQuietly(CountDownLatch latch) {

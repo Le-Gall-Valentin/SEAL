@@ -34,7 +34,7 @@ class ClasspathBlocklistTest {
     }
 
     @Test
-    @DisplayName("AUTH-11 : la licence MIT de la liste voyage avec elle, dans le jar comme dans l'image")
+    @DisplayName("AUTH-11 : la licence MIT accompagne la liste dans les ressources du serveur")
     void auth11LicenceIsEmbeddedWithTheList() throws IOException {
         try (InputStream in = ClasspathBlocklist.class.getResourceAsStream("/password-blocklist.LICENSE")) {
             assertThat(in).as("licence embarquée comme ressource Maven").isNotNull();

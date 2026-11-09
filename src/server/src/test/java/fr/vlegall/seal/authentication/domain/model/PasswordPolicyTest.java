@@ -103,6 +103,8 @@ class PasswordPolicyTest {
         "valentin.le.gall2026, valentin.le.gall, v, false",
         "annabelle sur le pont, ann, annabelle, false",
         "annabelle sur le pont du lac, ann, annabelle, true",
+        "abababzzzzzzzzzzzzz, aba, bab, false",
+        "abababzzzzzzzzzzzzz, bab, aba, true",
         "le phoque nage dans le port de seal, valentin, valentin, true"
     })
     @DisplayName("AUTH-11 : les exemples de PROTOCOL.md (section 3), que le client vérifiera aussi")

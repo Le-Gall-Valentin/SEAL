@@ -7,6 +7,7 @@ import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.port.out.EmailCodeRepository;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -60,8 +61,29 @@ class IdentityPersistenceIT {
     }
 
     @Test
-    @DisplayName("AUTH-14 : consommer un code déjà consommé, ou inconnu, échoue")
+    @DisplayName("AUTH-14 : consommer un code déjà consommé échoue")
     void auth14ConsumingAConsumedCodeFails() {
+        UserId pending = new UserId(jdbc.sql("INSERT INTO users (username, display_name, email) "
+                        + "VALUES ('persistance.trois', 'Nom', CAST('persistance.trois@exemple.ca' AS citext)) "
+                        + "RETURNING id")
+                .query(UUID.class)
+                .single());
+        Instant now = Instant.now();
+        transactions.executeWithoutResult(
+                status -> codes.renew(pending, new byte[32], now, now.plus(Duration.ofMinutes(10))));
+        UUID code = jdbc.sql("SELECT id FROM email_codes WHERE user_id = ?")
+                .param(pending.value())
+                .query(UUID.class)
+                .single();
+        transactions.executeWithoutResult(status -> codes.consume(code, now));
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> codes.consume(code, now)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("AUTH-14 : consommer un code inconnu, ou y compter un essai, échoue")
+    void auth14UnknownCodeFails() {
         UUID unknown = UUID.randomUUID();
 
         assertThatThrownBy(() -> transactions.executeWithoutResult(status -> codes.consume(unknown, Instant.now())))

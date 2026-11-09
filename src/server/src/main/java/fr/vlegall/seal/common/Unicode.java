@@ -7,7 +7,8 @@ import java.util.regex.Pattern;
 /**
  * Transformations Unicode de SEAL, écrites une seule fois. Chaque appelant valide la valeur transformée, jamais la
  * saisie brute : c'est l'ordre que recommande la règle {@code IMPROPER_UNICODE} de FindSecBugs (normaliser d'abord,
- * valider ensuite), d'où son exclusion limitée à cette classe ({@code spotbugs-exclude.xml}).
+ * valider ensuite), d'où son exclusion limitée aux méthodes de normalisation et de casse
+ * ({@code spotbugs-exclude.xml}).
  */
 public final class Unicode {
 

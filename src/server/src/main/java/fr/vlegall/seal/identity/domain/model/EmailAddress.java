@@ -43,9 +43,9 @@ public record EmailAddress(String value) {
     }
 
     /**
-     * Forme {@code partie-locale@domaine} : partie locale en « dot-atom » de la RFC 5322, étendue aux caractères non
-     * ASCII (RFC 6531) hors contrôle, format, espace, demi-paire isolée, usage privé et point non attribué ; domaine en libellés ASCII (un nom internationalisé s'écrit
-     * en punycode), au moins deux.
+     * Forme {@code partie-locale@domaine} (ADR 0019, point 5) : partie locale en « dot-atom » de la RFC 5322, étendue
+     * aux caractères non ASCII (RFC 6531) hors contrôle, format, espace, demi-paire isolée, usage privé et point non
+     * attribué ; domaine en libellés ASCII (un nom internationalisé s'écrit en punycode), au moins deux.
      */
     private static boolean isValid(String value) {
         if (value.length() > MAX_LENGTH || !Unicode.isNfc(value)) {

@@ -14,9 +14,9 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * Refus de la chaîne de filtres (401 sans session, 403 sans jeton CSRF ou sans droit, 413 pour un corps trop grand) rendus par le même gestionnaire
- * Problem Details que le reste de l'API (QA-05, ADR 0010) : les exceptions levées dans la chaîne de filtres sont
- * confiées au {@link HandlerExceptionResolver} de Spring MVC.
+ * Refus de la chaîne de filtres (401 sans session, 403 sans jeton CSRF ou sans droit, 413 pour un corps trop grand),
+ * rendus par le même gestionnaire Problem Details que le reste de l'API (QA-05, ADR 0010) : les exceptions levées dans
+ * la chaîne de filtres sont confiées au {@link HandlerExceptionResolver} de Spring MVC.
  */
 @Component
 public final class ProblemDetailsSecurityHandler implements AuthenticationEntryPoint, AccessDeniedHandler {

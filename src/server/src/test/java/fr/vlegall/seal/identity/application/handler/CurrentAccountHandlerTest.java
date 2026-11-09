@@ -22,7 +22,7 @@ class CurrentAccountHandlerTest {
             new CurrentAccountHandler(identity.users(), identity.emailCodes(), identity.allowance(), identity.clock);
 
     @Test
-    @DisplayName("AUTH-14 : un compte en attente reçoit l'expiration de son dernier code et ses renvois restants")
+    @DisplayName("AUTH-14 : un compte en attente reçoit l'expiration de son code vivant et ses renvois restants")
     void auth14PendingAccountGetsItsVerificationData() {
         Account account = identity.add("valentin", "v@exemple.ca", AccountStatus.PENDING_EMAIL);
         identity.emailCodes()
@@ -50,10 +50,15 @@ class CurrentAccountHandlerTest {
             identity.emailCodes()
                     .countFailedAttempt(identity.lastCodeOf(exhausted.id()).id());
         }
+        Account consumed = identity.add("consomme", "c@exemple.ca", AccountStatus.PENDING_EMAIL);
+        identity.issueCode(consumed, "333333");
+        identity.emailCodes().consume(identity.lastCodeOf(consumed.id()).id(), InMemoryIdentity.NOW);
         Account expired = identity.add("perime", "p@exemple.ca", AccountStatus.PENDING_EMAIL);
         identity.issueCode(expired, "222222");
 
         assertThat(handler.current(exhausted.id()).verification().codeExpiresAt())
+                .isNull();
+        assertThat(handler.current(consumed.id()).verification().codeExpiresAt())
                 .isNull();
         identity.clock.advance(Duration.ofMinutes(10));
         assertThat(handler.current(expired.id()).verification().codeExpiresAt()).isNull();

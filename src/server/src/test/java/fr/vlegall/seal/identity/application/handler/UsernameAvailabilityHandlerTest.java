@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import fr.vlegall.seal.identity.domain.model.AccountStatus;
 import fr.vlegall.seal.identity.domain.model.UsernameAvailability;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -67,5 +68,26 @@ class UsernameAvailabilityHandlerTest {
         UsernameAvailability result = handler.check("user");
 
         assertThat(result.suggestions()).containsExactly("user0042", "user0043", "user0044");
+    }
+
+    @Test
+    @DisplayName("AUTH-05 : si tous les suffixes et 10 tirages sont pris, moins de 3 suggestions, sans boucler (A06)")
+    void auth05SuggestionsStopAfterTenRandomDraws() {
+        identity.add("valentin", "valentin@exemple.ca", AccountStatus.ACTIVE);
+        for (int suffix = 2; suffix <= 99; suffix++) {
+            identity.add("valentin" + suffix, "v" + suffix + "@exemple.ca", AccountStatus.ACTIVE);
+        }
+        identity.add("valentin1234", "v1234@exemple.ca", AccountStatus.ACTIVE);
+        AtomicInteger draws = new AtomicInteger();
+        UsernameAvailabilityHandler unlucky = new UsernameAvailabilityHandler(identity.users(), length -> {
+            draws.incrementAndGet();
+            return "1234".substring(0, length);
+        });
+
+        UsernameAvailability result = unlucky.check("valentin");
+
+        assertThat(result.available()).isFalse();
+        assertThat(result.suggestions()).isEmpty();
+        assertThat(draws).hasValue(UsernameAvailabilityHandler.RANDOM_ATTEMPTS);
     }
 }

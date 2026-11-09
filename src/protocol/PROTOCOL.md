@@ -124,7 +124,8 @@ serveur refuse (`PASSWORD_TOO_WEAK`). Algorithme (ADR 0019, point 2) :
    chaîne en TypeScript). On recommence tant qu'une passe a retiré quelque chose. Il reste au moins
    15 points de code.
 
-L'ordre de l'étape 4 change le résultat quand deux mots se chevauchent. Avec l'identifiant `ann` et
+L'ordre de l'étape 4 change le résultat quand deux mots se chevauchent, même à longueur égale (deux
+dernières lignes du tableau). Avec l'identifiant `ann` et
 la partie locale `annabelle`, `annabelle sur le pont` est refusé : retirer `annabelle` d'abord
 laisse ` sur le pont`, 12 points de code. Retirer `ann` d'abord aurait laissé `abelle sur le pont`,
 18 points de code, et accepté un mot de passe bâti sur la partie locale.
@@ -136,6 +137,8 @@ laisse ` sur le pont`, 12 points de code. Retirer `ann` d'abord aurait laissé `
 | `valentin.le.gall2026` | `valentin.le.gall` | `v` | refusé (`2026` reste) |
 | `annabelle sur le pont` | `ann` | `annabelle` | refusé (12 points de code restent) |
 | `annabelle sur le pont du lac` | `ann` | `annabelle` | accepté (19 restent) |
+| `abababzzzzzzzzzzzzz` | `aba` | `bab` | refusé (`aba` d'abord : 13 restent) |
+| `abababzzzzzzzzzzzzz` | `bab` | `aba` | accepté (`bab` d'abord : 16 restent) |
 | `le phoque nage dans le port de seal` | `valentin` | `valentin` | accepté |
 | `fjord-tuque-raquette` précédé de U+D800 seul | `valentin` | `valentin` | refusé (demi-paire isolée) |
 
