@@ -26,19 +26,21 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Inscription, disponibilité de l'identifiant et compte courant (section 14.1 du CDC, ADR 0019). Les règles d'accès
- * sont dans {@code SecurityConfig} ; les handlers vérifient à nouveau l'état du compte (SEC-03).
+ * Inscription, disponibilité de l'identifiant et compte courant (section 14.1 du CDC, ADR 0019). Le chemin
+ * {@code /api/v1/auth} vient du CDC ; le contrôleur appartient à {@code identity}, qui possède le compte, et non à
+ * {@code authentication}, qui possède les secrets (ADR 0008). Les règles d'accès sont dans {@code SecurityConfig} ; les
+ * handlers vérifient à nouveau l'état du compte (SEC-03).
  */
 @RestController
 @RequestMapping("/api/v1/auth")
-public class AuthController {
+public class AccountController {
 
     private final RegisterUseCase register;
     private final UsernameAvailabilityQuery usernameAvailability;
     private final CurrentAccountQuery currentAccount;
     private final SessionEstablisher sessions;
 
-    public AuthController(
+    public AccountController(
             RegisterUseCase register,
             UsernameAvailabilityQuery usernameAvailability,
             CurrentAccountQuery currentAccount,

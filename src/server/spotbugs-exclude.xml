@@ -23,10 +23,16 @@
     <!--
       IMPROPER_UNICODE, même raison : Unicode regroupe les transformations de SEAL (NFC de SEC-01, NFKC d'AUTH-11,
       minuscules et pliage d'AUTH-04), et chaque appelant valide la valeur transformée, jamais la saisie brute.
-      Exclusion limitée à cette classe : tout appel à la normalisation hors d'elle reste signalé.
+      Exclusion limitée à ces méthodes : toute autre méthode, même dans Unicode, reste signalée.
     -->
     <Match>
         <Class name="fr.vlegall.seal.common.Unicode"/>
+        <Or>
+            <Method name="nfc"/>
+            <Method name="nfkc"/>
+            <Method name="lowerCase"/>
+            <Method name="foldWithoutMarks"/>
+        </Or>
         <Bug pattern="IMPROPER_UNICODE"/>
     </Match>
 
@@ -43,7 +49,7 @@
     <!-- /api/v1/auth : me (toute session), register (anonyme), username-availability (anonyme ou session complète) :
          RegistrationIT. -->
     <Match>
-        <Class name="fr.vlegall.seal.identity.infrastructure.web.AuthController"/>
+        <Class name="fr.vlegall.seal.identity.infrastructure.web.AccountController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
     <!-- /api/v1/auth/verify-email, /resend et /change, session restreinte seulement : EmailVerificationIT. -->
