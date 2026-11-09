@@ -12,14 +12,14 @@ import fr.vlegall.seal.identity.domain.model.IdentityException;
 import fr.vlegall.seal.identity.domain.model.RegisterCommand;
 import fr.vlegall.seal.identity.domain.model.VerificationCode;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class RegisterHandlerTest {
 
     private final InMemoryIdentity identity = new InMemoryIdentity();
-    private final RegisterHandler handler =
-            new RegisterHandler(identity.users(), identity.credentials(), identity.journal(), identity.codeDelivery());
+    private final RegisterHandler handler = identity.registerHandler();
 
     private static RegisterCommand command(String email, String username) {
         return new RegisterCommand(
@@ -39,6 +39,7 @@ class RegisterHandlerTest {
         assertThat(account.status()).isEqualTo(AccountStatus.PENDING_EMAIL);
         assertThat(account.username().value()).isEqualTo("valentin.le.gall");
         assertThat(identity.personalWords).containsExactly(List.of("valentin.le.gall", "Valentin.Le-Gall"));
+        assertThat(identity.storedPasswords).containsExactly(Map.entry(id, "hash:fjord-tuque-raquette"));
         assertThat(identity.events).containsExactly("registered:" + id.value() + ":Valentin.Le-Gall+uqac@exemple.ca");
         assertThat(identity.codes).singleElement().satisfies(code -> {
             assertThat(code.user()).isEqualTo(id);
@@ -98,6 +99,9 @@ class RegisterHandlerTest {
 
         assertThatThrownBy(() -> handler.register(command("a@exemple.ca", "valentin")))
                 .isInstanceOf(IdentityException.UsernameTaken.class);
+        assertThat(identity.personalWords)
+                .as("aucun hachage pour un identifiant pris")
+                .isEmpty();
         assertThat(identity.mails).isEmpty();
     }
 
@@ -108,6 +112,7 @@ class RegisterHandlerTest {
 
         assertThatThrownBy(() -> handler.register(command("a@exemple.ca", "valentin")))
                 .isInstanceOf(IdentityException.PasswordTooWeak.class);
+        assertThat(identity.accounts).as("refusé avant la création du compte").isEmpty();
         assertThat(identity.events).isEmpty();
         assertThat(identity.codes).isEmpty();
         assertThat(identity.mails).isEmpty();

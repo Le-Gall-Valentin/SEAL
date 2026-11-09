@@ -2,6 +2,7 @@ package fr.vlegall.seal.authentication.infrastructure.security;
 
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
+import fr.vlegall.seal.common.Unicode;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
@@ -57,8 +58,12 @@ public final class Argon2PasswordHasher implements PasswordHasher {
         return bounded(() -> Objects.requireNonNull(encoder.encode(password.value()), "haché"));
     }
 
+    /** Une demi-paire isolée ne s'encode pas en UTF-8 : elle ne correspond à rien, sans erreur (échec fermé). */
     @Override
     public boolean matches(Password password, String encoded) {
+        if (!Unicode.isWellFormed(password.value())) {
+            return false;
+        }
         return bounded(() -> encoder.matches(password.value(), encoded));
     }
 

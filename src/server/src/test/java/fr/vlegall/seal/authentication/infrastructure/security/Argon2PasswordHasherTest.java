@@ -51,6 +51,15 @@ class Argon2PasswordHasherTest {
     }
 
     @Test
+    @DisplayName("AUTH-11 : un mot de passe à demi-paire isolée ne correspond à aucun haché, sans erreur (échec fermé)")
+    void auth11LoneSurrogateMatchesNothing() {
+        String encoded = hasher.hash(Password.fromInput("fjord-tuque-raquette"));
+
+        assertThat(hasher.matches(Password.fromInput(Character.toString(0xD800) + "fjord-tuque-raquette"), encoded))
+                .isFalse();
+    }
+
+    @Test
     @DisplayName("A06 : au plus N calculs Argon2id simultanés ; le suivant attend un permis (ADR 0019)")
     void a06ConcurrentHashesAreBounded() throws Exception {
         int permits = 2;

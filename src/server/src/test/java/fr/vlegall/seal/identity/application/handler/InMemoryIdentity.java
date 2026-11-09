@@ -8,6 +8,7 @@ import fr.vlegall.seal.identity.domain.model.DisplayName;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.IdentityException;
 import fr.vlegall.seal.identity.domain.model.LiveCode;
+import fr.vlegall.seal.identity.domain.model.PreparedPassword;
 import fr.vlegall.seal.identity.domain.model.Username;
 import fr.vlegall.seal.identity.domain.model.VerificationCode;
 import fr.vlegall.seal.identity.domain.port.out.AccountMailPort;
@@ -59,6 +60,7 @@ final class InMemoryIdentity {
     final Deque<String> digits = new ArrayDeque<>(List.of("123456"));
     boolean passwordAccepted = true;
     final List<List<String>> personalWords = new ArrayList<>();
+    final Map<UserId, String> storedPasswords = new HashMap<>();
 
     Account add(String username, String email, AccountStatus status) {
         UserId id = new UserId(UUID.randomUUID());
@@ -176,10 +178,23 @@ final class InMemoryIdentity {
     }
 
     InitialPasswordPort credentials() {
-        return (user, password, words) -> {
-            personalWords.add(words);
-            return passwordAccepted;
+        return new InitialPasswordPort() {
+            @Override
+            public Optional<PreparedPassword> prepare(String password, List<String> words) {
+                personalWords.add(words);
+                return passwordAccepted ? Optional.of(new PreparedPassword("hash:" + password)) : Optional.empty();
+            }
+
+            @Override
+            public void store(UserId user, PreparedPassword password) {
+                storedPasswords.put(user, password.hash());
+            }
         };
+    }
+
+    RegisterHandler registerHandler() {
+        return new RegisterHandler(
+                users(), credentials(), new PendingAccountWriter(users(), credentials(), journal(), codeDelivery()));
     }
 
     AccountMailPort mail() {

@@ -6,9 +6,11 @@ import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
 import fr.vlegall.seal.common.UserId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -20,36 +22,46 @@ class InitialPasswordHandlerTest {
 
     private final Map<UserId, String> stored = new HashMap<>();
     private final CredentialRepository credentials = stored::put;
+    private final List<String> hashed = new ArrayList<>();
     private final PasswordHasher hasher = new PasswordHasher() {
         @Override
         public String hash(Password password) {
+            hashed.add(password.value());
             return "hash(" + password.value() + ")";
         }
 
         @Override
         public boolean matches(Password password, String encoded) {
-            return encoded.equals(hash(password));
+            return encoded.equals("hash(" + password.value() + ")");
         }
     };
     private final InitialPasswordHandler handler =
             new InitialPasswordHandler(Set.of("correcthorsebatterystaple")::contains, hasher, credentials);
 
     @Test
-    @DisplayName("AUTH-13 : un mot de passe accepté est enregistré haché, normalisé en NFKC")
-    void auth13AcceptedPasswordIsStoredHashed() {
-        boolean accepted = handler.establish(USER, "fjord-tuque-raquetteﬁ", List.of("valentin.le.gall", "valentin"));
+    @DisplayName("AUTH-13 : un mot de passe accepté est haché, normalisé en NFKC, sans rien écrire")
+    void auth13AcceptedPasswordIsHashedWithoutWriting() {
+        Optional<String> prepared =
+                handler.prepare("fjord-tuque-raquette\uFB01", List.of("valentin.le.gall", "valentin"));
 
-        assertThat(accepted).isTrue();
-        assertThat(stored).containsEntry(USER, "hash(fjord-tuque-raquettefi)");
+        assertThat(prepared).contains("hash(fjord-tuque-raquettefi)");
+        assertThat(stored).isEmpty();
     }
 
     @Test
-    @DisplayName("AUTH-11 : un mot de passe refusé n'est ni haché ni enregistré")
-    void auth11RejectedPasswordIsNotStored() {
-        assertThat(handler.establish(USER, "valentin.le.gall2026!x", List.of("valentin.le.gall", "valentin")))
-                .isFalse();
-        assertThat(handler.establish(USER, "CorrectHorseBatteryStaple", List.of()))
-                .isFalse();
-        assertThat(stored).isEmpty();
+    @DisplayName("AUTH-11 : un mot de passe refusé n'est pas haché")
+    void auth11RejectedPasswordIsNotHashed() {
+        assertThat(handler.prepare("valentin.le.gall2026!x", List.of("valentin.le.gall", "valentin")))
+                .isEmpty();
+        assertThat(handler.prepare("CorrectHorseBatteryStaple", List.of())).isEmpty();
+        assertThat(hashed).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AUTH-13 : le haché préparé est enregistré pour le compte")
+    void auth13PreparedHashIsStored() {
+        handler.store(USER, "hash(fjord-tuque-raquette)");
+
+        assertThat(stored).containsExactly(Map.entry(USER, "hash(fjord-tuque-raquette)"));
     }
 }

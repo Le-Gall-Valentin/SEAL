@@ -43,14 +43,27 @@ class CredentialStorageIT {
     }
 
     @Test
+    @DisplayName("A06 : Argon2id tourne hors de toute transaction ; dans une transaction, le hachage est refusé")
+    void a06PasswordIsHashedOutsideAnyTransaction() {
+        assertThat(initialPassword.prepare("fjord-tuque-raquette", List.of("credential.zero")))
+                .hasValueSatisfying(hash -> assertThat(hash).startsWith("{argon2}$argon2id$"));
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(
+                        status -> initialPassword.prepare("fjord-tuque-raquette", List.of())))
+                .isInstanceOf(IllegalTransactionStateException.class);
+    }
+
+    @Test
     @DisplayName("AUTH-13 : le haché est écrit dans la transaction de l'appelant, annulé avec elle")
     void auth13CredentialIsWrittenInTheCallerTransaction() {
+        String hash = initialPassword
+                .prepare("fjord-tuque-raquette", List.of("credential.un"))
+                .orElseThrow();
         UserId[] user = new UserId[1];
         transactions.executeWithoutResult(status -> {
             user[0] = insertUser("credential.un");
-            assertThat(initialPassword.establish(user[0], "fjord-tuque-raquette", List.of("credential.un")))
-                    .isTrue();
-            assertThat(storedHash(user[0])).startsWith("{argon2}$argon2id$");
+            initialPassword.store(user[0], hash);
+            assertThat(storedHash(user[0])).isEqualTo(hash);
             status.setRollbackOnly();
         });
 
@@ -59,10 +72,10 @@ class CredentialStorageIT {
 
     @Test
     @DisplayName("AUTH-13 : hors d'une transaction, l'enregistrement du mot de passe est refusé")
-    void auth13SetUpRequiresATransaction() {
+    void auth13StoringRequiresATransaction() {
         UserId user = new UserId(UUID.randomUUID());
 
-        assertThatThrownBy(() -> initialPassword.establish(user, "fjord-tuque-raquette", List.of()))
+        assertThatThrownBy(() -> initialPassword.store(user, "{argon2}$argon2id$x"))
                 .isInstanceOf(IllegalTransactionStateException.class);
     }
 }
