@@ -37,9 +37,10 @@ spring:
       # Tables créées par Flyway (V1__schema_initial.sql), jamais par Spring Session.
       initialize-schema: never
   mail:
-    # AUTH-14 : Mailpit en local (service mail de compose.yaml) ; délais bornés à 5 secondes (A10).
+    # AUTH-14 : Mailpit, sur son port SMTP ; délais bornés à 5 secondes (A10). compose.yaml donne l'hôte (service
+    # mail), localhost hors conteneur.
     host: ${SEAL_MAIL_HOST:localhost}
-    port: ${SEAL_MAIL_PORT:1025}
+    port: 1025
     default-encoding: UTF-8
     properties:
       mail.smtp.connectiontimeout: 5000
@@ -84,6 +85,10 @@ management:
     health:
       show-details: never
       show-components: never
+  health:
+    mail:
+      # ADR 0019, point 8 : une panne SMTP ne touche pas SEAL, donc pas non plus la sonde de son conteneur.
+      enabled: false
 
 seal:
   origin: https://localhost:8443
@@ -94,5 +99,5 @@ seal:
     # AUTH-52 : une session expire 12 heures après sa création, même active (AbsoluteSessionTimeoutFilter).
     absolute-timeout: 12h
   mail:
-    # ADR 0019, point 8.
-    from: ${SEAL_MAIL_FROM:SEAL <noreply@seal.localhost>}
+    # ADR 0019, point 8 : valeur fixe, rien à régler.
+    from: "SEAL <noreply@seal.localhost>"
