@@ -17,8 +17,10 @@ import fr.vlegall.seal.support.PasswordHashingProbe;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,6 +39,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -59,6 +64,9 @@ class LoginIT {
 
     @Autowired
     private PasswordHashingProbe hashing;
+
+    @Autowired
+    private JdbcIndexedSessionRepository sessionRepository;
 
     private AuthClient client;
 
@@ -102,7 +110,9 @@ class LoginIT {
     @DisplayName("AUTH-20 : un compte actif obtient une session complète, sous un nouvel identifiant (AUTH-23)")
     void auth20ActiveAccountGetsAFullSession() throws Exception {
         Registered account = active(unique("actif"));
-        Cookie planted = new Cookie(SESSION_COOKIE, "session-plantee");
+        String plantedId = plantedSession();
+        Cookie planted = new Cookie(
+                SESSION_COOKIE, Base64.getEncoder().encodeToString(plantedId.getBytes(StandardCharsets.UTF_8)));
 
         MvcResult result = mvc.perform(
                         loginRequest(client, account.username(), PASSWORD).cookie(planted))
@@ -111,6 +121,9 @@ class LoginIT {
 
         Cookie session = sessionOf(result);
         assertThat(session.getValue()).isNotEqualTo(planted.getValue());
+        assertThat(sessionRepository.findById(plantedId))
+                .as("la session plantée a changé d'identifiant (AUTH-23)")
+                .isNull();
         mvc.perform(client.from(get("/api/v1/auth/me")).cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
@@ -161,6 +174,15 @@ class LoginIT {
         mvc.perform(loginRequest(
                         new AuthClient(mvc, mail), account.email().toUpperCase(java.util.Locale.ROOT), PASSWORD))
                 .andExpect(status().isNoContent());
+    }
+
+    /** Session réelle et anonyme, enregistrée en base, que l'attaquant aurait fait adopter à sa victime. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private String plantedSession() {
+        FindByIndexNameSessionRepository raw = sessionRepository;
+        Session session = raw.createSession();
+        raw.save(session);
+        return session.getId();
     }
 
     private static Map<String, Object> shape(MvcResult result) throws Exception {
@@ -254,6 +276,39 @@ class LoginIT {
                 .andExpect(status().isUnauthorized());
         mvc.perform(loginRequest(client, account.username(), "mauvais-mot-de-passe-long"))
                 .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    @DisplayName("AUTH-22 : un succès rend aussi le jeton de l'IP : seuls les échecs comptent parmi ses 20")
+    void auth22SuccessRefundsTheIpToken() throws Exception {
+        Registered account = active(unique("ipsucces"));
+        for (int i = 0; i < 19; i++) {
+            mvc.perform(loginRequest(client, unique("ipr"), "mauvais-mot-de-passe-long"))
+                    .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(loginRequest(client, account.username(), PASSWORD)).andExpect(status().isNoContent());
+
+        mvc.perform(loginRequest(client, unique("ipr"), "mauvais-mot-de-passe-long"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(loginRequest(client, unique("ipr"), "mauvais-mot-de-passe-long"))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    @DisplayName("AUTH-22 : un refus par la limite de l'identifiant n'entame pas les 20 échecs de l'IP (ADR 0021)")
+    void auth22LoginLimitRefusalSparesTheIpBudget() throws Exception {
+        String blocked = unique("bloque");
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(loginRequest(client, blocked, "mauvais-mot-de-passe-long"))
+                    .andExpect(status().isUnauthorized());
+        }
+        for (int i = 0; i < 16; i++) {
+            mvc.perform(loginRequest(client, blocked, "mauvais-mot-de-passe-long"))
+                    .andExpect(status().isTooManyRequests());
+        }
+
+        mvc.perform(loginRequest(client, unique("autre"), "mauvais-mot-de-passe-long"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -354,6 +409,31 @@ class LoginIT {
                         Map.of("login", account.username(), "password", PASSWORD)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("QA-05 : une session complète qui tente de se connecter reçoit 403 (ADR 0021)")
+    void qa05FullSessionCannotLogInAgain() throws Exception {
+        Registered account = active(unique("deja"));
+        Cookie full = sessionOf(login(client, account.username(), PASSWORD));
+
+        mvc.perform(client.unsafe(
+                        post("/api/v1/auth/login"), full, Map.of("login", account.username(), "password", PASSWORD)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("AUTH-13 : la connexion vérifie le mot de passe sans tenir aucune connexion à la base (ADR 0020)")
+    void auth13LoginHashesWithoutHoldingAConnection() throws Exception {
+        Registered account = active(unique("pool"));
+        hashing.reset();
+
+        login(client, account.username(), PASSWORD);
+        login(new AuthClient(mvc, mail), account.username(), "mauvais-mot-de-passe-long");
+        login(new AuthClient(mvc, mail), unique("inconnu"), PASSWORD);
+
+        assertThat(hashing.observations()).hasSize(3).containsOnly(new PasswordHashingProbe.Observation(false, 0));
     }
 
     @Test
