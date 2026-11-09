@@ -428,6 +428,21 @@ class LoginIT {
     }
 
     @Test
+    @DisplayName("SEC-21 : un mot de passe tapé dans le champ identifiant n'est jamais journalisé, même en 429")
+    void sec21PasswordTypedAsLoginIsNeverJournaled() throws Exception {
+        String typed = "MonMotDePasse" + UUID.randomUUID().toString().substring(0, 6);
+        for (int i = 0; i < 6; i++) {
+            login(new AuthClient(mvc, mail), typed, "peu-importe-le-mot-de-passe");
+        }
+
+        assertThat(jdbc.sql("SELECT count(*) FROM security_events WHERE lower(details::text) LIKE ?")
+                        .param("%" + typed.toLowerCase(java.util.Locale.ROOT) + "%")
+                        .query(Long.class)
+                        .single())
+                .isZero();
+    }
+
+    @Test
     @DisplayName("SEC-20 : connexions réussie et refusée, et déconnexion, sont journalisées sans mot de passe")
     void sec20LoginAndLogoutAreJournaled() throws Exception {
         Registered account = active(unique("journal"));
@@ -446,7 +461,8 @@ class LoginIT {
                         .param(id)
                         .query(String.class)
                         .single())
-                .isEqualTo(account.username());
+                .as("la saisie n'est pas recopiée ; le compte suffit (ADR 0013)")
+                .isEqualTo("***");
         assertThat(jdbc.sql("SELECT count(*) FROM security_events WHERE details::text LIKE ?")
                         .param("%" + PASSWORD + "%")
                         .query(Long.class)

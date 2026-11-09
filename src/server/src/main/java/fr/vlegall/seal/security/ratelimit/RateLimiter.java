@@ -195,7 +195,8 @@ public final class RateLimiter {
     private static @Nullable String recordedKey(RateLimitKind kind, String key) {
         return switch (kind) {
             case IP -> LogValues.sanitize(key);
-            case ENTERED -> LogValues.identifier(key);
+            // SEC-21 : une saisie qui n'est pas un courriel pourrait être un mot de passe tapé au mauvais endroit.
+            case ENTERED -> LogValues.email(key);
             case EMAIL -> LogValues.email(key);
             case USER -> null;
         };

@@ -25,11 +25,14 @@ public class AuthenticationJournalAdapter implements SecurityEventPort {
         journal.recordStandalone(new SecurityEvent(SecurityEventType.LOGIN_SUCCEEDED, user, Map.of()));
     }
 
-    /** SEC-21 : un mot de passe tapé par erreur dans le champ identifiant n'est jamais journalisé (ADR 0013). */
+    /**
+     * SEC-21 : seule une saisie en forme de courriel est gardée, masquée ; toute autre devient {@code ***}, car elle
+     * pourrait être un mot de passe tapé dans le champ identifiant. Le compte, s'il existe, est noté (ADR 0013).
+     */
     @Override
     public void loginFailed(String login, @Nullable UserId user) {
         journal.recordStandalone(
-                new SecurityEvent(SecurityEventType.LOGIN_FAILED, user, Map.of("login", LogValues.identifier(login))));
+                new SecurityEvent(SecurityEventType.LOGIN_FAILED, user, Map.of("login", LogValues.email(login))));
     }
 
     @Override

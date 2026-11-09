@@ -263,6 +263,18 @@ class RateLimiterTest {
     }
 
     @Test
+    @DisplayName(
+            "SEC-21 : une saisie qui n'est pas un courriel n'est jamais journalisée, même en forme d'identifiant (ADR 0013)")
+    void sec21EnteredKeyThatIsNotAnEmailIsMasked() {
+        consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "monmotdepassesecret", 5);
+        refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "monmotdepassesecret"));
+
+        ArgumentCaptor<SecurityEvent> recorded = ArgumentCaptor.forClass(SecurityEvent.class);
+        verify(journal).recordRefusal(recorded.capture());
+        assertThat(recorded.getValue().details()).containsEntry("key", "***");
+    }
+
+    @Test
     @DisplayName("SEC-20 : l'alerte est écrite avant le journal, et la limite tient même si le journal échoue (A09)")
     void a09WarningSurvivesAJournalFailure(CapturedOutput output) {
         doThrow(new IllegalStateException("base indisponible")).when(journal).recordRefusal(any());

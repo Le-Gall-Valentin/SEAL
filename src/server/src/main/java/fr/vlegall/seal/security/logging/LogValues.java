@@ -11,9 +11,6 @@ public final class LogValues {
     private static final String MASK = "***";
     private static final char REPLACEMENT = '_';
 
-    /** AUTH-01 : un identifiant fait au plus 20 caractères. */
-    private static final int USERNAME_MAX_LENGTH = 20;
-
     /** Longueur maximale d'une adresse électronique (RFC 5321, chemin complet). */
     private static final int EMAIL_MAX_LENGTH = 254;
 
@@ -48,20 +45,6 @@ public final class LogValues {
     public static String email(String value) {
         Objects.requireNonNull(value, "value");
         return looksLikeEmail(value) ? maskEmail(value) : MASK;
-    }
-
-    /**
-     * Saisie d'un champ « identifiant ou courriel » (ADR 0013, point 1) : un courriel de forme stricte est masqué, une
-     * valeur qui pourrait être un identifiant (AUTH-01 : au plus 20 caractères parmi minuscules, chiffres, {@code .}
-     * et {@code _}) est gardée, tout le reste devient {@code ***}. Un mot de passe tapé par erreur dans ce champ, même
-     * avec un {@code @}, n'est ainsi pas journalisé (SEC-21).
-     */
-    public static String identifier(String value) {
-        Objects.requireNonNull(value, "value");
-        if (looksLikeEmail(value)) {
-            return maskEmail(value);
-        }
-        return couldBeUsername(value) ? value : MASK;
     }
 
     /**
@@ -100,14 +83,6 @@ public final class LogValues {
             }
         }
         return labelLength > 0 && labels >= 1;
-    }
-
-    /** Vérification linéaire, sans expression régulière : il ne s'agit que de décider ce qu'on journalise. */
-    private static boolean couldBeUsername(String value) {
-        return !value.isEmpty()
-                && value.length() <= USERNAME_MAX_LENGTH
-                && value.chars()
-                        .allMatch(c -> (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_');
     }
 
     private static boolean isLineBreaking(int c) {
