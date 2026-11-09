@@ -19,14 +19,18 @@ public final class LogValues {
 
     private LogValues() {}
 
-    /** {@code valentin@exemple.ca} devient {@code v***@exemple.ca} ; sans partie locale, seul {@code ***} reste. */
+    /**
+     * {@code valentin@exemple.ca} devient {@code v***@exemple.ca} : le premier point de code reste entier, émoji
+     * compris. Sans partie locale, seul {@code ***} reste.
+     */
     public static String maskEmail(String email) {
         Objects.requireNonNull(email, "email");
         int at = email.indexOf('@');
         if (at <= 0) {
             return MASK;
         }
-        return sanitize(email.substring(0, 1)) + MASK + sanitize(email.substring(at));
+        int first = Character.charCount(email.codePointAt(0));
+        return sanitize(email.substring(0, first)) + MASK + sanitize(email.substring(at));
     }
 
     /**

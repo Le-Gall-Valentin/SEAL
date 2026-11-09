@@ -73,4 +73,10 @@ class LogValuesTest {
     void a05DirectionalCharactersAreNeutralised() {
         assertThat(LogValues.sanitize("a\u202Eb\u2066c\u202Ad\u2069")).isEqualTo("a_b_c_d_");
     }
+
+    @Test
+    @DisplayName("SEC-21 : une partie locale qui commence par un émoji garde son premier caractère entier")
+    void sec21MaskKeepsAWholeFirstCodePoint() {
+        assertThat(LogValues.maskEmail("🦭phoque@exemple.ca")).isEqualTo("🦭***@exemple.ca");
+    }
 }
