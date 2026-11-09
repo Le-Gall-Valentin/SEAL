@@ -60,7 +60,7 @@ class Argon2PasswordHasherTest {
     }
 
     @Test
-    @DisplayName("A06 : au plus N calculs Argon2id simultanés ; le suivant attend un permis (ADR 0019)")
+    @DisplayName("AUTH-13 : au plus N calculs Argon2id simultanés ; le suivant attend un permis (A06, ADR 0019)")
     void a06ConcurrentHashesAreBounded() throws Exception {
         int permits = 2;
         AtomicInteger running = new AtomicInteger();
@@ -108,7 +108,7 @@ class Argon2PasswordHasherTest {
     }
 
     @Test
-    @DisplayName("A06 : le nombre de permis vaut le nombre de processeurs, au moins 2")
+    @DisplayName("AUTH-13 : le nombre de permis vaut le nombre de processeurs, au moins 2 (A06)")
     void a06PermitsFollowTheProcessors() {
         assertThat(Argon2PasswordHasher.defaultPermits())
                 .isEqualTo(Math.max(2, Runtime.getRuntime().availableProcessors()));

@@ -284,7 +284,7 @@ class EmailVerificationIT {
     }
 
     @Test
-    @DisplayName("A06 : deux vérifications simultanées du bon code donnent un succès et un CODE_EXPIRED")
+    @DisplayName("AUTH-14 : deux vérifications simultanées du bon code donnent un succès et un CODE_EXPIRED (A06)")
     void a06ConcurrentVerificationsSucceedOnce() throws Exception {
         Registered account = client.register("course.verif@exemple.ca", "course.verif");
         String code = client.codeSentTo("course.verif@exemple.ca");
@@ -358,5 +358,43 @@ class EmailVerificationIT {
         assertThat(codeExpiresAt(exhausted.session())).isEqualTo("null");
         clock.advance(Duration.ofMinutes(10));
         assertThat(codeExpiresAt(expired.session())).isEqualTo("null");
+    }
+
+    @Test
+    @DisplayName("QA-05 : vérification et changement refusent un champ inconnu ou un courriel invalide (400)")
+    void qa05VerifyAndChangeRejectInvalidBodies() throws Exception {
+        Registered account = client.register("corps@exemple.ca", "corps");
+        List<Map<String, ?>> invalidChanges = List.of(
+                Map.of("email", "pas-un-courriel"),
+                Map.of("email", "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(62)),
+                Map.of("email", "nouvelle@exemple.ca", "status", "ACTIVE"));
+
+        mvc.perform(client.unsafe(
+                        post("/api/v1/auth/verify-email"), account.session(), Map.of("code", "123456", "extra", 1)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        for (Map<String, ?> body : invalidChanges) {
+            mvc.perform(client.unsafe(post("/api/v1/auth/verify-email/change"), account.session(), body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(account.session()))
+                .andExpect(jsonPath("$.email").value("corps@exemple.ca"));
+    }
+
+    @Test
+    @DisplayName("SEC-03 : la session d'un compte supprimé n'obtient ni son compte ni un renvoi (401)")
+    void sec03DeletedAccountSessionGetsNothing() throws Exception {
+        Registered account = client.register("supprime@exemple.ca", "supprime");
+        jdbc.sql("UPDATE users SET status = 'DELETED', deleted_at = now() WHERE id = ?")
+                .param(account.id())
+                .update();
+
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(account.session()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        mvc.perform(client.unsafe(post("/api/v1/auth/verify-email/resend"), account.session(), null))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
 }

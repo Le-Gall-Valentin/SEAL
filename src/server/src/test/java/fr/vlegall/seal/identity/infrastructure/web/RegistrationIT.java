@@ -37,9 +37,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
@@ -50,6 +54,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** Inscription, disponibilité de l'identifiant et compte courant, de bout en bout dans le contexte complet. */
 @SealIntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
 class RegistrationIT {
 
     private static final JsonMapper JSON = JsonMapper.shared();
@@ -310,6 +315,19 @@ class RegistrationIT {
     }
 
     @Test
+    @DisplayName(
+            "AUTH-14 : un serveur SMTP en panne ne fait pas échouer l'inscription ; le journal ne cite pas l'adresse")
+    void auth14SmtpFailureDoesNotFailTheRegistration(CapturedOutput output) throws Exception {
+        mail.failWith(new MailSendException("Invalid Addresses: panne.it@exemple.ca"));
+
+        register("panne.it@exemple.ca", "panne.it");
+
+        assertThat(output.getAll())
+                .contains("Échec de l'envoi du courriel : MailSendException")
+                .doesNotContain("panne.it@");
+    }
+
+    @Test
     @DisplayName("SEC-01 : courriel, nom affiché et longueurs sont validés ; VALIDATION_FAILED nomme les champs")
     void sec01InvalidFieldsAreNamed() throws Exception {
         Map<String, Object> body = registration("pas-un-courriel", "champs.it");
@@ -346,7 +364,7 @@ class RegistrationIT {
     }
 
     @Test
-    @DisplayName("ADR 0019 : une session, même restreinte, ne peut pas s'inscrire à nouveau (403)")
+    @DisplayName("AUTH-10 : une session, même restreinte, ne peut pas s'inscrire à nouveau (403, ADR 0019)")
     void adr0019RegistrationIsForAnonymousOnly() throws Exception {
         Cookie session = sessionOf(register("deja.it@exemple.ca", "deja.it"));
 
@@ -412,7 +430,8 @@ class RegistrationIT {
     }
 
     @Test
-    @DisplayName("A06 : deux inscriptions simultanées du même identifiant donnent un 201 et un 409, jamais un 500")
+    @DisplayName(
+            "AUTH-02 : deux inscriptions simultanées du même identifiant donnent un 201 et un 409, jamais un 500 (A06)")
     void a06ConcurrentRegistrationsOfTheSameUsername() throws Exception {
         List<MockHttpServletRequestBuilder> requests = new ArrayList<>();
         for (int i = 0; i < 2; i++) {

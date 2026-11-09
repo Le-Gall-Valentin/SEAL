@@ -32,7 +32,9 @@ public class UsernameAvailabilityHandler implements UsernameAvailabilityQuery {
 
     /**
      * Les suggestions partent de l'identifiant normalisé par les étapes 2 à 4 d'AUTH-04 : sa forme normalisée d'abord,
-     * si elle diffère de la saisie, puis les suffixes 2 à 99 vérifiés en une requête, puis 4 chiffres aléatoires.
+     * si elle diffère de la saisie, puis les suffixes 2 à 99 vérifiés en une requête, puis 4 chiffres aléatoires. Les
+     * tirages aléatoires sont bornés à {@value #RANDOM_ATTEMPTS} (A06) : si les 98 suffixes et ces tirages sont tous
+     * pris, la réponse compte moins de 3 suggestions plutôt que de boucler (ADR 0019, point 5).
      */
     @Override
     @Transactional(readOnly = true)

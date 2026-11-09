@@ -43,7 +43,8 @@ class CredentialStorageIT {
     }
 
     @Test
-    @DisplayName("A06 : Argon2id tourne hors de toute transaction ; dans une transaction, le hachage est refusé")
+    @DisplayName(
+            "AUTH-13 : Argon2id tourne hors de toute transaction (A06) ; dans une transaction, le hachage est refusé")
     void a06PasswordIsHashedOutsideAnyTransaction() {
         assertThat(initialPassword.prepare("fjord-tuque-raquette", List.of("credential.zero")))
                 .hasValueSatisfying(hash -> assertThat(hash).startsWith("{argon2}$argon2id$"));

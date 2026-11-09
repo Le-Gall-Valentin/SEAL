@@ -103,9 +103,20 @@ class VerifyEmailHandlerTest {
     }
 
     @Test
-    @DisplayName("A01 : une session dont le compte n'existe pas répond UNAUTHENTICATED")
+    @DisplayName("SEC-03 : une session dont le compte n'existe pas répond UNAUTHENTICATED (A01)")
     void a01UnknownAccountIsUnauthenticated() {
         assertThatThrownBy(() -> handler.verify(new UserId(UUID.randomUUID()), code("482913")))
+                .isInstanceOf(SealException.class)
+                .extracting(e -> ((SealException) e).code())
+                .isEqualTo(ErrorCode.UNAUTHENTICATED);
+    }
+
+    @Test
+    @DisplayName("SEC-03 : une session dont le compte est supprimé répond UNAUTHENTICATED (échec fermé, A01)")
+    void sec03DeletedAccountIsUnauthenticated() {
+        Account deleted = identity.add("supprime", "s@exemple.ca", AccountStatus.DELETED);
+
+        assertThatThrownBy(() -> handler.verify(deleted.id(), code("482913")))
                 .isInstanceOf(SealException.class)
                 .extracting(e -> ((SealException) e).code())
                 .isEqualTo(ErrorCode.UNAUTHENTICATED);

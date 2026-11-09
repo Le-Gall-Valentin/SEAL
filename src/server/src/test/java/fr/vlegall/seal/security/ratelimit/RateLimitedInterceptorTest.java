@@ -81,7 +81,7 @@ class RateLimitedInterceptorTest {
     }
 
     @Test
-    @DisplayName("ADR 0013 : sans requête en cours, l'appel est refusé plutôt que laissé sans limite")
+    @DisplayName("SEC-10 : sans requête en cours, l'appel est refusé plutôt que laissé sans limite (ADR 0013)")
     void adr0013NoRequestFailsClosed() {
         RequestContextHolder.resetRequestAttributes();
 
@@ -104,7 +104,8 @@ class RateLimitedInterceptorTest {
     }
 
     @Test
-    @DisplayName("ADR 0013 : sans utilisateur authentifié, une limite par utilisateur refuse l'appel (échec fermé)")
+    @DisplayName(
+            "SEC-10 : sans utilisateur authentifié, une limite par utilisateur refuse l'appel (échec fermé, ADR 0013)")
     void adr0013UserLimitWithoutUserFailsClosed() {
         assertThatIllegalStateException().isThrownBy(probe::resend);
 

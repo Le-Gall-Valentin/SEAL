@@ -147,7 +147,7 @@ class RateLimiterTest {
     }
 
     @Test
-    @DisplayName("ADR 0013 : le limiteur refuse de tourner dans une transaction, qui garderait une connexion")
+    @DisplayName("SEC-10 : le limiteur refuse de tourner dans une transaction, qui garderait une connexion (ADR 0013)")
     void adr0013LimiterRefusesToRunInsideATransaction() {
         TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
@@ -178,7 +178,7 @@ class RateLimiterTest {
     }
 
     @Test
-    @DisplayName("ADR 0013 : une clé saisie, même énorme, occupe une place fixe")
+    @DisplayName("SEC-10 : une clé saisie, même énorme, occupe une place fixe (ADR 0013)")
     void adr0013BucketKeyHasAFixedSizeWhateverTheInput() {
         limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "x".repeat(1_000_000));
 
@@ -188,7 +188,8 @@ class RateLimiterTest {
     }
 
     @Test
-    @DisplayName("ADR 0013 : au-delà du plafond de seaux, une nouvelle clé est refusée et l'alerte écrite une fois")
+    @DisplayName(
+            "SEC-10 : au-delà du plafond de seaux, une nouvelle clé est refusée et l'alerte écrite une fois (ADR 0013)")
     void adr0013CapacityIsBoundedAndFailsClosed() {
         RateLimiter small = new RateLimiter(clock, journal, 2);
         small.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "alice");
@@ -204,7 +205,7 @@ class RateLimiterTest {
     }
 
     @Test
-    @DisplayName("ADR 0013 : seul le premier refus d'une période est journalisé")
+    @DisplayName("SEC-20 : seul le premier refus d'une période est journalisé (ADR 0013)")
     void adr0013OnlyTheFirstRefusalOfAPeriodIsJournaled() {
         consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob", 5);
         for (int i = 0; i < 10; i++) {
@@ -235,7 +236,7 @@ class RateLimiterTest {
     }
 
     @Test
-    @DisplayName("ADR 0013 : une limite par utilisateur exige un utilisateur, et inversement")
+    @DisplayName("SEC-10 : une limite par utilisateur exige un utilisateur, et inversement (ADR 0013)")
     void adr0013KeyTypeMatchesTheLimitKind() {
         UserId user = new UserId(UUID.randomUUID());
 
@@ -262,7 +263,7 @@ class RateLimiterTest {
     }
 
     @Test
-    @DisplayName("A09 : l'alerte est écrite avant le journal, et la limite tient même si le journal échoue")
+    @DisplayName("SEC-20 : l'alerte est écrite avant le journal, et la limite tient même si le journal échoue (A09)")
     void a09WarningSurvivesAJournalFailure(CapturedOutput output) {
         doThrow(new IllegalStateException("base indisponible")).when(journal).recordRefusal(any());
         consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob", 5);

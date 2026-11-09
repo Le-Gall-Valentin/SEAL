@@ -30,7 +30,7 @@ class BoundedMailExecutorTest {
     }
 
     @Test
-    @DisplayName("A06 : la file d'envoi est bornée ; au-delà, l'envoi est refusé au lieu de grossir sans fin")
+    @DisplayName("AUTH-14 : la file d'envoi est bornée ; au-delà, l'envoi est refusé au lieu de grossir sans fin (A06)")
     void a06QueueIsBounded() throws Exception {
         assertThat(BoundedMailExecutor.QUEUE_CAPACITY).isEqualTo(1_000);
         BoundedMailExecutor executor = new BoundedMailExecutor(1);

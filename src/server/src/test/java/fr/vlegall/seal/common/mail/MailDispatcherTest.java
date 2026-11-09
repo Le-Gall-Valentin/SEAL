@@ -86,7 +86,7 @@ class MailDispatcherTest {
     }
 
     @Test
-    @DisplayName("A06 : une file pleine abandonne le courriel sans faire échouer la requête")
+    @DisplayName("AUTH-14 : une file pleine abandonne le courriel sans faire échouer la requête (A06)")
     void a06FullQueueDropsTheMailWithoutFailingTheRequest() {
         begin();
 

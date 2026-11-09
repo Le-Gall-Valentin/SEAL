@@ -75,4 +75,34 @@ class ResendAndChangeHandlerTest {
                 .isEqualTo(ErrorCode.FORBIDDEN);
         assertThat(identity.mails).isEmpty();
     }
+
+    @Test
+    @DisplayName("AUTH-15 : un renvoi vers une adresse activée entre-temps avertit son titulaire, sans code ni indice")
+    void auth15ResendToAnAddressActivatedMeanwhileWarnsTheHolder() {
+        identity.issueCode(account, "111111");
+        identity.add("titulaire", "V@exemple.ca", AccountStatus.ACTIVE);
+
+        resend.resend(account.id());
+
+        assertThat(identity.codes)
+                .as("un code est renouvelé, comme pour une adresse libre")
+                .hasSize(2);
+        assertThat(identity.mails).last().isEqualTo("warning:v@exemple.ca");
+    }
+
+    @Test
+    @DisplayName("SEC-03 : une session dont le compte est supprimé ne renvoie ni ne change rien (UNAUTHENTICATED)")
+    void sec03DeletedAccountIsUnauthenticated() {
+        Account deleted = identity.add("supprime", "s@exemple.ca", AccountStatus.DELETED);
+
+        assertThatThrownBy(() -> resend.resend(deleted.id()))
+                .isInstanceOf(SealException.class)
+                .extracting(e -> ((SealException) e).code())
+                .isEqualTo(ErrorCode.UNAUTHENTICATED);
+        assertThatThrownBy(() -> change.change(deleted.id(), email("b@exemple.ca")))
+                .isInstanceOf(SealException.class)
+                .extracting(e -> ((SealException) e).code())
+                .isEqualTo(ErrorCode.UNAUTHENTICATED);
+        assertThat(identity.mails).isEmpty();
+    }
 }
