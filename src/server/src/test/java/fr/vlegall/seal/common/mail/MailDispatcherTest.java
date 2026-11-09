@@ -1,6 +1,7 @@
 package fr.vlegall.seal.common.mail;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.logging.CorrelationIdFilter;
@@ -29,6 +30,7 @@ class MailDispatcherTest {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.clearSynchronization();
         }
+        TransactionSynchronizationManager.setActualTransactionActive(false);
         MDC.clear();
     }
 
@@ -41,9 +43,10 @@ class MailDispatcherTest {
         return new MailDispatcher(sender, properties, executor);
     }
 
-    /** Ouvre une synchronisation de transaction, comme le ferait le gestionnaire de transactions. */
+    /** Ouvre une transaction et sa synchronisation, comme le ferait le gestionnaire de transactions. */
     private static void begin() {
         TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
     }
 
     /** Simule la validation de la transaction : lance les synchronisations enregistrées. */
@@ -83,6 +86,16 @@ class MailDispatcherTest {
 
         assertThat(sender.sent()).hasSize(1);
         assertThat(MDC.get(CorrelationIdFilter.MDC_KEY)).isEqualTo("requete-1");
+    }
+
+    @Test
+    @DisplayName(
+            "AUTH-14 : une portée sans vraie transaction (NEVER, SUPPORTS) refuse l'envoi, comme l'absence de portée")
+    void auth14ScopeWithoutActualTransactionRefusesTheMail() {
+        TransactionSynchronizationManager.initSynchronization();
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> dispatcher(Runnable::run).sendAfterCommit(MESSAGE));
     }
 
     @Test

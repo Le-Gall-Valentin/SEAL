@@ -33,9 +33,13 @@ public final class MailDispatcher {
         this.executor = executor;
     }
 
-    /** Programme l'envoi après la validation de la transaction en cours, obligatoire. */
+    /**
+     * Programme l'envoi après la validation de la transaction en cours, obligatoire : une portée sans vraie transaction
+     * ({@code NEVER}, {@code SUPPORTS}) n'a rien à valider ni à annuler, et l'envoi partirait même en cas d'échec.
+     */
     public void sendAfterCommit(MailMessage message) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
             throw new IllegalStateException("envoi de courriel hors transaction");
         }
         // L'identifiant de corrélation de la requête suit le courriel sur le fil d'envoi (SEC-21).
