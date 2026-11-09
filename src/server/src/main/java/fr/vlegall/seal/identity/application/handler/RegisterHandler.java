@@ -31,8 +31,8 @@ public class RegisterHandler implements RegisterUseCase {
      * réservé, pris, puis mot de passe trop faible ; un identifiant pris l'est sans calcul d'Argon2id.
      *
      * <p>Sans {@code @Transactional} : rien ici n'a à être atomique, et {@code InitialPasswordUseCase.prepare} refuse
-     * déjà d'être appelé dans une transaction. Hors transaction réelle, la connexion prise par {@code users.exists} est
-     * rendue aussitôt (ADR 0020).
+     * déjà d'être appelé dans une transaction. Sans portée transactionnelle, la connexion prise par {@code users.exists}
+     * est rendue aussitôt ; l'ADR 0020 garantit qu'il en irait de même sous {@code NEVER}.
      */
     @Override
     public UserId register(RegisterCommand command) {
