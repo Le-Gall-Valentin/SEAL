@@ -49,4 +49,15 @@ class UnicodeTest {
         assertThat(Unicode.foldLogin("V@EXEMPLE.ca")).isEqualTo("v@exemple.ca");
         assertThat(Unicode.foldLogin("Vale\u0301ntin@exemple.ca")).isEqualTo("val\u00e9ntin@exemple.ca");
     }
+
+    @Test
+    @DisplayName(
+            "AUTH-22 : la saisie normalisée reste en NFC après les minuscules : « T » + tréma donne « ẗ » (ADR 0021)")
+    void auth22FoldedLoginStaysNfc() {
+        String decomposed = "T" + Character.toString(0x0308) + "eo@exemple.ca";
+        String precomposed = Character.toString(0x1E97) + "eo@exemple.ca";
+
+        assertThat(Unicode.foldLogin(decomposed)).isEqualTo(Unicode.foldLogin(precomposed));
+        assertThat(Unicode.isNfc(Unicode.foldLogin(decomposed))).isTrue();
+    }
 }
