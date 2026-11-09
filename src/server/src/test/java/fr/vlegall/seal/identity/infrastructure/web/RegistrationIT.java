@@ -368,8 +368,7 @@ class RegistrationIT {
             assertThat(count("SELECT count(*) FROM user_credentials WHERE user_id = ?", id))
                     .isEqualTo(1);
         }
-        List<SimpleMailMessage> sent = mail.awaitSent(2);
-        assertThat(sent).hasSize(2);
+        assertThat(mail.sent()).hasSize(2);
         assertThat(mail.sentTo("titulaire.it@EXEMPLE.ca")).singleElement().satisfies(warning -> {
             assertThat(warning.getSubject()).isEqualTo("Tentative d'inscription sur SEAL");
             assertThat(warning.getText()).doesNotContain("squat.it").doesNotMatch(".*[0-9]{6}.*");

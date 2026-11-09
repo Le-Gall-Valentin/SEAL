@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
-import java.time.Duration;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,7 +47,8 @@ class MailDispatcherIT {
             assertThat(sender.sent()).as("rien ne part avant la validation").isEmpty();
         });
 
-        SimpleMailMessage sent = sender.awaitSent(1).getFirst();
+        assertThat(sender.sent()).hasSize(1);
+        SimpleMailMessage sent = sender.sent().getFirst();
         assertThat(sent.getTo()).containsExactly("valentin.mail@exemple.ca");
         assertThat(sent.getFrom()).isEqualTo("SEAL <noreply@seal.localhost>");
         assertThat(sent.getSubject()).isEqualTo("Votre code de vérification SEAL");
@@ -64,10 +63,7 @@ class MailDispatcherIT {
             status.setRollbackOnly();
         });
 
-        Awaitility.await()
-                .during(Duration.ofMillis(300))
-                .atMost(Duration.ofSeconds(1))
-                .until(() -> sender.sent().isEmpty());
+        assertThat(sender.sent()).isEmpty();
     }
 
     @Test
@@ -83,10 +79,8 @@ class MailDispatcherIT {
 
         transactions.executeWithoutResult(status -> mail.sendAfterCommit(MESSAGE));
 
-        Awaitility.await()
-                .atMost(Duration.ofSeconds(5))
-                .until(() -> output.getOut().contains("Échec de l'envoi du courriel"));
         assertThat(output.getAll())
+                .contains("Échec de l'envoi du courriel")
                 .contains("MailSendException")
                 .doesNotContain("valentin.mail")
                 .doesNotContain("482913");

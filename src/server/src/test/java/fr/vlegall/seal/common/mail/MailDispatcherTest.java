@@ -1,0 +1,101 @@
+package fr.vlegall.seal.common.mail;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import fr.vlegall.seal.common.SealProperties;
+import fr.vlegall.seal.security.logging.CorrelationIdFilter;
+import fr.vlegall.seal.support.RecordingMailSender;
+import java.net.URI;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+class MailDispatcherTest {
+
+    private static final MailMessage MESSAGE =
+            new MailMessage("valentin.mail@exemple.ca", "Objet", "Votre code de vérification SEAL : 482913.");
+
+    private final RecordingMailSender sender = new RecordingMailSender();
+
+    @AfterEach
+    void clear() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        MDC.clear();
+    }
+
+    private MailDispatcher dispatcher(MailExecutor executor) {
+        SealProperties properties = new SealProperties(
+                URI.create("https://localhost:8443"),
+                new SealProperties.Security(Duration.ofMinutes(5)),
+                new SealProperties.Session(Duration.ofHours(12)),
+                new SealProperties.Mail("SEAL <noreply@seal.localhost>"));
+        return new MailDispatcher(sender, properties, executor);
+    }
+
+    /** Ouvre une synchronisation de transaction, comme le ferait le gestionnaire de transactions. */
+    private static void begin() {
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    /** Simule la validation de la transaction : lance les synchronisations enregistrées. */
+    private static void commit() {
+        List<TransactionSynchronization> synchronizations =
+                new ArrayList<>(TransactionSynchronizationManager.getSynchronizations());
+        synchronizations.forEach(TransactionSynchronization::afterCommit);
+    }
+
+    @Test
+    @DisplayName("SEC-21 : l'identifiant de corrélation de la requête suit le courriel sur le fil d'envoi")
+    void sec21CorrelationIdFollowsTheMail() throws Exception {
+        List<Thread> threads = new ArrayList<>();
+        MailExecutor otherThread = sending -> {
+            Thread thread = new Thread(sending, "seal-mail-test");
+            threads.add(thread);
+            thread.start();
+        };
+        begin();
+        MDC.put(CorrelationIdFilter.MDC_KEY, "requete-1");
+
+        dispatcher(otherThread).sendAfterCommit(MESSAGE);
+        commit();
+        threads.getFirst().join(5_000);
+
+        assertThat(sender.correlationIds()).containsExactly("requete-1");
+    }
+
+    @Test
+    @DisplayName("SEC-21 : un envoi sur le fil appelant lui rend son contexte de journalisation")
+    void sec21SendingOnTheCallerThreadKeepsItsContext() {
+        begin();
+        MDC.put(CorrelationIdFilter.MDC_KEY, "requete-1");
+
+        dispatcher(Runnable::run).sendAfterCommit(MESSAGE);
+        commit();
+
+        assertThat(sender.sent()).hasSize(1);
+        assertThat(MDC.get(CorrelationIdFilter.MDC_KEY)).isEqualTo("requete-1");
+    }
+
+    @Test
+    @DisplayName("A06 : une file pleine abandonne le courriel sans faire échouer la requête")
+    void a06FullQueueDropsTheMailWithoutFailingTheRequest() {
+        begin();
+
+        dispatcher(sending -> {
+                    throw new RejectedExecutionException("pleine");
+                })
+                .sendAfterCommit(MESSAGE);
+        commit();
+
+        assertThat(sender.sent()).isEmpty();
+    }
+}

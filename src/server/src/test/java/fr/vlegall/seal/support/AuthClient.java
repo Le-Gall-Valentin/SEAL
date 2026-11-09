@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -105,10 +106,11 @@ public final class AuthClient {
         return new Registered(UUID.fromString(body(result).get("id").asString()), email, username, sessionOf(result));
     }
 
-    /** Dernier code reçu à cette adresse. */
+    /** Dernier code reçu à cette adresse ; les courriels partent avant la réponse ({@code MailTestConfiguration}). */
     public String codeSentTo(String address) {
-        mail.awaitSent(1);
-        SimpleMailMessage message = mail.sentTo(address).getLast();
+        List<SimpleMailMessage> received = mail.sentTo(address);
+        assertThat(received).as("courriel reçu à " + address).isNotEmpty();
+        SimpleMailMessage message = received.getLast();
         Matcher matcher = CODE.matcher(message.getText() == null ? "" : message.getText());
         assertThat(matcher.find()).as("code dans le courriel").isTrue();
         return matcher.group(1);

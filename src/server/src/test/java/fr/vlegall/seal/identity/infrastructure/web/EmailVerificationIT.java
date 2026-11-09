@@ -133,7 +133,6 @@ class EmailVerificationIT {
 
         mvc.perform(client.unsafe(post("/api/v1/auth/verify-email/resend"), account.session(), null))
                 .andExpect(status().isNoContent());
-        mail.awaitSent(2);
         String second = client.codeSentTo("renvoi@exemple.ca");
 
         if (!second.equals(first)) {
@@ -281,7 +280,6 @@ class EmailVerificationIT {
         String squatterCode = client.codeSentTo("partagee@exemple.ca");
         AuthClient owner = new AuthClient(mvc, mail);
         Registered account = owner.register("Partagee@Exemple.ca", "proprietaire");
-        mail.awaitSent(2);
         String ownerCode = owner.codeSentTo("Partagee@Exemple.ca");
 
         mvc.perform(owner.unsafe(post("/api/v1/auth/verify-email"), account.session(), Map.of("code", ownerCode)))
