@@ -202,9 +202,38 @@ final class ContextRules {
                 .resideInAnyPackage(root + ".crypto..", "java..", "javax..");
     }
 
-    // Règle 9
+    // Règle 9 : deux contextes peuvent s'appeler l'un l'autre, chacun par un adaptateur de infrastructure/<autre
+    // contexte>/ vers le port d'entrée de l'autre (ADR 0008, mise à jour du 2026-11-08). La règle 7 vérifie déjà que
+    // cet adaptateur ne vise que le contexte qu'il nomme ; tout autre cycle reste interdit.
     static ArchRule firstLevelPackagesHaveNoCycles(String root) {
-        return slices().matching(root + ".(*)..").should().beFreeOfCycles();
+        return slices().matching(root + ".(*)..")
+                .should()
+                .beFreeOfCycles()
+                .ignoreDependency(crossContextAdapter(root), contextUseCase(root));
+    }
+
+    /** Classe rangée dans {@code <contexte>/infrastructure/<autre contexte>/}. */
+    private static DescribedPredicate<JavaClass> crossContextAdapter(String root) {
+        return DescribedPredicate.describe("un adaptateur de infrastructure/<autre contexte>/", type -> {
+            String[] parts = relativePackage(root, type);
+            return parts.length >= 3 && parts[1].equals("infrastructure") && !parts[2].equals(parts[0]);
+        });
+    }
+
+    /** Interface rangée dans {@code <contexte>/application/port/in}. */
+    private static DescribedPredicate<JavaClass> contextUseCase(String root) {
+        return DescribedPredicate.describe("un cas d'usage de application/port/in", type -> {
+            String[] parts = relativePackage(root, type);
+            return parts.length >= 4
+                    && parts[1].equals("application")
+                    && parts[2].equals("port")
+                    && parts[3].equals("in");
+        });
+    }
+
+    private static String[] relativePackage(String root, JavaClass type) {
+        String name = type.getPackageName();
+        return name.startsWith(root + ".") ? name.substring(root.length() + 1).split("\\.") : new String[0];
     }
 
     // Règle 10
