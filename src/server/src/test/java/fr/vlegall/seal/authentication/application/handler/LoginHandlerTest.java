@@ -124,6 +124,7 @@ class LoginHandlerTest {
         UserId user = account("attente", false, true);
 
         assertThat(handler.login("attente", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, false));
+        assertThat(verifications).containsExactly("réelle");
     }
 
     @Test
@@ -160,5 +161,8 @@ class LoginHandlerTest {
 
         assertThat(handler.login("valentin", Character.toString(0xD800) + PASSWORD))
                 .isEqualTo(new LoginOutcome.Rejected(user));
+        assertThat(verifications)
+                .as("le hacheur calcule aussi pour une demi-paire (AUTH-21)")
+                .containsExactly("réelle");
     }
 }

@@ -69,10 +69,15 @@ public final class Argon2PasswordHasher implements PasswordHasher {
         return bounded(() -> Objects.requireNonNull(encoder.encode(password.value()), "haché"));
     }
 
-    /** Une demi-paire isolée ne s'encode pas en UTF-8 : elle ne correspond à rien, sans erreur (échec fermé). */
+    /**
+     * Une demi-paire isolée ne s'encode pas en UTF-8 : elle ne correspond à rien, sans erreur (échec fermé). Le calcul
+     * a quand même lieu, sur le leurre, pour que la durée ne dise rien du compte (AUTH-21).
+     */
     @Override
     public boolean matches(Password password, String encoded) {
         if (!Unicode.isWellFormed(password.value())) {
+            String decoyHash = decoy();
+            bounded(() -> encoder.matches(DECOY_PASSWORD, decoyHash));
             return false;
         }
         return bounded(() -> encoder.matches(password.value(), encoded));
