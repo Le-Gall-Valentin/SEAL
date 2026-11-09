@@ -199,4 +199,17 @@ class SecurityJournalIT {
                 .isInstanceOf(IllegalStateException.class);
         assertThat(rowsWithMarker()).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName(
+            "SEC-20 : une adresse IPv6 avec zone est enregistrée sans sa zone, sans faire échouer le journal (A10)")
+    void sec20ScopedIpv6AddressIsRecordedWithoutItsZone() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("fe80::1%eth0");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+        journal.recordStandalone(event(Map.of("marker", marker)));
+
+        assertThat(recordedRow().get("ip")).isEqualTo("fe80::1");
+    }
 }

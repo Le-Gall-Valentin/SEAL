@@ -1,8 +1,9 @@
-package fr.vlegall.seal.security.ratelimit;
+package fr.vlegall.seal.security.web;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.util.StringJoiner;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Clé de la limitation de débit par IP (SEC-10, ADR 0021 point 6). Une adresse IPv4, ou IPv4 mappée en IPv6, reste
@@ -20,12 +21,8 @@ public final class ClientAddress {
 
     /** Analyse l'adresse comme un littéral, sans jamais la résoudre par DNS ; l'éventuelle zone ({@code %eth0}) est ignorée. */
     public static String key(String remoteAddr) {
-        int zone = remoteAddr.indexOf('%');
-        String literal = zone >= 0 ? remoteAddr.substring(0, zone) : remoteAddr;
-        InetAddress address;
-        try {
-            address = InetAddress.ofLiteral(literal);
-        } catch (IllegalArgumentException e) {
+        InetAddress address = parse(remoteAddr);
+        if (address == null) {
             return UNREADABLE;
         }
         if (address instanceof Inet4Address) {
@@ -37,5 +34,23 @@ public final class ClientAddress {
             prefix.add(Integer.toHexString(((bytes[2 * group] & 0xff) << 8) | (bytes[2 * group + 1] & 0xff)));
         }
         return prefix.toString();
+    }
+
+    /**
+     * Adresse entière, sans sa zone, telle que PostgreSQL l'accepte en {@code inet} (SEC-20) ; {@code null} si elle est
+     * illisible.
+     */
+    public static @Nullable String literal(String remoteAddr) {
+        InetAddress address = parse(remoteAddr);
+        return address == null ? null : address.getHostAddress();
+    }
+
+    private static @Nullable InetAddress parse(String remoteAddr) {
+        int zone = remoteAddr.indexOf('%');
+        try {
+            return InetAddress.ofLiteral(zone >= 0 ? remoteAddr.substring(0, zone) : remoteAddr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

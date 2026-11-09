@@ -3,6 +3,7 @@ package fr.vlegall.seal.security.journal;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.logging.CorrelationIdFilter;
 import fr.vlegall.seal.security.logging.LogValues;
+import fr.vlegall.seal.security.web.ClientAddress;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -91,7 +92,7 @@ public class SecurityJournal {
                                 + "(CAST(:userId AS uuid), :type, CAST(:ip AS inet), :userAgent, CAST(:details AS jsonb), :createdAt)")
                 .param("userId", userIdOf(event))
                 .param("type", event.type().name())
-                .param("ip", request == null ? null : request.getRemoteAddr())
+                .param("ip", request == null ? null : ClientAddress.literal(request.getRemoteAddr()))
                 .param("userAgent", request == null ? null : userAgent(request))
                 .param("details", JSON.writeValueAsString(safeDetails(event.details())))
                 .param("createdAt", OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))

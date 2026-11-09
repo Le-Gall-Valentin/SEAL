@@ -1,4 +1,4 @@
-package fr.vlegall.seal.security.ratelimit;
+package fr.vlegall.seal.security.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,5 +40,13 @@ class ClientAddressTest {
     @DisplayName("SEC-10 : une adresse illisible, jamais résolue par DNS, partage une clé unique (échec fermé)")
     void sec10UnreadableAddressSharesOneKey(String raw) {
         assertThat(ClientAddress.key(raw)).isEqualTo(ClientAddress.UNREADABLE);
+    }
+
+    @Test
+    @DisplayName("SEC-20 : l'adresse journalisée est entière, sans zone ; illisible, elle n'est pas journalisée")
+    void sec20LiteralKeepsTheWholeAddressWithoutZone() {
+        assertThat(ClientAddress.literal("fe80::1%eth0")).isEqualTo("fe80:0:0:0:0:0:0:1");
+        assertThat(ClientAddress.literal("203.0.113.9")).isEqualTo("203.0.113.9");
+        assertThat(ClientAddress.literal("localhost")).isNull();
     }
 }

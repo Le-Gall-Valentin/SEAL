@@ -2,6 +2,7 @@ package fr.vlegall.seal.security.ratelimit;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.session.SealPrincipal;
+import fr.vlegall.seal.security.web.ClientAddress;
 import java.lang.reflect.Method;
 import java.util.Objects;
 import java.util.function.Supplier;

@@ -6,13 +6,13 @@ import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.Unicode;
 import fr.vlegall.seal.common.UserId;
-import fr.vlegall.seal.security.ratelimit.ClientAddress;
 import fr.vlegall.seal.security.ratelimit.RateLimit;
 import fr.vlegall.seal.security.ratelimit.RateLimitExceededException;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.session.SealPrincipal;
 import fr.vlegall.seal.security.session.SessionEstablisher;
+import fr.vlegall.seal.security.web.ClientAddress;
 import fr.vlegall.seal.security.web.CurrentUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -95,11 +95,14 @@ public class SessionController {
         }
     }
 
-    /** AUTH-53 : la session est invalidée en base, ses cookies expirés. */
+    /**
+     * AUTH-53 : la session est invalidée en base, ses cookies expirés, puis le geste est journalisé : un journal
+     * indisponible ne laisse pas la session ouverte.
+     */
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(@CurrentUser UserId user, HttpServletRequest request, HttpServletResponse response) {
-        logout.logout(user);
         sessions.close(request, response);
+        logout.logout(user);
     }
 }
