@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class DigestsTest {
 
     @Test
-    @DisplayName("ADR 0013 : SHA-256 suit le vecteur de FIPS 180-2 pour « abc »")
+    @DisplayName("AUTH-14 : SHA-256 suit le vecteur de FIPS 180-2 pour « abc »")
     void sha256MatchesTheFipsVector() {
         byte[] digest = Digests.sha256("abc".getBytes(StandardCharsets.US_ASCII));
 
@@ -19,9 +19,19 @@ class DigestsTest {
     }
 
     @Test
-    @DisplayName("ADR 0013 : l'empreinte d'une entrée vide est celle de la norme")
+    @DisplayName("AUTH-14 : l'empreinte d'une entrée vide est celle de la norme")
     void sha256OfEmptyInput() {
         assertThat(HexFormat.of().formatHex(Digests.sha256(new byte[0])))
                 .isEqualTo("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    }
+
+    @Test
+    @DisplayName("AUTH-14 : deux empreintes égales se comparent en temps constant (A04)")
+    void equalComparesDigests() {
+        byte[] digest = Digests.sha256(new byte[] {1});
+
+        assertThat(Digests.equal(digest, Digests.sha256(new byte[] {1}))).isTrue();
+        assertThat(Digests.equal(digest, Digests.sha256(new byte[] {2}))).isFalse();
+        assertThat(Digests.equal(digest, new byte[0])).isFalse();
     }
 }

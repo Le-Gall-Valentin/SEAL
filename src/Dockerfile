@@ -22,6 +22,9 @@ COPY server/.mvn/ .mvn/
 COPY server/mvnw server/pom.xml server/spotbugs-exclude.xml ./
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q dependency:go-offline
 COPY server/src/ src/
+# AUTH-11 : la liste de blocage, partagée avec le client, et sa licence MIT sont des ressources Maven lues depuis
+# ../protocol.
+COPY protocol/password-blocklist.txt protocol/password-blocklist.LICENSE /build/protocol/
 # Le client compilé est servi par Spring sur l'origine unique (TRN-02).
 COPY --from=client /build/client/dist/ src/main/resources/static/
 # Les tests et l'analyse statique tournent dans la CI (./mvnw verify) ; l'image ne fait qu'empaqueter.

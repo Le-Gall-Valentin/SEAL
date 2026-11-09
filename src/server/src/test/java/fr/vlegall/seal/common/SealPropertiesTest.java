@@ -15,11 +15,12 @@ class SealPropertiesTest {
 
     private static final SealProperties.Security SECURITY = new SealProperties.Security(Duration.ofSeconds(300));
     private static final SealProperties.Session SESSION = new SealProperties.Session(Duration.ofHours(12));
+    private static final SealProperties.Mail MAIL = new SealProperties.Mail("SEAL <noreply@seal.localhost>");
 
     @Test
     @DisplayName("TRN-02 : l'origine WebSocket dérive de l'origine HTTPS unique")
     void trn02WebSocketOriginDerivesFromTheHttpsOrigin() {
-        SealProperties properties = new SealProperties(URI.create("https://localhost:8443"), SECURITY, SESSION);
+        SealProperties properties = new SealProperties(URI.create("https://localhost:8443"), SECURITY, SESSION, MAIL);
 
         assertThat(properties.webSocketOrigin()).isEqualTo("wss://localhost:8443");
     }
@@ -42,7 +43,7 @@ class SealPropertiesTest {
     void trn02RejectsAnythingButABareHttpsOrigin(String origin) {
         URI uri = URI.create(origin);
 
-        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties(uri, SECURITY, SESSION));
+        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties(uri, SECURITY, SESSION, MAIL));
     }
 
     @Test
@@ -57,10 +58,10 @@ class SealPropertiesTest {
     void missingSettingsPreventStartup() {
         URI origin = URI.create("https://localhost:8443");
 
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties(null, SECURITY, SESSION));
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, null, SESSION));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(null, SECURITY, SESSION, MAIL));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, null, SESSION, MAIL));
         assertThatNullPointerException().isThrownBy(() -> new SealProperties.Security(null));
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, null));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, null, MAIL));
         assertThatNullPointerException().isThrownBy(() -> new SealProperties.Session(null));
     }
 
@@ -69,5 +70,14 @@ class SealPropertiesTest {
     void auth52RejectsANonPositiveAbsoluteTimeout() {
         assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties.Session(Duration.ZERO));
         assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties.Session(Duration.ofHours(-1)));
+    }
+
+    @Test
+    @DisplayName("AUTH-14 : l'expéditeur des courriels est obligatoire et non vide")
+    void auth14MailSenderIsRequired() {
+        URI origin = URI.create("https://localhost:8443");
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, SESSION, null));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties.Mail(null));
+        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties.Mail(" "));
     }
 }

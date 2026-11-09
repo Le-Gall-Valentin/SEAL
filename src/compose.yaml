@@ -41,6 +41,8 @@ services:
       SEAL_DATA_KEY: ${SEAL_DATA_KEY:?SEAL_DATA_KEY est vide, lancez scripts/gen-certs.sh}
       SEAL_TLS_CERTIFICATE: file:/certs/localhost.pem
       SEAL_TLS_PRIVATE_KEY: file:/certs/localhost-key.pem
+      # AUTH-14 : serveur SMTP de Mailpit, sur le réseau interne.
+      SEAL_MAIL_HOST: mail
     ports:
       - '127.0.0.1:8443:8443'
     volumes:

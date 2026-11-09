@@ -103,3 +103,59 @@ dépendance, indépendante de Java et de TypeScript. Pour les régénérer, depu
 python3 tools/gen_vectors.py           # réécrit vectors/canonical-encoding.json
 python3 tools/gen_vectors.py --check   # échoue si le fichier n'est pas à jour (CI)
 ```
+
+## 3. Mots de passe (AUTH-11)
+
+Client et serveur DOIVENT appliquer la même politique : le client affiche les règles en direct, le
+serveur refuse (`PASSWORD_TOO_WEAK`). Algorithme (ADR 0019, point 2) :
+
+1. `p` = mot de passe normalisé en NFKC. `p` est une suite de points de code valide, sans demi-paire
+   isolée (`isWellFormed()` en TypeScript), et sa longueur en points de code est comprise entre 15
+   et 128.
+2. `m` = `p` en minuscules, par la correspondance de casse par défaut d'Unicode (`Locale.ROOT` en
+   Java, `toLowerCase()` en TypeScript). `m` ne figure pas dans la liste de blocage, dont chaque
+   entrée est normalisée de la même façon.
+3. Mots du contexte : l'identifiant, la partie locale du courriel (avant le premier `+` ou `@`),
+   `seal` et `uqac`, normalisés comme `m`. Un mot de moins de 3 points de code est ignoré, et un
+   doublon n'est gardé qu'une fois, à sa première place.
+4. Les mots sont rangés du plus long au plus court en points de code ; à longueur égale, ils gardent
+   l'ordre de l'étape 3. Une passe prend chaque mot dans cet ordre et retire toutes ses occurrences
+   de `m`, de gauche à droite et sans chevauchement (`String.replace` en Java, `replaceAll` avec une
+   chaîne en TypeScript). On recommence tant qu'une passe a retiré quelque chose. Il reste au moins
+   15 points de code.
+
+L'ordre de l'étape 4 change le résultat quand deux mots se chevauchent, même à longueur égale (deux
+dernières lignes du tableau). Avec l'identifiant `ann` et
+la partie locale `annabelle`, `annabelle sur le pont` est refusé : retirer `annabelle` d'abord
+laisse ` sur le pont`, 12 points de code. Retirer `ann` d'abord aurait laissé `abelle sur le pont`,
+18 points de code, et accepté un mot de passe bâti sur la partie locale.
+
+| Mot de passe | Identifiant | Partie locale | Résultat |
+| --- | --- | --- | --- |
+| `sealsealsealseal` | `valentin` | `valentin` | refusé (rien ne reste) |
+| `sesealalsesealalsesealal` | `valentin` | `valentin` | refusé (passes répétées) |
+| `valentin.le.gall2026` | `valentin.le.gall` | `v` | refusé (`2026` reste) |
+| `annabelle sur le pont` | `ann` | `annabelle` | refusé (12 points de code restent) |
+| `annabelle sur le pont du lac` | `ann` | `annabelle` | accepté (19 restent) |
+| `abababzzzzzzzzzzzzz` | `aba` | `bab` | refusé (`aba` d'abord : 13 restent) |
+| `abababzzzzzzzzzzzzz` | `bab` | `aba` | accepté (`bab` d'abord : 16 restent) |
+| `le phoque nage dans le port de seal` | `valentin` | `valentin` | accepté |
+| `fjord-tuque-raquette` précédé de U+D800 seul | `valentin` | `valentin` | refusé (demi-paire isolée) |
+
+### 3.1 Liste de blocage
+
+`password-blocklist.txt` compte les 10 000 premiers mots de passe de 15 caractères ou plus, dans
+l'ordre de `Passwords/Common-Credentials/xato-net-10-million-passwords-1000000.txt` de
+[SecLists](https://github.com/danielmiessler/SecLists) (ADR 0007, point 4), qui en compte 10 908.
+Une entrée par ligne, en UTF-8, fins de ligne `\n`, toutes en ASCII.
+
+| Élément | Valeur |
+| --- | --- |
+| Fichier source, SHA-256 | `424a3e03a17df0a2bc2b3ca749d81b04e79d59cb7aeec8876a5a3f308d0caf51` |
+| `password-blocklist.txt`, SHA-256 | `0e44bfef3adb46364f09225c8e8bc2299169b1df1f020c49538a6aeafe12006d` |
+| Taille | 176 195 octets, 10 000 lignes |
+| Licence | MIT, copyright 2018 Daniel Miessler (`password-blocklist.LICENSE`) |
+
+Le serveur l'embarque comme ressource Maven et un test vérifie son empreinte ; le client la charge
+sur l'écran d'inscription seulement.
+

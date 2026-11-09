@@ -95,6 +95,16 @@ public final class RateLimiter {
         refundToken(limit, user.value().toString());
     }
 
+    /**
+     * Jetons restants d'une limite par utilisateur, sans en prendre ni créer de seau : « 2 renvois restants cette
+     * heure » de Verification-Courriel (AUTH-14, ADR 0019). Simple lecture, permise dans une transaction.
+     */
+    public long remaining(RateLimit limit, UserId user) {
+        requireKind(limit, true);
+        Tracked tracked = buckets.get(id(limit, user.value().toString()));
+        return tracked == null ? limit.capacity() : tracked.bucket().getAvailableTokens();
+    }
+
     @Scheduled(fixedDelay = 60_000)
     public void purgeRefilledBuckets() {
         for (String id : buckets.keySet()) {

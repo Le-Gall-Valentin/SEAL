@@ -2,7 +2,9 @@ package fr.vlegall.seal.security;
 
 import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.session.AbsoluteSessionTimeoutFilter;
+import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.web.ProblemDetailsSecurityHandler;
+import fr.vlegall.seal.security.web.RequestBodyLimitFilter;
 import jakarta.servlet.DispatcherType;
 import java.time.Clock;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -10,15 +12,22 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authorization.AuthenticatedAuthorizationManager;
+import org.springframework.security.authorization.AuthorityAuthorizationManager;
+import org.springframework.security.authorization.AuthorizationManagers;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.header.HeaderWriterFilter;
 import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy;
 import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 /**
  * Chaîne de filtres de Spring Security : tout est refusé par défaut et ouvert route par route (A01), et chaque réponse
@@ -29,6 +38,9 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 class SecurityConfig {
 
     static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+
+    /** SEC-01, A06 : 16 Kio au plus pour un corps sous {@code /api/v1/auth/} (ADR 0019, point 5). */
+    static final int AUTH_BODY_LIMIT = 16 * 1024;
 
     /** TRN-20, TRN-21 : aucune ressource tierce, aucun script ni style en ligne. */
     static String contentSecurityPolicy(SealProperties seal) {
@@ -47,9 +59,22 @@ class SecurityConfig {
         return registration;
     }
 
+    /**
+     * AUTH-60 : cookie {@code XSRF-TOKEN} lisible par le client, celui que {@code csrf.spa()} installerait ; déclaré en
+     * bean pour que {@code SessionEstablisher} retire l'ancien jeton à l'ouverture d'une session.
+     */
+    @Bean
+    CsrfTokenRepository csrfTokenRepository() {
+        return CookieCsrfTokenRepository.withHttpOnlyFalse();
+    }
+
     @Bean
     SecurityFilterChain securityFilterChain(
-            HttpSecurity http, SealProperties seal, ProblemDetailsSecurityHandler problemDetails, Clock clock) {
+            HttpSecurity http,
+            SealProperties seal,
+            ProblemDetailsSecurityHandler problemDetails,
+            Clock clock,
+            CsrfTokenRepository csrfTokens) {
         http.authorizeHttpRequests(requests -> requests
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
@@ -57,6 +82,25 @@ class SecurityConfig {
                         // AUTH-60 : jeton CSRF rechargé par le client.
                         .requestMatchers(HttpMethod.GET, "/api/v1/csrf")
                         .permitAll()
+                        // AUTH-16 : toute session, restreinte ou complète, lit son compte ; l'anonyme reçoit 401.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/me")
+                        .authenticated()
+                        // ADR 0019 : l'inscription est réservée aux anonymes ; une session reçoit 403.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register")
+                        .anonymous()
+                        // AUTH-05 : anonyme (formulaire d'inscription) ou session complète ; jamais restreinte
+                        // (AUTH-16).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/username-availability")
+                        .access(AuthorizationManagers.anyOf(
+                                AuthenticatedAuthorizationManager.anonymous(),
+                                AuthorityAuthorizationManager.hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)))
+                        // AUTH-16, AUTH-17 : vérification, renvoi et changement, pour la seule session restreinte.
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/auth/verify-email",
+                                "/api/v1/auth/verify-email/resend",
+                                "/api/v1/auth/verify-email/change")
+                        .hasAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL)
                         .requestMatchers("/error")
                         .permitAll()
                         // Sonde de santé du conteneur, sur le port de gestion interne (A02).
@@ -65,7 +109,7 @@ class SecurityConfig {
                         .anyRequest()
                         .denyAll())
                 // AUTH-60 : cookie XSRF-TOKEN lisible par le client, renvoyé dans l'en-tête X-XSRF-TOKEN.
-                .csrf(csrf -> csrf.spa())
+                .csrf(csrf -> csrf.spa().csrfTokenRepository(csrfTokens))
                 // QA-05 : 401 sans session, 403 sans jeton CSRF ou sans droit, en Problem Details.
                 .exceptionHandling(exceptions ->
                         exceptions.authenticationEntryPoint(problemDetails).accessDeniedHandler(problemDetails))
@@ -78,6 +122,14 @@ class SecurityConfig {
                 .addFilterBefore(
                         new AbsoluteSessionTimeoutFilter(clock, seal.session().absoluteTimeout()),
                         SecurityContextHolderFilter.class)
+                // SEC-01 : corps borné avant toute lecture par la chaîne (jeton CSRF de formulaire compris), après les
+                // en-têtes, que le refus porte aussi. FormContentFilter, placé avant, est désactivé (application.yaml).
+                .addFilterAfter(
+                        new RequestBodyLimitFilter(
+                                PathPatternRequestMatcher.withDefaults().matcher("/api/v1/auth/**"),
+                                AUTH_BODY_LIMIT,
+                                problemDetails::rejectTooLarge),
+                        HeaderWriterFilter.class)
                 .headers(headers -> headers.contentSecurityPolicy(
                                 csp -> csp.policyDirectives(contentSecurityPolicy(seal)))
                         // TRN-03 : sans includeSubDomains, pour ne pas imposer HTTPS aux autres services locaux.

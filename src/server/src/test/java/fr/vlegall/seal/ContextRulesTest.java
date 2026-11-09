@@ -20,6 +20,7 @@ import fr.vlegall.archfixture.authentication.infrastructure.HashingAdapter;
 import fr.vlegall.archfixture.beta.application.port.in.BetaUseCase;
 import fr.vlegall.archfixture.common.FixtureProperties;
 import fr.vlegall.archfixture.common.TimeConfiguration;
+import fr.vlegall.archfixture.common.mail.FixtureMailer;
 import fr.vlegall.archfixture.crypto.PureCrypto;
 import fr.vlegall.archfixture.security.FixtureJournal;
 import org.junit.jupiter.api.DisplayName;
@@ -107,7 +108,12 @@ class ContextRulesTest {
         expectViolations(ContextRules.entitiesResideInPersistenceEntity(ROOT), "MisplacedEntity", "LooseEntity");
         expectViolations(ContextRules.onlyInfrastructureUsesEntities(ROOT), "HandlerUsingEntity");
         expectAllowed(ContextRules.entitiesResideInPersistenceEntity(ROOT), AlphaEntity.class);
-        expectAllowed(ContextRules.onlyInfrastructureUsesEntities(ROOT), AlphaEntity.class, AlphaJpaRepository.class);
+        // AlphaHandler entre dans le périmètre de la règle : une règle qui n'examine rien échouerait.
+        expectAllowed(
+                ContextRules.onlyInfrastructureUsesEntities(ROOT),
+                AlphaEntity.class,
+                AlphaJpaRepository.class,
+                AlphaHandler.class);
     }
 
     @Test
@@ -128,7 +134,11 @@ class ContextRulesTest {
         expectViolations(ContextRules.onlyInfrastructureUsesSecurity(ROOT), "DomainUsingSecurity");
         expectViolations(ContextRules.transversePackagesIgnoreContexts(ROOT), "CommonUsingAlpha");
         expectViolations(ContextRules.cryptoDependsOnlyOnTheJdk(ROOT), "CryptoUsingSpring");
-        expectAllowed(ContextRules.onlyInfrastructureUsesSecurity(ROOT), JournalAdapter.class, FixtureJournal.class);
+        expectAllowed(
+                ContextRules.onlyInfrastructureUsesSecurity(ROOT),
+                JournalAdapter.class,
+                FixtureJournal.class,
+                AlphaHandler.class);
         expectAllowed(
                 ContextRules.transversePackagesIgnoreContexts(ROOT), TimeConfiguration.class, FixtureJournal.class);
         expectAllowed(ContextRules.cryptoDependsOnlyOnTheJdk(ROOT), PureCrypto.class);
@@ -172,5 +182,19 @@ class ContextRulesTest {
     void rule13NoCors() {
         expectViolations(ContextRules.noCors(ROOT), "CrossOriginController", "CorsConfig");
         expectAllowed(ContextRules.noCors(ROOT), ControllerUsingUseCase.class);
+    }
+
+    @Test
+    @DisplayName("ADR 0018, règle 12 : aucune classe, même dans authentication, n'importe Bouncy Castle")
+    void rule12NoDirectBouncyCastle() {
+        expectViolations(ContextRules.noDirectBouncyCastle(ROOT), "BouncyCastleAdapter");
+        expectAllowed(ContextRules.noDirectBouncyCastle(ROOT), HashingAdapter.class);
+    }
+
+    @Test
+    @DisplayName("ADR 0019, règle 14 : seul common.mail parle au serveur SMTP")
+    void rule14OnlyCommonMailSendsMail() {
+        expectViolations(ContextRules.onlyCommonMailSendsMail(ROOT), "DirectMailer");
+        expectAllowed(ContextRules.onlyCommonMailSendsMail(ROOT), FixtureMailer.class, AlphaThing.class);
     }
 }
