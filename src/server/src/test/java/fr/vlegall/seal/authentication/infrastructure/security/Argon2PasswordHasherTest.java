@@ -32,6 +32,18 @@ class Argon2PasswordHasherTest {
     }
 
     @Test
+    @DisplayName("AUTH-13 : seul un haché Argon2id aux paramètres de SEAL est reconnu, jamais un texte en clair")
+    void auth13OnlyItsOwnHashesAreRecognised() {
+        assertThat(hasher.recognises(hasher.hash(Password.fromInput("fjord-tuque-raquette"))))
+                .isTrue();
+        assertThat(hasher.recognises("fjord-tuque-raquette")).isFalse();
+        assertThat(hasher.recognises("{argon2}$argon2id$v=19$m=4096,t=3,p=1$c2Vs$aGFjaGU"))
+                .isFalse();
+        assertThat(hasher.recognises("{bcrypt}$2a$10$abcdefghijklmnopqrstuv")).isFalse();
+        assertThat(hasher.recognises("{argon2}$argon2id$v=19$m=19456,t=2,p=1$")).isFalse();
+    }
+
+    @Test
     @DisplayName("AUTH-13 : deux hachés du même mot de passe diffèrent par leur sel")
     void auth13EachHashHasItsOwnSalt() {
         Password password = Password.fromInput("fjord-tuque-raquette");

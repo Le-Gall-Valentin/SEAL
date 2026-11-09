@@ -79,4 +79,17 @@ class CredentialStorageIT {
         assertThatThrownBy(() -> initialPassword.store(user, "{argon2}$argon2id$x"))
                 .isInstanceOf(IllegalTransactionStateException.class);
     }
+
+    @Test
+    @DisplayName("AUTH-13 : un mot de passe en clair passé pour un haché n'est jamais écrit")
+    void auth13PlaintextIsNeverStored() {
+        UserId[] user = new UserId[1];
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+                    user[0] = insertUser("credential.deux");
+                    initialPassword.store(user[0], "fjord-tuque-raquette");
+                }))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(storedHash(user[0])).isNull();
+    }
 }

@@ -29,6 +29,10 @@ public final class Argon2PasswordHasher implements PasswordHasher {
     private static final int MEMORY_KIB = 19_456;
     private static final int ITERATIONS = 2;
 
+    /** Préfixe d'un haché aux paramètres ci-dessus, avant le sel et la sortie en base64. */
+    private static final String PREFIX =
+            "{" + ENCODING_ID + "}$argon2id$v=19$m=" + MEMORY_KIB + ",t=" + ITERATIONS + ",p=" + PARALLELISM + "$";
+
     private final PasswordEncoder encoder;
     private final Semaphore permits;
 
@@ -65,6 +69,16 @@ public final class Argon2PasswordHasher implements PasswordHasher {
             return false;
         }
         return bounded(() -> encoder.matches(password.value(), encoded));
+    }
+
+    /** Préfixe aux paramètres de SEAL, puis un sel et une sortie non vides. */
+    @Override
+    public boolean recognises(String encoded) {
+        if (!encoded.startsWith(PREFIX)) {
+            return false;
+        }
+        String[] saltAndHash = encoded.substring(PREFIX.length()).split("\\$", -1);
+        return saltAndHash.length == 2 && !saltAndHash[0].isEmpty() && !saltAndHash[1].isEmpty();
     }
 
     private <T> T bounded(Supplier<T> computation) {

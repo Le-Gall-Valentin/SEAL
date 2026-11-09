@@ -9,4 +9,7 @@ public interface PasswordHasher {
     String hash(Password password);
 
     boolean matches(Password password, String encoded);
+
+    /** Vrai si {@code encoded} est un haché que ce hacheur produit aujourd'hui : jamais un texte en clair. */
+    boolean recognises(String encoded);
 }

@@ -37,6 +37,11 @@ public class PasswordHashingProbeConfiguration {
                         probe.getObject().observe();
                         return hasher.matches(password, encoded);
                     }
+
+                    @Override
+                    public boolean recognises(String encoded) {
+                        return hasher.recognises(encoded);
+                    }
                 };
             }
         };

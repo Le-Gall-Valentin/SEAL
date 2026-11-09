@@ -40,10 +40,16 @@ public class InitialPasswordHandler implements InitialPasswordUseCase {
         return Optional.of(hasher.hash(candidate));
     }
 
-    /** {@code MANDATORY} : le mot de passe naît avec le compte, dans la même transaction, ou pas du tout. */
+    /**
+     * {@code MANDATORY} : le mot de passe naît avec le compte, dans la même transaction, ou pas du tout. Seul un haché
+     * que le hacheur reconnaît est écrit : un texte en clair passé par erreur est refusé (échec fermé, AUTH-13).
+     */
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void store(UserId user, String preparedHash) {
+        if (!hasher.recognises(preparedHash)) {
+            throw new IllegalArgumentException("haché de mot de passe non reconnu");
+        }
         credentials.save(user, preparedHash);
     }
 }

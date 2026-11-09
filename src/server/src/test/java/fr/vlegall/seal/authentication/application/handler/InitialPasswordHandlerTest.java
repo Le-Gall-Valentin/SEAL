@@ -1,6 +1,7 @@
 package fr.vlegall.seal.authentication.application.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
@@ -34,6 +35,11 @@ class InitialPasswordHandlerTest {
         public boolean matches(Password password, String encoded) {
             return encoded.equals("hash(" + password.value() + ")");
         }
+
+        @Override
+        public boolean recognises(String encoded) {
+            return encoded.startsWith("hash(");
+        }
     };
     private final InitialPasswordHandler handler =
             new InitialPasswordHandler(Set.of("correcthorsebatterystaple")::contains, hasher, credentials);
@@ -55,6 +61,14 @@ class InitialPasswordHandlerTest {
                 .isEmpty();
         assertThat(handler.prepare("CorrectHorseBatteryStaple", List.of())).isEmpty();
         assertThat(hashed).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AUTH-13 : une chaîne qui n'est pas un haché préparé n'est jamais enregistrée (échec fermé)")
+    void auth13AnythingButAPreparedHashIsRefused() {
+        assertThatThrownBy(() -> handler.store(USER, "fjord-tuque-raquette"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(stored).isEmpty();
     }
 
     @Test
