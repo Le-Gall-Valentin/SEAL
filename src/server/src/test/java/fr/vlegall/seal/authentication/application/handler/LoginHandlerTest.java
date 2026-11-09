@@ -7,6 +7,7 @@ import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
+import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.common.UserId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,7 +75,26 @@ class LoginHandlerTest {
             verifications.add("leurre");
         }
     };
-    private final LoginHandler handler = new LoginHandler(accounts, credentials, hasher);
+    /** Événements journalisés, dans l'ordre. */
+    private final List<String> events = new ArrayList<>();
+
+    private final SecurityEventPort journal = new SecurityEventPort() {
+        @Override
+        public void loginSucceeded(UserId user) {
+            events.add("réussie:" + user.value());
+        }
+
+        @Override
+        public void loginFailed(String login, UserId user) {
+            events.add("refusée:" + login + ":" + (user == null ? "aucun" : user.value()));
+        }
+
+        @Override
+        public void loggedOut(UserId user) {
+            events.add("sortie:" + user.value());
+        }
+    };
+    private final LoginHandler handler = new LoginHandler(accounts, credentials, hasher, journal);
 
     private UserId account(String login, boolean isVerified, boolean withPassword) {
         UserId user = new UserId(UUID.randomUUID());
@@ -95,6 +115,7 @@ class LoginHandlerTest {
 
         assertThat(handler.login("valentin", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, true));
         assertThat(verifications).containsExactly("réelle");
+        assertThat(events).containsExactly("réussie:" + user.value());
     }
 
     @Test
@@ -110,6 +131,7 @@ class LoginHandlerTest {
     void auth21UnknownLoginVerifiesTheDecoy() {
         assertThat(handler.login("inconnu", PASSWORD)).isEqualTo(new LoginOutcome.Rejected(null));
         assertThat(verifications).containsExactly("leurre");
+        assertThat(events).containsExactly("refusée:inconnu:aucun");
     }
 
     @Test
@@ -128,6 +150,7 @@ class LoginHandlerTest {
 
         assertThat(handler.login("valentin", "mauvais-mot-de-passe")).isEqualTo(new LoginOutcome.Rejected(user));
         assertThat(verifications).containsExactly("réelle");
+        assertThat(events).containsExactly("refusée:valentin:" + user.value());
     }
 
     @Test

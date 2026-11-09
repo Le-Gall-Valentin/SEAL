@@ -6,6 +6,7 @@ import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
+import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
 import java.util.Optional;
@@ -18,11 +19,17 @@ public class LoginHandler implements LoginUseCase {
     private final AccountLookupPort accounts;
     private final CredentialRepository credentials;
     private final PasswordHasher hasher;
+    private final SecurityEventPort journal;
 
-    public LoginHandler(AccountLookupPort accounts, CredentialRepository credentials, PasswordHasher hasher) {
+    public LoginHandler(
+            AccountLookupPort accounts,
+            CredentialRepository credentials,
+            PasswordHasher hasher,
+            SecurityEventPort journal) {
         this.accounts = accounts;
         this.credentials = credentials;
         this.hasher = hasher;
+        this.journal = journal;
     }
 
     /**
@@ -37,12 +44,15 @@ public class LoginHandler implements LoginUseCase {
         Optional<String> hash = account.flatMap(credentials::findHash);
         if (account.isEmpty() || hash.isEmpty()) {
             hasher.verifyDecoy(candidate);
+            journal.loginFailed(login, account.orElse(null));
             return new LoginOutcome.Rejected(account.orElse(null));
         }
         UserId user = account.get();
         if (!hasher.matches(candidate, hash.get())) {
+            journal.loginFailed(login, user);
             return new LoginOutcome.Rejected(user);
         }
+        journal.loginSucceeded(user);
         return new LoginOutcome.Authenticated(user, accounts.isVerified(user));
     }
 }

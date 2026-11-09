@@ -85,9 +85,14 @@ class SecurityConfig {
                         // AUTH-16 : toute session, restreinte ou complète, lit son compte ; l'anonyme reçoit 401.
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/me")
                         .authenticated()
-                        // ADR 0019 : l'inscription est réservée aux anonymes ; une session reçoit 403.
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register")
+                        // ADR 0019 : l'inscription est réservée aux anonymes ; une session reçoit 403. ADR 0021 : de
+                        // même
+                        // pour la connexion.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login")
                         .anonymous()
+                        // AUTH-53 : déconnexion ouverte à toute session, restreinte ou complète (AUTH-16).
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout")
+                        .authenticated()
                         // AUTH-05 : anonyme (formulaire d'inscription) ou session complète ; jamais restreinte
                         // (AUTH-16).
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/username-availability")

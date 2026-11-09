@@ -25,7 +25,9 @@ public enum ErrorCode {
     /** AUTH-14 : code de vérification erroné ; l'essai est compté. */
     INVALID_CODE(422),
     /** AUTH-14 : aucun code vivant (expiré, consommé, remplacé ou épuisé par les 5 essais). */
-    CODE_EXPIRED(422);
+    CODE_EXPIRED(422),
+    /** AUTH-21 : tout échec de connexion, sans en dire la raison (ADR 0021, point 1). */
+    INVALID_CREDENTIALS(401);
 
     private final int status;
 
