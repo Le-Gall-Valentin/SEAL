@@ -3,6 +3,7 @@ package fr.vlegall.seal.security.session;
 import fr.vlegall.seal.common.UserId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,12 +35,37 @@ public final class SessionEstablisher {
     private final SecurityContextHolderStrategy holder = SecurityContextHolder.getContextHolderStrategy();
     private final SecurityContextRepository contexts = new HttpSessionSecurityContextRepository();
     private final SessionAuthenticationStrategy renewal;
+    private final CsrfTokenRepository csrfTokens;
     private final Clock clock;
 
     public SessionEstablisher(CsrfTokenRepository csrfTokens, Clock clock) {
         this.renewal = new CompositeSessionAuthenticationStrategy(
                 List.of(new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrfTokens)));
+        this.csrfTokens = csrfTokens;
         this.clock = clock;
+    }
+
+    /** AUTH-20, AUTH-23 : session complète, après la connexion d'un compte actif, sous un nouvel identifiant. */
+    public Authentication openFull(UserId user, HttpServletRequest request, HttpServletResponse response) {
+        List<GrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_ACTIVE),
+                FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_PASSWORD)
+                        .issuedAt(clock.instant())
+                        .build());
+        return establish(new SealPrincipal(user), authorities, request, response);
+    }
+
+    /**
+     * AUTH-53 : invalide la session en base, vide le contexte et retire le jeton CSRF. Spring Session expire alors le
+     * cookie {@code __Host-seal_sid}. Sans session, seul le jeton CSRF est retiré.
+     */
+    public void close(HttpServletRequest request, HttpServletResponse response) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        holder.clearContext();
+        csrfTokens.saveToken(null, request, response);
     }
 
     /** AUTH-16 : session restreinte, après l'inscription ou la connexion d'un compte non vérifié. */

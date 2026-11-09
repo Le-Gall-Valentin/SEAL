@@ -3,6 +3,7 @@ package fr.vlegall.seal.security.journal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.logging.CorrelationIdFilter;
@@ -185,5 +186,17 @@ class SecurityJournalIT {
         journal.recordRefusal(event(Map.of("marker", marker, "limit", "x".repeat(1000))));
 
         assertThat((String) recordedRow().get("limit_name")).hasSize(SecurityJournal.DETAIL_MAX_LENGTH);
+    }
+
+    @Test
+    @DisplayName("SEC-20 : un événement de session s'écrit dans sa propre transaction, hors de toute autre")
+    void sec20StandaloneEventIsRecordedInItsOwnTransaction() {
+        journal.recordStandalone(event(Map.of("marker", marker)));
+
+        assertThat(rowsWithMarker()).isEqualTo(1);
+        assertThatThrownBy(() -> transactions.executeWithoutResult(
+                        status -> journal.recordStandalone(event(Map.of("marker", marker)))))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(rowsWithMarker()).isEqualTo(1);
     }
 }

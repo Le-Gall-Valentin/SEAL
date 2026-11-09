@@ -130,6 +130,62 @@ class SessionEstablisherTest {
     }
 
     @Test
+    @DisplayName("AUTH-20 : la connexion d'un compte actif ouvre une session complète, sous un nouvel identifiant")
+    void auth20FullSessionCarriesActiveStatusAndPasswordFactor() {
+        MockHttpSession anonymous = new MockHttpSession(null, "session-anonyme");
+        MockHttpServletRequest request = requestWithSession(anonymous);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        sessions.openFull(USER, request, response);
+
+        Authentication authentication = storedAuthentication(request);
+        assertThat(request.getSession(false).getId()).isNotEqualTo("session-anonyme");
+        assertThat(authentication.getPrincipal()).isEqualTo(new SealPrincipal(USER));
+        assertThat(authorities(authentication)).containsExactly("ACCOUNT_ACTIVE", "FACTOR_PASSWORD");
+        assertThat(authentication.getAuthorities())
+                .filteredOn(FactorGrantedAuthority.class::isInstance)
+                .singleElement()
+                .extracting(a -> ((FactorGrantedAuthority) a).getIssuedAt())
+                .isEqualTo(NOW);
+        assertThat(response.getCookie("XSRF-TOKEN"))
+                .isNotNull()
+                .extracting(Cookie::getMaxAge)
+                .isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("AUTH-53 : la fermeture invalide la session, vide le contexte et retire le jeton CSRF")
+    void auth53CloseInvalidatesTheSessionAndDropsTheCsrfToken() {
+        MockHttpSession session = new MockHttpSession();
+        MockHttpServletRequest request = requestWithSession(session);
+        sessions.openFull(USER, request, new MockHttpServletResponse());
+        MockHttpSession opened = (MockHttpSession) request.getSession(false);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        sessions.close(request, response);
+
+        assertThat(opened.isInvalid()).isTrue();
+        assertThat(request.getSession(false)).isNull();
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        assertThat(response.getCookie("XSRF-TOKEN"))
+                .isNotNull()
+                .extracting(Cookie::getMaxAge)
+                .isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("AUTH-53 : fermer sans session ne fait rien d'autre que retirer le jeton CSRF")
+    void auth53ClosingWithoutASessionIsHarmless() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        sessions.close(request, response);
+
+        assertThat(request.getSession(false)).isNull();
+        assertThat(response.getCookie("XSRF-TOKEN")).isNotNull();
+    }
+
+    @Test
     @DisplayName("AUTH-16 : seule la session restreinte du même compte peut devenir complète")
     void auth16OnlyTheSameRestrictedAccountIsUpgraded() {
         MockHttpServletRequest request = new MockHttpServletRequest();

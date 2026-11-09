@@ -58,8 +58,17 @@ public class SecurityJournal {
 
     /** Refus ou tentative refusée : propre transaction, hors de toute transaction appelante. */
     public void recordRefusal(SecurityEvent event) {
+        recordStandalone(event);
+    }
+
+    /**
+     * Événement sans écriture métier autour (connexion, déconnexion, ADR 0021) ou refus : propre transaction, hors de
+     * toute transaction appelante, depuis la couche web.
+     */
+    public void recordStandalone(SecurityEvent event) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException("Un refus se journalise hors transaction, depuis la couche web (ADR 0013)");
+            throw new IllegalStateException(
+                    "Un événement autonome se journalise hors transaction, depuis la couche web (ADR 0013)");
         }
         transaction(TransactionDefinition.PROPAGATION_REQUIRES_NEW).executeWithoutResult(status -> store(event));
     }

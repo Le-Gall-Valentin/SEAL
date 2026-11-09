@@ -7,5 +7,11 @@ public enum SecurityEventType {
     /** SEC-20 : inscription classique (AUTH-10). */
     ACCOUNT_REGISTERED,
     /** SEC-20 : courriel d'un compte remplacé (AUTH-17). */
-    EMAIL_CHANGED
+    EMAIL_CHANGED,
+    /** SEC-20 : connexion réussie (AUTH-20). */
+    LOGIN_SUCCEEDED,
+    /** SEC-20 : connexion refusée (AUTH-21) ; la saisie est filtrée (SEC-21). */
+    LOGIN_FAILED,
+    /** SEC-20 : déconnexion (AUTH-53). */
+    LOGOUT
 }
