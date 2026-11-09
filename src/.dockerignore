@@ -11,6 +11,7 @@ data
 docs
 protocol
 !protocol/password-blocklist.txt
+!protocol/password-blocklist.LICENSE
 scripts
 **/.env
 **/.env.*

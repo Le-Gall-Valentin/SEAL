@@ -135,11 +135,13 @@
       <resource>
         <directory>src/main/resources</directory>
       </resource>
-      <!-- AUTH-11 : liste de blocage partagée avec le client (PROTOCOL.md, section 3.1), jamais recopiée. -->
+      <!-- AUTH-11 : liste de blocage partagée avec le client (PROTOCOL.md, section 3.1), jamais recopiée, et sa
+           licence MIT, qui doit l'accompagner. -->
       <resource>
         <directory>../protocol</directory>
         <includes>
           <include>password-blocklist.txt</include>
+          <include>password-blocklist.LICENSE</include>
         </includes>
       </resource>
     </resources>

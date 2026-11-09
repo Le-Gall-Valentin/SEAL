@@ -34,6 +34,17 @@ class ClasspathBlocklistTest {
     }
 
     @Test
+    @DisplayName("AUTH-11 : la licence MIT de la liste voyage avec elle, dans le jar comme dans l'image")
+    void auth11LicenceIsEmbeddedWithTheList() throws IOException {
+        try (InputStream in = ClasspathBlocklist.class.getResourceAsStream("/password-blocklist.LICENSE")) {
+            assertThat(in).as("licence embarquée comme ressource Maven").isNotNull();
+            assertThat(new String(in.readAllBytes(), StandardCharsets.UTF_8))
+                    .startsWith("MIT License")
+                    .contains("Daniel Miessler");
+        }
+    }
+
+    @Test
     @DisplayName("AUTH-11 : 10 000 entrées uniques, toutes de 15 caractères ou plus")
     void auth11ListHasTenThousandLongEntries() throws IOException {
         List<String> lines =
