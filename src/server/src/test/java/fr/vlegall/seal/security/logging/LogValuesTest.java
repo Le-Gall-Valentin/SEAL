@@ -58,8 +58,8 @@ class LogValuesTest {
     }
 
     @Test
-    @DisplayName("SEC-21 : un mot de passe tapé dans un champ de courriel n'est jamais journalisé, @ compris")
-    void sec21PasswordTypedAsEmailIsMasked() {
+    @DisplayName("SEC-21 : une saisie sans la forme stricte d'un courriel est entièrement masquée, @ compris")
+    void sec21ValueNotStrictlyAnEmailIsFullyMasked() {
         assertThat(LogValues.email("monmotdepassesecret")).isEqualTo("***");
         assertThat(LogValues.email("Tr0ub4dor@Horse-Batt")).isEqualTo("***");
         assertThat(LogValues.email("MonP@ssphraseTresLongue2026")).isEqualTo("***");
