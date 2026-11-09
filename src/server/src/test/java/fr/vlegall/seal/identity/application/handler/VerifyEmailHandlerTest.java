@@ -9,6 +9,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.domain.model.Account;
 import fr.vlegall.seal.identity.domain.model.AccountStatus;
 import fr.vlegall.seal.identity.domain.model.EmailVerification;
+import fr.vlegall.seal.identity.domain.model.IdentityException;
 import fr.vlegall.seal.identity.domain.model.VerificationCode;
 import java.time.Duration;
 import java.util.UUID;
@@ -79,15 +80,18 @@ class VerifyEmailHandlerTest {
     }
 
     @Test
-    @DisplayName("AUTH-15 : l'activation retire les codes des autres comptes en attente à la même adresse")
-    void auth15ActivationRetiresOtherPendingCodes() {
-        Account squatter = identity.add("squatteur", "V@exemple.ca", AccountStatus.PENDING_EMAIL);
-        identity.issueCode(squatter, "999999");
+    @DisplayName("AUTH-15 : l'activation d'une adresse laisse vivants les codes des autres comptes en attente")
+    void auth15ActivationLeavesOtherPendingAccountsAlone() {
+        Account other = identity.add("autre", "V@exemple.ca", AccountStatus.PENDING_EMAIL);
+        identity.issueCode(other, "999999");
         identity.issueCode(account, "482913");
 
         handler.verify(account.id(), code("482913"));
 
-        assertThat(handler.verify(squatter.id(), code("999999"))).isInstanceOf(EmailVerification.NoLiveCode.class);
+        assertThat(identity.emailCodes().findLive(other.id(), InMemoryIdentity.NOW))
+                .isPresent();
+        assertThatThrownBy(() -> handler.verify(other.id(), code("999999")))
+                .isInstanceOf(IdentityException.CodeExpired.class);
     }
 
     @Test

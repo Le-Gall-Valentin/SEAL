@@ -1,7 +1,6 @@
 package fr.vlegall.seal.identity.domain.port.out;
 
 import fr.vlegall.seal.common.UserId;
-import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.LiveCode;
 import java.time.Instant;
 import java.util.Optional;
@@ -13,8 +12,8 @@ public interface EmailCodeRepository {
     /** Invalide les codes vivants du compte, puis enregistre le nouveau code haché (AUTH-14, AUTH-17). */
     void renew(UserId user, byte[] codeHash, Instant issuedAt, Instant expiresAt);
 
-    /** Expiration du dernier code non consommé du compte. */
-    Optional<Instant> latestExpiry(UserId user);
+    /** Expiration du code vivant du compte à {@code now}, vide s'il n'y en a aucun (ADR 0019, point 5). */
+    Optional<Instant> liveExpiry(UserId user, Instant now);
 
     /** Code vivant du compte à {@code now} : non consommé, non expiré, moins de 5 essais. */
     Optional<LiveCode> findLive(UserId user, Instant now);
@@ -23,10 +22,4 @@ public interface EmailCodeRepository {
     void countFailedAttempt(UUID code);
 
     void consume(UUID code, Instant now);
-
-    /**
-     * AUTH-15 : à l'activation d'un compte, les codes vivants des autres comptes en attente à la même adresse cessent de
-     * valoir (ADR 0019, point 1).
-     */
-    void retireOthersForAddress(EmailAddress email, UserId owner, Instant now);
 }

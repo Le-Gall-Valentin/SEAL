@@ -19,7 +19,7 @@ class CurrentAccountHandlerTest {
 
     private final InMemoryIdentity identity = new InMemoryIdentity();
     private final CurrentAccountHandler handler =
-            new CurrentAccountHandler(identity.users(), identity.emailCodes(), identity.allowance());
+            new CurrentAccountHandler(identity.users(), identity.emailCodes(), identity.allowance(), identity.clock);
 
     @Test
     @DisplayName("AUTH-14 : un compte en attente reçoit l'expiration de son dernier code et ses renvois restants")
@@ -39,6 +39,24 @@ class CurrentAccountHandlerTest {
         assertThat(view.username().value()).isEqualTo("valentin");
         assertThat(view.verification())
                 .isEqualTo(new PendingVerification(InMemoryIdentity.NOW.plus(Duration.ofMinutes(10)), 2));
+    }
+
+    @Test
+    @DisplayName("AUTH-14 : sans code vivant (épuisé, consommé ou expiré), aucune expiration n'est annoncée")
+    void auth14NoLiveCodeMeansNoExpiry() {
+        Account exhausted = identity.add("epuise", "e@exemple.ca", AccountStatus.PENDING_EMAIL);
+        identity.issueCode(exhausted, "111111");
+        for (int i = 0; i < 5; i++) {
+            identity.emailCodes()
+                    .countFailedAttempt(identity.lastCodeOf(exhausted.id()).id());
+        }
+        Account expired = identity.add("perime", "p@exemple.ca", AccountStatus.PENDING_EMAIL);
+        identity.issueCode(expired, "222222");
+
+        assertThat(handler.current(exhausted.id()).verification().codeExpiresAt())
+                .isNull();
+        identity.clock.advance(Duration.ofMinutes(10));
+        assertThat(handler.current(expired.id()).verification().codeExpiresAt()).isNull();
     }
 
     @Test

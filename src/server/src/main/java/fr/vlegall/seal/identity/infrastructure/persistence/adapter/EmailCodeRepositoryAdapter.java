@@ -2,7 +2,6 @@ package fr.vlegall.seal.identity.infrastructure.persistence.adapter;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.domain.model.CodePolicy;
-import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.LiveCode;
 import fr.vlegall.seal.identity.domain.port.out.EmailCodeRepository;
 import java.time.Instant;
@@ -16,6 +15,10 @@ import org.springframework.stereotype.Component;
 /** {@code email_codes} par {@link JdbcClient} : le haché seul est stocké (DATA-04). */
 @Component
 public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
+
+    /** Code vivant : non consommé, non expiré, moins de 5 essais (AUTH-14, SEC-10). */
+    private static final String LIVE =
+            "user_id = :user AND consumed_at IS NULL AND expires_at > :now " + "AND attempts < :maxAttempts";
 
     private final JdbcClient jdbc;
 
@@ -38,10 +41,11 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
     }
 
     @Override
-    public Optional<Instant> latestExpiry(UserId user) {
-        return jdbc.sql("SELECT expires_at FROM email_codes WHERE user_id = :user AND consumed_at IS NULL "
-                        + "ORDER BY id DESC LIMIT 1")
+    public Optional<Instant> liveExpiry(UserId user, Instant now) {
+        return jdbc.sql("SELECT expires_at FROM email_codes WHERE " + LIVE + " ORDER BY id DESC LIMIT 1")
                 .param("user", user.value())
+                .param("now", utc(now))
+                .param("maxAttempts", CodePolicy.MAX_ATTEMPTS)
                 .query(OffsetDateTime.class)
                 .optional()
                 .map(OffsetDateTime::toInstant);
@@ -49,8 +53,7 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
 
     @Override
     public Optional<LiveCode> findLive(UserId user, Instant now) {
-        return jdbc.sql("SELECT id, code_hash FROM email_codes WHERE user_id = :user AND consumed_at IS NULL "
-                        + "AND expires_at > :now AND attempts < :maxAttempts ORDER BY id DESC LIMIT 1")
+        return jdbc.sql("SELECT id, code_hash FROM email_codes WHERE " + LIVE + " ORDER BY id DESC LIMIT 1")
                 .param("user", user.value())
                 .param("now", utc(now))
                 .param("maxAttempts", CodePolicy.MAX_ATTEMPTS)
@@ -70,17 +73,6 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
         jdbc.sql("UPDATE email_codes SET consumed_at = :now WHERE id = :id AND consumed_at IS NULL")
                 .param("now", utc(now))
                 .param("id", code)
-                .update();
-    }
-
-    @Override
-    public void retireOthersForAddress(EmailAddress email, UserId owner, Instant now) {
-        jdbc.sql("UPDATE email_codes SET consumed_at = :now WHERE consumed_at IS NULL AND user_id IN ("
-                        + "SELECT id FROM users WHERE email = CAST(:email AS citext) AND status = 'PENDING_EMAIL' "
-                        + "AND id <> :owner)")
-                .param("now", utc(now))
-                .param("email", email.value())
-                .param("owner", owner.value())
                 .update();
     }
 

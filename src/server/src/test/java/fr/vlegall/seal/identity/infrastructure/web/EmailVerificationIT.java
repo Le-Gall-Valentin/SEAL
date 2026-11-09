@@ -241,15 +241,10 @@ class EmailVerificationIT {
         }
     }
 
-    @Test
-    @DisplayName("A06 : deux vérifications simultanées du bon code donnent un succès et un CODE_EXPIRED")
-    void a06ConcurrentVerificationsSucceedOnce() throws Exception {
-        Registered account = client.register("course.verif@exemple.ca", "course.verif");
-        String code = client.codeSentTo("course.verif@exemple.ca");
-        List<MockHttpServletRequestBuilder> requests =
-                List.of(verifyRequest(account.session(), code), verifyRequest(account.session(), code));
+    /** Lance les requêtes en même temps et rend leurs résultats, dans l'ordre des requêtes. */
+    private List<MvcResult> race(List<MockHttpServletRequestBuilder> requests) throws Exception {
         CountDownLatch start = new CountDownLatch(1);
-        ExecutorService pool = Executors.newFixedThreadPool(2);
+        ExecutorService pool = Executors.newFixedThreadPool(requests.size());
         try {
             List<Future<MvcResult>> futures = new ArrayList<>();
             for (MockHttpServletRequestBuilder request : requests) {
@@ -259,39 +254,109 @@ class EmailVerificationIT {
                 }));
             }
             start.countDown();
-            List<Integer> statuses = new ArrayList<>();
-            List<String> bodies = new ArrayList<>();
+            List<MvcResult> results = new ArrayList<>();
             for (Future<MvcResult> future : futures) {
-                MvcResult result = future.get(30, TimeUnit.SECONDS);
-                statuses.add(result.getResponse().getStatus());
-                bodies.add(result.getResponse().getContentAsString());
+                results.add(future.get(30, TimeUnit.SECONDS));
             }
-            assertThat(statuses).containsExactlyInAnyOrder(200, 422);
-            assertThat(bodies).anyMatch(text -> text.contains("CODE_EXPIRED"));
+            return results;
         } finally {
             pool.shutdownNow();
         }
     }
 
+    private static void assertOneSuccessAndOneCodeExpired(List<MvcResult> results) throws Exception {
+        List<Integer> statuses = new ArrayList<>();
+        List<String> bodies = new ArrayList<>();
+        for (MvcResult result : results) {
+            statuses.add(result.getResponse().getStatus());
+            bodies.add(result.getResponse().getContentAsString());
+        }
+        assertThat(statuses).containsExactlyInAnyOrder(200, 422);
+        assertThat(bodies).anyMatch(text -> text.contains("CODE_EXPIRED"));
+    }
+
+    private String codeExpiresAt(Cookie session) throws Exception {
+        return body(mvc.perform(client.from(get("/api/v1/auth/me")).cookie(session))
+                        .andReturn())
+                .get("verification")
+                .get("codeExpiresAt")
+                .toString();
+    }
+
     @Test
-    @DisplayName("AUTH-15 : l'activation d'un compte retire le code d'un autre compte en attente à la même adresse")
-    void auth15ActivationRetiresTheOtherPendingCode() throws Exception {
-        Registered squatter = client.register("partagee@exemple.ca", "squatteur");
-        String squatterCode = client.codeSentTo("partagee@exemple.ca");
+    @DisplayName("A06 : deux vérifications simultanées du bon code donnent un succès et un CODE_EXPIRED")
+    void a06ConcurrentVerificationsSucceedOnce() throws Exception {
+        Registered account = client.register("course.verif@exemple.ca", "course.verif");
+        String code = client.codeSentTo("course.verif@exemple.ca");
+
+        assertOneSuccessAndOneCodeExpired(
+                race(List.of(verifyRequest(account.session(), code), verifyRequest(account.session(), code))));
+    }
+
+    @Test
+    @DisplayName("AUTH-15 : deux comptes en attente à la même adresse vérifient en même temps : 200 et 422, jamais 500")
+    void auth15ConcurrentVerificationsOfOneAddressSucceedOnce() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            String address = "meme.adresse" + round + "@exemple.ca";
+            AuthClient other = new AuthClient(mvc, mail);
+            Registered first = client.register(address, "premier" + round);
+            String firstCode = client.codeSentTo(address);
+            Registered second = other.register(address, "second" + round);
+            String secondCode = other.codeSentTo(address);
+
+            assertOneSuccessAndOneCodeExpired(race(List.of(
+                    verifyRequest(first.session(), firstCode),
+                    other.unsafe(post("/api/v1/auth/verify-email"), second.session(), Map.of("code", secondCode)))));
+            assertThat(jdbc.sql("SELECT count(*) FROM users WHERE email = ? AND status = 'ACTIVE'")
+                            .param(address)
+                            .query(Integer.class)
+                            .single())
+                    .isEqualTo(1);
+        }
+    }
+
+    @Test
+    @DisplayName("AUTH-15 : l'activation d'une adresse ne change rien pour un autre compte en attente à cette adresse")
+    void auth15ActivationLeavesTheOtherPendingAccountUnchanged() throws Exception {
+        Registered spy = client.register("partagee@exemple.ca", "espion");
+        String before = codeExpiresAt(spy.session());
         AuthClient owner = new AuthClient(mvc, mail);
-        Registered account = owner.register("Partagee@Exemple.ca", "proprietaire");
-        String ownerCode = owner.codeSentTo("Partagee@Exemple.ca");
+        owner.verify(owner.register("Partagee@Exemple.ca", "proprietaire"));
 
-        mvc.perform(owner.unsafe(post("/api/v1/auth/verify-email"), account.session(), Map.of("code", ownerCode)))
-                .andExpect(status().isOk());
+        assertThat(codeExpiresAt(spy.session())).isEqualTo(before).isNotEqualTo("null");
+        mvc.perform(verifyRequest(spy.session(), "000000"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("INVALID_CODE"));
+    }
 
-        mvc.perform(verifyRequest(squatter.session(), squatterCode))
+    @Test
+    @DisplayName(
+            "AUTH-15 : le bon code d'une adresse activée entre-temps répond CODE_EXPIRED, et le compte reste en attente")
+    void auth15RightCodeForAnAddressActivatedMeanwhileIsExpired() throws Exception {
+        Registered late = client.register("doublon@exemple.ca", "retardataire");
+        String lateCode = client.codeSentTo("doublon@exemple.ca");
+        AuthClient owner = new AuthClient(mvc, mail);
+        owner.verify(owner.register("doublon@exemple.ca", "titulaire.doublon"));
+
+        mvc.perform(verifyRequest(late.session(), lateCode))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
-        assertThat(body(mvc.perform(client.from(get("/api/v1/auth/me")).cookie(squatter.session()))
-                                .andReturn())
-                        .get("status")
-                        .asString())
-                .isEqualTo("PENDING_EMAIL");
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(late.session()))
+                .andExpect(jsonPath("$.status").value("PENDING_EMAIL"));
+    }
+
+    @Test
+    @DisplayName("AUTH-14 : sans code vivant (épuisé ou expiré), /me n'annonce aucune expiration")
+    void auth14NoLiveCodeMeansNoExpiry() throws Exception {
+        Registered exhausted = client.register("epuise@exemple.ca", "epuise");
+        String code = client.codeSentTo("epuise@exemple.ca");
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(verifyRequest(exhausted.session(), wrongCode(code)));
+        }
+        Registered expired = new AuthClient(mvc, mail).register("perime@exemple.ca", "perime");
+
+        assertThat(codeExpiresAt(exhausted.session())).isEqualTo("null");
+        clock.advance(Duration.ofMinutes(10));
+        assertThat(codeExpiresAt(expired.session())).isEqualTo("null");
     }
 }

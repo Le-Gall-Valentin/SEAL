@@ -145,21 +145,21 @@ final class InMemoryIdentity {
             }
 
             @Override
-            public Optional<Instant> latestExpiry(UserId user) {
-                return codes.stream()
-                        .filter(code -> code.user().equals(user) && !code.consumed())
-                        .map(StoredCode::expiresAt)
-                        .reduce((first, second) -> second);
+            public Optional<Instant> liveExpiry(UserId user, Instant now) {
+                return live(user, now).map(StoredCode::expiresAt);
             }
 
             @Override
             public Optional<LiveCode> findLive(UserId user, Instant now) {
+                return live(user, now).map(code -> new LiveCode(code.id(), code.hash()));
+            }
+
+            private Optional<StoredCode> live(UserId user, Instant now) {
                 return codes.stream()
                         .filter(code -> code.user().equals(user)
                                 && !code.consumed()
                                 && code.expiresAt().isAfter(now)
                                 && code.attempts() < CodePolicy.MAX_ATTEMPTS)
-                        .map(code -> new LiveCode(code.id(), code.hash()))
                         .reduce((first, second) -> second);
             }
 
@@ -171,19 +171,6 @@ final class InMemoryIdentity {
             @Override
             public void consume(UUID id, Instant now) {
                 codes.replaceAll(code -> code.id().equals(id) ? code.consume() : code);
-            }
-
-            @Override
-            public void retireOthersForAddress(EmailAddress email, UserId owner, Instant now) {
-                codes.replaceAll(code -> {
-                    Account account = accounts.get(code.user());
-                    boolean other = !code.user().equals(owner)
-                            && account != null
-                            && account.status() == AccountStatus.PENDING_EMAIL
-                            && account.email() != null
-                            && account.email().value().equalsIgnoreCase(email.value());
-                    return other && !code.consumed() ? code.consume() : code;
-                });
             }
         };
     }
