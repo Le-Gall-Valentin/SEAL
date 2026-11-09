@@ -7,6 +7,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.support.MutableClock;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,9 +15,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -151,6 +154,44 @@ class SessionEstablisherTest {
                 .isNotNull()
                 .extracting(Cookie::getMaxAge)
                 .isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("AUTH-20 : la session ouverte suit l'authentification rendue : complète si vérifiée, sinon restreinte")
+    void auth20OpenFollowsTheAuthenticatedStatus() {
+        MockHttpServletRequest active = new MockHttpServletRequest();
+        sessions.open(
+                UsernamePasswordAuthenticationToken.authenticated(
+                        new SealPrincipal(USER),
+                        null,
+                        List.of(new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_ACTIVE))),
+                active,
+                new MockHttpServletResponse());
+        MockHttpServletRequest pending = new MockHttpServletRequest();
+        sessions.open(
+                UsernamePasswordAuthenticationToken.authenticated(
+                        new SealPrincipal(USER),
+                        null,
+                        List.of(new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL))),
+                pending,
+                new MockHttpServletResponse());
+
+        assertThat(authorities(storedAuthentication(active))).containsExactly("ACCOUNT_ACTIVE", "FACTOR_PASSWORD");
+        assertThat(authorities(storedAuthentication(pending)))
+                .containsExactly("ACCOUNT_PENDING_EMAIL", "FACTOR_PASSWORD");
+    }
+
+    @Test
+    @DisplayName("AUTH-20 : une authentification sans compte SEAL n'ouvre aucune session (échec fermé)")
+    void auth20AuthenticationWithoutSealAccountOpensNothing() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> sessions.open(
+                        UsernamePasswordAuthenticationToken.authenticated("quelquun", null, List.of()),
+                        request,
+                        new MockHttpServletResponse()));
+        assertThat(request.getSession(false)).isNull();
     }
 
     @Test

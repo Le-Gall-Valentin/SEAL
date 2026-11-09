@@ -203,8 +203,10 @@ final class ContextRules {
     }
 
     // Règle 9 : deux contextes peuvent s'appeler l'un l'autre, chacun par un adaptateur de infrastructure/<autre
-    // contexte>/ vers le port d'entrée de l'autre (ADR 0008, mise à jour du 2026-11-08). La règle 7 vérifie déjà que
-    // cet adaptateur ne vise que le contexte qu'il nomme ; tout autre cycle reste interdit.
+    // contexte>/ vers le port d'entrée de l'autre (ADR 0008, mise à jour du 2026-11-08). ArchUnit 1.5 ne compare pas
+    // l'origine et la cible d'une même dépendance : la règle ignore donc toute dépendance d'un sous-package
+    // d'infrastructure vers un application/port/in, et c'est la règle 7 qui borne ce chemin aux seuls adaptateurs de
+    // infrastructure/<autre contexte>/ vers ce contexte. Tout autre cycle reste interdit.
     static ArchRule firstLevelPackagesHaveNoCycles(String root) {
         return slices().matching(root + ".(*)..")
                 .should()
@@ -212,7 +214,7 @@ final class ContextRules {
                 .ignoreDependency(crossContextAdapter(root), contextUseCase(root));
     }
 
-    /** Classe rangée dans {@code <contexte>/infrastructure/<autre contexte>/}. */
+    /** Classe rangée dans un sous-package de {@code <contexte>/infrastructure/} autre que le nom du contexte. */
     private static DescribedPredicate<JavaClass> crossContextAdapter(String root) {
         return DescribedPredicate.describe("un adaptateur de infrastructure/<autre contexte>/", type -> {
             String[] parts = relativePackage(root, type);

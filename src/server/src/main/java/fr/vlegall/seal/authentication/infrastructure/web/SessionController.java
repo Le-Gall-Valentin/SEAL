@@ -9,8 +9,6 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.ratelimit.RateLimit;
 import fr.vlegall.seal.security.ratelimit.RateLimitExceededException;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
-import fr.vlegall.seal.security.session.SealAuthorities;
-import fr.vlegall.seal.security.session.SealPrincipal;
 import fr.vlegall.seal.security.session.SessionEstablisher;
 import fr.vlegall.seal.security.web.ClientAddress;
 import fr.vlegall.seal.security.web.CurrentUser;
@@ -78,21 +76,10 @@ public class SessionController {
         } catch (AuthenticationException e) {
             throw new SealException(ErrorCode.INVALID_CREDENTIALS);
         }
-        if (!(authenticated.getPrincipal() instanceof SealPrincipal principal)) {
-            // Échec fermé : le seul fournisseur rend toujours un compte SEAL ; autre chose est une erreur de
-            // programmation.
-            throw new IllegalStateException("authentification sans compte SEAL");
-        }
+        // La session s'ouvre d'abord : si elle échoue, les jetons ne sont pas rendus (échec fermé).
+        sessions.open(authenticated, request, response);
         limiter.refund(RateLimit.LOGIN_FAILURES_PER_IP, ip);
         limiter.refund(RateLimit.LOGIN_FAILURES_PER_LOGIN, entered);
-        UserId user = principal.userId();
-        boolean verified = authenticated.getAuthorities().stream()
-                .anyMatch(authority -> SealAuthorities.ACCOUNT_ACTIVE.equals(authority.getAuthority()));
-        if (verified) {
-            sessions.openFull(user, request, response);
-        } else {
-            sessions.openRestricted(user, request, response);
-        }
     }
 
     /**

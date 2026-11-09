@@ -130,7 +130,7 @@ class LoginHandlerTest {
     @Test
     @DisplayName("AUTH-21 : une saisie inconnue est refusée après la vérification d'un leurre, au même coût")
     void auth21UnknownLoginVerifiesTheDecoy() {
-        assertThat(handler.login("inconnu", PASSWORD)).isEqualTo(new LoginOutcome.Rejected(null));
+        assertThat(handler.login("inconnu", PASSWORD)).isEqualTo(new LoginOutcome.Rejected());
         assertThat(verifications).containsExactly("leurre");
         assertThat(events).containsExactly("refusée:inconnu:aucun");
     }
@@ -140,7 +140,7 @@ class LoginHandlerTest {
     void auth21AccountWithoutPasswordVerifiesTheDecoy() {
         UserId user = account("oauth", true, false);
 
-        assertThat(handler.login("oauth", PASSWORD)).isEqualTo(new LoginOutcome.Rejected(user));
+        assertThat(handler.login("oauth", PASSWORD)).isEqualTo(new LoginOutcome.Rejected());
         assertThat(verifications).containsExactly("leurre");
     }
 
@@ -149,7 +149,7 @@ class LoginHandlerTest {
     void auth21WrongPasswordIsRejected() {
         UserId user = account("valentin", true, true);
 
-        assertThat(handler.login("valentin", "mauvais-mot-de-passe")).isEqualTo(new LoginOutcome.Rejected(user));
+        assertThat(handler.login("valentin", "mauvais-mot-de-passe")).isEqualTo(new LoginOutcome.Rejected());
         assertThat(verifications).containsExactly("réelle");
         assertThat(events).containsExactly("refusée:valentin:" + user.value());
     }
@@ -160,7 +160,7 @@ class LoginHandlerTest {
         UserId user = account("valentin", true, true);
 
         assertThat(handler.login("valentin", Character.toString(0xD800) + PASSWORD))
-                .isEqualTo(new LoginOutcome.Rejected(user));
+                .isEqualTo(new LoginOutcome.Rejected());
         assertThat(verifications)
                 .as("le hacheur calcule aussi pour une demi-paire (AUTH-21)")
                 .containsExactly("réelle");

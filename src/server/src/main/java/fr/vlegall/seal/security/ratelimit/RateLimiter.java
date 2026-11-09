@@ -186,7 +186,7 @@ public final class RateLimiter {
     private void alert(SecurityEvent event) {
         LOG.warn("Limite de débit dépassée, détail dans security_events");
         try {
-            journal.recordRefusal(event);
+            journal.recordStandalone(event);
         } catch (RuntimeException e) {
             LOG.error("Journal de sécurité indisponible : dépassement non enregistré", e);
         }

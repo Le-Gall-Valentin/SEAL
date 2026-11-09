@@ -24,12 +24,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Journal d'imputabilité {@code security_events} (SEC-20), avec deux contrats d'écriture (ADR 0013, point 6) :
+ * Journal d'imputabilité {@code security_events} (SEC-20), avec deux contrats d'écriture (ADR 0013 point 6, ADR 0021
+ * point 7) :
  *
  * <ul>
- *   <li>{@link #recordRefusal} : un refus ou une tentative refusée, écrit dans sa propre transaction et appelé hors de
- *       toute transaction, depuis la couche web. Aucune annulation métier ne peut l'effacer, et aucune seconde
- *       connexion n'est retenue ;
+ *   <li>{@link #recordStandalone} : un refus, ou un geste sans écriture métier autour (connexion, déconnexion,
+ *       révocation de sessions), écrit dans sa propre transaction et appelé hors de toute transaction. Aucune
+ *       annulation métier ne peut l'effacer, et aucune seconde connexion n'est retenue ;
  *   <li>{@link #recordInTransaction} : un succès, écrit dans la transaction métier qui doit exister ; annulé avec
  *       elle.
  * </ul>
@@ -57,19 +58,11 @@ public class SecurityJournal {
         this.transactionManager = transactionManager;
     }
 
-    /** Refus ou tentative refusée : propre transaction, hors de toute transaction appelante. */
-    public void recordRefusal(SecurityEvent event) {
-        recordStandalone(event);
-    }
-
-    /**
-     * Événement sans écriture métier autour (connexion, déconnexion, ADR 0021) ou refus : propre transaction, hors de
-     * toute transaction appelante, depuis la couche web.
-     */
+    /** Refus, ou geste sans écriture métier autour : propre transaction, hors de toute transaction appelante. */
     public void recordStandalone(SecurityEvent event) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException(
-                    "Un événement autonome se journalise hors transaction, depuis la couche web (ADR 0013)");
+                    "Un événement autonome se journalise hors de toute transaction (ADR 0013, ADR 0021)");
         }
         transaction(TransactionDefinition.PROPAGATION_REQUIRES_NEW).executeWithoutResult(status -> store(event));
     }

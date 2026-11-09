@@ -2,7 +2,6 @@ package fr.vlegall.seal.authentication.domain.model;
 
 import fr.vlegall.seal.common.UserId;
 import java.util.Objects;
-import org.jspecify.annotations.Nullable;
 
 /** Issue d'une connexion par mot de passe (AUTH-20, AUTH-21). */
 public sealed interface LoginOutcome {
@@ -19,10 +18,6 @@ public sealed interface LoginOutcome {
         }
     }
 
-    /**
-     * Connexion refusée, quelle qu'en soit la raison : la réponse ne le dit pas (AUTH-21).
-     *
-     * @param user compte trouvé, pour le journal (SEC-20) ; {@code null} si la saisie n'en désigne aucun
-     */
-    record Rejected(@Nullable UserId user) implements LoginOutcome {}
+    /** Connexion refusée, quelle qu'en soit la raison : la réponse ne le dit pas (AUTH-21). */
+    record Rejected() implements LoginOutcome {}
 }
