@@ -6,6 +6,8 @@ import fr.vlegall.seal.security.journal.SecurityEventType;
 import fr.vlegall.seal.security.journal.SecurityJournal;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
 import org.springframework.stereotype.Component;
@@ -16,10 +18,14 @@ import org.springframework.stereotype.Component;
  *
  * <p>Spring Session n'écrit un nouvel identifiant de session qu'à la fin de la requête : appeler {@link #revokeOthers}
  * avant de changer l'identifiant de la session courante, sinon sa ligne, qui porte encore l'ancien, serait supprimée.
- * Une révocation qui fait tomber au moins une session est journalisée (SEC-20), hors de toute transaction.
+ * Une révocation qui fait tomber au moins une session est journalisée (SEC-20), hors de toute transaction. Comme pour
+ * un dépassement de limite (ADR 0013, point 3), un journal indisponible n'annule rien : les sessions sont déjà
+ * supprimées, et l'échec est écrit en erreur (A10).
  */
 @Component
 public final class SessionRevocation {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SessionRevocation.class);
 
     private final FindByIndexNameSessionRepository<? extends Session> sessions;
     private final SecurityJournal journal;
@@ -51,7 +57,11 @@ public final class SessionRevocation {
             return;
         }
         ids.forEach(sessions::deleteById);
-        journal.recordStandalone(new SecurityEvent(
-                SecurityEventType.SESSION_REVOKED, user, Map.of("sessions", Integer.toString(ids.size()))));
+        try {
+            journal.recordStandalone(new SecurityEvent(
+                    SecurityEventType.SESSION_REVOKED, user, Map.of("sessions", Integer.toString(ids.size()))));
+        } catch (RuntimeException e) {
+            LOG.error("Journal de sécurité indisponible : révocation de sessions non enregistrée", e);
+        }
     }
 }
