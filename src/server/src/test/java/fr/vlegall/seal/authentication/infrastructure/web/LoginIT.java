@@ -285,6 +285,27 @@ class LoginIT {
     }
 
     @Test
+    @DisplayName("SEC-10 : 20 adresses IPv6 d'un même /64 partagent les 20 échecs par IP (ADR 0021)")
+    void sec10Ipv6AddressesOfOneSlash64ShareTheIpLimit() throws Exception {
+        String prefix = "2001:db8:7:7::";
+        for (int i = 1; i <= 20; i++) {
+            String address = prefix + Integer.toHexString(i);
+            mvc.perform(loginRequest(client, unique("v6"), "mauvais-mot-de-passe-long")
+                            .with(r -> {
+                                r.setRemoteAddr(address);
+                                return r;
+                            }))
+                    .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(loginRequest(client, unique("v6"), "mauvais-mot-de-passe-long")
+                        .with(r -> {
+                            r.setRemoteAddr(prefix + "beef");
+                            return r;
+                        }))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     @DisplayName("AUTH-22 : six échecs simultanés sur un identifiant font au plus 5 vérifications Argon2id")
     void auth22ConcurrentFailuresVerifyAtMostFive() throws Exception {
         String login = active(unique("course")).username();

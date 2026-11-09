@@ -6,6 +6,7 @@ import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.Unicode;
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.security.ratelimit.ClientAddress;
 import fr.vlegall.seal.security.ratelimit.RateLimit;
 import fr.vlegall.seal.security.ratelimit.RateLimitExceededException;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
@@ -58,7 +59,7 @@ public class SessionController {
     @PostMapping("/login")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void login(@Valid @RequestBody LoginRequest body, HttpServletRequest request, HttpServletResponse response) {
-        String ip = request.getRemoteAddr();
+        String ip = ClientAddress.key(request.getRemoteAddr());
         String entered = Unicode.foldLogin(body.login());
         limiter.consume(RateLimit.LOGIN_FAILURES_PER_IP, ip);
         try {
