@@ -5,6 +5,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.VerifyEmailUseCase;
 import fr.vlegall.seal.identity.domain.model.Account;
 import fr.vlegall.seal.identity.domain.model.AccountStatus;
+import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.EmailVerification;
 import fr.vlegall.seal.identity.domain.model.LiveCode;
 import fr.vlegall.seal.identity.domain.model.VerificationCode;
@@ -12,6 +13,7 @@ import fr.vlegall.seal.identity.domain.port.out.EmailCodeRepository;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,9 +52,14 @@ public class VerifyEmailHandler implements VerifyEmailUseCase {
             return new EmailVerification.InvalidCode();
         }
         codes.consume(live.get().id(), now);
-        // AUTH-15 : si un autre compte a activé la même adresse entre-temps, l'index partiel refuse cette activation
-        // (CodeExpired, la transaction est annulée). Les autres comptes en attente ne sont pas touchés : rien ne
-        // signale à l'un d'eux que l'adresse vient d'être activée (ADR 0019, point 1).
+        // AUTH-15 : un autre compte a activé l'adresse entre-temps. Le code est consommé et la réponse est celle d'un
+        // code mort ; seul le détenteur du bon code, donc de la boîte, arrive ici (ADR 0019, point 1).
+        EmailAddress email = Objects.requireNonNull(account.email(), "courriel d'un compte en attente");
+        if (users.activeAccountOwns(email)) {
+            return new EmailVerification.NoLiveCode();
+        }
+        // Pendant une course réelle, l'index partiel refuse la seconde activation (CodeExpired, transaction annulée).
+        // Les autres comptes en attente ne sont pas touchés : rien ne leur signale l'activation.
         users.activate(user, now);
         return new EmailVerification.Verified();
     }

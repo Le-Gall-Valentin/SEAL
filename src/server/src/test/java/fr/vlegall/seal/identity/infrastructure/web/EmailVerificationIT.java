@@ -342,7 +342,8 @@ class EmailVerificationIT {
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
         mvc.perform(client.from(get("/api/v1/auth/me")).cookie(late.session()))
-                .andExpect(jsonPath("$.status").value("PENDING_EMAIL"));
+                .andExpect(jsonPath("$.status").value("PENDING_EMAIL"))
+                .andExpect(jsonPath("$.verification.codeExpiresAt").value(nullValue()));
     }
 
     @Test

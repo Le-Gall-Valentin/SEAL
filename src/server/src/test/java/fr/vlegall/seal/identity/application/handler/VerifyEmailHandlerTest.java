@@ -9,7 +9,6 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.domain.model.Account;
 import fr.vlegall.seal.identity.domain.model.AccountStatus;
 import fr.vlegall.seal.identity.domain.model.EmailVerification;
-import fr.vlegall.seal.identity.domain.model.IdentityException;
 import fr.vlegall.seal.identity.domain.model.VerificationCode;
 import java.time.Duration;
 import java.util.UUID;
@@ -90,8 +89,20 @@ class VerifyEmailHandlerTest {
 
         assertThat(identity.emailCodes().findLive(other.id(), InMemoryIdentity.NOW))
                 .isPresent();
-        assertThatThrownBy(() -> handler.verify(other.id(), code("999999")))
-                .isInstanceOf(IdentityException.CodeExpired.class);
+    }
+
+    @Test
+    @DisplayName("AUTH-15 : le bon code d'une adresse activée entre-temps répond NoLiveCode et cesse de vivre")
+    void auth15RightCodeForAnAddressActivatedMeanwhileIsConsumed() {
+        Account late = identity.add("retardataire", "V@exemple.ca", AccountStatus.PENDING_EMAIL);
+        identity.issueCode(late, "999999");
+        identity.issueCode(account, "482913");
+        handler.verify(account.id(), code("482913"));
+
+        assertThat(handler.verify(late.id(), code("999999"))).isInstanceOf(EmailVerification.NoLiveCode.class);
+        assertThat(identity.emailCodes().findLive(late.id(), InMemoryIdentity.NOW))
+                .isEmpty();
+        assertThat(identity.accounts.get(late.id()).status()).isEqualTo(AccountStatus.PENDING_EMAIL);
     }
 
     @Test
