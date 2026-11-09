@@ -398,4 +398,26 @@ class EmailVerificationIT {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
+
+    @Test
+    @DisplayName("AUTH-16 : la vérification révoque les autres sessions restreintes du compte (ADR 0021)")
+    void auth16VerificationRevokesTheOtherRestrictedSessions() throws Exception {
+        Registered account = client.register("deux.appareils@exemple.ca", "deux.appareils");
+        AuthClient other = new AuthClient(mvc, mail);
+        Cookie second = sessionOf(mvc.perform(other.unsafe(
+                        post("/api/v1/auth/login"),
+                        null,
+                        Map.of("login", "deux.appareils", "password", AuthClient.PASSWORD)))
+                .andExpect(status().isNoContent())
+                .andReturn());
+
+        Cookie full = client.verify(account);
+
+        mvc.perform(other.from(get("/api/v1/auth/me")).cookie(second))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(full))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
 }
