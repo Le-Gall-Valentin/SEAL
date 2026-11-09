@@ -54,13 +54,15 @@ public class SessionController {
 
     /**
      * AUTH-20 à AUTH-23, hors de toute transaction. Un jeton de chaque limite est pris avant la vérification, par IP
-     * puis par saisie normalisée (ADR 0013, point 4) ; un succès les rend, seuls les échecs comptent (AUTH-22).
+     * puis par saisie normalisée (ADR 0013, point 4). La limite des tentatives garde le sien ; un succès rend ceux des
+     * échecs, qui seuls comptent pour AUTH-22 (ADR 0021).
      */
     @PostMapping("/login")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void login(@Valid @RequestBody LoginRequest body, HttpServletRequest request, HttpServletResponse response) {
         String ip = ClientAddress.key(request.getRemoteAddr());
         String entered = Unicode.foldLogin(body.login());
+        limiter.consume(RateLimit.LOGIN_ATTEMPTS_PER_IP, ip);
         limiter.consume(RateLimit.LOGIN_FAILURES_PER_IP, ip);
         try {
             limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, entered);

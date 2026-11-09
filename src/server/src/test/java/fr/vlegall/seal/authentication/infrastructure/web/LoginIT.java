@@ -295,6 +295,21 @@ class LoginIT {
     }
 
     @Test
+    @DisplayName(
+            "SEC-10 : au-delà de 60 tentatives en 15 minutes depuis une IP, même réussies, la connexion répond 429")
+    void sec10SuccessfulAttemptsAreAlsoLimitedPerIp() throws Exception {
+        Registered account = active(unique("succes"));
+        for (int i = 0; i < 60; i++) {
+            mvc.perform(loginRequest(client, account.username(), PASSWORD)).andExpect(status().isNoContent());
+        }
+
+        mvc.perform(loginRequest(client, account.username(), PASSWORD))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+    }
+
+    @Test
     @DisplayName("AUTH-22 : un refus par la limite de l'identifiant n'entame pas les 20 échecs de l'IP (ADR 0021)")
     void auth22LoginLimitRefusalSparesTheIpBudget() throws Exception {
         String blocked = unique("bloque");

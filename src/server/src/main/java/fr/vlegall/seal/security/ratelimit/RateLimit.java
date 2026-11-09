@@ -8,6 +8,11 @@ public enum RateLimit {
     LOGIN_FAILURES_PER_LOGIN(5, Duration.ofMinutes(15), RateLimitKind.ENTERED),
     /** AUTH-22 : 20 échecs de connexion par 15 minutes, par IP. */
     LOGIN_FAILURES_PER_IP(20, Duration.ofMinutes(15), RateLimitKind.IP),
+    /**
+     * ADR 0021 : 60 tentatives de connexion par 15 minutes et par IP, réussies ou non. Sans elle, un seul compte valide
+     * déclencherait autant de calculs Argon2id et de sessions qu'on voudrait.
+     */
+    LOGIN_ATTEMPTS_PER_IP(60, Duration.ofMinutes(15), RateLimitKind.IP),
     REGISTRATIONS_PER_IP(5, Duration.ofHours(1), RateLimitKind.IP),
     /** AUTH-05. */
     USERNAME_CHECKS_PER_IP(30, Duration.ofMinutes(1), RateLimitKind.IP),

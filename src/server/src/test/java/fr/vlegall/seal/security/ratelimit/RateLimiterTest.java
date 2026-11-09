@@ -62,6 +62,11 @@ class RateLimiterTest {
                 .returns(20, RateLimit::capacity)
                 .returns(Duration.ofMinutes(15), RateLimit::period)
                 .returns(RateLimitKind.IP, RateLimit::kind);
+        assertThat(RateLimit.LOGIN_ATTEMPTS_PER_IP)
+                .as("ADR 0021 : toute tentative, réussie ou non")
+                .returns(60, RateLimit::capacity)
+                .returns(Duration.ofMinutes(15), RateLimit::period)
+                .returns(RateLimitKind.IP, RateLimit::kind);
         assertThat(RateLimit.REGISTRATIONS_PER_IP)
                 .returns(5, RateLimit::capacity)
                 .returns(Duration.ofHours(1), RateLimit::period)
