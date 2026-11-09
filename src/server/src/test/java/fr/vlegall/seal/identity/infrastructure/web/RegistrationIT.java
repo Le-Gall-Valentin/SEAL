@@ -275,6 +275,20 @@ class RegistrationIT {
     }
 
     @Test
+    @DisplayName("AUTH-11 : une demi-paire isolée dans le mot de passe répond 422 PASSWORD_TOO_WEAK, jamais 500")
+    void auth11LoneSurrogateIsTooWeak() throws Exception {
+        Map<String, Object> body = registration("demipaire.it@exemple.ca", "demipaire.it");
+        // L'échappement JSON de U+D800 donne une demi-paire isolée, que le hachage ne saurait pas encoder.
+        String raw = json(body).replace(AuthClient.PASSWORD, "\\" + "ud800" + AuthClient.PASSWORD);
+
+        mvc.perform(registerRequest(body, ip).content(raw))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("PASSWORD_TOO_WEAK"));
+        assertThat(count("SELECT count(*) FROM users WHERE username = ?", "demipaire.it"))
+                .isZero();
+    }
+
+    @Test
     @DisplayName("SEC-01 : courriel, nom affiché et longueurs sont validés ; VALIDATION_FAILED nomme les champs")
     void sec01InvalidFieldsAreNamed() throws Exception {
         Map<String, Object> body = registration("pas-un-courriel", "champs.it");

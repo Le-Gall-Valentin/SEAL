@@ -24,6 +24,15 @@ public final class Unicode {
         return Normalizer.isNormalized(text, Normalizer.Form.NFC);
     }
 
+    /**
+     * Vrai si le texte est une suite de points de code valide, sans demi-paire isolée : Java et JavaScript
+     * l'autorisent, mais UTF-8 ne sait pas l'encoder (AUTH-11, SEC-01).
+     */
+    public static boolean isWellFormed(String text) {
+        return text.codePoints()
+                .noneMatch(point -> point >= Character.MIN_SURROGATE && point <= Character.MAX_SURROGATE);
+    }
+
     /** AUTH-11 : normalisation NFKC des mots de passe. */
     public static String nfkc(String text) {
         return Normalizer.normalize(text, Normalizer.Form.NFKC);

@@ -8,6 +8,7 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class PasswordPolicyTest {
@@ -69,5 +70,43 @@ class PasswordPolicyTest {
     @DisplayName("AUTH-11 : un mot du contexte de moins de 3 caractères est ignoré")
     void auth11ShortPersonalWordsAreIgnored() {
         assertThat(accepts("jojojojojojojojo", List.of("jo"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("AUTH-11 : une demi-paire isolée est refusée (PASSWORD_TOO_WEAK), jamais transmise au hachage")
+    void auth11LoneSurrogateIsRefused() {
+        String passphrase = "fjord-tuque-raquette";
+        assertThat(accepts(Character.toString(0xD800) + passphrase, NO_WORDS)).isFalse();
+        assertThat(accepts(passphrase + Character.toString(0xDC00), NO_WORDS)).isFalse();
+        assertThat(accepts(Character.toString(0xDC00) + Character.toString(0xD800) + passphrase, NO_WORDS))
+                .isFalse();
+        assertThat(accepts("🦭" + passphrase, NO_WORDS)).as("paire complète").isTrue();
+    }
+
+    @Test
+    @DisplayName("AUTH-11 : le mot du contexte le plus long est retiré d'abord (PROTOCOL.md, section 3)")
+    void auth11LongestContextWordIsRemovedFirst() {
+        // Identifiant « ann », partie locale « annabelle » : retirer « ann » d'abord laisserait « abelle sur le
+        // pont », 18 points de code ; retirer « annabelle » d'abord n'en laisse que 12.
+        assertThat(accepts("annabelle sur le pont", List.of("ann", "annabelle")))
+                .isFalse();
+        assertThat(accepts("annabelle sur le pont", List.of("annabelle", "ann")))
+                .isFalse();
+        assertThat(accepts("annabelle sur le pont du lac", List.of("ann", "annabelle")))
+                .isTrue();
+    }
+
+    @ParameterizedTest(name = "{0} → {3}")
+    @CsvSource({
+        "sealsealsealseal, valentin, valentin, false",
+        "sesealalsesealalsesealal, valentin, valentin, false",
+        "valentin.le.gall2026, valentin.le.gall, v, false",
+        "annabelle sur le pont, ann, annabelle, false",
+        "annabelle sur le pont du lac, ann, annabelle, true",
+        "le phoque nage dans le port de seal, valentin, valentin, true"
+    })
+    @DisplayName("AUTH-11 : les exemples de PROTOCOL.md (section 3), que le client vérifiera aussi")
+    void auth11ProtocolExamples(String raw, String username, String localPart, boolean expected) {
+        assertThat(accepts(raw, List.of(username, localPart))).isEqualTo(expected);
     }
 }

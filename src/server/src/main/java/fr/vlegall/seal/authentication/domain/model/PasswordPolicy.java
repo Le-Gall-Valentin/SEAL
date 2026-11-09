@@ -2,6 +2,7 @@ package fr.vlegall.seal.authentication.domain.model;
 
 import fr.vlegall.seal.authentication.domain.port.out.Blocklist;
 import fr.vlegall.seal.common.Unicode;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -25,14 +26,14 @@ public final class PasswordPolicy {
     private PasswordPolicy() {}
 
     /**
-     * Vrai si le mot de passe respecte AUTH-11 : 15 à 128 points de code, absent de la liste de blocage, et 15 points
-     * de code au moins une fois retirés les mots du contexte.
+     * Vrai si le mot de passe respecte AUTH-11 : suite de points de code valide de 15 à 128 points de code, absente de
+     * la liste de blocage, et 15 points de code au moins une fois retirés les mots du contexte.
      *
-     * @param personalWords identifiant et partie locale du courriel, avant {@code +} et {@code @}
+     * @param personalWords identifiant et partie locale du courriel, avant {@code +} et {@code @}, dans cet ordre
      */
     public static boolean accepts(Password password, List<String> personalWords, Blocklist blocklist) {
         String value = password.value();
-        if (!hasLengthBetween(value, MIN_LENGTH, MAX_LENGTH)) {
+        if (!Unicode.isWellFormed(value) || !hasLengthBetween(value, MIN_LENGTH, MAX_LENGTH)) {
             return false;
         }
         String folded = fold(value);
@@ -45,12 +46,19 @@ public final class PasswordPolicy {
         return Unicode.lowerCase(Unicode.nfkc(text));
     }
 
-    /** Retire chaque occurrence de chaque mot, jusqu'à ce qu'il n'en reste aucune (« sesealal » ne laisse rien). */
+    /**
+     * Retire chaque occurrence de chaque mot, jusqu'à ce qu'il n'en reste aucune (« sesealal » ne laisse rien). Les mots
+     * passent du plus long au plus court, à longueur égale dans l'ordre identifiant, partie locale, « seal », « uqac » :
+     * retirer « ann » avant « annabelle » laisserait « abelle » compter. Le client suit le même ordre (PROTOCOL.md,
+     * section 3).
+     */
     private static String withoutContextWords(String folded, List<String> personalWords) {
         List<String> words = Stream.concat(personalWords.stream(), SERVICE_WORDS.stream())
                 .map(PasswordPolicy::fold)
                 .filter(word -> hasLengthBetween(word, MIN_WORD_LENGTH, Integer.MAX_VALUE))
                 .distinct()
+                .sorted(Comparator.comparingInt((String word) -> word.codePointCount(0, word.length()))
+                        .reversed())
                 .toList();
         String remaining = folded;
         boolean removed;

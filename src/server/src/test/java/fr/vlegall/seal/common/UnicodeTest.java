@@ -32,4 +32,13 @@ class UnicodeTest {
     void auth04FoldRemovesMarks() {
         assertThat(Unicode.foldWithoutMarks("Valéntin İﬁ")).isEqualTo("valentin ifi");
     }
+
+    @Test
+    @DisplayName("AUTH-11 : un texte bien formé n'a aucune demi-paire isolée ; une paire complète l'est")
+    void auth11WellFormedMeansNoLoneSurrogate() {
+        assertThat(Unicode.isWellFormed("phoque 🦭")).isTrue();
+        assertThat(Unicode.isWellFormed("")).isTrue();
+        assertThat(Unicode.isWellFormed("a" + Character.toString(0xD83E))).isFalse();
+        assertThat(Unicode.isWellFormed(Character.toString(0xDE6D) + "a")).isFalse();
+    }
 }
