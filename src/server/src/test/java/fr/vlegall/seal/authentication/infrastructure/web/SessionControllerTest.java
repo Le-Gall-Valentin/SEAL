@@ -1,5 +1,6 @@
 package fr.vlegall.seal.authentication.infrastructure.web;
 
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -8,14 +9,18 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import fr.vlegall.seal.authentication.application.port.in.LogoutUseCase;
 import fr.vlegall.seal.authentication.infrastructure.web.dto.LoginRequest;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.ratelimit.RateLimit;
+import fr.vlegall.seal.security.ratelimit.RateLimitExceededException;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.session.SessionEstablisher;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -63,6 +68,45 @@ class SessionControllerTest {
     }
 
     @Test
+    @DisplayName("SEC-10 : un refus par identifiant rend les jetons déjà pris par IP, sans vérification")
+    void sec10LoginLimitRefusalRefundsTheIpTokens() {
+        doThrow(refused(RateLimit.LOGIN_FAILURES_PER_LOGIN))
+                .when(limiter)
+                .consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "valentin");
+
+        assertThatExceptionOfType(RateLimitExceededException.class).isThrownBy(this::login);
+
+        verify(limiter).refund(RateLimit.LOGIN_ATTEMPTS_PER_IP, IP);
+        verify(limiter).refund(RateLimit.LOGIN_FAILURES_PER_IP, IP);
+        verifyNoInteractions(authentication, sessions);
+    }
+
+    @Test
+    @DisplayName("SEC-10 : un refus des échecs par IP rend le jeton des tentatives, sans toucher à l'identifiant")
+    void sec10IpFailureLimitRefusalRefundsTheAttempt() {
+        doThrow(refused(RateLimit.LOGIN_FAILURES_PER_IP)).when(limiter).consume(RateLimit.LOGIN_FAILURES_PER_IP, IP);
+
+        assertThatExceptionOfType(RateLimitExceededException.class).isThrownBy(this::login);
+
+        verify(limiter).refund(RateLimit.LOGIN_ATTEMPTS_PER_IP, IP);
+        verify(limiter, never()).consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "valentin");
+        verify(limiter, never()).refund(RateLimit.LOGIN_FAILURES_PER_IP, IP);
+        verifyNoInteractions(authentication, sessions);
+    }
+
+    @Test
+    @DisplayName("SEC-10 : un refus de la limite des tentatives ne rend rien et ne prend rien d'autre")
+    void sec10AttemptsLimitRefusalTakesNothingElse() {
+        doThrow(refused(RateLimit.LOGIN_ATTEMPTS_PER_IP)).when(limiter).consume(RateLimit.LOGIN_ATTEMPTS_PER_IP, IP);
+
+        assertThatExceptionOfType(RateLimitExceededException.class).isThrownBy(this::login);
+
+        verify(limiter).consume(RateLimit.LOGIN_ATTEMPTS_PER_IP, IP);
+        verifyNoMoreInteractions(limiter);
+        verifyNoInteractions(authentication, sessions);
+    }
+
+    @Test
     @DisplayName("AUTH-22 : une session qui ne s'ouvre pas ne rend aucun jeton (échec fermé)")
     void auth22FailedSessionRefundsNothing() {
         Authentication authenticated = authenticated();
@@ -85,6 +129,10 @@ class SessionControllerTest {
         InOrder order = inOrder(sessions, logout);
         order.verify(sessions).close(request, response);
         order.verify(logout).logout(user);
+    }
+
+    private static RateLimitExceededException refused(RateLimit limit) {
+        return new RateLimitExceededException(limit, Duration.ofMinutes(15));
     }
 
     private static Authentication authenticated() {

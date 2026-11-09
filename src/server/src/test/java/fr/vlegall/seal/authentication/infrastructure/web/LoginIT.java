@@ -327,6 +327,24 @@ class LoginIT {
     }
 
     @Test
+    @DisplayName(
+            "SEC-10 : une requête refusée avant toute vérification ne compte pas parmi les 60 tentatives (ADR 0021)")
+    void sec10RefusalBeforeVerificationIsNotAnAttempt() throws Exception {
+        Registered account = active(unique("voisin"));
+        String blocked = unique("bloque");
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(loginRequest(client, blocked, "mauvais-mot-de-passe-long"))
+                    .andExpect(status().isUnauthorized());
+        }
+        for (int i = 0; i < 60; i++) {
+            mvc.perform(loginRequest(client, blocked, "mauvais-mot-de-passe-long"))
+                    .andExpect(status().isTooManyRequests());
+        }
+
+        mvc.perform(loginRequest(client, account.username(), PASSWORD)).andExpect(status().isNoContent());
+    }
+
+    @Test
     @DisplayName("AUTH-22 : les variantes de casse d'une saisie partagent les mêmes 5 échecs (ADR 0021)")
     void auth22FoldedLoginSharesTheBucket() throws Exception {
         String login = unique("variantes");
