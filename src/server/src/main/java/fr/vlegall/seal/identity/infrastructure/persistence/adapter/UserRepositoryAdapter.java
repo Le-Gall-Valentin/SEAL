@@ -107,6 +107,24 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<UserId> findNotDeletedByUsername(Username username) {
+        return jdbc.sql("SELECT id FROM users WHERE username = :username AND status <> 'DELETED'")
+                .param("username", username.value())
+                .query(UUID.class)
+                .optional()
+                .map(UserId::new);
+    }
+
+    @Override
+    public Optional<UserId> findActiveByEmail(EmailAddress email) {
+        return jdbc.sql("SELECT id FROM users WHERE email = CAST(:email AS citext) AND status = 'ACTIVE'")
+                .param("email", email.value())
+                .query(UUID.class)
+                .optional()
+                .map(UserId::new);
+    }
+
+    @Override
     public boolean exists(Username username) {
         return jdbc.sql("SELECT EXISTS (SELECT 1 FROM users WHERE username = :username)")
                 .param("username", username.value())

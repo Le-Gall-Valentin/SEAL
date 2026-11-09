@@ -41,4 +41,12 @@ class UnicodeTest {
         assertThat(Unicode.isWellFormed("a" + Character.toString(0xD83E))).isFalse();
         assertThat(Unicode.isWellFormed(Character.toString(0xDE6D) + "a")).isFalse();
     }
+
+    @Test
+    @DisplayName("AUTH-20 : la saisie d'une connexion est normalisée en NFC puis passée en minuscules (ADR 0021)")
+    void auth20LoginInputIsFolded() {
+        assertThat(Unicode.foldLogin("Valentin.Le.Gall")).isEqualTo("valentin.le.gall");
+        assertThat(Unicode.foldLogin("V@EXEMPLE.ca")).isEqualTo("v@exemple.ca");
+        assertThat(Unicode.foldLogin("Vale\u0301ntin@exemple.ca")).isEqualTo("val\u00e9ntin@exemple.ca");
+    }
 }

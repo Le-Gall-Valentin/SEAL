@@ -39,6 +39,12 @@ public interface UserRepository {
     /** AUTH-15 : vrai si un compte actif possède cette adresse, sans tenir compte de la casse. */
     boolean activeAccountOwns(EmailAddress email);
 
+    /** AUTH-20 : compte non supprimé qui porte cet identifiant, en attente ou actif. */
+    Optional<UserId> findNotDeletedByUsername(Username username);
+
+    /** AUTH-20 : compte actif qui possède cette adresse, sans tenir compte de la casse (ADR 0019). */
+    Optional<UserId> findActiveByEmail(EmailAddress email);
+
     /** Vrai si l'identifiant est pris, par un compte de n'importe quel statut (AUTH-03). */
     boolean exists(Username username);
 
