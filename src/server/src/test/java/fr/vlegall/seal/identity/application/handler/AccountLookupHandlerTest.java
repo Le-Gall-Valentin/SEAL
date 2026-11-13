@@ -3,6 +3,7 @@ package fr.vlegall.seal.identity.application.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.identity.application.port.in.AccountLookupQuery.Contact;
 import fr.vlegall.seal.identity.domain.model.Account;
 import fr.vlegall.seal.identity.domain.model.AccountStatus;
 import java.util.UUID;
@@ -83,5 +84,50 @@ class AccountLookupHandlerTest {
         assertThat(handler.isVerified(active.id())).isTrue();
         assertThat(handler.isVerified(pending.id())).isFalse();
         assertThat(handler.isVerified(new UserId(UUID.randomUUID()))).isFalse();
+    }
+
+    @Test
+    @DisplayName("AUTH-70 : le courriel normalisé donne les coordonnées du seul compte actif (ADR 0022)")
+    void auth70EmailGivesTheActiveAccountContact() {
+        identity.add("attente", "valentin@exemple.ca", AccountStatus.PENDING_EMAIL);
+        Account active = identity.add("valentin", "Val\u00e9ntin@Exemple.ca", AccountStatus.ACTIVE);
+
+        assertThat(handler.findActiveByEmail("VALE\u0301NTIN@EXEMPLE.CA"))
+                .get()
+                .extracting(Contact::user, Contact::username, Contact::email)
+                .containsExactly(active.id(), "valentin", active.email().value());
+    }
+
+    @Test
+    @DisplayName("AUTH-70 : un compte en attente ou supprimé n'a pas de coordonnées (ADR 0022)")
+    void auth70PendingOrDeletedAccountHasNoContact() {
+        Account pending = identity.add("attente", "attente@exemple.ca", AccountStatus.PENDING_EMAIL);
+        Account deleted = identity.add("supprime", "supprime@exemple.ca", AccountStatus.DELETED);
+
+        assertThat(handler.findActiveByEmail("attente@exemple.ca")).isEmpty();
+        assertThat(handler.findActiveByEmail("supprime@exemple.ca")).isEmpty();
+        assertThat(handler.findActiveContact(pending.id())).isEmpty();
+        assertThat(handler.findActiveContact(deleted.id())).isEmpty();
+        assertThat(handler.findActiveContact(new UserId(UUID.randomUUID()))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AUTH-70 : un compte actif donne ses coordonnées par son identifiant de compte")
+    void auth70ActiveAccountGivesItsContactById() {
+        Account active = identity.add("valentin", "valentin@exemple.ca", AccountStatus.ACTIVE);
+
+        assertThat(handler.findActiveContact(active.id()))
+                .get()
+                .extracting(Contact::user, Contact::username, Contact::email)
+                .containsExactly(active.id(), "valentin", "valentin@exemple.ca");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "valentin", "a@b", "@exemple.ca", "valentin@exemple.ca\u0000"})
+    @DisplayName("AUTH-70 : une saisie qui n'est pas un courriel ne donne rien, sans erreur")
+    void auth70MalformedEmailGivesNothing(String email) {
+        identity.add("valentin", "valentin@exemple.ca", AccountStatus.ACTIVE);
+
+        assertThat(handler.findActiveByEmail(email)).isEmpty();
     }
 }
