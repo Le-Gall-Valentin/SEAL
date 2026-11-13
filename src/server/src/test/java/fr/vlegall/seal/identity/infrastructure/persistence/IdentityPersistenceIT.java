@@ -1,9 +1,11 @@
 package fr.vlegall.seal.identity.infrastructure.persistence;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
+import fr.vlegall.seal.identity.domain.model.Username;
 import fr.vlegall.seal.identity.domain.port.out.EmailCodeRepository;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
 import fr.vlegall.seal.support.SealIntegrationTest;
@@ -90,5 +92,32 @@ class IdentityPersistenceIT {
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> transactions.executeWithoutResult(status -> codes.countFailedAttempt(unknown)))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName(
+            "AUTH-20 : l'identifiant trouve un compte non supprimé ; le courriel, un compte actif, sans tenir compte de la casse")
+    void auth20LoginLookupsFollowTheStatus() {
+        UserId active = insertActive("persistance.quatre");
+        UserId pending = new UserId(jdbc.sql(
+                        "INSERT INTO users (username, display_name, email) "
+                                + "VALUES ('persistance.cinq', 'Nom', CAST('Persistance.Cinq@Exemple.ca' AS citext)) RETURNING id")
+                .query(UUID.class)
+                .single());
+        jdbc.sql("INSERT INTO users (username, display_name, status) VALUES ('persistance.six', 'Nom', 'DELETED')")
+                .update();
+
+        assertThat(users.findNotDeletedByUsername(Username.parse("persistance.quatre")))
+                .contains(active);
+        assertThat(users.findNotDeletedByUsername(Username.parse("persistance.cinq")))
+                .contains(pending);
+        assertThat(users.findNotDeletedByUsername(Username.parse("persistance.six")))
+                .isEmpty();
+        assertThat(users.findActiveByEmail(
+                        EmailAddress.parse("PERSISTANCE.QUATRE@exemple.ca").orElseThrow()))
+                .contains(active);
+        assertThat(users.findActiveByEmail(
+                        EmailAddress.parse("persistance.cinq@exemple.ca").orElseThrow()))
+                .isEmpty();
     }
 }

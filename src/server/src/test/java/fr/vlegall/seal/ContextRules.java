@@ -202,9 +202,43 @@ final class ContextRules {
                 .resideInAnyPackage(root + ".crypto..", "java..", "javax..");
     }
 
-    // Règle 9
+    // Règle 9 : deux contextes peuvent s'appeler l'un l'autre, chacun par un adaptateur de infrastructure/<autre
+    // contexte>/ vers le port d'entrée de l'autre (ADR 0008, mise à jour du 2026-11-08). ArchUnit 1.5 ne compare pas
+    // l'origine et la cible d'une même dépendance : la règle ignore donc toute dépendance d'un sous-package
+    // d'infrastructure vers un application/port/in, et c'est la règle 7 qui borne ce chemin aux seuls adaptateurs de
+    // infrastructure/<autre contexte>/ vers ce contexte. Tout autre cycle reste interdit.
     static ArchRule firstLevelPackagesHaveNoCycles(String root) {
-        return slices().matching(root + ".(*)..").should().beFreeOfCycles();
+        return slices().matching(root + ".(*)..")
+                .should()
+                .beFreeOfCycles()
+                .ignoreDependency(crossContextAdapter(root), contextUseCase(root));
+    }
+
+    /**
+     * Classe rangée dans un sous-package de {@code <contexte>/infrastructure/} qui ne porte pas le nom du contexte. Le
+     * prédicat ne distingue pas un adaptateur vers un autre contexte d'un contrôleur : la règle 7 borne ce chemin.
+     */
+    private static DescribedPredicate<JavaClass> crossContextAdapter(String root) {
+        return DescribedPredicate.describe("une classe d'un sous-package de infrastructure/", type -> {
+            String[] parts = relativePackage(root, type);
+            return parts.length >= 3 && parts[1].equals("infrastructure") && !parts[2].equals(parts[0]);
+        });
+    }
+
+    /** Interface rangée dans {@code <contexte>/application/port/in}. */
+    private static DescribedPredicate<JavaClass> contextUseCase(String root) {
+        return DescribedPredicate.describe("un cas d'usage de application/port/in", type -> {
+            String[] parts = relativePackage(root, type);
+            return parts.length >= 4
+                    && parts[1].equals("application")
+                    && parts[2].equals("port")
+                    && parts[3].equals("in");
+        });
+    }
+
+    private static String[] relativePackage(String root, JavaClass type) {
+        String name = type.getPackageName();
+        return name.startsWith(root + ".") ? name.substring(root.length() + 1).split("\\.") : new String[0];
     }
 
     // Règle 10

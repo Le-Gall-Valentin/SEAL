@@ -123,6 +123,25 @@ final class InMemoryIdentity {
             }
 
             @Override
+            public Optional<UserId> findNotDeletedByUsername(Username username) {
+                return accounts.values().stream()
+                        .filter(account -> account.status() != AccountStatus.DELETED
+                                && account.username().equals(username))
+                        .map(Account::id)
+                        .findFirst();
+            }
+
+            @Override
+            public Optional<UserId> findActiveByEmail(EmailAddress email) {
+                return accounts.values().stream()
+                        .filter(account -> account.status() == AccountStatus.ACTIVE
+                                && account.email() != null
+                                && account.email().value().equalsIgnoreCase(email.value()))
+                        .map(Account::id)
+                        .findFirst();
+            }
+
+            @Override
             public boolean exists(Username username) {
                 return accounts.values().stream()
                         .anyMatch(account -> account.username().equals(username));

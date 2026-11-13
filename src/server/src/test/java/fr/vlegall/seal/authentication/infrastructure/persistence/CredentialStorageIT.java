@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.authentication.application.port.in.InitialPasswordUseCase;
+import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import java.util.List;
@@ -23,6 +24,9 @@ class CredentialStorageIT {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private CredentialRepository credentials;
 
     @Autowired
     private TransactionTemplate transactions;
@@ -91,5 +95,18 @@ class CredentialStorageIT {
                 .isInstanceOf(IllegalArgumentException.class);
 
         assertThat(storedHash(user[0])).isNull();
+    }
+
+    @Test
+    @DisplayName("AUTH-20 : le haché d'un compte se relit ; un compte sans mot de passe n'en a pas")
+    void auth20StoredHashIsFound() {
+        String hash = initialPassword
+                .prepare("fjord-tuque-raquette", List.of("credential.trois"))
+                .orElseThrow();
+        UserId user = insertUser("credential.trois");
+        transactions.executeWithoutResult(status -> initialPassword.store(user, hash));
+
+        assertThat(credentials.findHash(user)).contains(hash);
+        assertThat(credentials.findHash(insertUser("credential.quatre"))).isEmpty();
     }
 }

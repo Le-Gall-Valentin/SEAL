@@ -35,28 +35,6 @@ class LogValuesTest {
     }
 
     @Test
-    @DisplayName("SEC-21 : un identifiant saisi est gardé s'il a la forme d'un identifiant (AUTH-01), masqué sinon")
-    void sec21IdentifierKeepsOnlyWhatCouldBeAUsername() {
-        assertThat(LogValues.identifier("Bob@Exemple.ca")).isEqualTo("B***@Exemple.ca");
-        assertThat(LogValues.identifier("valentin.le.gall")).isEqualTo("valentin.le.gall");
-    }
-
-    @Test
-    @DisplayName("SEC-21 : un mot de passe tapé dans le champ identifiant n'est jamais journalisé")
-    void sec21PasswordTypedAsIdentifierIsMasked() {
-        assertThat(LogValues.identifier("Correct Horse Battery Staple")).isEqualTo("***");
-        assertThat(LogValues.identifier("bob\n")).isEqualTo("***");
-    }
-
-    @Test
-    @DisplayName("SEC-21 : un mot de passe contenant @ n'est pas pris pour un courriel et n'est pas journalisé")
-    void sec21PasswordWithAtSignIsMasked() {
-        assertThat(LogValues.identifier("Tr0ub4dor@Horse-Batt")).isEqualTo("***");
-        assertThat(LogValues.identifier("correct-horse@battery-staple")).isEqualTo("***");
-        assertThat(LogValues.identifier("MonP@ssphraseTresLongue2026")).isEqualTo("***");
-    }
-
-    @Test
     @DisplayName("SEC-21 : seule une valeur de forme stricte est traitée comme un courriel")
     void sec21OnlyAStrictEmailIsMaskedAsAnEmail() {
         assertThat(LogValues.email("valentin@exemple.ca")).isEqualTo("v***@exemple.ca");
@@ -65,7 +43,6 @@ class LogValuesTest {
         assertThat(LogValues.email("valentin@exemple")).isEqualTo("***");
         assertThat(LogValues.email("valentin@exemple..ca")).isEqualTo("***");
         assertThat(LogValues.email("v@" + "a".repeat(250) + ".ca")).isEqualTo("***");
-        assertThat(LogValues.identifier("Bob@Exemple.ca")).isEqualTo("B***@Exemple.ca");
     }
 
     @Test
@@ -78,5 +55,13 @@ class LogValuesTest {
     @DisplayName("SEC-21 : une partie locale qui commence par un émoji garde son premier caractère entier")
     void sec21MaskKeepsAWholeFirstCodePoint() {
         assertThat(LogValues.maskEmail("🦭phoque@exemple.ca")).isEqualTo("🦭***@exemple.ca");
+    }
+
+    @Test
+    @DisplayName("SEC-21 : une saisie sans la forme stricte d'un courriel est entièrement masquée, @ compris")
+    void sec21ValueNotStrictlyAnEmailIsFullyMasked() {
+        assertThat(LogValues.email("monmotdepassesecret")).isEqualTo("***");
+        assertThat(LogValues.email("Tr0ub4dor@Horse-Batt")).isEqualTo("***");
+        assertThat(LogValues.email("MonP@ssphraseTresLongue2026")).isEqualTo("***");
     }
 }

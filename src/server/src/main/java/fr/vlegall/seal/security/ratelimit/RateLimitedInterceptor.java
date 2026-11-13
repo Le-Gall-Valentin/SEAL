@@ -2,6 +2,7 @@ package fr.vlegall.seal.security.ratelimit;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.session.SealPrincipal;
+import fr.vlegall.seal.security.web.ClientAddress;
 import java.lang.reflect.Method;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -64,7 +65,7 @@ public final class RateLimitedInterceptor implements MethodInterceptor {
 
     private static String currentIp() {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
-            return attributes.getRequest().getRemoteAddr();
+            return ClientAddress.key(attributes.getRequest().getRemoteAddr());
         }
         throw new IllegalStateException("@RateLimited appelé hors d'une requête HTTP");
     }

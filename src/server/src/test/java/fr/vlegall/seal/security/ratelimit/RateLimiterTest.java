@@ -47,7 +47,7 @@ class RateLimiterTest {
 
     private SecurityEvent onlyRecordedEvent() {
         ArgumentCaptor<SecurityEvent> recorded = ArgumentCaptor.forClass(SecurityEvent.class);
-        verify(journal).recordRefusal(recorded.capture());
+        verify(journal).recordStandalone(recorded.capture());
         return recorded.getValue();
     }
 
@@ -60,6 +60,11 @@ class RateLimiterTest {
                 .returns(RateLimitKind.ENTERED, RateLimit::kind);
         assertThat(RateLimit.LOGIN_FAILURES_PER_IP)
                 .returns(20, RateLimit::capacity)
+                .returns(Duration.ofMinutes(15), RateLimit::period)
+                .returns(RateLimitKind.IP, RateLimit::kind);
+        assertThat(RateLimit.LOGIN_ATTEMPTS_PER_IP)
+                .as("ADR 0021 : toute tentative, réussie ou non")
+                .returns(60, RateLimit::capacity)
                 .returns(Duration.ofMinutes(15), RateLimit::period)
                 .returns(RateLimitKind.IP, RateLimit::kind);
         assertThat(RateLimit.REGISTRATIONS_PER_IP)
@@ -211,13 +216,13 @@ class RateLimiterTest {
         for (int i = 0; i < 10; i++) {
             refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob"));
         }
-        verify(journal, times(1)).recordRefusal(any());
+        verify(journal, times(1)).recordStandalone(any());
 
         clock.advance(Duration.ofMinutes(15));
         consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob", 5);
         refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob"));
 
-        verify(journal, times(2)).recordRefusal(any());
+        verify(journal, times(2)).recordStandalone(any());
     }
 
     @Test
@@ -256,16 +261,28 @@ class RateLimiterTest {
         refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_IP, "2001:db8::1"));
 
         ArgumentCaptor<SecurityEvent> recorded = ArgumentCaptor.forClass(SecurityEvent.class);
-        verify(journal, times(3)).recordRefusal(recorded.capture());
+        verify(journal, times(3)).recordStandalone(recorded.capture());
         assertThat(recorded.getAllValues())
                 .extracting(event -> event.details().get("key"))
-                .containsExactly("b***@exemple.ca", "***", "2001:db8::1");
+                .containsExactly(null, "***", "2001:db8::1");
+    }
+
+    @Test
+    @DisplayName(
+            "SEC-21 : une saisie du champ identifiant n'est jamais journalisée, même en forme de courriel (ADR 0021)")
+    void sec21EnteredKeyIsNeverJournaled() {
+        consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "p@ssw0rd.2026", 5);
+        refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "p@ssw0rd.2026"));
+
+        ArgumentCaptor<SecurityEvent> recorded = ArgumentCaptor.forClass(SecurityEvent.class);
+        verify(journal).recordStandalone(recorded.capture());
+        assertThat(recorded.getValue().details()).doesNotContainKey("key");
     }
 
     @Test
     @DisplayName("SEC-20 : l'alerte est écrite avant le journal, et la limite tient même si le journal échoue (A09)")
     void a09WarningSurvivesAJournalFailure(CapturedOutput output) {
-        doThrow(new IllegalStateException("base indisponible")).when(journal).recordRefusal(any());
+        doThrow(new IllegalStateException("base indisponible")).when(journal).recordStandalone(any());
         consumeTimes(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob", 5);
 
         RateLimitExceededException refused = refusal(() -> limiter.consume(RateLimit.LOGIN_FAILURES_PER_LOGIN, "bob"));

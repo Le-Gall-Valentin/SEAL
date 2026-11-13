@@ -3,6 +3,7 @@ package fr.vlegall.seal.security.journal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.logging.CorrelationIdFilter;
@@ -77,7 +78,7 @@ class SecurityJournalIT {
         request.addHeader("User-Agent", "x\r\n" + "a".repeat(600));
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
 
-        journal.recordRefusal(event(Map.of("marker", marker, "limit", "A\nB")));
+        journal.recordStandalone(event(Map.of("marker", marker, "limit", "A\nB")));
 
         Map<String, Object> row = recordedRow();
         assertThat(row.get("type")).isEqualTo("RATE_LIMIT_EXCEEDED");
@@ -96,7 +97,7 @@ class SecurityJournalIT {
         // Le framework de test attache une requête simulée à chaque test : on s'en détache, comme une tâche planifiée.
         RequestContextHolder.resetRequestAttributes();
 
-        journal.recordRefusal(event(Map.of("marker", marker)));
+        journal.recordStandalone(event(Map.of("marker", marker)));
 
         Map<String, Object> row = recordedRow();
         assertThat(row.get("ip")).isNull();
@@ -107,7 +108,7 @@ class SecurityJournalIT {
     @DisplayName("ADR 0013 : un refus s'écrit hors de toute transaction, sans retenir une seconde connexion")
     void adr0013RefusalRefusesToRunInsideATransaction() {
         transactions.executeWithoutResult(status -> assertThatIllegalStateException()
-                .isThrownBy(() -> journal.recordRefusal(event(Map.of("marker", marker)))));
+                .isThrownBy(() -> journal.recordStandalone(event(Map.of("marker", marker)))));
 
         assertThat(rowsWithMarker()).isZero();
     }
@@ -148,7 +149,7 @@ class SecurityJournalIT {
                 .query(UUID.class)
                 .single();
 
-        journal.recordRefusal(
+        journal.recordStandalone(
                 new SecurityEvent(SecurityEventType.RATE_LIMIT_EXCEEDED, new UserId(userId), Map.of("marker", marker)));
 
         assertThat(recordedRow().get("user_id")).isEqualTo(userId);
@@ -159,7 +160,7 @@ class SecurityJournalIT {
     void adr0013CreatedAtComesFromTheClock() {
         clock.advance(Duration.ofDays(3));
 
-        journal.recordRefusal(event(Map.of("marker", marker)));
+        journal.recordStandalone(event(Map.of("marker", marker)));
 
         OffsetDateTime createdAt = jdbc.sql("SELECT created_at FROM security_events WHERE details->>'marker' = ?")
                 .param(marker)
@@ -174,7 +175,7 @@ class SecurityJournalIT {
     void sec21CorrelationIdIsRecorded() {
         MDC.put(CorrelationIdFilter.MDC_KEY, "correlation-test");
 
-        journal.recordRefusal(event(Map.of("marker", marker)));
+        journal.recordStandalone(event(Map.of("marker", marker)));
 
         assertThat(recordedRow().get("correlation_id")).isEqualTo("correlation-test");
     }
@@ -182,8 +183,33 @@ class SecurityJournalIT {
     @Test
     @DisplayName("ADR 0013 : chaque valeur des détails est tronquée à 256 caractères")
     void adr0013DetailValuesAreTruncated() {
-        journal.recordRefusal(event(Map.of("marker", marker, "limit", "x".repeat(1000))));
+        journal.recordStandalone(event(Map.of("marker", marker, "limit", "x".repeat(1000))));
 
         assertThat((String) recordedRow().get("limit_name")).hasSize(SecurityJournal.DETAIL_MAX_LENGTH);
+    }
+
+    @Test
+    @DisplayName("SEC-20 : un événement de session s'écrit dans sa propre transaction, hors de toute autre")
+    void sec20StandaloneEventIsRecordedInItsOwnTransaction() {
+        journal.recordStandalone(event(Map.of("marker", marker)));
+
+        assertThat(rowsWithMarker()).isEqualTo(1);
+        assertThatThrownBy(() -> transactions.executeWithoutResult(
+                        status -> journal.recordStandalone(event(Map.of("marker", marker)))))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(rowsWithMarker()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName(
+            "SEC-20 : une adresse IPv6 avec zone est enregistrée sans sa zone, sans faire échouer le journal (A10)")
+    void sec20ScopedIpv6AddressIsRecordedWithoutItsZone() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("fe80::1%eth0");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+        journal.recordStandalone(event(Map.of("marker", marker)));
+
+        assertThat(recordedRow().get("ip")).isEqualTo("fe80::1");
     }
 }

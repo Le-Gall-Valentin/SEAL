@@ -44,6 +44,15 @@ public final class Unicode {
         return text.toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * AUTH-20 : saisie d'un champ « Identifiant ou courriel », normalisée en NFC, passée en minuscules, puis normalisée
+     * à nouveau : une minuscule peut se composer là où sa majuscule ne le pouvait pas (« T » + tréma donne « ẗ »). Elle
+     * sert à la recherche du compte comme à la clé de la limite par identifiant saisi (ADR 0021, point 5).
+     */
+    public static String foldLogin(String text) {
+        return nfc(lowerCase(nfc(text)));
+    }
+
     /** AUTH-04, étape 2, dans l'ordre du CDC : NFKD, retrait des diacritiques, puis minuscules. */
     public static String foldWithoutMarks(String text) {
         return lowerCase(

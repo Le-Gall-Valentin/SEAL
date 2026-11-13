@@ -3,6 +3,7 @@ package fr.vlegall.seal.security.session;
 import fr.vlegall.seal.common.UserId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,9 +25,10 @@ import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.stereotype.Component;
 
 /**
- * Ouvre et élève les sessions (ADR 0007, point 2). À chaque fois : nouvel identifiant de session contre la fixation
- * (AUTH-23), ancien jeton CSRF retiré (le client recharge le sien par {@code GET /api/v1/csrf}, AUTH-60), et contexte
- * enregistré explicitement dans la session (AUTH-20).
+ * Ouvre, élève et ferme les sessions (ADR 0007 point 2, ADR 0021). À chaque ouverture ou élévation : nouvel
+ * identifiant de session contre la fixation (AUTH-23), ancien jeton CSRF retiré (le client recharge le sien par
+ * {@code GET /api/v1/csrf}, AUTH-60), et contexte enregistré explicitement dans la session (AUTH-20). La fermeture
+ * invalide la session en base et retire le jeton CSRF (AUTH-53).
  */
 @Component
 public final class SessionEstablisher {
@@ -34,12 +36,52 @@ public final class SessionEstablisher {
     private final SecurityContextHolderStrategy holder = SecurityContextHolder.getContextHolderStrategy();
     private final SecurityContextRepository contexts = new HttpSessionSecurityContextRepository();
     private final SessionAuthenticationStrategy renewal;
+    private final CsrfTokenRepository csrfTokens;
     private final Clock clock;
 
     public SessionEstablisher(CsrfTokenRepository csrfTokens, Clock clock) {
         this.renewal = new CompositeSessionAuthenticationStrategy(
                 List.of(new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrfTokens)));
+        this.csrfTokens = csrfTokens;
         this.clock = clock;
+    }
+
+    /**
+     * AUTH-20 : session d'une connexion, selon l'authentification rendue par l'{@code AuthenticationManager} : complète
+     * pour un compte actif, restreinte sinon (AUTH-16). Une authentification sans compte SEAL n'ouvre rien (échec fermé).
+     */
+    public Authentication open(Authentication authenticated, HttpServletRequest request, HttpServletResponse response) {
+        if (!(authenticated.getPrincipal() instanceof SealPrincipal principal)) {
+            throw new IllegalStateException("authentification sans compte SEAL");
+        }
+        boolean active = authenticated.getAuthorities().stream()
+                .anyMatch(authority -> SealAuthorities.ACCOUNT_ACTIVE.equals(authority.getAuthority()));
+        return active
+                ? openFull(principal.userId(), request, response)
+                : openRestricted(principal.userId(), request, response);
+    }
+
+    /** AUTH-20, AUTH-23 : session complète, après la connexion d'un compte actif, sous un nouvel identifiant. */
+    public Authentication openFull(UserId user, HttpServletRequest request, HttpServletResponse response) {
+        List<GrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_ACTIVE),
+                FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_PASSWORD)
+                        .issuedAt(clock.instant())
+                        .build());
+        return establish(new SealPrincipal(user), authorities, request, response);
+    }
+
+    /**
+     * AUTH-53 : invalide la session en base, vide le contexte et retire le jeton CSRF. Spring Session expire alors le
+     * cookie {@code __Host-seal_sid}. Sans session, seul le jeton CSRF est retiré.
+     */
+    public void close(HttpServletRequest request, HttpServletResponse response) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        holder.clearContext();
+        csrfTokens.saveToken(null, request, response);
     }
 
     /** AUTH-16 : session restreinte, après l'inscription ou la connexion d'un compte non vérifié. */

@@ -186,7 +186,7 @@ public final class RateLimiter {
     private void alert(SecurityEvent event) {
         LOG.warn("Limite de débit dépassée, détail dans security_events");
         try {
-            journal.recordRefusal(event);
+            journal.recordStandalone(event);
         } catch (RuntimeException e) {
             LOG.error("Journal de sécurité indisponible : dépassement non enregistré", e);
         }
@@ -195,7 +195,9 @@ public final class RateLimiter {
     private static @Nullable String recordedKey(RateLimitKind kind, String key) {
         return switch (kind) {
             case IP -> LogValues.sanitize(key);
-            case ENTERED -> LogValues.identifier(key);
+            // SEC-21 : toute saisie du champ identifiant, même en forme de courriel, pourrait être un mot de passe tapé
+            // au mauvais endroit (ADR 0021, mise à jour). La limite reste lisible par son nom.
+            case ENTERED -> null;
             case EMAIL -> LogValues.email(key);
             case USER -> null;
         };

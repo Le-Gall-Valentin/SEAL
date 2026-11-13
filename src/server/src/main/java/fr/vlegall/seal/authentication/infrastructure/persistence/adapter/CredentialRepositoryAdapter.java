@@ -2,6 +2,7 @@ package fr.vlegall.seal.authentication.infrastructure.persistence.adapter;
 
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.common.UserId;
+import java.util.Optional;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -21,5 +22,13 @@ public class CredentialRepositoryAdapter implements CredentialRepository {
                 .param("user", user.value())
                 .param("hash", passwordHash)
                 .update();
+    }
+
+    @Override
+    public Optional<String> findHash(UserId user) {
+        return jdbc.sql("SELECT password_hash FROM user_credentials WHERE user_id = :user")
+                .param("user", user.value())
+                .query(String.class)
+                .optional();
     }
 }

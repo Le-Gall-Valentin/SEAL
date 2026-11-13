@@ -18,6 +18,7 @@ import fr.vlegall.archfixture.alpha.infrastructure.persistence.repository.AlphaJ
 import fr.vlegall.archfixture.alpha.infrastructure.web.ControllerUsingUseCase;
 import fr.vlegall.archfixture.authentication.infrastructure.HashingAdapter;
 import fr.vlegall.archfixture.beta.application.port.in.BetaUseCase;
+import fr.vlegall.archfixture.beta.infrastructure.alpha.AlphaAdapter;
 import fr.vlegall.archfixture.common.FixtureProperties;
 import fr.vlegall.archfixture.common.TimeConfiguration;
 import fr.vlegall.archfixture.common.mail.FixtureMailer;
@@ -145,10 +146,18 @@ class ContextRulesTest {
     }
 
     @Test
-    @DisplayName("ADR 0008, règle 9 : aucun cycle entre packages de premier niveau")
+    @DisplayName(
+            "ADR 0008, règle 9 : aucun cycle entre packages de premier niveau, hors appels entre adaptateurs de contextes")
     void rule9NoCycles() {
-        expectViolations(ContextRules.firstLevelPackagesHaveNoCycles(ROOT), "CycleA");
+        expectViolations(ContextRules.firstLevelPackagesHaveNoCycles(ROOT), "CycleA", "BetaUsingAlpha");
         expectAllowed(ContextRules.firstLevelPackagesHaveNoCycles(ROOT), TimeConfiguration.class, FixtureJournal.class);
+        // Deux contextes qui s'appellent par leurs adaptateurs infrastructure/<autre contexte>/ (règle 7).
+        expectAllowed(
+                ContextRules.firstLevelPackagesHaveNoCycles(ROOT),
+                BetaAdapter.class,
+                AlphaAdapter.class,
+                AlphaUseCase.class,
+                BetaUseCase.class);
     }
 
     @Test

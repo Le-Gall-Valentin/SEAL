@@ -31,7 +31,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 @SealIntegrationTest
 class WebAuthorizationConventionsIT {
 
-    /** AUTH-16 : seules routes permises à la session restreinte ; la déconnexion s'y ajoutera avec la PR 3. */
+    /** AUTH-16 : seules routes permises à la session restreinte. */
     private static final Set<String> RESTRICTED_SESSION_ROUTES = Set.of(
             "GET /api/v1/csrf",
             "GET /api/v1/auth/me",
@@ -39,6 +39,9 @@ class WebAuthorizationConventionsIT {
             "POST /api/v1/auth/verify-email/resend",
             "POST /api/v1/auth/verify-email/change",
             "POST /api/v1/auth/logout");
+
+    /** AUTH-53 : la déconnexion ferme la session ; essayée en dernier, elle ne fausse pas les autres routes. */
+    private static final String LOGOUT = "POST /api/v1/auth/logout";
 
     /** Dispatch d'erreur du conteneur, sans donnée ni effet (ADR 0011). */
     private static final String ERROR_PATH = "/error";
@@ -79,7 +82,11 @@ class WebAuthorizationConventionsIT {
                 tried.forEach(method -> routes.add(method.name() + " " + path));
             }
         }
-        return new ArrayList<>(routes);
+        List<String> ordered = new ArrayList<>(routes);
+        if (ordered.remove(LOGOUT)) {
+            ordered.add(LOGOUT);
+        }
+        return ordered;
     }
 
     @Test

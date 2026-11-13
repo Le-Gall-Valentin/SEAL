@@ -13,6 +13,7 @@ import fr.vlegall.seal.identity.infrastructure.web.dto.VerifyEmailRequest;
 import fr.vlegall.seal.security.ratelimit.RateLimit;
 import fr.vlegall.seal.security.ratelimit.RateLimited;
 import fr.vlegall.seal.security.session.SessionEstablisher;
+import fr.vlegall.seal.security.session.SessionRevocation;
 import fr.vlegall.seal.security.web.CurrentUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -38,21 +39,28 @@ public class EmailVerificationController {
     private final ChangePendingEmailUseCase changeEmail;
     private final CurrentAccountQuery currentAccount;
     private final SessionEstablisher sessions;
+    private final SessionRevocation revocation;
 
     public EmailVerificationController(
             VerifyEmailUseCase verifyEmail,
             ResendCodeUseCase resendCode,
             ChangePendingEmailUseCase changeEmail,
             CurrentAccountQuery currentAccount,
-            SessionEstablisher sessions) {
+            SessionEstablisher sessions,
+            SessionRevocation revocation) {
         this.verifyEmail = verifyEmail;
         this.resendCode = resendCode;
         this.changeEmail = changeEmail;
         this.currentAccount = currentAccount;
         this.sessions = sessions;
+        this.revocation = revocation;
     }
 
-    /** AUTH-16 : une vérification réussie rend la session complète, avec un nouvel identifiant de session. */
+    /**
+     * AUTH-16 : une vérification réussie rend la session complète, avec un nouvel identifiant de session. Les autres
+     * sessions du compte, toutes restreintes, sont révoquées d'abord, tant que la session courante porte encore son
+     * identifiant en base (ADR 0021, point 4) : l'autre appareil se reconnecte, en session complète.
+     */
     @PostMapping
     public MeResponse verify(
             @CurrentUser UserId user,
@@ -62,6 +70,7 @@ public class EmailVerificationController {
         EmailVerification result = verifyEmail.verify(user, body.toCode());
         return switch (result) {
             case EmailVerification.Verified verified -> {
+                revocation.revokeOthers(user, request.getSession().getId());
                 Authentication authentication = sessions.upgradeToFull(user, request, response);
                 yield MeResponse.of(currentAccount.current(user), sessions.factors(authentication));
             }

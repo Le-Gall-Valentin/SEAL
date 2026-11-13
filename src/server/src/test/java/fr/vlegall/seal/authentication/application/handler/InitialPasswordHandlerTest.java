@@ -22,7 +22,17 @@ class InitialPasswordHandlerTest {
     private static final UserId USER = new UserId(UUID.fromString("01900000-0000-7000-8000-000000000001"));
 
     private final Map<UserId, String> stored = new HashMap<>();
-    private final CredentialRepository credentials = stored::put;
+    private final CredentialRepository credentials = new CredentialRepository() {
+        @Override
+        public void save(UserId user, String passwordHash) {
+            stored.put(user, passwordHash);
+        }
+
+        @Override
+        public Optional<String> findHash(UserId user) {
+            return Optional.ofNullable(stored.get(user));
+        }
+    };
     private final List<String> hashed = new ArrayList<>();
     private final PasswordHasher hasher = new PasswordHasher() {
         @Override
@@ -39,6 +49,11 @@ class InitialPasswordHandlerTest {
         @Override
         public boolean recognises(String encoded) {
             return encoded.startsWith("hash(");
+        }
+
+        @Override
+        public void verifyDecoy(Password password) {
+            hashed.add("leurre");
         }
     };
     private final InitialPasswordHandler handler =

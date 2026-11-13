@@ -3,6 +3,7 @@ package fr.vlegall.seal.security.journal;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.logging.CorrelationIdFilter;
 import fr.vlegall.seal.security.logging.LogValues;
+import fr.vlegall.seal.security.web.ClientAddress;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -23,12 +24,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Journal d'imputabilité {@code security_events} (SEC-20), avec deux contrats d'écriture (ADR 0013, point 6) :
+ * Journal d'imputabilité {@code security_events} (SEC-20), avec deux contrats d'écriture (ADR 0013 point 6, ADR 0021
+ * point 7) :
  *
  * <ul>
- *   <li>{@link #recordRefusal} : un refus ou une tentative refusée, écrit dans sa propre transaction et appelé hors de
- *       toute transaction, depuis la couche web. Aucune annulation métier ne peut l'effacer, et aucune seconde
- *       connexion n'est retenue ;
+ *   <li>{@link #recordStandalone} : un refus, ou un geste sans écriture métier autour (connexion, déconnexion,
+ *       révocation de sessions), écrit dans sa propre transaction et appelé hors de toute transaction. Aucune
+ *       annulation métier ne peut l'effacer, et aucune seconde connexion n'est retenue ;
  *   <li>{@link #recordInTransaction} : un succès, écrit dans la transaction métier qui doit exister ; annulé avec
  *       elle.
  * </ul>
@@ -56,10 +58,11 @@ public class SecurityJournal {
         this.transactionManager = transactionManager;
     }
 
-    /** Refus ou tentative refusée : propre transaction, hors de toute transaction appelante. */
-    public void recordRefusal(SecurityEvent event) {
+    /** Refus, ou geste sans écriture métier autour : propre transaction, hors de toute transaction appelante. */
+    public void recordStandalone(SecurityEvent event) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException("Un refus se journalise hors transaction, depuis la couche web (ADR 0013)");
+            throw new IllegalStateException(
+                    "Un événement autonome se journalise hors de toute transaction (ADR 0013, ADR 0021)");
         }
         transaction(TransactionDefinition.PROPAGATION_REQUIRES_NEW).executeWithoutResult(status -> store(event));
     }
@@ -82,7 +85,7 @@ public class SecurityJournal {
                                 + "(CAST(:userId AS uuid), :type, CAST(:ip AS inet), :userAgent, CAST(:details AS jsonb), :createdAt)")
                 .param("userId", userIdOf(event))
                 .param("type", event.type().name())
-                .param("ip", request == null ? null : request.getRemoteAddr())
+                .param("ip", request == null ? null : ClientAddress.literal(request.getRemoteAddr()))
                 .param("userAgent", request == null ? null : userAgent(request))
                 .param("details", JSON.writeValueAsString(safeDetails(event.details())))
                 .param("createdAt", OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))

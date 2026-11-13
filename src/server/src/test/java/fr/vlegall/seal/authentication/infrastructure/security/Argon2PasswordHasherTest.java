@@ -32,6 +32,63 @@ class Argon2PasswordHasherTest {
     }
 
     @Test
+    @DisplayName("AUTH-21 : chaque leurre coûte une vérification Argon2id ; le haché leurre n'est calculé qu'une fois")
+    void auth21DecoyCostsOneVerification() {
+        int[] encodes = new int[1];
+        int[] verifications = new int[1];
+        PasswordEncoder counting = new PasswordEncoder() {
+            @Override
+            public String encode(CharSequence raw) {
+                encodes[0]++;
+                return "{argon2}leurre";
+            }
+
+            @Override
+            public boolean matches(CharSequence raw, String encoded) {
+                verifications[0]++;
+                return false;
+            }
+        };
+        Argon2PasswordHasher decoyed = new Argon2PasswordHasher(counting, 2);
+
+        decoyed.verifyDecoy(Password.fromInput("fjord-tuque-raquette"));
+        decoyed.verifyDecoy(Password.fromInput("autre-mot-de-passe-long"));
+
+        assertThat(encodes[0]).as("leurre haché une seule fois").isEqualTo(1);
+        assertThat(verifications[0]).as("une vérification par appel").isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("AUTH-21 : une demi-paire isolée coûte quand même un calcul Argon2id, dont le résultat est ignoré")
+    void auth21LoneSurrogateStillCostsOneVerification() {
+        int[] verifications = new int[1];
+        PasswordEncoder alwaysMatching = new PasswordEncoder() {
+            @Override
+            public String encode(CharSequence raw) {
+                return "{argon2}leurre";
+            }
+
+            @Override
+            public boolean matches(CharSequence raw, String encoded) {
+                verifications[0]++;
+                assertThat(raw.toString().codePoints().noneMatch(c -> c >= 0xD800 && c <= 0xDFFF))
+                        .as("jamais une demi-paire transmise au calcul")
+                        .isTrue();
+                return true;
+            }
+        };
+        Argon2PasswordHasher measured = new Argon2PasswordHasher(alwaysMatching, 2);
+        Password malformed = Password.fromInput(Character.toString(0xD800) + "fjord-tuque-raquette");
+
+        assertThat(measured.matches(malformed, "{argon2}x")).isFalse();
+        measured.verifyDecoy(malformed);
+
+        assertThat(verifications[0])
+                .as("un calcul par appel, comme pour un mot de passe bien formé")
+                .isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("AUTH-13 : seul un haché Argon2id aux paramètres de SEAL est reconnu, jamais un texte en clair")
     void auth13OnlyItsOwnHashesAreRecognised() {
         assertThat(hasher.recognises(hasher.hash(Password.fromInput("fjord-tuque-raquette"))))

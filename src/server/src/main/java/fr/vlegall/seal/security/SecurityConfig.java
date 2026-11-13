@@ -85,9 +85,13 @@ class SecurityConfig {
                         // AUTH-16 : toute session, restreinte ou complète, lit son compte ; l'anonyme reçoit 401.
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/me")
                         .authenticated()
-                        // ADR 0019 : l'inscription est réservée aux anonymes ; une session reçoit 403.
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register")
+                        // ADR 0019, ADR 0021 : inscription et connexion réservées aux anonymes ; une session reçoit
+                        // 403.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login")
                         .anonymous()
+                        // AUTH-53 : déconnexion ouverte à toute session, restreinte ou complète (AUTH-16).
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout")
+                        .authenticated()
                         // AUTH-05 : anonyme (formulaire d'inscription) ou session complète ; jamais restreinte
                         // (AUTH-16).
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/username-availability")
@@ -116,7 +120,7 @@ class SecurityConfig {
                 // Une requête anonyme refusée ne doit pas créer de session pour mémoriser son URL : sinon n'importe
                 // qui remplirait la table des sessions.
                 .requestCache(RequestCacheConfigurer::disable)
-                // A01 : pas de /logout implicite ; la déconnexion sera POST /api/v1/auth/logout (AUTH-53).
+                // A01 : pas de /logout implicite ; la déconnexion est POST /api/v1/auth/logout (AUTH-53).
                 .logout(LogoutConfigurer::disable)
                 // AUTH-52 : la session de plus de 12 heures est invalidée avant de charger le contexte de sécurité.
                 .addFilterBefore(
