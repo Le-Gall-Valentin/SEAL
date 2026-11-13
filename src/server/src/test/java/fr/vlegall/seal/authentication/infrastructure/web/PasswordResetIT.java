@@ -467,6 +467,8 @@ class PasswordResetIT {
                 List.of(
                         Map.of("email", "x@exemple.ca", "username", "x"),
                         Map.of("email", "x".repeat(250) + "@e.ca"),
+                        Map.of("email", "pas-un-courriel"),
+                        Map.of("email", "valentin@exemple"),
                         Map.of()),
                 INSPECT,
                 List.of(
