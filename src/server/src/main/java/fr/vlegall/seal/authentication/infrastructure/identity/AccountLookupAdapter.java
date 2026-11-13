@@ -1,6 +1,7 @@
 package fr.vlegall.seal.authentication.infrastructure.identity;
 
 import fr.vlegall.seal.authentication.domain.model.AccountContact;
+import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.AccountLookupQuery;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Component;
  * 0008, règle 7).
  */
 @Component
-public class AccountLookupAdapter implements AccountLookupPort {
+public class AccountLookupAdapter implements AccountLookupPort, AccountContactPort {
 
     private final AccountLookupQuery accounts;
 

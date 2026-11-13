@@ -1,5 +1,6 @@
 package fr.vlegall.seal.authentication.infrastructure.security;
 
+import fr.vlegall.seal.authentication.domain.port.out.PasswordResetEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.journal.SecurityEvent;
@@ -14,7 +15,7 @@ import org.springframework.stereotype.Component;
  * transaction.
  */
 @Component
-public class AuthenticationJournalAdapter implements SecurityEventPort {
+public class AuthenticationJournalAdapter implements SecurityEventPort, PasswordResetEventPort {
 
     private final SecurityJournal journal;
 

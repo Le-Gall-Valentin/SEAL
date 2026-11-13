@@ -3,7 +3,7 @@ package fr.vlegall.seal.authentication.application.handler;
 import fr.vlegall.seal.authentication.application.port.in.RequestPasswordResetUseCase;
 import fr.vlegall.seal.authentication.domain.model.AccountContact;
 import fr.vlegall.seal.authentication.domain.model.ResetToken;
-import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
+import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetMailPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetTokenRepository;
@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ApplicationService
 public class RequestPasswordResetHandler implements RequestPasswordResetUseCase {
 
-    private final AccountLookupPort accounts;
+    private final AccountContactPort accounts;
     private final CredentialRepository credentials;
     private final PasswordResetTokenRepository tokens;
     private final PasswordResetMailPort mail;
@@ -25,7 +25,7 @@ public class RequestPasswordResetHandler implements RequestPasswordResetUseCase 
     private final Clock clock;
 
     public RequestPasswordResetHandler(
-            AccountLookupPort accounts,
+            AccountContactPort accounts,
             CredentialRepository credentials,
             PasswordResetTokenRepository tokens,
             PasswordResetMailPort mail,

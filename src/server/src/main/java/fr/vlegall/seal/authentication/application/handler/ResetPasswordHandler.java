@@ -5,9 +5,9 @@ import fr.vlegall.seal.authentication.domain.model.AccountContact;
 import fr.vlegall.seal.authentication.domain.model.LiveReset;
 import fr.vlegall.seal.authentication.domain.model.ResetOutcome;
 import fr.vlegall.seal.authentication.domain.model.ResetToken;
-import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
+import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
+import fr.vlegall.seal.authentication.domain.port.out.PasswordResetEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetTokenRepository;
-import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.SessionRevocationPort;
 import fr.vlegall.seal.common.ApplicationService;
 import java.time.Clock;
@@ -19,20 +19,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResetPasswordHandler implements ResetPasswordUseCase {
 
     private final PasswordResetTokenRepository tokens;
-    private final AccountLookupPort accounts;
+    private final AccountContactPort accounts;
     private final PasswordPreparation preparation;
     private final PasswordResetWriter writer;
     private final SessionRevocationPort sessions;
-    private final SecurityEventPort journal;
+    private final PasswordResetEventPort journal;
     private final Clock clock;
 
     public ResetPasswordHandler(
             PasswordResetTokenRepository tokens,
-            AccountLookupPort accounts,
+            AccountContactPort accounts,
             PasswordPreparation preparation,
             PasswordResetWriter writer,
             SessionRevocationPort sessions,
-            SecurityEventPort journal,
+            PasswordResetEventPort journal,
             Clock clock) {
         this.tokens = tokens;
         this.accounts = accounts;

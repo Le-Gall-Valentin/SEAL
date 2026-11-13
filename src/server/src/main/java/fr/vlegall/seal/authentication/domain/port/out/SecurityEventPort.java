@@ -3,7 +3,7 @@ package fr.vlegall.seal.authentication.domain.port.out;
 import fr.vlegall.seal.common.UserId;
 import org.jspecify.annotations.Nullable;
 
-/** Journal des connexions, déconnexions et réinitialisations (SEC-20), écrit hors de toute transaction (ADR 0021). */
+/** Journal des connexions et déconnexions (SEC-20), écrit hors de toute transaction (ADR 0021, point 7). */
 public interface SecurityEventPort {
 
     void loginSucceeded(UserId user);
@@ -16,7 +16,4 @@ public interface SecurityEventPort {
     void loginFailed(@Nullable UserId user);
 
     void loggedOut(UserId user);
-
-    /** AUTH-70 : mot de passe réinitialisé par lien. */
-    void passwordReset(UserId user);
 }

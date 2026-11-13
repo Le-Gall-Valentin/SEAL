@@ -4,12 +4,12 @@ import fr.vlegall.seal.authentication.domain.model.AccountContact;
 import fr.vlegall.seal.authentication.domain.model.LiveReset;
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.model.ResetToken;
-import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
+import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
+import fr.vlegall.seal.authentication.domain.port.out.PasswordResetEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetMailPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetTokenRepository;
 import fr.vlegall.seal.authentication.domain.port.out.RandomBytes;
-import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.SessionRevocationPort;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.support.MutableClock;
@@ -82,17 +82,7 @@ final class PasswordResetFixture {
         return token;
     }
 
-    final AccountLookupPort accounts = new AccountLookupPort() {
-        @Override
-        public Optional<UserId> findForLogin(String login) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean isVerified(UserId user) {
-            throw new UnsupportedOperationException();
-        }
-
+    final AccountContactPort accounts = new AccountContactPort() {
         @Override
         public Optional<AccountContact> findActiveByEmail(String email) {
             return contacts.values().stream()
@@ -172,27 +162,7 @@ final class PasswordResetFixture {
 
     final SessionRevocationPort sessions = user -> calls.add("révocation:" + user.value());
 
-    final SecurityEventPort journal = new SecurityEventPort() {
-        @Override
-        public void loginSucceeded(UserId user) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void loginFailed(@Nullable UserId user) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void loggedOut(UserId user) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void passwordReset(UserId user) {
-            calls.add("journal:" + user.value());
-        }
-    };
+    final PasswordResetEventPort journal = user -> calls.add("journal:" + user.value());
 
     /** Octets prévisibles et tous différents : 1, puis 2, puis 3… */
     RandomBytes random() {

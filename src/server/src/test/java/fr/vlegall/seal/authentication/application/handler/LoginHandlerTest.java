@@ -2,7 +2,6 @@ package fr.vlegall.seal.authentication.application.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import fr.vlegall.seal.authentication.domain.model.AccountContact;
 import fr.vlegall.seal.authentication.domain.model.LoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
@@ -38,16 +37,6 @@ class LoginHandlerTest {
         @Override
         public boolean isVerified(UserId user) {
             return verified.contains(user);
-        }
-
-        @Override
-        public Optional<AccountContact> findActiveByEmail(String email) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Optional<AccountContact> findActiveContact(UserId user) {
-            throw new UnsupportedOperationException();
         }
     };
     private final InMemoryCredentials credentials = new InMemoryCredentials();
@@ -91,11 +80,6 @@ class LoginHandlerTest {
         @Override
         public void loggedOut(UserId user) {
             events.add("sortie:" + user.value());
-        }
-
-        @Override
-        public void passwordReset(UserId user) {
-            throw new UnsupportedOperationException();
         }
     };
     private final LoginHandler handler = new LoginHandler(accounts, credentials, hasher, journal);
