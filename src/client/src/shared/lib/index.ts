@@ -8,3 +8,5 @@ export {
   toErrorCode,
 } from './apiErrors'
 export type { ErrorCode } from './apiErrors'
+export { failureOf } from './failure'
+export type { Failure } from './failure'

@@ -1,7 +1,12 @@
 // API publique du segment shared/ui (ADR 0012) : composants d'interface sans métier.
+export { Alert } from './Alert'
 export { Empreinte } from './Empreinte'
+export { FailureAlert } from './FailureAlert'
 export { LoadErrorState } from './LoadErrorState'
+export { PasswordField } from './PasswordField'
 export { Phoque } from './Phoque'
 export type { PhoqueVariant } from './Phoque'
+export { PrimaryButton } from './PrimaryButton'
 export { Sceau } from './Sceau'
+export { TextField } from './TextField'
 export { Wordmark } from './Wordmark'

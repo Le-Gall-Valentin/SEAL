@@ -6,7 +6,7 @@ import { render } from 'vitest-browser-react'
 import { type Account, type ISessionApi, SessionApiProvider } from '@/entities/session'
 import { ApiError, NetworkError } from '@/shared/lib'
 import { createQueryClient } from '../providers'
-import { SessionGuard } from './SessionGuard'
+import { ActiveRoute, AnonymousRoute, PendingRoute } from './routeGuards'
 
 const ACTIVE: Account = {
   id: '0192f0c4-7b1a-7cc0-9a51-3f6f8e2d4b10',
@@ -22,26 +22,30 @@ const PENDING: Account = {
   verification: { codeExpiresAt: null, resendsRemaining: 3 },
 }
 
-// Une page qui découvre en cours de route que la session n'existe plus (expirée, révoquée).
+// Une page qui découvre en cours de route que la session n'existe plus (expirée, révoquée) : /me répond alors 401.
+let expired = false
 function ExpiringPage() {
   const query = useQuery({
     queryKey: ['donnees'],
-    queryFn: () => Promise.reject(new ApiError(401, 'UNAUTHENTICATED')),
+    queryFn: () => {
+      expired = true
+      return Promise.reject(new ApiError(401, 'UNAUTHENTICATED'))
+    },
   })
   return <p>{query.isError ? 'Session perdue' : 'Données'}</p>
 }
 
 const TREE: RouteObject[] = [
   {
-    element: <SessionGuard allow="anonymous" />,
+    element: <AnonymousRoute />,
     children: [{ path: '/connexion', element: <p>Écran de connexion</p> }],
   },
   {
-    element: <SessionGuard allow="pending" />,
+    element: <PendingRoute />,
     children: [{ path: '/verification-courriel', element: <p>Écran de vérification</p> }],
   },
   {
-    element: <SessionGuard allow="active" />,
+    element: <ActiveRoute />,
     children: [
       { path: '/', element: <p>Accueil</p> },
       { path: '/expire', element: <ExpiringPage /> },
@@ -88,7 +92,10 @@ describe('AUTH-16 : gardes de route selon le compte courant', () => {
   })
 
   it('AUTH-53, ADR 0023 : un 401 UNAUTHENTICATED en cours de route ramène à la connexion', async () => {
-    const { router, screen } = await renderAt('/expire', () => Promise.resolve(ACTIVE))
+    expired = false
+    const { router, screen } = await renderAt('/expire', () =>
+      Promise.resolve(expired ? null : ACTIVE),
+    )
 
     await expect.element(screen.getByText('Écran de connexion')).toBeVisible()
     expect(router.state.location.pathname).toBe('/connexion')

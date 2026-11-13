@@ -30,6 +30,8 @@
   --fp-a: #4f5b14;
   --fp-b: #94a257;
   --fp-c: #d3dbb5;
+  /* Halo du champ actif (Connexion-Ordinateur). */
+  --focus-glow: rgba(102, 116, 28, 0.22);
   /* ADR 0024 : « Schibsted Grotesk Variable » est le nom de la police variable servie par SEAL. */
   --sans: 'Schibsted Grotesk Variable', 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
   --mono: 'DM Mono', ui-monospace, Menlo, Consolas, monospace;
@@ -64,5 +66,6 @@
     --fp-a: #b4c65a;
     --fp-b: #6f7f34;
     --fp-c: #36421f;
+    --focus-glow: rgba(180, 198, 90, 0.28);
   }
 }

@@ -22,3 +22,8 @@ export function endSession(client: QueryClient): void {
   })
   client.setQueryData(SESSION_QUERY_KEY, null)
 }
+
+/** AUTH-16 : après une connexion ou une vérification, /me est relu ; les gardes de route mènent à l'écran suivant. */
+export function refreshSession(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({ queryKey: SESSION_QUERY_KEY })
+}

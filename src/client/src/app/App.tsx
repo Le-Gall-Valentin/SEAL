@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { createBrowserRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { SessionApiProvider, sessionApi } from '@/entities/session'
+import { LoginApiProvider, loginApi } from '@/features/login'
 import { LanguageProvider } from '@/shared/i18n'
 import { createQueryClient, ErrorBoundary, routerErrorHandler } from './providers'
 import { routes } from './router'
@@ -20,7 +21,9 @@ export function App() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <SessionApiProvider api={sessionApi}>
-            <RouterProvider router={router} onError={routerErrorHandler(import.meta.env.PROD)} />
+            <LoginApiProvider api={loginApi}>
+              <RouterProvider router={router} onError={routerErrorHandler(import.meta.env.PROD)} />
+            </LoginApiProvider>
           </SessionApiProvider>
         </QueryClientProvider>
       </ErrorBoundary>

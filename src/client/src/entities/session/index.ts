@@ -4,4 +4,9 @@ export { sessionApi } from './api/sessionApi'
 export { SessionApiProvider } from './model/SessionApiProvider'
 export { destinationFor, SESSION_STATES, sessionStateOf } from './model/sessionState'
 export type { SessionState } from './model/sessionState'
-export { endSession, SESSION_QUERY_KEY, useCurrentAccount } from './model/useCurrentAccount'
+export {
+  endSession,
+  refreshSession,
+  SESSION_QUERY_KEY,
+  useCurrentAccount,
+} from './model/useCurrentAccount'
