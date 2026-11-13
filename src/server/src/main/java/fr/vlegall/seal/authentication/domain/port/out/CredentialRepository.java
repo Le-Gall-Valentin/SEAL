@@ -10,4 +10,11 @@ public interface CredentialRepository {
 
     /** AUTH-20 : haché du mot de passe du compte ; vide pour un compte sans mot de passe (OAuth, lot 2). */
     Optional<String> findHash(UserId user);
+
+    /**
+     * AUTH-70 : remplace le haché d'un compte qui a déjà un mot de passe, dans la transaction de l'appelant.
+     *
+     * @return faux si le compte n'a pas de mot de passe : rien n'est écrit (ADR 0022, point 3)
+     */
+    boolean changeHash(UserId user, String passwordHash);
 }

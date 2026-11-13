@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import fr.vlegall.seal.authentication.domain.model.LoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
-import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
 import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.common.UserId;
@@ -26,7 +25,6 @@ class LoginHandlerTest {
 
     private final Map<String, UserId> logins = new HashMap<>();
     private final Set<UserId> verified = new HashSet<>();
-    private final Map<UserId, String> hashes = new HashMap<>();
     /** Chaque vérification Argon2id, réelle ou leurre, dans l'ordre. */
     private final List<String> verifications = new ArrayList<>();
 
@@ -41,17 +39,7 @@ class LoginHandlerTest {
             return verified.contains(user);
         }
     };
-    private final CredentialRepository credentials = new CredentialRepository() {
-        @Override
-        public void save(UserId user, String passwordHash) {
-            hashes.put(user, passwordHash);
-        }
-
-        @Override
-        public Optional<String> findHash(UserId user) {
-            return Optional.ofNullable(hashes.get(user));
-        }
-    };
+    private final InMemoryCredentials credentials = new InMemoryCredentials();
     private final PasswordHasher hasher = new PasswordHasher() {
         @Override
         public String hash(Password password) {
@@ -103,7 +91,7 @@ class LoginHandlerTest {
             verified.add(user);
         }
         if (withPassword) {
-            hashes.put(user, "hash(" + PASSWORD + ")");
+            credentials.save(user, "hash(" + PASSWORD + ")");
         }
         return user;
     }

@@ -25,6 +25,15 @@ public class CredentialRepositoryAdapter implements CredentialRepository {
     }
 
     @Override
+    public boolean changeHash(UserId user, String passwordHash) {
+        return jdbc.sql("UPDATE user_credentials SET password_hash = :hash WHERE user_id = :user")
+                        .param("user", user.value())
+                        .param("hash", passwordHash)
+                        .update()
+                == 1;
+    }
+
+    @Override
     public Optional<String> findHash(UserId user) {
         return jdbc.sql("SELECT password_hash FROM user_credentials WHERE user_id = :user")
                 .param("user", user.value())

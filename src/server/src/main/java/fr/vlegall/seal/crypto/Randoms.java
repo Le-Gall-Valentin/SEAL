@@ -21,4 +21,14 @@ public final class Randoms {
         }
         return digits.toString();
     }
+
+    /** {@code count} octets tirés uniformément, par exemple le jeton de 256 bits d'AUTH-70. */
+    public static byte[] bytes(int count) {
+        if (count <= 0) {
+            throw new IllegalArgumentException("nombre d'octets strictement positif attendu : " + count);
+        }
+        byte[] bytes = new byte[count];
+        RANDOM.nextBytes(bytes);
+        return bytes;
+    }
 }
