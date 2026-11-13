@@ -12,3 +12,24 @@ describe('ADR 0016 : styles de base de la feuille d’entrée', () => {
     })
   })
 })
+
+describe('ADR 0007 : polices servies par SEAL', () => {
+  it.each([
+    ['650 16px "Schibsted Grotesk Variable"'],
+    ['400 16px "DM Mono"'],
+    ['500 16px "DM Mono"'],
+  ])('ADR 0007, point 8 : %s se charge depuis le client, sans ressource tierce', async (font) => {
+    const faces = await document.fonts.load(font, 'SEAL')
+
+    expect(faces.length).toBeGreaterThan(0)
+    expect(document.fonts.check(font, 'SEAL')).toBe(true)
+  })
+
+  it('ADR 0024 : le texte prend Schibsted Grotesk, en police variable', async () => {
+    const screen = await render(<p>Connexion</p>)
+
+    expect(
+      getComputedStyle(screen.container.querySelector('p') ?? document.body).fontFamily,
+    ).toMatch(/^"Schibsted Grotesk Variable"/)
+  })
+})

@@ -4,6 +4,10 @@
  * aucune classe à la feuille livrée.
  */
 @import 'tailwindcss' source(none);
+/* ADR 0007, point 8 : polices servies par SEAL ; Schibsted Grotesk en police variable, comme la maquette (ADR 0024). */
+@import '@fontsource-variable/schibsted-grotesk/wght.css';
+@import '@fontsource/dm-mono/400.css';
+@import '@fontsource/dm-mono/500.css';
 @source '../../**/*.{ts,tsx}';
 @source not '../../**/*.test.{ts,tsx}';
 @import '../../shared/styles/tokens.css';

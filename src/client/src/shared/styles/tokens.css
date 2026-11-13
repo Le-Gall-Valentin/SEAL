@@ -1,8 +1,10 @@
 /*
  * Jetons de design de la maquette, repris tels quels du bloc <helmet> de chaque écran
- * (reference/maquette/project/*.dc.html). Toute couleur ou police de l'interface passe par eux.
+ * (reference/maquette/project/*.dc.html), classe « clair » puis classe « sombre ». Toute couleur ou police de
+ * l'interface passe par eux.
  */
 :root {
+  color-scheme: light;
   --bg: #f7f8f3;
   --surface: #ffffff;
   --sunken: #f1f3ea;
@@ -17,14 +19,50 @@
   --accent-soft: #eef1e2;
   --accent-soft-2: #e5ead3;
   --accent-text: #525e15;
+  --accent-line: rgba(102, 116, 28, 0.28);
   --danger: #b3261e;
   --danger-soft: #fbedea;
   --danger-line: #efc5be;
   --warning: #8a5a00;
+  --warning-soft: #fcf3df;
+  --warning-line: #ebd39a;
   --fp-bg: #eef1e2;
   --fp-a: #4f5b14;
   --fp-b: #94a257;
   --fp-c: #d3dbb5;
-  --sans: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  /* ADR 0024 : « Schibsted Grotesk Variable » est le nom de la police variable servie par SEAL. */
+  --sans: 'Schibsted Grotesk Variable', 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
   --mono: 'DM Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+
+/* ADR 0024, point 4 : le système choisit le thème, jusqu'aux préférences d'ACC-05. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0e120b;
+    --surface: #151a10;
+    --sunken: #11150d;
+    --line: #262d1d;
+    --line-strong: #364029;
+    --ink: #e9eddf;
+    --ink-2: #bac1a9;
+    --ink-3: #99a187;
+    --on-accent: #10140a;
+    --accent: #b4c65a;
+    --accent-hover: #c4d46e;
+    --accent-soft: #1e2611;
+    --accent-soft-2: #26301a;
+    --accent-text: #c2d26a;
+    --accent-line: rgba(180, 198, 90, 0.3);
+    --danger: #f2867a;
+    --danger-soft: #2b1512;
+    --danger-line: #5c2a23;
+    --warning: #e7b95e;
+    --warning-soft: #2a2210;
+    --warning-line: #59461a;
+    --fp-bg: #1e2611;
+    --fp-a: #b4c65a;
+    --fp-b: #6f7f34;
+    --fp-c: #36421f;
+  }
 }
