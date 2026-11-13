@@ -1,5 +1,6 @@
 package fr.vlegall.seal.authentication.application.handler;
 
+import fr.vlegall.seal.authentication.domain.model.StoredCredential;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.common.UserId;
 import java.util.HashMap;
@@ -10,20 +11,26 @@ import java.util.Optional;
 final class InMemoryCredentials implements CredentialRepository {
 
     private final Map<UserId, String> hashes = new HashMap<>();
+    private final Map<UserId, Long> versions = new HashMap<>();
 
     @Override
     public void save(UserId user, String passwordHash) {
         hashes.put(user, passwordHash);
+        versions.put(user, 1L);
     }
 
     @Override
-    public Optional<String> findHash(UserId user) {
-        return Optional.ofNullable(hashes.get(user));
+    public Optional<StoredCredential> find(UserId user) {
+        return Optional.ofNullable(hashes.get(user)).map(hash -> new StoredCredential(hash, versions.get(user)));
     }
 
     @Override
     public boolean changeHash(UserId user, String passwordHash) {
-        return hashes.replace(user, passwordHash) != null;
+        if (hashes.replace(user, passwordHash) == null) {
+            return false;
+        }
+        versions.merge(user, 1L, Long::sum);
+        return true;
     }
 
     @Override

@@ -1,5 +1,6 @@
 package fr.vlegall.seal.authentication.infrastructure.persistence.adapter;
 
+import fr.vlegall.seal.authentication.domain.model.StoredCredential;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.common.UserId;
 import java.util.Optional;
@@ -26,7 +27,8 @@ public class CredentialRepositoryAdapter implements CredentialRepository {
 
     @Override
     public boolean changeHash(UserId user, String passwordHash) {
-        return jdbc.sql("UPDATE user_credentials SET password_hash = :hash WHERE user_id = :user")
+        return jdbc.sql(
+                                "UPDATE user_credentials SET password_hash = :hash, version = version + 1 WHERE user_id = :user")
                         .param("user", user.value())
                         .param("hash", passwordHash)
                         .update()
@@ -43,10 +45,10 @@ public class CredentialRepositoryAdapter implements CredentialRepository {
     }
 
     @Override
-    public Optional<String> findHash(UserId user) {
-        return jdbc.sql("SELECT password_hash FROM user_credentials WHERE user_id = :user")
+    public Optional<StoredCredential> find(UserId user) {
+        return jdbc.sql("SELECT password_hash, version FROM user_credentials WHERE user_id = :user")
                 .param("user", user.value())
-                .query(String.class)
+                .query((row, number) -> new StoredCredential(row.getString("password_hash"), row.getLong("version")))
                 .optional();
     }
 }

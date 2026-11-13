@@ -3,6 +3,7 @@ package fr.vlegall.seal.authentication.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.authentication.domain.model.LiveReset;
+import fr.vlegall.seal.authentication.domain.model.StoredCredential;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetTokenRepository;
 import fr.vlegall.seal.common.UserId;
@@ -165,9 +166,9 @@ class PasswordResetStorageIT {
         credentials.save(user, "{argon2}ancien");
 
         assertThat(credentials.changeHash(user, "{argon2}nouveau")).isTrue();
-        assertThat(credentials.findHash(user)).contains("{argon2}nouveau");
+        assertThat(credentials.find(user)).contains(new StoredCredential("{argon2}nouveau", 2));
         assertThat(credentials.changeHash(oauthOnly, "{argon2}nouveau")).isFalse();
-        assertThat(credentials.findHash(oauthOnly)).isEmpty();
+        assertThat(credentials.find(oauthOnly)).isEmpty();
     }
 
     @Test

@@ -1,5 +1,6 @@
 package fr.vlegall.seal.authentication.domain.port.out;
 
+import fr.vlegall.seal.authentication.domain.model.StoredCredential;
 import fr.vlegall.seal.common.UserId;
 import java.util.Optional;
 
@@ -8,11 +9,15 @@ public interface CredentialRepository {
 
     void save(UserId user, String passwordHash);
 
-    /** AUTH-20 : haché du mot de passe du compte ; vide pour un compte sans mot de passe (OAuth, lot 2). */
-    Optional<String> findHash(UserId user);
+    /**
+     * AUTH-20 : haché du mot de passe du compte et sa version, lus dans la même requête (ADR 0023) ; vide pour un compte
+     * sans mot de passe (OAuth, lot 2).
+     */
+    Optional<StoredCredential> find(UserId user);
 
     /**
-     * AUTH-70 : remplace le haché d'un compte qui a déjà un mot de passe, dans la transaction de l'appelant.
+     * AUTH-70 : remplace le haché d'un compte qui a déjà un mot de passe et incrémente sa version (ADR 0023), dans la
+     * transaction de l'appelant.
      *
      * @return faux si le compte n'a pas de mot de passe : rien n'est écrit (ADR 0022, point 3)
      */

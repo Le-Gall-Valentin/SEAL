@@ -101,7 +101,7 @@ class LoginHandlerTest {
     void auth20RightPasswordOfAnActiveAccountIsAuthenticated() {
         UserId user = account("valentin", true, true);
 
-        assertThat(handler.login("valentin", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, true));
+        assertThat(handler.login("valentin", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, true, 1L));
         assertThat(verifications).containsExactly("réelle");
         assertThat(events).containsExactly("réussie:" + user.value());
     }
@@ -111,7 +111,7 @@ class LoginHandlerTest {
     void auth16RightPasswordOfAPendingAccountIsAuthenticatedUnverified() {
         UserId user = account("attente", false, true);
 
-        assertThat(handler.login("attente", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, false));
+        assertThat(handler.login("attente", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, false, 1L));
         assertThat(verifications).containsExactly("réelle");
     }
 
@@ -140,6 +140,15 @@ class LoginHandlerTest {
         assertThat(handler.login("valentin", "mauvais-mot-de-passe")).isEqualTo(new LoginOutcome.Rejected());
         assertThat(verifications).containsExactly("réelle");
         assertThat(events).containsExactly("refusée:" + user.value());
+    }
+
+    @Test
+    @DisplayName("AUTH-70 : la connexion rend la version du mot de passe lue avec le haché vérifié (ADR 0023)")
+    void auth70LoginReturnsTheVersionReadWithTheHash() {
+        UserId user = account("valentin", true, true);
+        credentials.changeHash(user, "hash(" + PASSWORD + ")");
+
+        assertThat(handler.login("valentin", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, true, 2L));
     }
 
     @Test

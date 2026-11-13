@@ -182,6 +182,22 @@ class SessionEstablisherTest {
     }
 
     @Test
+    @DisplayName(
+            "AUTH-70 : la session d'une connexion garde la version du mot de passe, complète ou restreinte (ADR 0023)")
+    void auth70OpenKeepsTheCredentialVersion() {
+        for (String status : List.of(SealAuthorities.ACCOUNT_ACTIVE, SealAuthorities.ACCOUNT_PENDING_EMAIL)) {
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            sessions.open(
+                    UsernamePasswordAuthenticationToken.authenticated(
+                            new SealPrincipal(USER, 7L), null, List.of(new SimpleGrantedAuthority(status))),
+                    request,
+                    new MockHttpServletResponse());
+
+            assertThat(storedAuthentication(request).getPrincipal()).isEqualTo(new SealPrincipal(USER, 7L));
+        }
+    }
+
+    @Test
     @DisplayName("AUTH-20 : une authentification sans compte SEAL n'ouvre aucune session (échec fermé)")
     void auth20AuthenticationWithoutSealAccountOpensNothing() {
         MockHttpServletRequest request = new MockHttpServletRequest();

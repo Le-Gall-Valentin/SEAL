@@ -2,6 +2,8 @@ package fr.vlegall.seal.security;
 
 import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.session.AbsoluteSessionTimeoutFilter;
+import fr.vlegall.seal.security.session.CredentialVersionFilter;
+import fr.vlegall.seal.security.session.CredentialVersions;
 import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.web.ProblemDetailsSecurityHandler;
 import fr.vlegall.seal.security.web.RequestBodyLimitFilter;
@@ -74,7 +76,8 @@ class SecurityConfig {
             SealProperties seal,
             ProblemDetailsSecurityHandler problemDetails,
             Clock clock,
-            CsrfTokenRepository csrfTokens) {
+            CsrfTokenRepository csrfTokens,
+            CredentialVersions credentialVersions) {
         http.authorizeHttpRequests(requests -> requests
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
@@ -132,6 +135,9 @@ class SecurityConfig {
                 .addFilterBefore(
                         new AbsoluteSessionTimeoutFilter(clock, seal.session().absoluteTimeout()),
                         SecurityContextHolderFilter.class)
+                // AUTH-70, ADR 0023 : une session ouverte avec une version périmée du mot de passe tombe, juste après
+                // le chargement du contexte de sécurité.
+                .addFilterAfter(new CredentialVersionFilter(credentialVersions), SecurityContextHolderFilter.class)
                 // SEC-01 : corps borné avant toute lecture par la chaîne (jeton CSRF de formulaire compris), après les
                 // en-têtes, que le refus porte aussi. FormContentFilter, placé avant, est désactivé (application.yaml).
                 .addFilterAfter(

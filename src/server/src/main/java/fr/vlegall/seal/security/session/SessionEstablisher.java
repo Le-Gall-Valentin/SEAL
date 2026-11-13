@@ -48,7 +48,8 @@ public final class SessionEstablisher {
 
     /**
      * AUTH-20 : session d'une connexion, selon l'authentification rendue par l'{@code AuthenticationManager} : complète
-     * pour un compte actif, restreinte sinon (AUTH-16). Une authentification sans compte SEAL n'ouvre rien (échec fermé).
+     * pour un compte actif, restreinte sinon (AUTH-16). Le principal rendu est gardé tel quel, avec la version du mot de
+     * passe vérifié (ADR 0023). Une authentification sans compte SEAL n'ouvre rien (échec fermé).
      */
     public Authentication open(Authentication authenticated, HttpServletRequest request, HttpServletResponse response) {
         if (!(authenticated.getPrincipal() instanceof SealPrincipal principal)) {
@@ -56,19 +57,12 @@ public final class SessionEstablisher {
         }
         boolean active = authenticated.getAuthorities().stream()
                 .anyMatch(authority -> SealAuthorities.ACCOUNT_ACTIVE.equals(authority.getAuthority()));
-        return active
-                ? openFull(principal.userId(), request, response)
-                : openRestricted(principal.userId(), request, response);
+        return establish(principal, active ? fullAuthorities() : restrictedAuthorities(), request, response);
     }
 
     /** AUTH-20, AUTH-23 : session complète, après la connexion d'un compte actif, sous un nouvel identifiant. */
     public Authentication openFull(UserId user, HttpServletRequest request, HttpServletResponse response) {
-        List<GrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_ACTIVE),
-                FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_PASSWORD)
-                        .issuedAt(clock.instant())
-                        .build());
-        return establish(new SealPrincipal(user), authorities, request, response);
+        return establish(new SealPrincipal(user), fullAuthorities(), request, response);
     }
 
     /**
@@ -86,12 +80,21 @@ public final class SessionEstablisher {
 
     /** AUTH-16 : session restreinte, après l'inscription ou la connexion d'un compte non vérifié. */
     public Authentication openRestricted(UserId user, HttpServletRequest request, HttpServletResponse response) {
-        List<GrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL),
-                FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_PASSWORD)
-                        .issuedAt(clock.instant())
-                        .build());
-        return establish(new SealPrincipal(user), authorities, request, response);
+        return establish(new SealPrincipal(user), restrictedAuthorities(), request, response);
+    }
+
+    private List<GrantedAuthority> fullAuthorities() {
+        return List.of(new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_ACTIVE), passwordFactor());
+    }
+
+    private List<GrantedAuthority> restrictedAuthorities() {
+        return List.of(new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL), passwordFactor());
+    }
+
+    private GrantedAuthority passwordFactor() {
+        return FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_PASSWORD)
+                .issuedAt(clock.instant())
+                .build();
     }
 
     /**

@@ -56,9 +56,9 @@ class SchemaMigrationIT {
     }
 
     @Test
-    @DisplayName("DATA-01 : le schéma vient des migrations Flyway V1 et V2, validées par Hibernate")
+    @DisplayName("DATA-01 : le schéma vient des migrations Flyway V1 à V3, validées par Hibernate")
     void data01SchemaComesFromFlyway() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
         assertThat(jdbc.queryForObject(
                         "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
                                 + "AND table_name IN ('users', 'messages', 'spring_session', 'spring_session_attributes')",
@@ -108,7 +108,7 @@ class SchemaMigrationIT {
         assertThat(columnsOf("email_codes"))
                 .containsExactly(
                         "id", "user_id", "purpose", "code_hash", "target", "attempts", "expires_at", "consumed_at");
-        assertThat(columnsOf("user_credentials")).containsExactly("user_id", "password_hash");
+        assertThat(columnsOf("user_credentials")).containsExactly("user_id", "password_hash", "version");
         assertThat(columnsOf("password_reset_tokens"))
                 .containsExactly("id", "user_id", "token_hash", "expires_at", "consumed_at");
         assertThat(columnsOf("totp_factors")).containsExactly("user_id", "secret_enc", "enabled_at", "last_step");

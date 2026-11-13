@@ -345,6 +345,26 @@ class LoginIT {
     }
 
     @Test
+    @DisplayName("AUTH-70 : une session ouverte avec une version périmée du mot de passe tombe, même sans révocation"
+            + " (ADR 0023)")
+    void auth70SessionWithAStalePasswordVersionIsDropped() throws Exception {
+        Registered account = active(unique("version"));
+        Cookie session = sessionOf(login(client, account.username(), PASSWORD));
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(session)).andExpect(status().isOk());
+
+        jdbc.sql("UPDATE user_credentials SET version = version + 1 WHERE user_id = ?")
+                .param(account.id())
+                .update();
+
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(session))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        assertThat(login(client, account.username(), PASSWORD).getResponse().getStatus())
+                .as("une nouvelle connexion grave la nouvelle version")
+                .isEqualTo(204);
+    }
+
+    @Test
     @DisplayName("AUTH-22 : les variantes de casse d'une saisie partagent les mêmes 5 échecs (ADR 0021)")
     void auth22FoldedLoginSharesTheBucket() throws Exception {
         String login = unique("variantes");

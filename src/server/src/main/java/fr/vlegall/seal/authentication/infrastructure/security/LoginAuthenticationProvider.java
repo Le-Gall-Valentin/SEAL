@@ -30,12 +30,14 @@ public class LoginAuthenticationProvider implements AuthenticationProvider {
     public Authentication authenticate(Authentication authentication) {
         String password = authentication.getCredentials() instanceof String text ? text : "";
         return switch (login.login(authentication.getName(), password)) {
-            case LoginOutcome.Authenticated(var user, var verified) ->
+            case LoginOutcome.Authenticated authenticated ->
                 UsernamePasswordAuthenticationToken.authenticated(
-                        new SealPrincipal(user),
+                        new SealPrincipal(authenticated.user(), authenticated.credentialVersion()),
                         null,
                         List.of(new SimpleGrantedAuthority(
-                                verified ? SealAuthorities.ACCOUNT_ACTIVE : SealAuthorities.ACCOUNT_PENDING_EMAIL)));
+                                authenticated.verified()
+                                        ? SealAuthorities.ACCOUNT_ACTIVE
+                                        : SealAuthorities.ACCOUNT_PENDING_EMAIL)));
             case LoginOutcome.Rejected rejected -> throw new BadCredentialsException("connexion refusée");
         };
     }
