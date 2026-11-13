@@ -8,6 +8,7 @@ import fr.vlegall.seal.authentication.infrastructure.web.dto.PasswordResetConfir
 import fr.vlegall.seal.authentication.infrastructure.web.dto.PasswordResetInspectRequest;
 import fr.vlegall.seal.authentication.infrastructure.web.dto.PasswordResetRequest;
 import fr.vlegall.seal.authentication.infrastructure.web.dto.PasswordResetView;
+import fr.vlegall.seal.common.BackgroundTasks;
 import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.Unicode;
@@ -37,21 +38,25 @@ public class PasswordResetController {
     private final InspectPasswordResetQuery inspections;
     private final ResetPasswordUseCase resets;
     private final RateLimiter limiter;
+    private final BackgroundTasks background;
 
     public PasswordResetController(
             RequestPasswordResetUseCase requests,
             InspectPasswordResetQuery inspections,
             ResetPasswordUseCase resets,
-            RateLimiter limiter) {
+            RateLimiter limiter,
+            BackgroundTasks background) {
         this.requests = requests;
         this.inspections = inspections;
         this.resets = resets;
         this.limiter = limiter;
+        this.background = background;
     }
 
     /**
      * Toujours 204, que le compte existe ou non (AUTH-70). 3 demandes par heure par IP, puis par courriel saisi,
-     * normalisé comme pour la recherche du compte (section 15.2, ADR 0022 point 7).
+     * normalisé comme pour la recherche du compte (section 15.2, ADR 0022 point 7). La demande est traitée en
+     * arrière-plan : le temps de réponse ne dépend pas de l'existence du compte (ADR 0022, mise à jour).
      */
     @PostMapping("/request")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -59,7 +64,8 @@ public class PasswordResetController {
         limiter.consumeAll(List.of(
                 new RateLimitToken(RateLimit.PASSWORD_RESETS_PER_IP, ClientAddress.key(request.getRemoteAddr())),
                 new RateLimitToken(RateLimit.PASSWORD_RESETS_PER_EMAIL, Unicode.foldLogin(body.email()))));
-        requests.request(body.email());
+        String email = body.email();
+        background.submit(() -> requests.request(email));
     }
 
     /** ADR 0022, point 1 : 200 pour un lien valable, 422 {@code CODE_EXPIRED} sinon, quelle qu'en soit la raison. */
