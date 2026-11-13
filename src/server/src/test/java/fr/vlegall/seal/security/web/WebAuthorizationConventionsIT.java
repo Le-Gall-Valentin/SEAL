@@ -40,6 +40,17 @@ class WebAuthorizationConventionsIT {
             "POST /api/v1/auth/verify-email/change",
             "POST /api/v1/auth/logout");
 
+    /**
+     * ADR 0024, point 5 : pages du client, du HTML statique sans donnée, servies à toute session comme {@code /} ; la
+     * session restreinte doit pouvoir ouvrir l'écran de vérification.
+     */
+    private static final Set<String> CLIENT_PAGES = Set.of(
+            "GET /connexion",
+            "GET /inscription",
+            "GET /verification-courriel",
+            "GET /mot-de-passe/oublie",
+            "GET /mot-de-passe/nouveau");
+
     /** AUTH-53 : la déconnexion ferme la session ; essayée en dernier, elle ne fausse pas les autres routes. */
     private static final String LOGOUT = "POST /api/v1/auth/logout";
 
@@ -105,8 +116,9 @@ class WebAuthorizationConventionsIT {
                     .andReturn()
                     .getResponse()
                     .getStatus();
+            boolean page = CLIENT_PAGES.contains(route);
             boolean permitted = RESTRICTED_SESSION_ROUTES.contains(route);
-            if (permitted ? status == 401 || status == 403 : status != 403) {
+            if (page ? status != 200 : permitted ? status == 401 || status == 403 : status != 403) {
                 wrong.add(route + " → " + status);
             }
         }

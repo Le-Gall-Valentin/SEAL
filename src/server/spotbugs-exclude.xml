@@ -67,6 +67,12 @@
         <Class name="fr.vlegall.seal.identity.infrastructure.web.EmailVerificationController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- GET des adresses des écrans (ADR 0024, point 5) : renvoient le client compilé, sans donnée ni effet, à toute
+         session comme à l'anonyme ; liste fermée, POST refusé : ClientRoutesIT, WebAuthorizationConventionsIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.security.web.ClientRoutesController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /error, dispatch d'erreur du conteneur, sans donnée ni effet (ADR 0011) : CsrfIT.auth60ErrorEndpointIsCsrfProtected. -->
     <Match>
         <Class name="fr.vlegall.seal.common.web.ProblemDetailsErrorController"/>
