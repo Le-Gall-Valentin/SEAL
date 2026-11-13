@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -16,11 +17,14 @@ import static org.mockito.Mockito.when;
 import fr.vlegall.seal.authentication.application.port.in.LogoutUseCase;
 import fr.vlegall.seal.authentication.infrastructure.web.dto.LoginRequest;
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.security.journal.SecurityJournal;
 import fr.vlegall.seal.security.ratelimit.RateLimit;
 import fr.vlegall.seal.security.ratelimit.RateLimitExceededException;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.session.SessionEstablisher;
+import fr.vlegall.seal.support.MutableClock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +43,10 @@ class SessionControllerTest {
 
     private final AuthenticationManager authentication = mock(AuthenticationManager.class);
     private final LogoutUseCase logout = mock(LogoutUseCase.class);
-    private final RateLimiter limiter = mock(RateLimiter.class);
+    /** Vrai limiteur, espionné : la prise et le rendu des jetons restent observables (ADR 0021). */
+    private final RateLimiter limiter = spy(
+            new RateLimiter(MutableClock.fixedAt(Instant.parse("2026-11-13T12:00:00Z")), mock(SecurityJournal.class)));
+
     private final SessionEstablisher sessions = mock(SessionEstablisher.class);
     private final SessionController controller = new SessionController(authentication, logout, limiter, sessions);
 
@@ -101,6 +108,7 @@ class SessionControllerTest {
 
         assertThatExceptionOfType(RateLimitExceededException.class).isThrownBy(this::login);
 
+        verify(limiter).consumeAll(any());
         verify(limiter).consume(RateLimit.LOGIN_ATTEMPTS_PER_IP, IP);
         verifyNoMoreInteractions(limiter);
         verifyNoInteractions(authentication, sessions);

@@ -7,7 +7,7 @@ import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.Unicode;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.ratelimit.RateLimit;
-import fr.vlegall.seal.security.ratelimit.RateLimitExceededException;
+import fr.vlegall.seal.security.ratelimit.RateLimitToken;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.session.SessionEstablisher;
 import fr.vlegall.seal.security.web.ClientAddress;
@@ -15,7 +15,6 @@ import fr.vlegall.seal.security.web.CurrentUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -62,10 +61,10 @@ public class SessionController {
     public void login(@Valid @RequestBody LoginRequest body, HttpServletRequest request, HttpServletResponse response) {
         String ip = ClientAddress.key(request.getRemoteAddr());
         String entered = Unicode.foldLogin(body.login());
-        take(List.of(
-                new Token(RateLimit.LOGIN_ATTEMPTS_PER_IP, ip),
-                new Token(RateLimit.LOGIN_FAILURES_PER_IP, ip),
-                new Token(RateLimit.LOGIN_FAILURES_PER_LOGIN, entered)));
+        limiter.consumeAll(List.of(
+                new RateLimitToken(RateLimit.LOGIN_ATTEMPTS_PER_IP, ip),
+                new RateLimitToken(RateLimit.LOGIN_FAILURES_PER_IP, ip),
+                new RateLimitToken(RateLimit.LOGIN_FAILURES_PER_LOGIN, entered)));
         Authentication authenticated;
         try {
             authenticated = authentication.authenticate(
@@ -78,26 +77,6 @@ public class SessionController {
         limiter.refund(RateLimit.LOGIN_FAILURES_PER_IP, ip);
         limiter.refund(RateLimit.LOGIN_FAILURES_PER_LOGIN, entered);
     }
-
-    /**
-     * Prend les jetons dans l'ordre. Quand une limite refuse, ceux déjà pris sont rendus : aucune vérification n'a eu
-     * lieu, la requête ne compte ni comme tentative ni comme échec (SEC-10, ADR 0021).
-     */
-    private void take(List<Token> tokens) {
-        List<Token> taken = new ArrayList<>(tokens.size());
-        for (Token token : tokens) {
-            try {
-                limiter.consume(token.limit(), token.key());
-            } catch (RateLimitExceededException e) {
-                taken.forEach(t -> limiter.refund(t.limit(), t.key()));
-                throw e;
-            }
-            taken.add(token);
-        }
-    }
-
-    /** Un jeton d'une limite dont la clé est une IP ou une saisie. */
-    private record Token(RateLimit limit, String key) {}
 
     /**
      * AUTH-53 : la session est invalidée en base, ses cookies expirés, puis le geste est journalisé : un journal
