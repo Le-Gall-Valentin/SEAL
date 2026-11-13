@@ -3,10 +3,12 @@ package fr.vlegall.seal.common;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,5 +75,39 @@ class BoundedBackgroundTasksTest {
         assertThatNoException().isThrownBy(() -> tasks.submit(() -> {}));
         release.countDown();
         assertThat(output).contains("File des tâches d'arrière-plan pleine");
+    }
+
+    @Test
+    @DisplayName("AUTH-14 : à l'arrêt, la tâche en cours et celles de la file finissent avant la fermeture")
+    void auth14ShutdownRunsTheQueuedTasks() throws Exception {
+        BoundedBackgroundTasks stopping = new BoundedBackgroundTasks(10);
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(2);
+        stopping.submit(() -> {
+            started.countDown();
+            try {
+                release.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            done.countDown();
+        });
+        stopping.submit(done::countDown);
+        assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+
+        Thread stopper = new Thread(() -> {
+            try {
+                stopping.destroy();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        stopper.start();
+        Awaitility.await().atMost(Duration.ofSeconds(5)).until(stopping::isStopping);
+        release.countDown();
+        stopper.join(10_000);
+
+        assertThat(done.getCount()).isZero();
     }
 }

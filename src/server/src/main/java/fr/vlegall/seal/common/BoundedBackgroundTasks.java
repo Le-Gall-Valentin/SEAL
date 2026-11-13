@@ -13,7 +13,8 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Component;
 
 /**
- * Tâches d'arrière-plan sur un fil unique et une file bornée (A06), comme l'envoi des courriels (ADR 0019, point 8).
+ * Tâches d'arrière-plan sur un fil unique et une file bornée (A06) : envoi des courriels (ADR 0019, point 8) et demandes
+ * de réinitialisation (ADR 0022).
  * L'identifiant de corrélation de la requête suit la tâche (SEC-21). Une tâche en échec est journalisée par le seul nom
  * de son exception, sans arrêter les suivantes. À l'arrêt, les tâches programmées ont 5 secondes pour finir.
  */
@@ -45,8 +46,16 @@ public final class BoundedBackgroundTasks implements BackgroundTasks, Disposable
         try {
             executor.execute(() -> run(task, context));
         } catch (RejectedExecutionException e) {
-            LOG.warn("File des tâches d'arrière-plan pleine : tâche abandonnée");
+            LOG.warn(
+                    executor.isShutdown()
+                            ? "Arrêt en cours : tâche d'arrière-plan abandonnée"
+                            : "File des tâches d'arrière-plan pleine : tâche abandonnée");
         }
+    }
+
+    /** Vrai dès que l'arrêt a commencé : plus aucune tâche n'est acceptée. */
+    boolean isStopping() {
+        return executor.isShutdown();
     }
 
     private static void run(Runnable task, @Nullable Map<String, String> context) {
