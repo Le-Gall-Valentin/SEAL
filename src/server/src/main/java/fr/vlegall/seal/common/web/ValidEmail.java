@@ -1,6 +1,7 @@
-package fr.vlegall.seal.identity.infrastructure.web;
+package fr.vlegall.seal.common.web;
 
-import fr.vlegall.seal.identity.domain.model.EmailAddress;
+import fr.vlegall.seal.common.EmailFormat;
+import fr.vlegall.seal.common.Unicode;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
@@ -12,7 +13,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.jspecify.annotations.Nullable;
 
-/** SEC-01 : courriel au format d'{@link EmailAddress}, la règle n'étant écrite qu'une fois (d'après NIDO). */
+/** SEC-01 : courriel au format d'{@link EmailFormat}, après NFC, la règle n'étant écrite qu'une fois (d'après NIDO). */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
@@ -30,7 +31,7 @@ public @interface ValidEmail {
 
         @Override
         public boolean isValid(@Nullable String value, ConstraintValidatorContext context) {
-            return value == null || EmailAddress.parse(value).isPresent();
+            return value == null || EmailFormat.isValid(Unicode.nfc(value));
         }
     }
 }

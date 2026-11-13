@@ -3,6 +3,8 @@ package fr.vlegall.seal.common.mail;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
+import fr.vlegall.seal.common.BackgroundTasks;
+import fr.vlegall.seal.common.BoundedBackgroundTasks;
 import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.logging.CorrelationIdFilter;
 import fr.vlegall.seal.support.RecordingMailSender;
@@ -10,7 +12,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.RejectedExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,13 +35,13 @@ class MailDispatcherTest {
         MDC.clear();
     }
 
-    private MailDispatcher dispatcher(MailExecutor executor) {
+    private MailDispatcher dispatcher(BackgroundTasks background) {
         SealProperties properties = new SealProperties(
                 URI.create("https://localhost:8443"),
                 new SealProperties.Security(Duration.ofMinutes(5)),
                 new SealProperties.Session(Duration.ofHours(12)),
                 new SealProperties.Mail("SEAL <noreply@seal.localhost>"));
-        return new MailDispatcher(sender, properties, executor);
+        return new MailDispatcher(sender, properties, background);
     }
 
     /** Ouvre une transaction et sa synchronisation, comme le ferait le gestionnaire de transactions. */
@@ -59,18 +60,16 @@ class MailDispatcherTest {
     @Test
     @DisplayName("SEC-21 : l'identifiant de corrélation de la requête suit le courriel sur le fil d'envoi")
     void sec21CorrelationIdFollowsTheMail() throws Exception {
-        List<Thread> threads = new ArrayList<>();
-        MailExecutor otherThread = sending -> {
-            Thread thread = new Thread(sending, "seal-mail-test");
-            threads.add(thread);
-            thread.start();
-        };
-        begin();
-        MDC.put(CorrelationIdFilter.MDC_KEY, "requete-1");
+        BoundedBackgroundTasks background = new BoundedBackgroundTasks();
+        try {
+            begin();
+            MDC.put(CorrelationIdFilter.MDC_KEY, "requete-1");
 
-        dispatcher(otherThread).sendAfterCommit(MESSAGE);
-        commit();
-        threads.getFirst().join(5_000);
+            dispatcher(background).sendAfterCommit(MESSAGE);
+            commit();
+        } finally {
+            background.destroy();
+        }
 
         assertThat(sender.correlationIds()).containsExactly("requete-1");
     }
@@ -99,16 +98,14 @@ class MailDispatcherTest {
     }
 
     @Test
-    @DisplayName("AUTH-14 : une file pleine abandonne le courriel sans faire échouer la requête (A06)")
-    void a06FullQueueDropsTheMailWithoutFailingTheRequest() {
+    @DisplayName("AUTH-14 : rien ne part avant la validation de la transaction (ADR 0019, point 8)")
+    void auth14NothingLeavesBeforeTheCommit() {
         begin();
 
-        dispatcher(sending -> {
-                    throw new RejectedExecutionException("pleine");
-                })
-                .sendAfterCommit(MESSAGE);
-        commit();
+        dispatcher(Runnable::run).sendAfterCommit(MESSAGE);
 
         assertThat(sender.sent()).isEmpty();
+        commit();
+        assertThat(sender.sent()).hasSize(1);
     }
 }

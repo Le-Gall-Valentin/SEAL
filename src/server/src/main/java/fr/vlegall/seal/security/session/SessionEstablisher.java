@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalLong;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -38,17 +39,20 @@ public final class SessionEstablisher {
     private final SessionAuthenticationStrategy renewal;
     private final CsrfTokenRepository csrfTokens;
     private final Clock clock;
+    private final CredentialVersions versions;
 
-    public SessionEstablisher(CsrfTokenRepository csrfTokens, Clock clock) {
+    public SessionEstablisher(CsrfTokenRepository csrfTokens, Clock clock, CredentialVersions versions) {
         this.renewal = new CompositeSessionAuthenticationStrategy(
                 List.of(new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrfTokens)));
         this.csrfTokens = csrfTokens;
         this.clock = clock;
+        this.versions = versions;
     }
 
     /**
      * AUTH-20 : session d'une connexion, selon l'authentification rendue par l'{@code AuthenticationManager} : complète
-     * pour un compte actif, restreinte sinon (AUTH-16). Une authentification sans compte SEAL n'ouvre rien (échec fermé).
+     * pour un compte actif, restreinte sinon (AUTH-16). Le principal rendu est gardé tel quel, avec la version du mot de
+     * passe vérifié (ADR 0023). Une authentification sans compte SEAL n'ouvre rien (échec fermé).
      */
     public Authentication open(Authentication authenticated, HttpServletRequest request, HttpServletResponse response) {
         if (!(authenticated.getPrincipal() instanceof SealPrincipal principal)) {
@@ -56,19 +60,7 @@ public final class SessionEstablisher {
         }
         boolean active = authenticated.getAuthorities().stream()
                 .anyMatch(authority -> SealAuthorities.ACCOUNT_ACTIVE.equals(authority.getAuthority()));
-        return active
-                ? openFull(principal.userId(), request, response)
-                : openRestricted(principal.userId(), request, response);
-    }
-
-    /** AUTH-20, AUTH-23 : session complète, après la connexion d'un compte actif, sous un nouvel identifiant. */
-    public Authentication openFull(UserId user, HttpServletRequest request, HttpServletResponse response) {
-        List<GrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_ACTIVE),
-                FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_PASSWORD)
-                        .issuedAt(clock.instant())
-                        .build());
-        return establish(new SealPrincipal(user), authorities, request, response);
+        return establish(principal, active ? fullAuthorities() : restrictedAuthorities(), request, response);
     }
 
     /**
@@ -84,14 +76,30 @@ public final class SessionEstablisher {
         csrfTokens.saveToken(null, request, response);
     }
 
-    /** AUTH-16 : session restreinte, après l'inscription ou la connexion d'un compte non vérifié. */
+    /**
+     * AUTH-16 : session restreinte, après l'inscription. Elle grave la version courante du mot de passe que le compte
+     * vient de choisir : toute session d'un compte qui a un mot de passe est ainsi comparée (ADR 0023). La connexion
+     * passe par {@link #open}, qui garde la version lue avec le haché vérifié.
+     */
     public Authentication openRestricted(UserId user, HttpServletRequest request, HttpServletResponse response) {
-        List<GrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL),
-                FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_PASSWORD)
-                        .issuedAt(clock.instant())
-                        .build());
-        return establish(new SealPrincipal(user), authorities, request, response);
+        OptionalLong version = versions.current(user);
+        SealPrincipal principal =
+                version.isPresent() ? new SealPrincipal(user, version.getAsLong()) : new SealPrincipal(user);
+        return establish(principal, restrictedAuthorities(), request, response);
+    }
+
+    private List<GrantedAuthority> fullAuthorities() {
+        return List.of(new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_ACTIVE), passwordFactor());
+    }
+
+    private List<GrantedAuthority> restrictedAuthorities() {
+        return List.of(new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL), passwordFactor());
+    }
+
+    private GrantedAuthority passwordFactor() {
+        return FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_PASSWORD)
+                .issuedAt(clock.instant())
+                .build();
     }
 
     /**

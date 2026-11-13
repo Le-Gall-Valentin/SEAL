@@ -56,9 +56,9 @@ class SchemaMigrationIT {
     }
 
     @Test
-    @DisplayName("DATA-01 : le schéma vient des migrations Flyway V1 et V2, validées par Hibernate")
+    @DisplayName("DATA-01 : le schéma vient des migrations Flyway V1 à V3, validées par Hibernate")
     void data01SchemaComesFromFlyway() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
         assertThat(jdbc.queryForObject(
                         "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
                                 + "AND table_name IN ('users', 'messages', 'spring_session', 'spring_session_attributes')",
@@ -108,7 +108,7 @@ class SchemaMigrationIT {
         assertThat(columnsOf("email_codes"))
                 .containsExactly(
                         "id", "user_id", "purpose", "code_hash", "target", "attempts", "expires_at", "consumed_at");
-        assertThat(columnsOf("user_credentials")).containsExactly("user_id", "password_hash");
+        assertThat(columnsOf("user_credentials")).containsExactly("user_id", "password_hash", "version");
         assertThat(columnsOf("password_reset_tokens"))
                 .containsExactly("id", "user_id", "token_hash", "expires_at", "consumed_at");
         assertThat(columnsOf("totp_factors")).containsExactly("user_id", "secret_enc", "enabled_at", "last_step");
@@ -202,6 +202,54 @@ class SchemaMigrationIT {
                     .isEqualTo(1);
             assertThat(v1.queryForObject("SELECT count(*) FROM key_challenges WHERE user_id = ?", Integer.class, user))
                     .isEqualTo(1);
+        } finally {
+            jdbc.execute("DROP DATABASE IF EXISTS seal_upgrade WITH (FORCE)");
+        }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("AUTH-70 : la V3 vide les sessions, aucune ne portant de version du mot de passe (ADR 0023)")
+    void auth70VersionThreeDropsTheSessionsOpenedBefore() {
+        jdbc.execute("DROP DATABASE IF EXISTS seal_upgrade");
+        jdbc.execute("CREATE DATABASE seal_upgrade");
+        HikariDataSource main = (HikariDataSource) dataSource;
+        DriverManagerDataSource upgrade = new DriverManagerDataSource(
+                main.getJdbcUrl().replaceFirst("/[^/?]+(\\?|$)", "/seal_upgrade$1"),
+                main.getUsername(),
+                main.getPassword());
+        try {
+            Flyway.configure()
+                    .dataSource(upgrade)
+                    .locations("classpath:db/migration")
+                    .target("2")
+                    .load()
+                    .migrate();
+            JdbcTemplate v2 = new JdbcTemplate(upgrade);
+            UUID user = v2.queryForObject(
+                    "INSERT INTO users (username, display_name, email) VALUES ('erin', 'Erin', 'erin@exemple.ca')"
+                            + " RETURNING id",
+                    UUID.class);
+            v2.update("INSERT INTO user_credentials (user_id, password_hash) VALUES (?, '{argon2}h')", user);
+            v2.update(
+                    "INSERT INTO spring_session (primary_id, session_id, creation_time, last_access_time,"
+                            + " max_inactive_interval, expiry_time, principal_name) VALUES ('p', 's', 0, 0, 1800, 9999999999999,"
+                            + " ?)",
+                    user.toString());
+            v2.update("INSERT INTO spring_session_attributes VALUES ('p', 'SPRING_SECURITY_CONTEXT', '\\x00')");
+
+            Flyway.configure()
+                    .dataSource(upgrade)
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
+
+            assertThat(v2.queryForObject("SELECT count(*) FROM spring_session", Integer.class))
+                    .isZero();
+            assertThat(v2.queryForObject("SELECT count(*) FROM spring_session_attributes", Integer.class))
+                    .isZero();
+            assertThat(v2.queryForObject("SELECT version FROM user_credentials WHERE user_id = ?", Long.class, user))
+                    .isEqualTo(1L);
         } finally {
             jdbc.execute("DROP DATABASE IF EXISTS seal_upgrade WITH (FORCE)");
         }

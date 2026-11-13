@@ -4,11 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.authentication.domain.model.Password;
-import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
 import fr.vlegall.seal.common.UserId;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,18 +19,7 @@ class InitialPasswordHandlerTest {
 
     private static final UserId USER = new UserId(UUID.fromString("01900000-0000-7000-8000-000000000001"));
 
-    private final Map<UserId, String> stored = new HashMap<>();
-    private final CredentialRepository credentials = new CredentialRepository() {
-        @Override
-        public void save(UserId user, String passwordHash) {
-            stored.put(user, passwordHash);
-        }
-
-        @Override
-        public Optional<String> findHash(UserId user) {
-            return Optional.ofNullable(stored.get(user));
-        }
-    };
+    private final InMemoryCredentials credentials = new InMemoryCredentials();
     private final List<String> hashed = new ArrayList<>();
     private final PasswordHasher hasher = new PasswordHasher() {
         @Override
@@ -56,8 +43,8 @@ class InitialPasswordHandlerTest {
             hashed.add("leurre");
         }
     };
-    private final InitialPasswordHandler handler =
-            new InitialPasswordHandler(Set.of("correcthorsebatterystaple")::contains, hasher, credentials);
+    private final InitialPasswordHandler handler = new InitialPasswordHandler(
+            new PasswordPreparation(Set.of("correcthorsebatterystaple")::contains, hasher), hasher, credentials);
 
     @Test
     @DisplayName("AUTH-13 : un mot de passe accepté est haché, normalisé en NFKC, sans rien écrire")
@@ -66,7 +53,7 @@ class InitialPasswordHandlerTest {
                 handler.prepare("fjord-tuque-raquette\uFB01", List.of("valentin.le.gall", "valentin"));
 
         assertThat(prepared).contains("hash(fjord-tuque-raquettefi)");
-        assertThat(stored).isEmpty();
+        assertThat(credentials.hashes()).isEmpty();
     }
 
     @Test
@@ -83,7 +70,7 @@ class InitialPasswordHandlerTest {
     void auth13AnythingButAPreparedHashIsRefused() {
         assertThatThrownBy(() -> handler.store(USER, "fjord-tuque-raquette"))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThat(stored).isEmpty();
+        assertThat(credentials.hashes()).isEmpty();
     }
 
     @Test
@@ -91,6 +78,6 @@ class InitialPasswordHandlerTest {
     void auth13PreparedHashIsStored() {
         handler.store(USER, "hash(fjord-tuque-raquette)");
 
-        assertThat(stored).containsExactly(Map.entry(USER, "hash(fjord-tuque-raquette)"));
+        assertThat(credentials.hashes()).containsExactly(Map.entry(USER, "hash(fjord-tuque-raquette)"));
     }
 }

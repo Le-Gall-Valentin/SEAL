@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import fr.vlegall.seal.authentication.domain.model.LoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
-import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
 import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.common.UserId;
@@ -26,7 +25,6 @@ class LoginHandlerTest {
 
     private final Map<String, UserId> logins = new HashMap<>();
     private final Set<UserId> verified = new HashSet<>();
-    private final Map<UserId, String> hashes = new HashMap<>();
     /** Chaque vérification Argon2id, réelle ou leurre, dans l'ordre. */
     private final List<String> verifications = new ArrayList<>();
 
@@ -41,17 +39,7 @@ class LoginHandlerTest {
             return verified.contains(user);
         }
     };
-    private final CredentialRepository credentials = new CredentialRepository() {
-        @Override
-        public void save(UserId user, String passwordHash) {
-            hashes.put(user, passwordHash);
-        }
-
-        @Override
-        public Optional<String> findHash(UserId user) {
-            return Optional.ofNullable(hashes.get(user));
-        }
-    };
+    private final InMemoryCredentials credentials = new InMemoryCredentials();
     private final PasswordHasher hasher = new PasswordHasher() {
         @Override
         public String hash(Password password) {
@@ -103,7 +91,7 @@ class LoginHandlerTest {
             verified.add(user);
         }
         if (withPassword) {
-            hashes.put(user, "hash(" + PASSWORD + ")");
+            credentials.save(user, "hash(" + PASSWORD + ")");
         }
         return user;
     }
@@ -113,7 +101,7 @@ class LoginHandlerTest {
     void auth20RightPasswordOfAnActiveAccountIsAuthenticated() {
         UserId user = account("valentin", true, true);
 
-        assertThat(handler.login("valentin", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, true));
+        assertThat(handler.login("valentin", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, true, 1L));
         assertThat(verifications).containsExactly("réelle");
         assertThat(events).containsExactly("réussie:" + user.value());
     }
@@ -123,7 +111,7 @@ class LoginHandlerTest {
     void auth16RightPasswordOfAPendingAccountIsAuthenticatedUnverified() {
         UserId user = account("attente", false, true);
 
-        assertThat(handler.login("attente", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, false));
+        assertThat(handler.login("attente", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, false, 1L));
         assertThat(verifications).containsExactly("réelle");
     }
 
@@ -152,6 +140,15 @@ class LoginHandlerTest {
         assertThat(handler.login("valentin", "mauvais-mot-de-passe")).isEqualTo(new LoginOutcome.Rejected());
         assertThat(verifications).containsExactly("réelle");
         assertThat(events).containsExactly("refusée:" + user.value());
+    }
+
+    @Test
+    @DisplayName("AUTH-70 : la connexion rend la version du mot de passe lue avec le haché vérifié (ADR 0023)")
+    void auth70LoginReturnsTheVersionReadWithTheHash() {
+        UserId user = account("valentin", true, true);
+        credentials.changeHash(user, "hash(" + PASSWORD + ")");
+
+        assertThat(handler.login("valentin", PASSWORD)).isEqualTo(new LoginOutcome.Authenticated(user, true, 2L));
     }
 
     @Test

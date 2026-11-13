@@ -57,6 +57,11 @@
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.SessionController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- /api/v1/auth/password-reset/request, /inspect et /confirm (anonyme seulement, ADR 0022) : PasswordResetIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.web.PasswordResetController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /api/v1/auth/verify-email, /resend et /change, session restreinte seulement : EmailVerificationIT. -->
     <Match>
         <Class name="fr.vlegall.seal.identity.infrastructure.web.EmailVerificationController"/>

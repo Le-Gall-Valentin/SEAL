@@ -2,6 +2,8 @@ package fr.vlegall.seal.security;
 
 import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.session.AbsoluteSessionTimeoutFilter;
+import fr.vlegall.seal.security.session.CredentialVersionFilter;
+import fr.vlegall.seal.security.session.CredentialVersions;
 import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.web.ProblemDetailsSecurityHandler;
 import fr.vlegall.seal.security.web.RequestBodyLimitFilter;
@@ -74,7 +76,8 @@ class SecurityConfig {
             SealProperties seal,
             ProblemDetailsSecurityHandler problemDetails,
             Clock clock,
-            CsrfTokenRepository csrfTokens) {
+            CsrfTokenRepository csrfTokens,
+            CredentialVersions credentialVersions) {
         http.authorizeHttpRequests(requests -> requests
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
@@ -85,9 +88,15 @@ class SecurityConfig {
                         // AUTH-16 : toute session, restreinte ou complète, lit son compte ; l'anonyme reçoit 401.
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/me")
                         .authenticated()
-                        // ADR 0019, ADR 0021 : inscription et connexion réservées aux anonymes ; une session reçoit
-                        // 403.
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login")
+                        // ADR 0019, ADR 0021, ADR 0022 : inscription, connexion et mot de passe oublié réservés aux
+                        // anonymes ; une session reçoit 403.
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/password-reset/request",
+                                "/api/v1/auth/password-reset/inspect",
+                                "/api/v1/auth/password-reset/confirm")
                         .anonymous()
                         // AUTH-53 : déconnexion ouverte à toute session, restreinte ou complète (AUTH-16).
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout")
@@ -126,6 +135,9 @@ class SecurityConfig {
                 .addFilterBefore(
                         new AbsoluteSessionTimeoutFilter(clock, seal.session().absoluteTimeout()),
                         SecurityContextHolderFilter.class)
+                // AUTH-70, ADR 0023 : une session ouverte avec une version périmée du mot de passe tombe, juste après
+                // le chargement du contexte de sécurité.
+                .addFilterAfter(new CredentialVersionFilter(credentialVersions), SecurityContextHolderFilter.class)
                 // SEC-01 : corps borné avant toute lecture par la chaîne (jeton CSRF de formulaire compris), après les
                 // en-têtes, que le refus porte aussi. FormContentFilter, placé avant, est désactivé (application.yaml).
                 .addFilterAfter(

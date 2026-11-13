@@ -1,5 +1,6 @@
 package fr.vlegall.seal.authentication.infrastructure.security;
 
+import fr.vlegall.seal.authentication.domain.port.out.PasswordResetEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.journal.SecurityEvent;
@@ -9,9 +10,13 @@ import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
-/** Écrit les événements de connexion dans {@code security_events}, chacun dans sa propre transaction. */
+/**
+ * Écrit les événements de connexion et de réinitialisation dans {@code security_events} : la connexion et la
+ * déconnexion chacune dans sa propre transaction (ADR 0021), la réinitialisation dans celle qui remplace le haché (ADR
+ * 0013, point 6).
+ */
 @Component
-public class AuthenticationJournalAdapter implements SecurityEventPort {
+public class AuthenticationJournalAdapter implements SecurityEventPort, PasswordResetEventPort {
 
     private final SecurityJournal journal;
 
@@ -33,5 +38,14 @@ public class AuthenticationJournalAdapter implements SecurityEventPort {
     @Override
     public void loggedOut(UserId user) {
         journal.recordStandalone(new SecurityEvent(SecurityEventType.LOGOUT, user, Map.of()));
+    }
+
+    /**
+     * SEC-20, SEC-21 : dans la transaction qui remplace le haché (ADR 0013, point 6) ; seul le compte est noté, ni le
+     * jeton, ni le lien, ni le mot de passe.
+     */
+    @Override
+    public void passwordReset(UserId user) {
+        journal.recordInTransaction(new SecurityEvent(SecurityEventType.PASSWORD_RESET, user, Map.of()));
     }
 }

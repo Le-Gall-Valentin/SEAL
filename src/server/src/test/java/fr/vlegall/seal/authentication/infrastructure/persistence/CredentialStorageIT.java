@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.authentication.application.port.in.InitialPasswordUseCase;
+import fr.vlegall.seal.authentication.domain.model.StoredCredential;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.support.SealIntegrationTest;
@@ -106,7 +107,7 @@ class CredentialStorageIT {
         UserId user = insertUser("credential.trois");
         transactions.executeWithoutResult(status -> initialPassword.store(user, hash));
 
-        assertThat(credentials.findHash(user)).contains(hash);
-        assertThat(credentials.findHash(insertUser("credential.quatre"))).isEmpty();
+        assertThat(credentials.find(user)).contains(new StoredCredential(hash, 1));
+        assertThat(credentials.find(insertUser("credential.quatre"))).isEmpty();
     }
 }

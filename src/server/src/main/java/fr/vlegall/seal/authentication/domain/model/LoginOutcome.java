@@ -10,8 +10,9 @@ public sealed interface LoginOutcome {
      * Mot de passe juste.
      *
      * @param verified vrai si le compte est actif ; faux s'il est en attente, d'où une session restreinte (AUTH-16)
+     * @param credentialVersion version du mot de passe vérifié, gravée dans la session (ADR 0023)
      */
-    record Authenticated(UserId user, boolean verified) implements LoginOutcome {
+    record Authenticated(UserId user, boolean verified, long credentialVersion) implements LoginOutcome {
 
         public Authenticated {
             Objects.requireNonNull(user, "user");

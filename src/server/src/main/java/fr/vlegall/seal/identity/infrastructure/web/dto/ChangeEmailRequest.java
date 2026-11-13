@@ -1,7 +1,7 @@
 package fr.vlegall.seal.identity.infrastructure.web.dto;
 
+import fr.vlegall.seal.common.web.ValidEmail;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
-import fr.vlegall.seal.identity.infrastructure.web.ValidEmail;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 

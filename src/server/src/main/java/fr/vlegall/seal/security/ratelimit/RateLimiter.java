@@ -12,8 +12,10 @@ import io.github.bucket4j.ConsumptionProbe;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -75,6 +77,23 @@ public final class RateLimiter {
     public void consume(RateLimit limit, String key) {
         requireKind(limit, false);
         consume(limit, key, null);
+    }
+
+    /**
+     * Prend un jeton de chaque limite, dans l'ordre donné : par IP d'abord (ADR 0013, point 4). Quand une limite
+     * refuse, les jetons déjà pris pour cette requête sont rendus, puisqu'elle n'aboutit à rien (ADR 0021).
+     */
+    public void consumeAll(List<RateLimitToken> tokens) {
+        List<RateLimitToken> taken = new ArrayList<>(tokens.size());
+        for (RateLimitToken token : tokens) {
+            try {
+                consume(token.limit(), token.key());
+            } catch (RateLimitExceededException e) {
+                taken.forEach(t -> refund(t.limit(), t.key()));
+                throw e;
+            }
+            taken.add(token);
+        }
     }
 
     /** Prend un jeton d'une limite par utilisateur, ou refuse ; un refus est rattaché à cet utilisateur. */

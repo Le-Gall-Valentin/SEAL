@@ -3,6 +3,7 @@ package fr.vlegall.seal.authentication.application.handler;
 import fr.vlegall.seal.authentication.application.port.in.LoginUseCase;
 import fr.vlegall.seal.authentication.domain.model.LoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.Password;
+import fr.vlegall.seal.authentication.domain.model.StoredCredential;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
@@ -34,25 +35,27 @@ public class LoginHandler implements LoginUseCase {
 
     /**
      * {@code NEVER} : Argon2id et l'attente de son sémaphore ne retiennent aucune connexion (ADR 0020). Un compte
-     * inconnu, supprimé ou sans mot de passe coûte la vérification d'un leurre, comme un compte existant (AUTH-21).
+     * inconnu, supprimé ou sans mot de passe coûte la vérification d'un leurre, comme un compte existant (AUTH-21). La
+     * version du mot de passe, lue avec le haché vérifié, part avec la session (ADR 0023).
      */
     @Override
     @Transactional(propagation = Propagation.NEVER)
     public LoginOutcome login(String login, String password) {
         Password candidate = Password.fromInput(password);
         Optional<UserId> account = accounts.findForLogin(login);
-        Optional<String> hash = account.flatMap(credentials::findHash);
-        if (account.isEmpty() || hash.isEmpty()) {
+        Optional<StoredCredential> stored = account.flatMap(credentials::find);
+        if (account.isEmpty() || stored.isEmpty()) {
             hasher.verifyDecoy(candidate);
             journal.loginFailed(account.orElse(null));
             return new LoginOutcome.Rejected();
         }
         UserId user = account.get();
-        if (!hasher.matches(candidate, hash.get())) {
+        if (!hasher.matches(candidate, stored.get().hash())) {
             journal.loginFailed(user);
             return new LoginOutcome.Rejected();
         }
         journal.loginSucceeded(user);
-        return new LoginOutcome.Authenticated(user, accounts.isVerified(user));
+        return new LoginOutcome.Authenticated(
+                user, accounts.isVerified(user), stored.get().version());
     }
 }

@@ -19,6 +19,7 @@ import fr.vlegall.seal.security.journal.SecurityJournal;
 import fr.vlegall.seal.support.MutableClock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -316,5 +317,53 @@ class RateLimiterTest {
         clock.advance(Duration.ofHours(1));
         assertThat(limiter.remaining(RateLimit.EMAIL_CODE_RESENDS_PER_USER, user))
                 .isEqualTo(3);
+    }
+
+    private static final String IP = "203.0.113.9";
+    private static final String EMAIL = "valentin@exemple.ca";
+
+    private List<RateLimitToken> resetTokens(String ip, String email) {
+        return List.of(
+                new RateLimitToken(RateLimit.PASSWORD_RESETS_PER_IP, ip),
+                new RateLimitToken(RateLimit.PASSWORD_RESETS_PER_EMAIL, email));
+    }
+
+    @Test
+    @DisplayName("SEC-10 : consumeAll prend un jeton de chaque limite de la requête")
+    void sec10ConsumeAllTakesOneTokenFromEachLimit() {
+        for (int i = 0; i < 3; i++) {
+            limiter.consumeAll(resetTokens(IP, EMAIL));
+        }
+
+        assertThat(refusal(() -> limiter.consume(RateLimit.PASSWORD_RESETS_PER_IP, IP)))
+                .isNotNull();
+        assertThat(refusal(() -> limiter.consume(RateLimit.PASSWORD_RESETS_PER_EMAIL, EMAIL)))
+                .isNotNull();
+    }
+
+    @Test
+    @DisplayName("SEC-10 : quand une limite refuse, les jetons déjà pris pour la requête sont rendus (ADR 0021)")
+    void sec10RefusalRefundsTheTokensAlreadyTaken() {
+        consumeTimes(RateLimit.PASSWORD_RESETS_PER_EMAIL, EMAIL, 3);
+
+        RateLimitExceededException refused = refusal(() -> limiter.consumeAll(resetTokens(IP, EMAIL)));
+
+        assertThat(refused.limit()).isEqualTo(RateLimit.PASSWORD_RESETS_PER_EMAIL);
+        consumeTimes(RateLimit.PASSWORD_RESETS_PER_IP, IP, 3);
+        assertThat(refusal(() -> limiter.consume(RateLimit.PASSWORD_RESETS_PER_IP, IP)))
+                .isNotNull();
+    }
+
+    @Test
+    @DisplayName("SEC-10 : quand la première limite refuse, aucune autre n'est entamée (ADR 0013, point 4)")
+    void sec10FirstRefusalTouchesNoOtherLimit() {
+        consumeTimes(RateLimit.PASSWORD_RESETS_PER_IP, IP, 3);
+
+        assertThat(refusal(() -> limiter.consumeAll(resetTokens(IP, EMAIL))).limit())
+                .isEqualTo(RateLimit.PASSWORD_RESETS_PER_IP);
+
+        consumeTimes(RateLimit.PASSWORD_RESETS_PER_EMAIL, EMAIL, 3);
+        assertThat(refusal(() -> limiter.consume(RateLimit.PASSWORD_RESETS_PER_EMAIL, EMAIL)))
+                .isNotNull();
     }
 }
