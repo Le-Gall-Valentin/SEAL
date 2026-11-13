@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SealIntegrationTest
 class PasswordResetStorageIT {
@@ -37,6 +38,9 @@ class PasswordResetStorageIT {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     private UserId insertUser() {
         String username = "reset." + UUID.randomUUID().toString().substring(0, 8);
@@ -164,5 +168,19 @@ class PasswordResetStorageIT {
         assertThat(credentials.findHash(user)).contains("{argon2}nouveau");
         assertThat(credentials.changeHash(oauthOnly, "{argon2}nouveau")).isFalse();
         assertThat(credentials.findHash(oauthOnly)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AUTH-70 : le verrou du compte n'existe que s'il a un mot de passe (ADR 0022, point 4)")
+    void auth70LockNeedsACredential() {
+        UserId user = insertUser();
+        UserId oauthOnly = insertUser();
+        credentials.save(user, "{argon2}haché");
+
+        Boolean withPassword = transactions.execute(status -> credentials.lock(user));
+        Boolean withoutPassword = transactions.execute(status -> credentials.lock(oauthOnly));
+
+        assertThat(withPassword).isTrue();
+        assertThat(withoutPassword).isFalse();
     }
 }

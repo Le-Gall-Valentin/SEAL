@@ -6,7 +6,6 @@ import fr.vlegall.seal.authentication.domain.model.LiveReset;
 import fr.vlegall.seal.authentication.domain.model.ResetOutcome;
 import fr.vlegall.seal.authentication.domain.model.ResetToken;
 import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
-import fr.vlegall.seal.authentication.domain.port.out.PasswordResetEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetTokenRepository;
 import fr.vlegall.seal.authentication.domain.port.out.SessionRevocationPort;
 import fr.vlegall.seal.common.ApplicationService;
@@ -23,7 +22,6 @@ public class ResetPasswordHandler implements ResetPasswordUseCase {
     private final PasswordPreparation preparation;
     private final PasswordResetWriter writer;
     private final SessionRevocationPort sessions;
-    private final PasswordResetEventPort journal;
     private final Clock clock;
 
     public ResetPasswordHandler(
@@ -32,21 +30,19 @@ public class ResetPasswordHandler implements ResetPasswordUseCase {
             PasswordPreparation preparation,
             PasswordResetWriter writer,
             SessionRevocationPort sessions,
-            PasswordResetEventPort journal,
             Clock clock) {
         this.tokens = tokens;
         this.accounts = accounts;
         this.preparation = preparation;
         this.writer = writer;
         this.sessions = sessions;
-        this.journal = journal;
         this.clock = clock;
     }
 
     /**
-     * {@code NEVER} : Argon2id ne retient aucune connexion (ADR 0020), et la révocation, qui refuse une transaction
-     * active, suit la validation de l'écriture. Un lien invalide ne coûte aucun calcul. Les sessions tombent avant le
-     * journal, comme à la déconnexion : un journal indisponible ne les laisse pas ouvertes (ADR 0022, point 6).
+     * {@code NEVER} : Argon2id ne retient aucune connexion (ADR 0020). Un lien invalide ne coûte aucun calcul. Le haché,
+     * le lien et le journal s'écrivent dans la transaction du {@link PasswordResetWriter} ; la révocation des sessions
+     * suit sa validation (ADR 0022, point 6).
      */
     @Override
     @Transactional(propagation = Propagation.NEVER)
@@ -65,7 +61,6 @@ public class ResetPasswordHandler implements ResetPasswordUseCase {
             return new ResetOutcome.InvalidToken();
         }
         sessions.revokeAll(live.get().user());
-        journal.passwordReset(live.get().user());
         return new ResetOutcome.Done();
     }
 }

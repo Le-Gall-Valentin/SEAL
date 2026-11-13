@@ -17,4 +17,12 @@ public interface CredentialRepository {
      * @return faux si le compte n'a pas de mot de passe : rien n'est écrit (ADR 0022, point 3)
      */
     boolean changeHash(UserId user, String passwordHash);
+
+    /**
+     * AUTH-70 : verrouille la ligne du compte jusqu'à la fin de la transaction de l'appelant. L'émission d'un lien et la
+     * réinitialisation le prennent en premier : elles se sérialisent par compte, sans interblocage (ADR 0022, point 4).
+     *
+     * @return faux si le compte n'a pas de mot de passe : rien n'est verrouillé
+     */
+    boolean lock(UserId user);
 }

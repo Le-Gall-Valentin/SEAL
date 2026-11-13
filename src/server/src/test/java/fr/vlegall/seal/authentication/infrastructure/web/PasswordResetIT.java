@@ -289,6 +289,63 @@ class PasswordResetIT {
     }
 
     @Test
+    @DisplayName("AUTH-70 : des demandes simultanées pour un compte ne laissent qu'un lien vivant (ADR 0022, point 4)")
+    void auth70ConcurrentRequestsLeaveOneLiveLink() throws Exception {
+        Registered account = active(unique("simult"));
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+        try {
+            List<Future<Integer>> statuses = new ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                var prepared = new AuthClient(mvc, mail).unsafe(post(REQUEST), null, Map.of("email", account.email()));
+                statuses.add(pool.submit(() -> {
+                    start.await();
+                    return mvc.perform(prepared).andReturn().getResponse().getStatus();
+                }));
+            }
+            start.countDown();
+            for (Future<Integer> status : statuses) {
+                assertThat(status.get()).isEqualTo(204);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(jdbc.sql("SELECT count(*) FROM password_reset_tokens WHERE user_id = ? AND consumed_at IS NULL")
+                        .param(account.id())
+                        .query(Long.class)
+                        .single())
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName(
+            "SEC-20 : un journal indisponible annule la réinitialisation ; le lien et l'ancien mot de passe restent"
+                    + " (ADR 0013)")
+    void sec20JournalFailureRollsTheResetBack() throws Exception {
+        Registered account = active(unique("annule"));
+        String token = requestToken(account);
+        jdbc.sql("ALTER TABLE security_events ADD CONSTRAINT test_sans_reinitialisation"
+                        + " CHECK (type <> 'PASSWORD_RESET') NOT VALID")
+                .update();
+        try {
+            assertThat(confirm(client, token, NEW_PASSWORD).getResponse().getStatus())
+                    .isEqualTo(500);
+        } finally {
+            jdbc.sql("ALTER TABLE security_events DROP CONSTRAINT test_sans_reinitialisation")
+                    .update();
+        }
+
+        assertThat(inspect(token).getResponse().getStatus())
+                .as("le lien reste utilisable")
+                .isEqualTo(200);
+        assertThat(login(account.username(), PASSWORD).getResponse().getStatus())
+                .isEqualTo(204);
+        assertThat(confirm(client, token, NEW_PASSWORD).getResponse().getStatus())
+                .isEqualTo(204);
+    }
+
+    @Test
     @DisplayName("AUTH-11 : un mot de passe refusé répond 422 PASSWORD_TOO_WEAK et garde le lien (ADR 0022)")
     void auth11WeakPasswordKeepsTheLink() throws Exception {
         Registered account = active(unique("faible"));
@@ -446,7 +503,7 @@ class PasswordResetIT {
                 .param(account.id())
                 .query(String.class)
                 .list();
-        assertThat(types).containsExactly("SESSION_REVOKED", "PASSWORD_RESET");
+        assertThat(types).containsExactly("PASSWORD_RESET", "SESSION_REVOKED");
         for (String secret : List.of(token, NEW_PASSWORD)) {
             assertThat(jdbc.sql("SELECT count(*) FROM security_events WHERE details::text LIKE ?")
                             .param("%" + secret + "%")

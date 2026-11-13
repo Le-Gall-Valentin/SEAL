@@ -40,15 +40,14 @@ public class RequestPasswordResetHandler implements RequestPasswordResetUseCase 
     }
 
     /**
-     * Le nouveau lien invalide les précédents et naît dans la même transaction ; le courriel part après sa validation
-     * (ADR 0022, points 3 et 4).
+     * Le verrou du compte, qui suppose un mot de passe, sérialise les demandes simultanées : le nouveau lien invalide
+     * les précédents et naît dans la même transaction ; le courriel part après sa validation (ADR 0022, points 3 et 4).
      */
     @Override
     @Transactional
     public void request(String email) {
-        Optional<AccountContact> contact = accounts.findActiveByEmail(email)
-                .filter(found -> credentials.findHash(found.user()).isPresent());
-        if (contact.isEmpty()) {
+        Optional<AccountContact> contact = accounts.findActiveByEmail(email);
+        if (contact.isEmpty() || !credentials.lock(contact.get().user())) {
             return;
         }
         ResetToken token = ResetToken.of(random.next(ResetToken.BYTES));

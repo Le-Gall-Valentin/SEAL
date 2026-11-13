@@ -26,6 +26,11 @@ final class InMemoryCredentials implements CredentialRepository {
         return hashes.replace(user, passwordHash) != null;
     }
 
+    @Override
+    public boolean lock(UserId user) {
+        return hashes.containsKey(user);
+    }
+
     /** Hachés enregistrés, par compte. */
     Map<UserId, String> hashes() {
         return hashes;

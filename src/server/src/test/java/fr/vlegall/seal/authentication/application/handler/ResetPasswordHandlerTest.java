@@ -23,13 +23,12 @@ class ResetPasswordHandlerTest {
             fixture.tokens,
             fixture.accounts,
             fixture.preparation(),
-            new PasswordResetWriter(fixture.tokens, fixture.credentials),
+            new PasswordResetWriter(fixture.tokens, fixture.credentials, fixture.journal),
             fixture.sessions,
-            fixture.journal,
             fixture.clock);
 
     @Test
-    @DisplayName("AUTH-70 : le succès remplace le haché, consomme le lien, puis révoque les sessions et journalise")
+    @DisplayName("AUTH-70 : le succès remplace le haché, consomme le lien et journalise, puis révoque les sessions")
     void auth70SuccessReplacesHashThenRevokesAndJournals() {
         AccountContact valentin = fixture.active("valentin", true);
         ResetToken token = fixture.issue(valentin.user());
@@ -40,12 +39,12 @@ class ResetPasswordHandlerTest {
         assertThat(fixture.tokens.findLive(token.hash(), fixture.clock.instant()))
                 .isEmpty();
         assertThat(fixture.calls)
-                .as("Argon2id hors transaction, puis l'écriture, puis la révocation avant le journal (ADR 0022)")
+                .as("Argon2id hors transaction, puis l'écriture et son journal, enfin la révocation (ADR 0013, 0022)")
                 .containsExactly(
                         "hachage",
                         "consommation",
-                        "révocation:" + valentin.user().value(),
-                        "journal:" + valentin.user().value());
+                        "journal:" + valentin.user().value(),
+                        "révocation:" + valentin.user().value());
     }
 
     @Test

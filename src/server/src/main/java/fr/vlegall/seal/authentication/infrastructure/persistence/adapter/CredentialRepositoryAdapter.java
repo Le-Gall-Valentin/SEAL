@@ -34,6 +34,15 @@ public class CredentialRepositoryAdapter implements CredentialRepository {
     }
 
     @Override
+    public boolean lock(UserId user) {
+        return jdbc.sql("SELECT 1 FROM user_credentials WHERE user_id = :user FOR UPDATE")
+                .param("user", user.value())
+                .query(Integer.class)
+                .optional()
+                .isPresent();
+    }
+
+    @Override
     public Optional<String> findHash(UserId user) {
         return jdbc.sql("SELECT password_hash FROM user_credentials WHERE user_id = :user")
                 .param("user", user.value())

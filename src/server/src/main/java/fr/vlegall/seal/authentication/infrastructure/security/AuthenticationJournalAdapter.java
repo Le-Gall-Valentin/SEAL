@@ -39,9 +39,12 @@ public class AuthenticationJournalAdapter implements SecurityEventPort, Password
         journal.recordStandalone(new SecurityEvent(SecurityEventType.LOGOUT, user, Map.of()));
     }
 
-    /** SEC-20, SEC-21 : seul le compte est noté ; ni le jeton, ni le lien, ni le mot de passe. */
+    /**
+     * SEC-20, SEC-21 : dans la transaction qui remplace le haché (ADR 0013, point 6) ; seul le compte est noté, ni le
+     * jeton, ni le lien, ni le mot de passe.
+     */
     @Override
     public void passwordReset(UserId user) {
-        journal.recordStandalone(new SecurityEvent(SecurityEventType.PASSWORD_RESET, user, Map.of()));
+        journal.recordInTransaction(new SecurityEvent(SecurityEventType.PASSWORD_RESET, user, Map.of()));
     }
 }
