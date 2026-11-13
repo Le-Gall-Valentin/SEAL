@@ -9,7 +9,10 @@ import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
-/** Écrit les événements de connexion dans {@code security_events}, chacun dans sa propre transaction. */
+/**
+ * Écrit les événements de connexion et de réinitialisation dans {@code security_events}, chacun dans sa propre
+ * transaction.
+ */
 @Component
 public class AuthenticationJournalAdapter implements SecurityEventPort {
 
@@ -33,5 +36,11 @@ public class AuthenticationJournalAdapter implements SecurityEventPort {
     @Override
     public void loggedOut(UserId user) {
         journal.recordStandalone(new SecurityEvent(SecurityEventType.LOGOUT, user, Map.of()));
+    }
+
+    /** SEC-20, SEC-21 : seul le compte est noté ; ni le jeton, ni le lien, ni le mot de passe. */
+    @Override
+    public void passwordReset(UserId user) {
+        journal.recordStandalone(new SecurityEvent(SecurityEventType.PASSWORD_RESET, user, Map.of()));
     }
 }

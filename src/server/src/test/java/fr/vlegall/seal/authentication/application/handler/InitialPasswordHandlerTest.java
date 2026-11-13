@@ -43,8 +43,8 @@ class InitialPasswordHandlerTest {
             hashed.add("leurre");
         }
     };
-    private final InitialPasswordHandler handler =
-            new InitialPasswordHandler(Set.of("correcthorsebatterystaple")::contains, hasher, credentials);
+    private final InitialPasswordHandler handler = new InitialPasswordHandler(
+            new PasswordPreparation(Set.of("correcthorsebatterystaple")::contains, hasher), hasher, credentials);
 
     @Test
     @DisplayName("AUTH-13 : un mot de passe accepté est haché, normalisé en NFKC, sans rien écrire")

@@ -15,5 +15,7 @@ public enum SecurityEventType {
     /** SEC-20 : déconnexion (AUTH-53). */
     LOGOUT,
     /** SEC-20 : sessions d'un compte révoquées (AUTH-16, AUTH-70), avec leur nombre. */
-    SESSION_REVOKED
+    SESSION_REVOKED,
+    /** SEC-20 : mot de passe réinitialisé par lien (AUTH-70). */
+    PASSWORD_RESET
 }
