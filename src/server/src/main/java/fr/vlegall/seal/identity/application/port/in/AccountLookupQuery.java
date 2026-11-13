@@ -27,8 +27,9 @@ public interface AccountLookupQuery {
     }
 
     /**
-     * Compte qui correspond à la saisie, normalisée par {@code Unicode.foldLogin} : identifiant d'un compte non supprimé,
-     * ou courriel d'un compte actif (ADR 0019). Vide pour toute autre saisie, sans erreur.
+     * Compte qui correspond à la saisie : identifiant d'un compte non supprimé, replié par {@code Unicode.foldLogin}, ou
+     * courriel d'un compte actif, normalisé en NFC et comparé sans tenir compte de la casse (ADR 0019, ADR 0021). Vide pour
+     * toute autre saisie, sans erreur.
      */
     Optional<UserId> findForLogin(String login);
 
@@ -36,8 +37,8 @@ public interface AccountLookupQuery {
     boolean isVerified(UserId user);
 
     /**
-     * AUTH-70 : coordonnées du compte actif dont le courriel vérifié est la saisie, normalisée par
-     * {@code Unicode.foldLogin}. Vide pour un compte en attente, supprimé ou inconnu, et pour toute saisie qui n'est pas
+     * AUTH-70 : coordonnées du compte actif dont le courriel vérifié est la saisie, normalisée en NFC et comparée sans
+     * tenir compte de la casse. Vide pour un compte en attente, supprimé ou inconnu, et pour toute saisie qui n'est pas
      * un courriel, sans erreur (ADR 0022, point 3).
      */
     Optional<Contact> findActiveByEmail(String email);

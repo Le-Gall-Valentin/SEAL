@@ -508,6 +508,24 @@ class PasswordResetIT {
     }
 
     @Test
+    @DisplayName("AUTH-70 : une adresse de 254 caractères avec « İ » retrouve son compte, pour se connecter comme pour"
+            + " réinitialiser (ADR 0021)")
+    void auth70LongAddressWithDottedCapitalIFindsItsAccount() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String email =
+                "\u0130" + "a".repeat(55) + suffix + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(61);
+        assertThat(email).hasSize(254);
+        AuthClient owner = new AuthClient(mvc, mail);
+        Registered account = owner.register(email, unique("longue"));
+        owner.verify(account);
+        mail.reset();
+
+        assertThat(login(email, PASSWORD).getResponse().getStatus()).isEqualTo(204);
+        assertThat(request(client, email).getResponse().getStatus()).isEqualTo(204);
+        assertThat(mail.sentTo(email)).as("le lien part au titulaire").hasSize(1);
+    }
+
+    @Test
     @DisplayName("SEC-10 : une saisie en NFD partage le seau du courriel en NFC (ADR 0021, point 5)")
     void sec10DecomposedEmailSharesTheBucket() throws Exception {
         String suffix = UUID.randomUUID().toString().substring(0, 8);

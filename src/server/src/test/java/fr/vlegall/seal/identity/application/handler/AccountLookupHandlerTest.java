@@ -134,6 +134,21 @@ class AccountLookupHandlerTest {
                 .isEqualTo(List.of("valentin", "fjord"));
     }
 
+    @Test
+    @DisplayName(
+            "AUTH-20, AUTH-70 : une adresse plus longue une fois en minuscules (« İ ») retrouve son compte (ADR 0021)")
+    void auth70AddressLongerOnceLowerCasedStillFindsItsAccount() {
+        String email = "\u0130" + "a".repeat(63) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(61);
+        assertThat(email).hasSize(254);
+        Account active = identity.add("longue", email, AccountStatus.ACTIVE);
+
+        assertThat(handler.findActiveByEmail(email))
+                .get()
+                .extracting(Contact::user)
+                .isEqualTo(active.id());
+        assertThat(handler.findForLogin(email)).contains(active.id());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"", "valentin", "a@b", "@exemple.ca", "valentin@exemple.ca\u0000"})
     @DisplayName("AUTH-70 : une saisie qui n'est pas un courriel ne donne rien, sans erreur")

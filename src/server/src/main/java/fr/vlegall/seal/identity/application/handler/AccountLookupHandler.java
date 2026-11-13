@@ -24,16 +24,20 @@ public class AccountLookupHandler implements AccountLookupQuery {
         this.users = users;
     }
 
-    /** Une saisie qui a la forme d'un identifiant le cherche ; sinon, une saisie qui a la forme d'un courriel. */
+    /**
+     * Une saisie qui a la forme d'un identifiant, une fois repliée, le cherche ; sinon, une saisie qui a la forme d'un
+     * courriel cherche le compte actif. Le courriel n'est normalisé qu'en NFC : la base le compare sans tenir compte de
+     * la casse ({@code citext}), et un passage en minuscules peut l'allonger au-delà de 254 caractères (« İ » donne
+     * deux caractères), au point de ne plus retrouver le compte (ADR 0021, mise à jour du 2026-11-13).
+     */
     @Override
     @Transactional(readOnly = true)
     public Optional<UserId> findForLogin(String login) {
-        String folded = Unicode.foldLogin(login);
-        Optional<Username> username = Username.tryParse(folded);
+        Optional<Username> username = Username.tryParse(Unicode.foldLogin(login));
         if (username.isPresent()) {
             return users.findNotDeletedByUsername(username.get());
         }
-        return EmailAddress.parse(folded).flatMap(users::findActiveByEmail);
+        return EmailAddress.parse(login).flatMap(users::findActiveByEmail);
     }
 
     @Override
@@ -45,9 +49,7 @@ public class AccountLookupHandler implements AccountLookupQuery {
     @Override
     @Transactional(readOnly = true)
     public Optional<Contact> findActiveByEmail(String email) {
-        return EmailAddress.parse(Unicode.foldLogin(email))
-                .flatMap(users::findActiveByEmail)
-                .flatMap(this::findActiveContact);
+        return EmailAddress.parse(email).flatMap(users::findActiveByEmail).flatMap(this::findActiveContact);
     }
 
     @Override
