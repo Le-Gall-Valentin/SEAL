@@ -8,6 +8,7 @@ import fr.vlegall.seal.support.MutableClock;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import java.util.List;
+import java.util.OptionalLong;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,9 +32,21 @@ class SessionEstablisherTest {
     private static final UserId USER = new UserId(UUID.fromString("0190f1d2-7e3a-7b4c-8d5e-6f7a8b9c0d1e"));
     private static final Instant NOW = Instant.parse("2026-11-08T12:00:00Z");
 
+    /** Version courante du mot de passe de {@link #USER}, gravée dans ses sessions (ADR 0023). */
+    private static final long VERSION = 4;
+
     private final MutableClock clock = MutableClock.fixedAt(NOW);
+    private OptionalLong storedVersion = OptionalLong.of(VERSION);
     private final SessionEstablisher sessions =
-            new SessionEstablisher(CookieCsrfTokenRepository.withHttpOnlyFalse(), clock);
+            new SessionEstablisher(CookieCsrfTokenRepository.withHttpOnlyFalse(), clock, user -> storedVersion);
+
+    /** Authentification d'une connexion réussie d'un compte actif, telle que la rend le fournisseur. */
+    private static Authentication activeLogin() {
+        return UsernamePasswordAuthenticationToken.authenticated(
+                new SealPrincipal(USER, VERSION),
+                null,
+                List.of(new SimpleGrantedAuthority(SealAuthorities.ACCOUNT_ACTIVE)));
+    }
 
     @AfterEach
     void clearContext() {
@@ -73,7 +86,7 @@ class SessionEstablisherTest {
         sessions.openRestricted(USER, request, new MockHttpServletResponse());
 
         Authentication authentication = storedAuthentication(request);
-        assertThat(authentication.getPrincipal()).isEqualTo(new SealPrincipal(USER));
+        assertThat(authentication.getPrincipal()).isEqualTo(new SealPrincipal(USER, VERSION));
         assertThat(authentication.getName()).isEqualTo(USER.value().toString());
         assertThat(authorities(authentication)).containsExactly("ACCOUNT_PENDING_EMAIL", "FACTOR_PASSWORD");
         assertThat(authentication.getAuthorities())
@@ -139,11 +152,11 @@ class SessionEstablisherTest {
         MockHttpServletRequest request = requestWithSession(anonymous);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        sessions.openFull(USER, request, response);
+        sessions.open(activeLogin(), request, response);
 
         Authentication authentication = storedAuthentication(request);
         assertThat(request.getSession(false).getId()).isNotEqualTo("session-anonyme");
-        assertThat(authentication.getPrincipal()).isEqualTo(new SealPrincipal(USER));
+        assertThat(authentication.getPrincipal()).isEqualTo(new SealPrincipal(USER, VERSION));
         assertThat(authorities(authentication)).containsExactly("ACCOUNT_ACTIVE", "FACTOR_PASSWORD");
         assertThat(authentication.getAuthorities())
                 .filteredOn(FactorGrantedAuthority.class::isInstance)
@@ -198,6 +211,21 @@ class SessionEstablisherTest {
     }
 
     @Test
+    @DisplayName("AUTH-70 : la session d'inscription grave la version courante du mot de passe (ADR 0023)")
+    void auth70RestrictedSessionCarriesTheCurrentVersion() {
+        MockHttpServletRequest withPassword = new MockHttpServletRequest();
+        sessions.openRestricted(USER, withPassword, new MockHttpServletResponse());
+        storedVersion = OptionalLong.empty();
+        MockHttpServletRequest withoutPassword = new MockHttpServletRequest();
+        sessions.openRestricted(USER, withoutPassword, new MockHttpServletResponse());
+
+        assertThat(storedAuthentication(withPassword).getPrincipal()).isEqualTo(new SealPrincipal(USER, VERSION));
+        assertThat(storedAuthentication(withoutPassword).getPrincipal())
+                .as("compte sans mot de passe (OAuth, lot 2) : rien à comparer")
+                .isEqualTo(new SealPrincipal(USER));
+    }
+
+    @Test
     @DisplayName("AUTH-20 : une authentification sans compte SEAL n'ouvre aucune session (échec fermé)")
     void auth20AuthenticationWithoutSealAccountOpensNothing() {
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -215,7 +243,7 @@ class SessionEstablisherTest {
     void auth53CloseInvalidatesTheSessionAndDropsTheCsrfToken() {
         MockHttpSession session = new MockHttpSession();
         MockHttpServletRequest request = requestWithSession(session);
-        sessions.openFull(USER, request, new MockHttpServletResponse());
+        sessions.open(activeLogin(), request, new MockHttpServletResponse());
         MockHttpSession opened = (MockHttpSession) request.getSession(false);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -267,7 +295,7 @@ class SessionEstablisherTest {
 
         SecurityContext copy = (SecurityContext) SerializationUtils.clone((java.io.Serializable) context);
 
-        assertThat(copy.getAuthentication().getPrincipal()).isEqualTo(new SealPrincipal(USER));
+        assertThat(copy.getAuthentication().getPrincipal()).isEqualTo(new SealPrincipal(USER, VERSION));
         assertThat(authorities(copy.getAuthentication())).containsExactly("ACCOUNT_PENDING_EMAIL", "FACTOR_PASSWORD");
     }
 }

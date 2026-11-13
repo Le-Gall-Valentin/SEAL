@@ -365,6 +365,22 @@ class LoginIT {
     }
 
     @Test
+    @DisplayName("AUTH-70 : une session ouverte à l'inscription porte aussi la version du mot de passe (ADR 0023)")
+    void auth70RegistrationSessionAlsoCarriesTheVersion() throws Exception {
+        Registered account = pending(unique("inscrit"));
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(account.session()))
+                .andExpect(status().isOk());
+
+        jdbc.sql("UPDATE user_credentials SET version = version + 1 WHERE user_id = ?")
+                .param(account.id())
+                .update();
+
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(account.session()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
     @DisplayName("AUTH-22 : les variantes de casse d'une saisie partagent les mêmes 5 échecs (ADR 0021)")
     void auth22FoldedLoginSharesTheBucket() throws Exception {
         String login = unique("variantes");
