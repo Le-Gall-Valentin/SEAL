@@ -42,6 +42,7 @@ class ResetPasswordHandlerTest {
                 .as("Argon2id hors transaction, puis l'écriture et son journal, enfin la révocation (ADR 0013, 0022)")
                 .containsExactly(
                         "hachage",
+                        "verrou",
                         "consommation",
                         "journal:" + valentin.user().value(),
                         "révocation:" + valentin.user().value());
@@ -109,7 +110,7 @@ class ResetPasswordHandlerTest {
 
         assertThat(handler.reset(token.value(), NEW_PASSWORD)).isEqualTo(new ResetOutcome.InvalidToken());
         assertThat(fixture.credentials.hashes()).containsEntry(valentin.user(), "hash(ancien-mot-de-passe-long)");
-        assertThat(fixture.calls).containsExactly("hachage", "consommation");
+        assertThat(fixture.calls).containsExactly("hachage", "verrou", "consommation");
     }
 
     @Test

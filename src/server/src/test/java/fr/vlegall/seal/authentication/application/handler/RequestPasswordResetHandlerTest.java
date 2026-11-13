@@ -30,7 +30,9 @@ class RequestPasswordResetHandlerTest {
                 assertThat(live.expiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(30)));
             });
         });
-        assertThat(fixture.calls).containsExactly("émission", "courriel");
+        assertThat(fixture.calls)
+                .as("le verrou du compte d'abord (ADR 0022, point 4)")
+                .containsExactly("verrou", "émission", "courriel");
     }
 
     @Test
@@ -43,7 +45,9 @@ class RequestPasswordResetHandlerTest {
 
         assertThat(fixture.mails).isEmpty();
         assertThat(fixture.rows).isEmpty();
-        assertThat(fixture.calls).isEmpty();
+        assertThat(fixture.calls)
+                .as("le verrou, refusé faute de mot de passe, est le seul effet : ni émission ni courriel")
+                .containsExactly("verrou");
     }
 
     @Test

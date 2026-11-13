@@ -11,8 +11,9 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Écrit les événements de connexion et de réinitialisation dans {@code security_events}, chacun dans sa propre
- * transaction.
+ * Écrit les événements de connexion et de réinitialisation dans {@code security_events} : la connexion et la
+ * déconnexion chacune dans sa propre transaction (ADR 0021), la réinitialisation dans celle qui remplace le haché (ADR
+ * 0013, point 6).
  */
 @Component
 public class AuthenticationJournalAdapter implements SecurityEventPort, PasswordResetEventPort {

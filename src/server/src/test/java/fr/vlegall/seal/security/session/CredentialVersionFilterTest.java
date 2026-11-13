@@ -99,7 +99,7 @@ class CredentialVersionFilterTest {
     }
 
     @Test
-    @DisplayName("AUTH-60 : une requête anonyme passe sans lecture de la base")
+    @DisplayName("AUTH-70 : une requête anonyme passe sans lecture de la base (ADR 0023)")
     void auth60AnonymousRequestIsNotChecked() throws Exception {
         MockFilterChain chain = run();
 

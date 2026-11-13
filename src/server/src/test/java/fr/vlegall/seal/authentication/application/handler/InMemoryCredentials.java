@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /** {@link CredentialRepository} en mémoire, partagé par les tests des cas d'usage d'{@code authentication}. */
-final class InMemoryCredentials implements CredentialRepository {
+class InMemoryCredentials implements CredentialRepository {
 
     private final Map<UserId, String> hashes = new HashMap<>();
     private final Map<UserId, Long> versions = new HashMap<>();

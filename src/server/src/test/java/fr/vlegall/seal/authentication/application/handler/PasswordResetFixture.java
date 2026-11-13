@@ -35,7 +35,15 @@ final class PasswordResetFixture {
 
     final MutableClock clock = MutableClock.fixedAt(NOW);
     final List<String> calls = new ArrayList<>();
-    final InMemoryCredentials credentials = new InMemoryCredentials();
+    /** Inscrit aussi chaque verrou du compte dans {@link #calls} (ADR 0022, point 4). */
+    final InMemoryCredentials credentials = new InMemoryCredentials() {
+        @Override
+        public boolean lock(UserId user) {
+            calls.add("verrou");
+            return super.lock(user);
+        }
+    };
+
     final Map<UserId, AccountContact> contacts = new HashMap<>();
     final List<Row> rows = new ArrayList<>();
     final List<SentLink> mails = new ArrayList<>();
