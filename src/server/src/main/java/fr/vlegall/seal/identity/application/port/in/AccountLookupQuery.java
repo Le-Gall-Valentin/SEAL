@@ -1,6 +1,7 @@
 package fr.vlegall.seal.identity.application.port.in;
 
 import fr.vlegall.seal.common.UserId;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -20,6 +21,9 @@ public interface AccountLookupQuery {
 
         /** Courriel vérifié. */
         String email();
+
+        /** AUTH-11 : identifiant et partie locale du courriel, avant {@code +} et {@code @}, qui ne comptent pas. */
+        List<String> personalWords();
     }
 
     /**

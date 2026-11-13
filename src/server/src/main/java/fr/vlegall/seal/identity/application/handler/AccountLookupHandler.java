@@ -7,8 +7,10 @@ import fr.vlegall.seal.identity.application.port.in.AccountLookupQuery;
 import fr.vlegall.seal.identity.domain.model.Account;
 import fr.vlegall.seal.identity.domain.model.AccountStatus;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
+import fr.vlegall.seal.identity.domain.model.PersonalWords;
 import fr.vlegall.seal.identity.domain.model.Username;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,11 +62,16 @@ public class AccountLookupHandler implements AccountLookupQuery {
 
     /** Un compte actif a toujours un courriel : seul un compte supprimé n'en a pas ({@link Account}). */
     private static Contact contactOf(Account account) {
+        EmailAddress email = Objects.requireNonNull(account.email(), "email");
         return new ActiveContact(
-                account.id(),
-                account.username().value(),
-                Objects.requireNonNull(account.email(), "email").value());
+                account.id(), account.username().value(), email.value(), PersonalWords.of(account.username(), email));
     }
 
-    private record ActiveContact(UserId user, String username, String email) implements Contact {}
+    private record ActiveContact(UserId user, String username, String email, List<String> personalWords)
+            implements Contact {
+
+        ActiveContact {
+            personalWords = List.copyOf(personalWords);
+        }
+    }
 }

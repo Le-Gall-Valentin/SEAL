@@ -6,6 +6,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.AccountLookupQuery.Contact;
 import fr.vlegall.seal.identity.domain.model.Account;
 import fr.vlegall.seal.identity.domain.model.AccountStatus;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -120,6 +121,17 @@ class AccountLookupHandlerTest {
                 .get()
                 .extracting(Contact::user, Contact::username, Contact::email)
                 .containsExactly(active.id(), "valentin", "valentin@exemple.ca");
+    }
+
+    @Test
+    @DisplayName("AUTH-11 : les mots personnels d'un contact sont son identifiant et la partie locale de son courriel")
+    void auth11ContactGivesUsernameAndEmailLocalPart() {
+        Account active = identity.add("valentin", "fjord+seal@exemple.ca", AccountStatus.ACTIVE);
+
+        assertThat(handler.findActiveContact(active.id()))
+                .get()
+                .extracting(Contact::personalWords)
+                .isEqualTo(List.of("valentin", "fjord"));
     }
 
     @ParameterizedTest

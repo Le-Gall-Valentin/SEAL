@@ -4,6 +4,7 @@ import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.RegisterUseCase;
 import fr.vlegall.seal.identity.domain.model.IdentityException;
+import fr.vlegall.seal.identity.domain.model.PersonalWords;
 import fr.vlegall.seal.identity.domain.model.PreparedPassword;
 import fr.vlegall.seal.identity.domain.model.RegisterCommand;
 import fr.vlegall.seal.identity.domain.model.ReservedUsernames;
@@ -43,7 +44,7 @@ public class RegisterHandler implements RegisterUseCase {
         if (users.exists(username)) {
             throw new IdentityException.UsernameTaken();
         }
-        List<String> personalWords = List.of(username.value(), command.email().localPart());
+        List<String> personalWords = PersonalWords.of(username, command.email());
         PreparedPassword password = credentials
                 .prepare(command.password(), personalWords)
                 .orElseThrow(IdentityException.PasswordTooWeak::new);
