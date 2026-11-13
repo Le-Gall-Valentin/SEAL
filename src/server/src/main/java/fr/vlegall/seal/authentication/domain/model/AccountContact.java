@@ -18,4 +18,10 @@ public record AccountContact(UserId user, String username, String email, List<St
         Objects.requireNonNull(email, "email");
         personalWords = List.copyOf(personalWords);
     }
+
+    /** SEC-21 : ni le courriel ni les mots personnels n'apparaissent dans une trace. */
+    @Override
+    public String toString() {
+        return "AccountContact[user=" + user + ", username=" + username + ", email=***, personalWords=***]";
+    }
 }

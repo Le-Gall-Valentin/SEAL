@@ -30,8 +30,9 @@ public class PasswordResetMailAdapter implements PasswordResetMailPort {
     @Override
     public void sendLink(String email, String username, ResetToken token) {
         String link = seal.origin() + PATH + token.value();
-        String body = "Pour choisir un nouveau mot de passe pour @" + username + ", ouvrez ce lien : " + link
-                + ". Il est valable " + ResetToken.VALIDITY.toMinutes() + " minutes et ne sert qu'une fois."
+        // Lien seul sur sa ligne : aucun client de messagerie n'y colle la ponctuation (ADR 0022, mise à jour).
+        String body = "Pour choisir un nouveau mot de passe pour @" + username + ", ouvrez ce lien :\n\n" + link
+                + "\n\nIl est valable " + ResetToken.VALIDITY.toMinutes() + " minutes et ne sert qu'une fois."
                 + " Vos clés ne changent pas. Si vous n'avez rien demandé, ignorez ce message : votre mot de passe"
                 + " reste inchangé.";
         mail.sendAfterCommit(new MailMessage(email, SUBJECT, body));

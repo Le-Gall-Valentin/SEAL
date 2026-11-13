@@ -9,4 +9,10 @@ public record PasswordResetView(String username, String email, Instant expiresAt
     public static PasswordResetView of(ResetView view) {
         return new PasswordResetView(view.username(), view.email(), view.expiresAt());
     }
+
+    /** SEC-21 : le courriel n'apparaît dans aucune trace. */
+    @Override
+    public String toString() {
+        return "PasswordResetView[username=" + username + ", email=***, expiresAt=" + expiresAt + "]";
+    }
 }

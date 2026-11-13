@@ -11,4 +11,10 @@ public record ResetView(String username, String email, Instant expiresAt) {
         Objects.requireNonNull(email, "email");
         Objects.requireNonNull(expiresAt, "expiresAt");
     }
+
+    /** SEC-21 : le courriel n'apparaît dans aucune trace. */
+    @Override
+    public String toString() {
+        return "ResetView[username=" + username + ", email=***, expiresAt=" + expiresAt + "]";
+    }
 }

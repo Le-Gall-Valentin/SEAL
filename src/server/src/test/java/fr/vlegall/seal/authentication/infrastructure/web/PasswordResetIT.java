@@ -3,6 +3,7 @@ package fr.vlegall.seal.authentication.infrastructure.web;
 import static fr.vlegall.seal.support.AuthClient.PASSWORD;
 import static fr.vlegall.seal.support.AuthClient.sessionOf;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,7 +52,7 @@ class PasswordResetIT {
     private static final String CONFIRM = "/api/v1/auth/password-reset/confirm";
     private static final String NEW_PASSWORD = "nouvelle-phrase-de-passe";
     private static final Pattern LINK =
-            Pattern.compile("(https://\\S+/mot-de-passe/nouveau#jeton=)([A-Za-z0-9_-]{43})\\.");
+            Pattern.compile("(?m)^(https://\\S+/mot-de-passe/nouveau#jeton=)([A-Za-z0-9_-]{43})$");
 
     @Autowired
     private MockMvc mvc;
@@ -169,9 +170,10 @@ class PasswordResetIT {
         SimpleMailMessage sent = mail.sentTo(account.email()).getLast();
         assertThat(sent.getSubject()).isEqualTo("Réinitialisation de votre mot de passe SEAL");
         assertThat(sent.getText())
-                .isEqualTo("Pour choisir un nouveau mot de passe pour @" + account.username() + ", ouvrez ce lien : "
+                .as("lien seul sur sa ligne : aucune ponctuation collée (ADR 0022, mise à jour)")
+                .isEqualTo("Pour choisir un nouveau mot de passe pour @" + account.username() + ", ouvrez ce lien :\n\n"
                         + seal.origin() + "/mot-de-passe/nouveau#jeton=" + token
-                        + ". Il est valable 30 minutes et ne sert qu'une fois. Vos clés ne changent pas. Si vous"
+                        + "\n\nIl est valable 30 minutes et ne sert qu'une fois. Vos clés ne changent pas. Si vous"
                         + " n'avez rien demandé, ignorez ce message : votre mot de passe reste inchangé.");
         assertThat(jdbc.sql("SELECT count(*) FROM password_reset_tokens WHERE encode(token_hash, 'escape') LIKE ?")
                         .param("%" + token + "%")
@@ -407,31 +409,32 @@ class PasswordResetIT {
         assertThat(hashing.observations()).containsExactly(new PasswordHashingProbe.Observation(false, 0));
     }
 
+    private static final List<String> KEY_TABLES =
+            List.of("identity_certificates", "subkeys", "key_vaults", "recovery_codes", "key_challenges");
+
     @Test
-    @DisplayName("AUTH-71 : la réinitialisation ne touche à aucune table de clés")
+    @DisplayName("AUTH-71 : la réinitialisation n'écrit dans aucune table de clés")
     void auth71KeysAreUntouched() throws Exception {
         Registered account = active(unique("cles"));
-        String before = keyTablesFingerprint();
+        String token = requestToken(account);
+        jdbc.sql("CREATE FUNCTION test_refuse_cles() RETURNS trigger LANGUAGE plpgsql AS"
+                        + " $$ BEGIN RAISE EXCEPTION 'table de clés touchée : %', TG_TABLE_NAME; END $$")
+                .update();
+        try {
+            for (String table : KEY_TABLES) {
+                jdbc.sql("CREATE TRIGGER test_refuse_cles BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON " + table
+                                + " FOR EACH STATEMENT EXECUTE FUNCTION test_refuse_cles()")
+                        .update();
+            }
+            assertThatThrownBy(() -> jdbc.sql("DELETE FROM key_challenges").update())
+                    .as("le garde-fou est actif")
+                    .hasMessageContaining("table de clés touchée");
 
-        confirm(client, requestToken(account), NEW_PASSWORD);
-
-        assertThat(keyTablesFingerprint()).isEqualTo(before);
-    }
-
-    private String keyTablesFingerprint() {
-        StringBuilder fingerprint = new StringBuilder();
-        for (String table :
-                List.of("identity_certificates", "subkeys", "key_vaults", "recovery_codes", "key_challenges")) {
-            fingerprint
-                    .append(table)
-                    .append('=')
-                    .append(jdbc.sql("SELECT coalesce(md5(string_agg(t::text, ',' ORDER BY t::text)), '') FROM " + table
-                                    + " t")
-                            .query(String.class)
-                            .single())
-                    .append(';');
+            assertThat(confirm(client, token, NEW_PASSWORD).getResponse().getStatus())
+                    .isEqualTo(204);
+        } finally {
+            jdbc.sql("DROP FUNCTION test_refuse_cles() CASCADE").update();
         }
-        return fingerprint.toString();
     }
 
     @Test
@@ -449,7 +452,8 @@ class PasswordResetIT {
             mvc.perform(client.from(post(route.getKey()))
                             .contentType("application/json")
                             .content("{}"))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
             for (Cookie session : List.of(pendingAccount.session(), fullSession)) {
                 mvc.perform(client.unsafe(post(route.getKey()), session, route.getValue()))
                         .andExpect(status().isForbidden())
@@ -489,6 +493,35 @@ class PasswordResetIT {
             }
         }
         assertThat(hashing.observations()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("SEC-01 : un courriel de 254 caractères et un mot de passe de 512 passent la validation")
+    void sec01BoundsAreAccepted() throws Exception {
+        String longest = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(61);
+        assertThat(longest).hasSize(254);
+
+        assertThat(request(client, longest).getResponse().getStatus()).isEqualTo(204);
+        mvc.perform(client.unsafe(post(CONFIRM), null, Map.of("token", "A".repeat(43), "password", "p".repeat(512))))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
+    }
+
+    @Test
+    @DisplayName("SEC-10 : une saisie en NFD partage le seau du courriel en NFC (ADR 0021, point 5)")
+    void sec10DecomposedEmailSharesTheBucket() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        for (int i = 0; i < 3; i++) {
+            assertThat(request(new AuthClient(mvc, mail), "\u00e9lodie" + suffix + "@exemple.ca")
+                            .getResponse()
+                            .getStatus())
+                    .isEqualTo(204);
+        }
+
+        assertThat(request(new AuthClient(mvc, mail), "e\u0301lodie" + suffix + "@exemple.ca")
+                        .getResponse()
+                        .getStatus())
+                .isEqualTo(429);
     }
 
     @Test
