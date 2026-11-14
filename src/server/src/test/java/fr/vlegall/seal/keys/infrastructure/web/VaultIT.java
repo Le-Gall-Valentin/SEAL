@@ -130,6 +130,19 @@ class VaultIT {
     }
 
     @Test
+    @DisplayName("SEC-01 : un champ inconnu donne 400 VALIDATION_FAILED, sans rien écrire")
+    void sec01UnknownFieldIsRefused() throws Exception {
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "coffre_champ");
+        Map<String, Object> extra = vault(1, 16, 0);
+        extra.put("userId", account.id.toString());
+
+        save(account, extra)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        read(account).andExpect(status().isNotFound());
+    }
+
+    @Test
     @DisplayName("QA-05 : sans session 401, sans jeton CSRF 403, en session restreinte 403")
     void qa05AccessIsChecked() throws Exception {
         AuthClient client = new AuthClient(mvc, mail);

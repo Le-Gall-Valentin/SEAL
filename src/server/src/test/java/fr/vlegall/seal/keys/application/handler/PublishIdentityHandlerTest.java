@@ -41,6 +41,7 @@ class PublishIdentityHandlerTest {
     private final List<UserId> published = new ArrayList<>();
     private final Map<UserId, String> usernames = new HashMap<>(Map.of(USER, "valentin", OTHER, "autre"));
     private final Ed25519.GeneratedKey ik = Ed25519.generate();
+    private int rejectedSignatures;
     private Instant now = NOW;
     private int nextByte = 1;
 
@@ -69,6 +70,11 @@ class PublishIdentityHandlerTest {
 
             @Override
             public void subkeyPublished(UserId user, byte[] ekId) {}
+
+            @Override
+            public void signatureRejected() {
+                rejectedSignatures++;
+            }
         };
         return new PublishIdentityHandler(challenges, accounts, certification, events, clock());
     }
@@ -144,12 +150,13 @@ class PublishIdentityHandlerTest {
     }
 
     @Test
-    @DisplayName("KEY-03 : une preuve signée pour un autre compte est refusée")
+    @DisplayName("KEY-03, A09 : une preuve signée pour un autre compte est refusée et signalée")
     void key03ProofForAnotherAccountIsRefused() {
         byte[] challenge = creator().create(USER).value();
 
         assertThat(publisher().publish(USER, ik.publicKey(), challenge, sign(OTHER, challenge)))
                 .isInstanceOf(IdentityPublication.InvalidSignature.class);
+        assertThat(rejectedSignatures).isEqualTo(1);
     }
 
     @Test

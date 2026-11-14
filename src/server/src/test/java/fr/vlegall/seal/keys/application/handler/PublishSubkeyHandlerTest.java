@@ -7,6 +7,7 @@ import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.keys.domain.model.CurrentCertificate;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
+import fr.vlegall.seal.keys.domain.model.SubkeyPolicy;
 import fr.vlegall.seal.keys.domain.model.SubkeyPublication;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
 import fr.vlegall.seal.keys.domain.port.out.KeyEventPort;
@@ -35,8 +36,11 @@ class PublishSubkeyHandlerTest {
     private static final byte[] EK_PUBLIC = filled(32, 5);
 
     private final Ed25519.GeneratedKey ik = Ed25519.generate();
-    private final List<byte[]> saved = new ArrayList<>();
+    private final FakeSubkeys subkeys = new FakeSubkeys();
+    private final List<byte[]> saved = subkeys.ekIds;
     private final List<byte[]> published = new ArrayList<>();
+    private int rejectedSignatures;
+    private Instant now = NOW;
     private Optional<CurrentCertificate> current = Optional.of(new CurrentCertificate(SERIAL, ik.publicKey()));
 
     private static byte[] filled(int length, int value) {
@@ -57,13 +61,6 @@ class PublishSubkeyHandlerTest {
                 return current;
             }
         };
-        SubkeyRepository subkeys = (binding, signature) -> {
-            if (saved.stream().anyMatch(ekId -> Arrays.equals(ekId, binding.ekId()))) {
-                return false;
-            }
-            saved.add(binding.ekId());
-            return true;
-        };
         KeyEventPort events = new KeyEventPort() {
             @Override
             public void identityPublished(UserId user, byte[] serial) {}
@@ -72,18 +69,33 @@ class PublishSubkeyHandlerTest {
             public void subkeyPublished(UserId user, byte[] ekId) {
                 published.add(ekId);
             }
+
+            @Override
+            public void signatureRejected() {
+                rejectedSignatures++;
+            }
         };
-        return new PublishSubkeyHandler(certification, subkeys, events, Clock.fixed(NOW, ZoneOffset.UTC));
+        return new PublishSubkeyHandler(certification, subkeys, events, Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private byte[] sign(UserId user, Instant createdAt, Instant expiresAt, Ed25519.GeneratedKey key) {
+        return sign(user, EK_ID, createdAt, expiresAt, key);
+    }
+
+    private byte[] sign(UserId user, byte[] ekId, Instant createdAt, Instant expiresAt, Ed25519.GeneratedKey key) {
         SubkeyBinding binding =
-                new SubkeyBinding(user, SERIAL, EK_ID, SubkeyBinding.KEM, EK_PUBLIC, createdAt, expiresAt);
+                new SubkeyBinding(user, SERIAL, ekId, SubkeyBinding.KEM, EK_PUBLIC, createdAt, expiresAt);
         return Ed25519.sign(key.privateKey(), binding.encode());
     }
 
     private SubkeyPublication publish(Instant createdAt, Instant expiresAt, byte[] signature) {
         return handler().publish(USER, SERIAL, EK_ID, EK_PUBLIC, createdAt, expiresAt, signature);
+    }
+
+    private SubkeyPublication publishFresh(int ekIdByte) {
+        byte[] ekId = filled(16, ekIdByte);
+        Instant expires = now.plus(SubkeyBinding.VALIDITY);
+        return handler().publish(USER, SERIAL, ekId, EK_PUBLIC, now, expires, sign(USER, ekId, now, expires, ik));
     }
 
     @Test
@@ -121,7 +133,7 @@ class PublishSubkeyHandlerTest {
     }
 
     @Test
-    @DisplayName("KEY-05 : une liaison signée par une autre clé, ou pour un autre compte, est refusée")
+    @DisplayName("KEY-05, A09 : une liaison signée par une autre clé, ou pour un autre compte, est refusée et signalée")
     void key05ForgedBindingIsRefused() {
         Instant expires = NOW.plus(SubkeyBinding.VALIDITY);
 
@@ -130,12 +142,13 @@ class PublishSubkeyHandlerTest {
         assertThat(publish(NOW, expires, sign(OTHER, NOW, expires, ik)))
                 .isInstanceOf(SubkeyPublication.InvalidSignature.class);
         assertThat(saved).isEmpty();
+        assertThat(rejectedSignatures).isEqualTo(2);
     }
 
     @Test
     @DisplayName("ADR 0025, point 7 : createdAt à plus de 5 minutes de l'horloge du serveur est refusé")
     void adr0025CreatedAtMustBeNearTheServerClock() {
-        Duration skew = PublishSubkeyHandler.CLOCK_SKEW;
+        Duration skew = SubkeyPolicy.CLOCK_SKEW;
         for (Instant createdAt : List.of(NOW.minus(skew), NOW.plus(skew))) {
             Instant expires = createdAt.plus(SubkeyBinding.VALIDITY);
             assertThat(publish(createdAt, expires, sign(USER, createdAt, expires, ik)))
@@ -161,5 +174,82 @@ class PublishSubkeyHandlerTest {
         assertThat(publish(NOW, tooShort, sign(USER, NOW, tooShort, ik)))
                 .isEqualTo(new SubkeyPublication.OutOfBounds(List.of("expiresAt")));
         assertThat(saved).isEmpty();
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 7 : des dates extrêmes sont hors des bornes, sans débordement de calcul")
+    void adr0025ExtremeDatesAreOutOfBoundsWithoutOverflow() {
+        byte[] anySignature = new byte[64];
+
+        assertThat(publish(Instant.MAX, Instant.MAX, anySignature))
+                .isEqualTo(new SubkeyPublication.OutOfBounds(List.of("createdAt", "expiresAt")));
+        assertThat(publish(Instant.MIN, Instant.MAX, anySignature))
+                .isEqualTo(new SubkeyPublication.OutOfBounds(List.of("createdAt", "expiresAt")));
+        assertThat(publish(NOW, Instant.MIN, anySignature))
+                .isEqualTo(new SubkeyPublication.OutOfBounds(List.of("expiresAt")));
+        assertThat(saved).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+            "ADR 0025, point 7 : les dates sont ramenées à la milliseconde signée avant contrôle et enregistrement")
+    void adr0025DatesAreTruncatedToTheSignedMillisecond() {
+        Instant createdAt = NOW.plusNanos(456_789);
+        Instant expiresAt = NOW.plus(SubkeyBinding.VALIDITY).plusNanos(999_999);
+        Instant signedCreatedAt = NOW;
+        Instant signedExpiresAt = NOW.plus(SubkeyBinding.VALIDITY);
+
+        assertThat(publish(createdAt, expiresAt, sign(USER, signedCreatedAt, signedExpiresAt, ik)))
+                .isInstanceOf(SubkeyPublication.Published.class);
+        assertThat(subkeys.bindings.getFirst().createdAt()).isEqualTo(signedCreatedAt);
+        assertThat(subkeys.bindings.getFirst().expiresAt()).isEqualTo(signedExpiresAt);
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 15 : au plus trois sous-clés non expirées, comptées sous le verrou du compte")
+    void adr0025AtMostThreeLiveSubkeys() {
+        assertThat(publishFresh(1)).isInstanceOf(SubkeyPublication.Published.class);
+        assertThat(publishFresh(2)).isInstanceOf(SubkeyPublication.Published.class);
+        assertThat(publishFresh(3)).isInstanceOf(SubkeyPublication.Published.class);
+
+        assertThat(publishFresh(4)).isInstanceOf(SubkeyPublication.LimitReached.class);
+        assertThat(subkeys.calls).endsWith("lock", "count");
+        assertThat(saved).hasSize(SubkeyPolicy.MAX_LIVE);
+        assertThat(published).hasSize(SubkeyPolicy.MAX_LIVE);
+
+        now = NOW.plus(SubkeyBinding.VALIDITY);
+        assertThat(publishFresh(5)).isInstanceOf(SubkeyPublication.Published.class);
+    }
+
+    /** Table subkeys en mémoire : ekId unique, et le verrou du compte noté avant chaque comptage. */
+    private static final class FakeSubkeys implements SubkeyRepository {
+        final List<byte[]> ekIds = new ArrayList<>();
+        final List<SubkeyBinding> bindings = new ArrayList<>();
+        final List<String> calls = new ArrayList<>();
+
+        @Override
+        public void lockAccount(UserId user) {
+            calls.add("lock");
+        }
+
+        @Override
+        public int countLive(UserId user, Instant at) {
+            calls.add("count");
+            return (int) bindings.stream()
+                    .filter(binding -> binding.user().equals(user))
+                    .filter(binding -> at.isBefore(binding.expiresAt()))
+                    .count();
+        }
+
+        @Override
+        public boolean save(SubkeyBinding binding, byte[] signature) {
+            calls.add("save");
+            if (ekIds.stream().anyMatch(ekId -> Arrays.equals(ekId, binding.ekId()))) {
+                return false;
+            }
+            ekIds.add(binding.ekId());
+            bindings.add(binding);
+            return true;
+        }
     }
 }

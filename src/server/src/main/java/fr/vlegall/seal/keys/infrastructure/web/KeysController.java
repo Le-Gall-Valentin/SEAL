@@ -73,7 +73,7 @@ public class KeysController {
         };
     }
 
-    /** KEY-05 : 204 ; statuts de l'ADR 0025, points 5 et 7. */
+    /** KEY-05 : 204 ; statuts de l'ADR 0025, points 5, 7 et 15. */
     @PostMapping("/subkeys")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void subkey(@CurrentUser UserId user, @Valid @RequestBody PublishSubkeyRequest body) {
@@ -92,6 +92,7 @@ public class KeysController {
                 throw new SealException(
                         ErrorCode.VALIDATION_FAILED, bounds.fields().toArray(String[]::new));
             case SubkeyPublication.InvalidSignature invalid -> throw new SealException(ErrorCode.INVALID_SIGNATURE);
+            case SubkeyPublication.LimitReached limit -> throw new SealException(ErrorCode.FORBIDDEN);
             case SubkeyPublication.DuplicateEkId duplicate ->
                 throw new SealException(ErrorCode.VALIDATION_FAILED, "ekId");
         }

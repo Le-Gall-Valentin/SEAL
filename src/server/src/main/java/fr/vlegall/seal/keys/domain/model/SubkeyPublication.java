@@ -21,6 +21,9 @@ public sealed interface SubkeyPublication {
     /** Liaison qui ne vérifie pas avec la clé d'identité certifiée : 422 {@code INVALID_SIGNATURE}. */
     record InvalidSignature() implements SubkeyPublication {}
 
+    /** ADR 0025, point 15 : trois sous-clés non expirées déjà publiées, 403 {@code FORBIDDEN}. */
+    record LimitReached() implements SubkeyPublication {}
+
     /** KEY-05 : {@code ekId} déjà utilisé, 400 {@code VALIDATION_FAILED} sur {@code ekId}. */
     record DuplicateEkId() implements SubkeyPublication {}
 }

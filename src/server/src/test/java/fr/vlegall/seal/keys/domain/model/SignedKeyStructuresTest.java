@@ -109,6 +109,13 @@ class SignedKeyStructuresTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new SubkeyBinding(USER, new byte[16], new byte[16], "", new byte[32], NOW, expires))
                 .isInstanceOf(IllegalArgumentException.class);
+        // ADR 0025, point 7 : une date plus fine que la milliseconde ne serait pas celle qui est signée.
+        assertThatThrownBy(() -> new SubkeyBinding(
+                        USER, new byte[16], new byte[16], kem, new byte[32], NOW.plusNanos(1), expires))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new SubkeyBinding(
+                        USER, new byte[16], new byte[16], kem, new byte[32], NOW, expires.plusNanos(1_000)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

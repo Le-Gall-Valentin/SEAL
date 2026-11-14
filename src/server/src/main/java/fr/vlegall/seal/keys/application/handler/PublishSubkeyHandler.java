@@ -5,23 +5,20 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.keys.application.port.in.PublishSubkeyUseCase;
 import fr.vlegall.seal.keys.domain.model.CurrentCertificate;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
+import fr.vlegall.seal.keys.domain.model.SubkeyPolicy;
 import fr.vlegall.seal.keys.domain.model.SubkeyPublication;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
 import fr.vlegall.seal.keys.domain.port.out.KeyEventPort;
 import fr.vlegall.seal.keys.domain.port.out.SubkeyRepository;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
 
 @ApplicationService
 public class PublishSubkeyHandler implements PublishSubkeyUseCase {
-
-    /** ADR 0025, point 7 : écart toléré entre l'horloge du client et celle du serveur. */
-    static final Duration CLOCK_SKEW = Duration.ofMinutes(5);
 
     private final CertificationPort certification;
     private final SubkeyRepository subkeys;
@@ -36,6 +33,10 @@ public class PublishSubkeyHandler implements PublishSubkeyUseCase {
         this.clock = clock;
     }
 
+    /**
+     * Contrôles dans l'ordre de l'ADR 0025 : certificat courant, bornes des dates, signature, puis, sous le verrou du
+     * compte, le plafond de trois sous-clés et l'unicité de {@code ekId}. Aucune exception pour un refus.
+     */
     @Override
     @Transactional
     public SubkeyPublication publish(
@@ -51,21 +52,23 @@ public class PublishSubkeyHandler implements PublishSubkeyUseCase {
         if (current.isEmpty() || !current.get().hasSerial(certSerial)) {
             return new SubkeyPublication.NoCurrentCertificate();
         }
-        List<String> outOfBounds = new ArrayList<>();
+        // ADR 0025, point 7 : la signature porte sur des millisecondes ; contrôle et enregistrement aussi.
+        Instant created = createdAt.truncatedTo(ChronoUnit.MILLIS);
+        Instant expires = expiresAt.truncatedTo(ChronoUnit.MILLIS);
         Instant now = clock.instant();
-        if (createdAt.isBefore(now.minus(CLOCK_SKEW)) || createdAt.isAfter(now.plus(CLOCK_SKEW))) {
-            outOfBounds.add("createdAt");
-        }
-        if (!expiresAt.equals(createdAt.plus(SubkeyBinding.VALIDITY))) {
-            outOfBounds.add("expiresAt");
-        }
+        List<String> outOfBounds = SubkeyPolicy.outOfBounds(created, expires, now);
         if (!outOfBounds.isEmpty()) {
             return new SubkeyPublication.OutOfBounds(outOfBounds);
         }
         SubkeyBinding binding =
-                new SubkeyBinding(user, certSerial, ekId, SubkeyBinding.KEM, ekPublic, createdAt, expiresAt);
+                new SubkeyBinding(user, certSerial, ekId, SubkeyBinding.KEM, ekPublic, created, expires);
         if (!binding.isSignedBy(current.get().ikPublic(), signature)) {
+            events.signatureRejected();
             return new SubkeyPublication.InvalidSignature();
+        }
+        subkeys.lockAccount(user);
+        if (subkeys.countLive(user, now) >= SubkeyPolicy.MAX_LIVE) {
+            return new SubkeyPublication.LimitReached();
         }
         if (!subkeys.save(binding, signature)) {
             return new SubkeyPublication.DuplicateEkId();

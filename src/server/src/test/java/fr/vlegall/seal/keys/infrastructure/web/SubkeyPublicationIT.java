@@ -12,27 +12,39 @@ import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
 import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.MutableClock;
+import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
+import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /** KEY-05, KEY-21, SEC-20, QA-05 : publication d'une sous-clé, liée au certificat courant (ADR 0025, point 7). */
 @SealIntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
 class SubkeyPublicationIT {
 
     private static final String SUBKEYS = "/api/v1/keys/subkeys";
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Autowired
     private MockMvc mvc;
@@ -45,8 +57,6 @@ class SubkeyPublicationIT {
 
     @Autowired
     private JdbcClient jdbc;
-
-    private int nextEkId;
 
     @AfterEach
     void reset() {
@@ -76,11 +86,10 @@ class SubkeyPublicationIT {
         return body;
     }
 
-    private byte[] freshEkId() {
-        byte[] ekId = new byte[16];
-        ekId[0] = (byte) 0x5e;
-        ekId[15] = (byte) ++nextEkId;
-        ekId[14] = (byte) (System.nanoTime() & 0x7f);
+    /** 16 octets tirés au hasard, comme le client : aucune collision entre tests sur la base partagée. */
+    private static byte[] freshEkId() {
+        byte[] ekId = new byte[SubkeyBinding.EK_ID_BYTES];
+        RANDOM.nextBytes(ekId);
         return ekId;
     }
 
@@ -160,23 +169,25 @@ class SubkeyPublicationIT {
     }
 
     @Test
-    @DisplayName("KEY-05 : une liaison signée par une autre clé que l'IK certifiée donne 422 INVALID_SIGNATURE")
-    void key05BindingSignedByAnotherKeyIsRefused() throws Exception {
+    @DisplayName("KEY-05, A09 : une liaison signée par une autre clé donne 422 INVALID_SIGNATURE et une alerte WARN"
+            + " sans aucune valeur")
+    void key05BindingSignedByAnotherKeyIsRefused(CapturedOutput output) throws Exception {
         KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_forge");
         byte[] serial = account.publishIdentity();
         Instant now = now();
+        Map<String, Object> forged =
+                binding(account, serial, freshEkId(), now, now.plus(SubkeyBinding.VALIDITY), Ed25519.generate());
 
-        publish(
-                        account,
-                        binding(
-                                account,
-                                serial,
-                                freshEkId(),
-                                now,
-                                now.plus(SubkeyBinding.VALIDITY),
-                                Ed25519.generate()))
+        publish(account, forged)
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("INVALID_SIGNATURE"));
+
+        assertThat(output.getOut().lines())
+                .anyMatch(line -> line.contains("WARN") && line.contains("Signature refusée"));
+        assertThat(output.getAll())
+                .doesNotContain((String) forged.get("signature"))
+                .doesNotContain((String) forged.get("ekId"))
+                .doesNotContain(account.id.toString());
     }
 
     @Test
@@ -224,5 +235,128 @@ class SubkeyPublicationIT {
         mvc.perform(client.from(post(SUBKEYS)).cookie(account.session))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 7 : une date extrême, en ISO 8601 ou en nombre, donne 400 et jamais 500")
+    void adr0025ExtremeDatesAreRefusedWithoutServerError() throws Exception {
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_extreme");
+        byte[] serial = account.publishIdentity();
+        Instant now = now();
+        Map<String, Object> body =
+                binding(account, serial, freshEkId(), now, now.plus(SubkeyBinding.VALIDITY), account.ik);
+
+        for (Object instantMax :
+                List.of("+1000000000-12-31T23:59:59.999999999Z", new BigDecimal("31556889864403199.999999999"))) {
+            body.put("createdAt", instantMax);
+            publish(account, body)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                    .andExpect(jsonPath("$.fields", contains("createdAt", "expiresAt")));
+        }
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 7 : des dates au-delà de la milliseconde sont gardées à la milliseconde signée")
+    void adr0025SubMillisecondDatesKeepTheSignedMillisecond() throws Exception {
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_microsecondes");
+        byte[] serial = account.publishIdentity();
+        byte[] ekId = freshEkId();
+        Instant now = now();
+        Instant expires = now.plus(SubkeyBinding.VALIDITY);
+        Map<String, Object> body = binding(account, serial, ekId, now, expires, account.ik);
+        // 999,6 µs après la milliseconde signée : arrondie à la microseconde, la base passerait à la suivante.
+        body.put("createdAt", now.plusNanos(999_600).toString());
+        body.put("expiresAt", expires.plusNanos(999_600).toString());
+
+        publish(account, body).andExpect(status().isNoContent());
+
+        assertThat(jdbc.sql("SELECT created_at, expires_at FROM subkeys WHERE ek_id = :ekId")
+                        .param("ekId", ekId)
+                        .query((row, number) -> List.of(
+                                row.getTimestamp("created_at").toInstant(),
+                                row.getTimestamp("expires_at").toInstant()))
+                        .single())
+                .containsExactly(now, expires);
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 15 : une quatrième sous-clé non expirée donne 403 FORBIDDEN, sans rien écrire")
+    void adr0025FourthLiveSubkeyIsForbidden() throws Exception {
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_plafond");
+        byte[] serial = account.publishIdentity();
+        Instant now = now();
+        Instant expires = now.plus(SubkeyBinding.VALIDITY);
+        for (int i = 0; i < 3; i++) {
+            publish(account, binding(account, serial, freshEkId(), now, expires, account.ik))
+                    .andExpect(status().isNoContent());
+        }
+
+        publish(account, binding(account, serial, freshEkId(), now, expires, account.ik))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        assertThat(count("SELECT count(*) FROM subkeys WHERE user_id = :user", account))
+                .isEqualTo(3L);
+        assertThat(count(
+                        "SELECT count(*) FROM security_events WHERE user_id = :user AND type = 'SUBKEY_PUBLISHED'",
+                        account))
+                .isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 15, A06 : six publications simultanées n'enregistrent que trois sous-clés")
+    void adr0025ConcurrentPublicationsKeepTheLimit() throws Exception {
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_course");
+        byte[] serial = account.publishIdentity();
+        Instant now = now();
+        List<MockHttpServletRequestBuilder> requests = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            requests.add(account.client.unsafe(
+                    post(SUBKEYS),
+                    account.session,
+                    binding(account, serial, freshEkId(), now, now.plus(SubkeyBinding.VALIDITY), account.ik)));
+        }
+
+        List<Integer> statuses = Race.run(
+                requests.size(),
+                index -> mvc.perform(requests.get(index))
+                        .andReturn()
+                        .getResponse()
+                        .getStatus());
+
+        assertThat(statuses)
+                .containsOnly(204, 403)
+                .filteredOn(code -> code == 204)
+                .hasSize(3);
+        assertThat(count("SELECT count(*) FROM subkeys WHERE user_id = :user", account))
+                .isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("SEC-01 : un champ inconnu ou une clé publique de 31 octets donnent 400 VALIDATION_FAILED")
+    void sec01MalformedBindingsAreRefused() throws Exception {
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_format");
+        byte[] serial = account.publishIdentity();
+        Instant now = now();
+        Map<String, Object> extra =
+                binding(account, serial, freshEkId(), now, now.plus(SubkeyBinding.VALIDITY), account.ik);
+        extra.put("userId", UUID.randomUUID().toString());
+        Map<String, Object> shortKey =
+                binding(account, serial, freshEkId(), now, now.plus(SubkeyBinding.VALIDITY), account.ik);
+        shortKey.put("ekPublic", Base64Url.encode(new byte[31]));
+
+        publish(account, extra)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        publish(account, shortKey)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields", contains("ekPublic")));
+        assertThat(count("SELECT count(*) FROM subkeys WHERE user_id = :user", account))
+                .isZero();
+    }
+
+    private long count(String sql, KeysTestClient account) {
+        return jdbc.sql(sql).param("user", account.id).query(Long.class).single();
     }
 }

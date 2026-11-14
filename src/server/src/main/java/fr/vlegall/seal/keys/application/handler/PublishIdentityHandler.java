@@ -49,6 +49,7 @@ public class PublishIdentityHandler implements PublishIdentityUseCase {
         }
         // userId vient de la session : une preuve signée pour un autre compte ne vérifie pas (PROTOCOL.md, 4.3).
         if (!new ProofOfPossession(user, ikPublic, challenge).isSignedBy(signature)) {
+            events.signatureRejected();
             return new IdentityPublication.InvalidSignature();
         }
         Optional<IdentityCertificate> certificate =

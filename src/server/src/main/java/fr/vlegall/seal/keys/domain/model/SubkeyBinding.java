@@ -5,6 +5,7 @@ import fr.vlegall.seal.crypto.Canonical;
 import fr.vlegall.seal.crypto.Ed25519;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Objects;
@@ -47,8 +48,8 @@ public record SubkeyBinding(
         if (Objects.requireNonNull(kem, "kem").isEmpty()) {
             throw new IllegalArgumentException("une liaison nomme son mécanisme d'encapsulation");
         }
-        Objects.requireNonNull(createdAt, "createdAt");
-        Objects.requireNonNull(expiresAt, "expiresAt");
+        createdAt = millis(createdAt, "createdAt");
+        expiresAt = millis(expiresAt, "expiresAt");
     }
 
     /** Octets signés par IK. */
@@ -97,6 +98,14 @@ public record SubkeyBinding(
     @Override
     public String toString() {
         return "SubkeyBinding[ekId=" + HexFormat.of().formatHex(ekId) + ", user=" + user.value() + "]";
+    }
+
+    /** La signature porte sur des millisecondes : une date plus fine ne serait pas celle qui est signée. */
+    private static Instant millis(Instant value, String name) {
+        if (!Objects.requireNonNull(value, name).equals(value.truncatedTo(ChronoUnit.MILLIS))) {
+            throw new IllegalArgumentException(name + " s'arrête à la milliseconde");
+        }
+        return value;
     }
 
     private static byte[] sized(byte[] value, int length, String name) {
