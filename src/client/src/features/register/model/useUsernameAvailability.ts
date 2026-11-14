@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { isReservedUsername, isUsernameWellFormed } from '@/entities/account'
 import { useDebouncedValue } from '@/shared/lib'
-import { useRegisterApi } from './registerApiContext'
+import { useRegisterApi } from './registerApiPort'
 
 /** État de l'identifiant affiché sous son champ (Inscription-Telephone, Identifiant-OAuth, ADR 0024). */
 export type UsernameStatus =

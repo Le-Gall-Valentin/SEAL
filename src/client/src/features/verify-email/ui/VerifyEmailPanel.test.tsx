@@ -10,7 +10,7 @@ import {
   useCurrentAccount,
 } from '@/entities/session'
 import { ApiError } from '@/shared/lib'
-import { VerifyEmailApiProvider } from '../model/VerifyEmailApiProvider'
+import { VerifyEmailApiProvider } from '../model/verifyEmailApiPort'
 import { VerifyEmailPanel } from './VerifyEmailPanel'
 
 type IVerifyEmailApi = ComponentProps<typeof VerifyEmailApiProvider>['api']

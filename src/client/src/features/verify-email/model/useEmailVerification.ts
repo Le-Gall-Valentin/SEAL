@@ -4,7 +4,7 @@ import { isEmailWellFormed } from '@/entities/account'
 import { type Account, refreshSession } from '@/entities/session'
 import { ApiError, useRetryAfterLock } from '@/shared/lib'
 import { CODE_LENGTH, verifyFailureOf, type VerifyFailure } from './code'
-import { useVerifyEmailApi } from './verifyEmailApiContext'
+import { useVerifyEmailApi } from './verifyEmailApiPort'
 import { useSecondsLeft } from './useSecondsLeft'
 
 const EMPTY_CODE: readonly string[] = Array.from({ length: CODE_LENGTH }, () => '')

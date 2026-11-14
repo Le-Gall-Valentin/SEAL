@@ -3,8 +3,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { render, renderHook } from 'vitest-browser-react'
 import type { Account, ISessionApi } from '../api/ISessionApi'
-import { SessionApiProvider } from './SessionApiProvider'
-import { useSessionApi } from './sessionApiContext'
+import { SessionApiProvider, useSessionApi } from './sessionApiPort'
 import { endSession, SESSION_QUERY_KEY, useCurrentAccount } from './useCurrentAccount'
 
 const ACCOUNT: Account = {

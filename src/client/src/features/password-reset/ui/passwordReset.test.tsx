@@ -7,7 +7,7 @@ import { render } from 'vitest-browser-react'
 import { PasswordBlocklistProvider } from '@/entities/password'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
 import { ApiError } from '@/shared/lib'
-import { PasswordResetApiProvider } from '../model/PasswordResetApiProvider'
+import { PasswordResetApiProvider } from '../model/passwordResetApiPort'
 import { ForgotPasswordForm } from './ForgotPasswordForm'
 import { NewPasswordPanel } from './NewPasswordPanel'
 

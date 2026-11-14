@@ -17,7 +17,7 @@ import { refreshSession } from '@/entities/session'
 import { useRetryAfterLock } from '@/shared/lib'
 import type { Registration } from '../api/IRegisterApi'
 import { registerFailureOf } from './registerFailure'
-import { useRegisterApi } from './registerApiContext'
+import { useRegisterApi } from './registerApiPort'
 import {
   type UsernameStatus,
   usernameAvailabilityKey,

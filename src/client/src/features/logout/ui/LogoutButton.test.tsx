@@ -7,7 +7,7 @@ import {
   SessionApiProvider,
   useCurrentAccount,
 } from '@/entities/session'
-import { LogoutApiProvider } from '../model/LogoutApiProvider'
+import { LogoutApiProvider } from '../model/logoutApiPort'
 import { LogoutButton } from './LogoutButton'
 
 const ACTIVE: Account = {

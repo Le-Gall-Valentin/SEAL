@@ -1,5 +1,5 @@
 import { hashKey, type QueryClient, useQuery } from '@tanstack/react-query'
-import { useSessionApi } from './sessionApiContext'
+import { useSessionApi } from './sessionApiPort'
 
 /** Clé du compte courant : /me est la seule source de la session (ADR 0024, point 7). */
 export const SESSION_QUERY_KEY = ['session', 'me'] as const

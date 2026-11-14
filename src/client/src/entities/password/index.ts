@@ -1,7 +1,7 @@
 // API publique de la tranche password (ADR 0012).
 export type { IPasswordBlocklist } from './api/passwordBlocklist'
 export { passwordBlocklist } from './api/passwordBlocklist'
-export { PasswordBlocklistProvider } from './model/PasswordBlocklistProvider'
+export { PasswordBlocklistProvider } from './model/passwordBlocklistPort'
 export {
   canSubmitPassword,
   evaluatePassword,

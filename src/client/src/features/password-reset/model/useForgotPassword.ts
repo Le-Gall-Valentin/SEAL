@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { isEmailWellFormed } from '@/entities/account'
 import { useRetryAfterLock } from '@/shared/lib'
 import { resetFailureOf } from './resetLink'
-import { usePasswordResetApi } from './passwordResetApiContext'
+import { usePasswordResetApi } from './passwordResetApiPort'
 
 /** AUTH-70 : demande d'un lien ; la réponse est la même que l'adresse ait un compte ou non. */
 export function useForgotPassword() {

@@ -12,7 +12,7 @@ import {
   useCurrentAccount,
 } from '@/entities/session'
 import { ApiError } from '@/shared/lib'
-import { RegisterApiProvider } from '../model/RegisterApiProvider'
+import { RegisterApiProvider } from '../model/registerApiPort'
 import { RegisterForm } from './RegisterForm'
 
 // Le test de ui/ n'importe pas api/ (ADR 0012) : le port se lit sur son fournisseur.

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { usePasswordBlocklistApi } from './passwordBlocklistContext'
+import { usePasswordBlocklistApi } from './passwordBlocklistPort'
 import { foldPassword } from './passwordPolicy'
 
 /** Liste de blocage repliée, ou null tant qu'elle n'est pas chargée, ou si son chargement a échoué (ADR 0024). */

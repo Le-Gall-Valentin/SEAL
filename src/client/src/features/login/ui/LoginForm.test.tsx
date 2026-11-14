@@ -11,7 +11,7 @@ import {
   useCurrentAccount,
 } from '@/entities/session'
 import { ApiError, NetworkError } from '@/shared/lib'
-import { LoginApiProvider } from '../model/LoginApiProvider'
+import { LoginApiProvider } from '../model/loginApiPort'
 import { LoginForm } from './LoginForm'
 
 const ACTIVE: Account = {

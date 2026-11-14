@@ -11,7 +11,7 @@ import {
 import { ROUTES } from '@/shared/config'
 import { useRetryAfterLock } from '@/shared/lib'
 import { minutesLeft, resetFailureOf } from './resetLink'
-import { usePasswordResetApi } from './passwordResetApiContext'
+import { usePasswordResetApi } from './passwordResetApiPort'
 
 /** État de navigation de la connexion après une réinitialisation réussie (ADR 0024, point 9). */
 export interface PasswordResetDone {

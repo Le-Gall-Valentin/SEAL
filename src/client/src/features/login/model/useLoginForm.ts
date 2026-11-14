@@ -4,7 +4,7 @@ import { refreshSession } from '@/entities/session'
 import { useRetryAfterLock } from '@/shared/lib'
 import type { Credentials } from '../api/ILoginApi'
 import { canSubmit, loginAlertOf } from './loginAlert'
-import { useLoginApi } from './loginApiContext'
+import { useLoginApi } from './loginApiPort'
 
 /**
  * AUTH-20 à AUTH-22 : état du formulaire de connexion. Une réussite relit /me, et la garde de route mène à l'écran du
