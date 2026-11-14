@@ -85,6 +85,20 @@
       "signature": "DXwyap_OqgfDPGZu19-nF8ib2LbKJ0pV8VV0SGGWtDsJbipvCU_K5oOGFqUIEAdh83Dtzqt1WoxfBDocPSsiCA"
     }
   ],
+  "smallOrder": {
+    "rule": "Une cl\u00e9 publique ou un R d'ordre faible est refus\u00e9 avant toute v\u00e9rification (PROTOCOL.md, 4.5)",
+    "points": [
+      "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "7P_______________________________________38",
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA",
+      "xxdqcD1N2E-6PAt2DRBnDyogU_osOczGTsf9d5KsA3o",
+      "xxdqcD1N2E-6PAt2DRBnDyogU_osOczGTsf9d5KsA_o",
+      "JuiVj8KyJ7BFw_SJ8u-Y8NXfrAXTxjM5sTgCiG1T_AU",
+      "JuiVj8KyJ7BFw_SJ8u-Y8NXfrAXTxjM5sTgCiG1T_IU"
+    ],
+    "message": "bidpbXBvcnRlIHF1ZWwgbWVzc2FnZQ"
+  },
   "forgeries": [
     {
       "name": "certificat prolong\u00e9 d'un jour apr\u00e8s signature",

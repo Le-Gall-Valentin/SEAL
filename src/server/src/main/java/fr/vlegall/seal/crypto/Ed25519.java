@@ -15,7 +15,9 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * Ed25519 pur (RFC 8032), par la JCA seule (ADR 0001, ADR 0025). Clés publiques et signatures circulent en octets
@@ -33,6 +35,24 @@ public final class Ed25519 {
 
     /** En-tête DER d'un SubjectPublicKeyInfo Ed25519 (RFC 8410, OID 1.3.101.112), suivi des 32 octets de la clé. */
     private static final byte[] SPKI_PREFIX = HexFormat.of().parseHex("302a300506032b6570032100");
+
+    /**
+     * Les 8 points d'ordre faible de la courbe, en encodage canonique (la liste de libsodium). Avec une telle clé et un R
+     * pris parmi eux, l'équation de vérification tient pour tout message, et la JCA de la JDK 25 accepte la signature :
+     * une clé sans clé privée serait certifiée, et n'importe qui signerait en son nom (ADR 0025, point 14). Les encodages
+     * non canoniques de ces points sont déjà refusés par la JCA au décodage.
+     */
+    private static final List<byte[]> SMALL_ORDER_POINTS = Stream.of(
+                    "0100000000000000000000000000000000000000000000000000000000000000",
+                    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+                    "0000000000000000000000000000000000000000000000000000000000000000",
+                    "0000000000000000000000000000000000000000000000000000000000000080",
+                    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+                    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+                    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+                    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85")
+            .map(HexFormat.of()::parseHex)
+            .toList();
 
     private Ed25519() {}
 
@@ -107,6 +127,10 @@ public final class Ed25519 {
         if (publicKey.length != PUBLIC_KEY_BYTES || signature.length != SIGNATURE_BYTES) {
             return false;
         }
+        // ADR 0025, point 14 : ni clé publique ni R d'ordre faible, avant toute vérification.
+        if (hasSmallOrder(publicKey) || hasSmallOrder(signature)) {
+            return false;
+        }
         try {
             PublicKey key = keyFactory().generatePublic(new X509EncodedKeySpec(toSubjectPublicKeyInfo(publicKey)));
             Signature verifier = signature();
@@ -117,6 +141,12 @@ public final class Ed25519 {
             // Clé hors de la courbe (InvalidKeyException) ou signature mal formée (SignatureException).
             return false;
         }
+    }
+
+    /** Vrai si les 32 premiers octets de {@code encoded} sont l'un des points d'ordre faible. */
+    private static boolean hasSmallOrder(byte[] encoded) {
+        return SMALL_ORDER_POINTS.stream()
+                .anyMatch(point -> Arrays.equals(encoded, 0, PUBLIC_KEY_BYTES, point, 0, PUBLIC_KEY_BYTES));
     }
 
     /** ADR 0025, point 12 : clé publique brute de 32 octets, encodée en SubjectPublicKeyInfo (RFC 8410). */

@@ -520,6 +520,20 @@ EK_ID = bytes(range(0x20, 0x30))
 EK_PUBLIC = bytes(range(0x40, 0x60))  # 32 octets : la liaison ne vérifie pas le point X25519 (ADR 0025)
 CHALLENGE = bytes(range(0x60, 0x80))
 
+# Les 8 points d'ordre faible d'Ed25519, en encodage canonique (la liste de libsodium). Avec une telle clé, et R pris
+# parmi eux, l'équation de vérification tient pour tout message : certaines bibliothèques, dont la JCA de la JDK 25,
+# acceptent alors une signature sans clé privée. SEAL refuse ces clés et ces R (PROTOCOL.md, section 4).
+SMALL_ORDER_POINTS = [
+    "0100000000000000000000000000000000000000000000000000000000000000",  # neutre, ordre 1
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # ordre 2
+    "0000000000000000000000000000000000000000000000000000000000000000",  # ordre 4
+    "0000000000000000000000000000000000000000000000000000000000000080",  # ordre 4
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",  # ordre 8
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",  # ordre 8
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",  # ordre 8
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85",  # ordre 8
+]
+
 
 def certificate_struct(f: dict) -> dict:
     return STRUCT(
@@ -632,6 +646,11 @@ def build_identity() -> str:
         ],
         "proofs": [signed("preuve de possession du défi", "proof", proof, "ik")],
         "subkeyBindings": [signed("liaison de la sous-clé X25519, 45 jours", "subkeyBinding", binding, "ik")],
+        "smallOrder": {
+            "rule": "Une clé publique ou un R d'ordre faible est refusé avant toute vérification (PROTOCOL.md, 4.5)",
+            "points": [b64url(bytes.fromhex(point)) for point in SMALL_ORDER_POINTS],
+            "message": b64url("n'importe quel message".encode("utf-8")),
+        },
         "forgeries": [
             forgery("certificat prolongé d'un jour après signature", "certificate", longer, sign(CA_SEED, cert_bytes), "ca"),
             forgery("certificat signé par une autre clé que la CA", "certificate", certificate, sign(OTHER_SEED, cert_bytes), "ca"),

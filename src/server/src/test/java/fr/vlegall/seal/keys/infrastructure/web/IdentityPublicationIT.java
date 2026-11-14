@@ -200,6 +200,26 @@ class IdentityPublicationIT {
     }
 
     @Test
+    @DisplayName("QA-04, ADR 0025 : le point neutre, avec R neutre et S nul, ne fait certifier aucune clé (422)")
+    void qa04SmallOrderKeyCannotBeCertified() throws Exception {
+        Account account = account("pop_ordre_faible");
+        byte[] identityPoint = HexFormat.of().parseHex("01" + "00".repeat(31));
+        Map<String, Object> body = new HashMap<>();
+        body.put("ikPublic", Base64Url.encode(identityPoint));
+        body.put("challenge", Base64Url.encode(challenge(account)));
+        body.put("signature", Base64Url.encode(fr.vlegall.seal.crypto.Canonical.concat(identityPoint, new byte[32])));
+
+        publish(account, body)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("INVALID_SIGNATURE"));
+        assertThat(jdbc.sql("SELECT count(*) FROM identity_certificates WHERE user_id = :user")
+                        .param("user", account.id())
+                        .query(Long.class)
+                        .single())
+                .isZero();
+    }
+
+    @Test
     @DisplayName("SEC-01 : longueur fausse, remplissage ou champ inconnu donnent 400 VALIDATION_FAILED")
     void sec01MalformedBodiesAreRefused() throws Exception {
         Account account = account("pop_format");

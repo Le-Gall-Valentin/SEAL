@@ -194,6 +194,11 @@ sous-clé de chiffrement X25519 (EK). Toute signature est Ed25519 pur (RFC 8032)
 la structure. L'étiquette de chaque structure fixe son algorithme : aucun champ ne le négocie, et un autre
 algorithme serait une nouvelle version de l'étiquette (ADR 0025, point 11).
 
+Toute vérification refuse d'abord une clé publique ou un `R` (les 32 premiers octets de la signature) d'ordre
+faible : les 8 points de la section `smallOrder` de `vectors/identity.json`. Avec eux, l'équation de vérification
+tient pour tout message, et des bibliothèques courantes, dont la JCA de la JDK 25, acceptent la signature : une clé
+sans clé privée serait certifiée (ADR 0025, point 14).
+
 ### 4.1 Autorité
 
 | Élément | Valeur |
@@ -250,8 +255,9 @@ point 7). Il ne vérifie de `ekPublic` que sa longueur : l'émetteur rejette un 
 
 - `vectors/ed25519-rfc8032.json` : les tests 1 à 3 de la RFC 8032, section 7.1, en hexadécimal.
 - `vectors/identity.json` : la CA, deux certificats, une preuve, une liaison, chacun avec ses champs, ses
-  octets canoniques et sa signature, plus six falsifications que toute implémentation DOIT refuser. Les clés
-  sont les graines publiques de la RFC 8032 (CA : test 1, IK : test 2, autre clé : test 3).
+  octets canoniques et sa signature, plus six falsifications que toute implémentation DOIT refuser, et les 8 points
+  d'ordre faible (`smallOrder`) : aucune clé ni aucun `R` pris parmi eux ne DOIT vérifier. Les clés sont les graines
+  publiques de la RFC 8032 (CA : test 1, IK : test 2, autre clé : test 3).
 
 `gen_vectors.py` les signe avec la bibliothèque `cryptography`, épinglée avec ses empreintes :
 

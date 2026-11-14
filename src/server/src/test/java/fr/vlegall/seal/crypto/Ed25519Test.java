@@ -169,4 +169,35 @@ class Ed25519Test {
         assertThat(key).isEqualTo(copy).hasSameHashCodeAs(copy).isNotEqualTo(Ed25519.generate());
         assertThat(key).isNotEqualTo(key.publicKey());
     }
+
+    @Test
+    @DisplayName("QA-04, ADR 0025 : aucune clé ni aucun R d'ordre faible ne vérifie, alors que la JCA l'accepterait")
+    void qa04SmallOrderKeysAndRAreRejected() throws IOException {
+        JsonNode smallOrder = JsonMapper.builder()
+                .build()
+                .readTree(Files.readString(Path.of("..", "protocol", "vectors", "identity.json")))
+                .get("smallOrder");
+        byte[] message = java.util.Base64.getUrlDecoder()
+                .decode(smallOrder.get("message").asString());
+        java.util.List<byte[]> points = smallOrder
+                .get("points")
+                .valueStream()
+                .map(point -> java.util.Base64.getUrlDecoder().decode(point.asString()))
+                .toList();
+        Ed25519.GeneratedKey genuine = Ed25519.generate();
+
+        assertThat(points).hasSize(8);
+        for (byte[] key : points) {
+            for (byte[] r : points) {
+                byte[] signature = Canonical.concat(r, new byte[32]);
+                assertThat(Ed25519.verify(key, message, signature))
+                        .as("clé %s, R %s", HEX.formatHex(key), HEX.formatHex(r))
+                        .isFalse();
+            }
+        }
+        for (byte[] r : points) {
+            assertThat(Ed25519.verify(genuine.publicKey(), message, Canonical.concat(r, new byte[32])))
+                    .isFalse();
+        }
+    }
 }
