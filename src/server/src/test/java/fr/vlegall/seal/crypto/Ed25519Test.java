@@ -170,32 +170,52 @@ class Ed25519Test {
         assertThat(key).isNotEqualTo(key.publicKey());
     }
 
-    @Test
-    @DisplayName("QA-04, ADR 0025 : aucune clé ni aucun R d'ordre faible ne vérifie, alors que la JCA l'accepterait")
-    void qa04SmallOrderKeysAndRAreRejected() throws IOException {
+    /** Les 8 points d'ordre faible et 6 autres encodages des mêmes points (vectors/identity.json, smallOrder). */
+    private static java.util.List<byte[]> weakEncodings(String section) throws IOException {
         JsonNode smallOrder = JsonMapper.builder()
                 .build()
                 .readTree(Files.readString(Path.of("..", "protocol", "vectors", "identity.json")))
                 .get("smallOrder");
-        byte[] message = java.util.Base64.getUrlDecoder()
-                .decode(smallOrder.get("message").asString());
-        java.util.List<byte[]> points = smallOrder
-                .get("points")
+        return smallOrder
+                .get(section)
                 .valueStream()
                 .map(point -> java.util.Base64.getUrlDecoder().decode(point.asString()))
                 .toList();
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 14 : la règle refuse les 14 encodages d'ordre faible ou non canoniques, et eux seuls")
+    void adr0025WeakEncodingRuleCoversEveryEncoding() throws IOException {
+        java.util.List<byte[]> weak = new java.util.ArrayList<>(weakEncodings("points"));
+        weak.addAll(weakEncodings("otherEncodings"));
+
+        assertThat(weak).hasSize(14);
+        for (byte[] encoding : weak) {
+            assertThat(Ed25519.isWeakPoint(encoding))
+                    .as(HEX.formatHex(encoding))
+                    .isTrue();
+        }
+        assertThat(Ed25519.isWeakPoint(Ed25519.generate().publicKey())).isFalse();
+        assertThat(Ed25519.isWeakPoint(HEX.parseHex("02" + "00".repeat(31)))).isFalse();
+    }
+
+    @Test
+    @DisplayName("QA-04, ADR 0025 : aucune clé ni aucun R d'ordre faible ne vérifie, alors que la JCA l'accepterait")
+    void qa04SmallOrderKeysAndRAreRejected() throws IOException {
+        java.util.List<byte[]> weak = new java.util.ArrayList<>(weakEncodings("points"));
+        weak.addAll(weakEncodings("otherEncodings"));
+        byte[] message = "n'importe quel message".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         Ed25519.GeneratedKey genuine = Ed25519.generate();
 
-        assertThat(points).hasSize(8);
-        for (byte[] key : points) {
-            for (byte[] r : points) {
+        for (byte[] key : weak) {
+            for (byte[] r : weak) {
                 byte[] signature = Canonical.concat(r, new byte[32]);
                 assertThat(Ed25519.verify(key, message, signature))
                         .as("clé %s, R %s", HEX.formatHex(key), HEX.formatHex(r))
                         .isFalse();
             }
         }
-        for (byte[] r : points) {
+        for (byte[] r : weak) {
             assertThat(Ed25519.verify(genuine.publicKey(), message, Canonical.concat(r, new byte[32])))
                     .isFalse();
         }

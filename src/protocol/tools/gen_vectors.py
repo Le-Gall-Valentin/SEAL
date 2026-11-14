@@ -534,6 +534,16 @@ SMALL_ORDER_POINTS = [
     "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85",  # ordre 8
 ]
 
+# Autres encodages des mêmes points, refusés aussi : bit de signe posé sur x nul, et y non canonique (y = p, y = p + 1).
+SMALL_ORDER_OTHER_ENCODINGS = [
+    "0100000000000000000000000000000000000000000000000000000000000080",  # neutre, bit de signe
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",  # ordre 2, bit de signe
+    "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # y = p, soit 0
+    "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",  # y = p, bit de signe
+    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # y = p + 1, soit 1
+    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",  # y = p + 1, bit de signe
+]
+
 
 def certificate_struct(f: dict) -> dict:
     return STRUCT(
@@ -649,6 +659,7 @@ def build_identity() -> str:
         "smallOrder": {
             "rule": "Une clé publique ou un R d'ordre faible est refusé avant toute vérification (PROTOCOL.md, 4.5)",
             "points": [b64url(bytes.fromhex(point)) for point in SMALL_ORDER_POINTS],
+            "otherEncodings": [b64url(bytes.fromhex(encoding)) for encoding in SMALL_ORDER_OTHER_ENCODINGS],
             "message": b64url("n'importe quel message".encode("utf-8")),
         },
         "forgeries": [

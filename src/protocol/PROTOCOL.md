@@ -195,7 +195,9 @@ la structure. L'étiquette de chaque structure fixe son algorithme : aucun champ
 algorithme serait une nouvelle version de l'étiquette (ADR 0025, point 11).
 
 Toute vérification refuse d'abord une clé publique ou un `R` (les 32 premiers octets de la signature) d'ordre
-faible : les 8 points de la section `smallOrder` de `vectors/identity.json`. Avec eux, l'équation de vérification
+faible ou non canonique, comme libsodium : bit de signe effacé, `y` lu en petit-boutiste ne DOIT être ni supérieur ou
+égal à p = 2²⁵⁵ − 19, ni l'un des `y` des 8 points d'ordre faible (0, 1, p − 1 et les deux `y` d'ordre 8). La section
+`smallOrder` de `vectors/identity.json` donne ces 8 points et 6 autres encodages des mêmes points. Avec eux, l'équation de vérification
 tient pour tout message, et des bibliothèques courantes, dont la JCA de la JDK 25, acceptent la signature : une clé
 sans clé privée serait certifiée (ADR 0025, point 14).
 

@@ -1,5 +1,6 @@
 package fr.vlegall.seal.crypto;
 
+import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -15,8 +16,9 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -36,13 +38,16 @@ public final class Ed25519 {
     /** En-tête DER d'un SubjectPublicKeyInfo Ed25519 (RFC 8410, OID 1.3.101.112), suivi des 32 octets de la clé. */
     private static final byte[] SPKI_PREFIX = HexFormat.of().parseHex("302a300506032b6570032100");
 
+    /** p = 2^255 − 19, le corps de la courbe. */
+    private static final BigInteger FIELD_PRIME = BigInteger.TWO.pow(255).subtract(BigInteger.valueOf(19));
+
     /**
-     * Les 8 points d'ordre faible de la courbe, en encodage canonique (la liste de libsodium). Avec une telle clé et un R
-     * pris parmi eux, l'équation de vérification tient pour tout message, et la JCA de la JDK 25 accepte la signature :
-     * une clé sans clé privée serait certifiée, et n'importe qui signerait en son nom (ADR 0025, point 14). Les encodages
-     * non canoniques de ces points sont déjà refusés par la JCA au décodage.
+     * Les {@code y} des 8 points d'ordre faible (0, 1, p − 1 et les deux {@code y} d'ordre 8), tirés de leurs encodages
+     * canoniques, la liste de libsodium. Avec une clé et un R pris parmi ces points, l'équation de vérification tient
+     * pour tout message, et la JCA de la JDK 25 accepte la signature : une clé sans clé privée serait certifiée, et
+     * n'importe qui signerait en son nom (ADR 0025, point 14).
      */
-    private static final List<byte[]> SMALL_ORDER_POINTS = Stream.of(
+    private static final Set<BigInteger> SMALL_ORDER_Y = Stream.of(
                     "0100000000000000000000000000000000000000000000000000000000000000",
                     "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
                     "0000000000000000000000000000000000000000000000000000000000000000",
@@ -51,8 +56,8 @@ public final class Ed25519 {
                     "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
                     "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
                     "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85")
-            .map(HexFormat.of()::parseHex)
-            .toList();
+            .map(point -> y(HexFormat.of().parseHex(point)))
+            .collect(Collectors.toUnmodifiableSet());
 
     private Ed25519() {}
 
@@ -128,7 +133,7 @@ public final class Ed25519 {
             return false;
         }
         // ADR 0025, point 14 : ni clé publique ni R d'ordre faible, avant toute vérification.
-        if (hasSmallOrder(publicKey) || hasSmallOrder(signature)) {
+        if (isWeakPoint(publicKey) || isWeakPoint(signature)) {
             return false;
         }
         try {
@@ -143,10 +148,24 @@ public final class Ed25519 {
         }
     }
 
-    /** Vrai si les 32 premiers octets de {@code encoded} sont l'un des points d'ordre faible. */
-    private static boolean hasSmallOrder(byte[] encoded) {
-        return SMALL_ORDER_POINTS.stream()
-                .anyMatch(point -> Arrays.equals(encoded, 0, PUBLIC_KEY_BYTES, point, 0, PUBLIC_KEY_BYTES));
+    /**
+     * ADR 0025, point 14 : vrai si les 32 premiers octets de {@code encoded} sont un point d'ordre faible ou un encodage
+     * non canonique, comme le refuse libsodium : bit de signe effacé, {@code y} ≥ p, ou {@code y} d'un point d'ordre
+     * faible. Indépendant de ce que la JCA accepte au décodage.
+     */
+    static boolean isWeakPoint(byte[] encoded) {
+        BigInteger y = y(encoded);
+        return y.compareTo(FIELD_PRIME) >= 0 || SMALL_ORDER_Y.contains(y);
+    }
+
+    /** {@code y} d'un point encodé : 32 octets petit-boutistes, sans le bit de signe de {@code x} (RFC 8032, 5.1.3). */
+    private static BigInteger y(byte[] encoded) {
+        byte[] bigEndian = new byte[PUBLIC_KEY_BYTES];
+        for (int i = 0; i < PUBLIC_KEY_BYTES; i++) {
+            bigEndian[i] = encoded[PUBLIC_KEY_BYTES - 1 - i];
+        }
+        bigEndian[0] &= 0x7f;
+        return new BigInteger(1, bigEndian);
     }
 
     /** ADR 0025, point 12 : clé publique brute de 32 octets, encodée en SubjectPublicKeyInfo (RFC 8410). */
