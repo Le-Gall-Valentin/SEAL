@@ -100,8 +100,8 @@ Les vecteurs sont produits par `tools/gen_vectors.py`, une troisième implément
 dépendance, indépendante de Java et de TypeScript. Pour les régénérer, depuis `src/protocol` :
 
 ```bash
-python3 tools/gen_vectors.py           # réécrit vectors/canonical-encoding.json
-python3 tools/gen_vectors.py --check   # échoue si le fichier n'est pas à jour (CI)
+python3 tools/gen_vectors.py           # réécrit les fichiers de vectors/
+python3 tools/gen_vectors.py --check   # échoue si un fichier n'est pas à jour (CI)
 ```
 
 ## 3. Mots de passe (AUTH-11)
@@ -142,6 +142,32 @@ laisse ` sur le pont`, 12 points de code. Retirer `ann` d'abord aurait laissé `
 | `le phoque nage dans le port de seal` | `valentin` | `valentin` | accepté |
 | `fjord-tuque-raquette` précédé de U+D800 seul | `valentin` | `valentin` | refusé (demi-paire isolée) |
 
+`vectors/password-policy.json`, produit par le même générateur (ADR 0024, point 6), reprend ce tableau et
+y ajoute les bornes : 14, 15, 128 et 129 points de code, en ASCII comme en phoques U+1F9AD (deux unités UTF-16
+chacun), pleine chasse et ligatures ramenées par NFKC, entrées de la liste de blocage, casse, `+` dans le courriel,
+mot du contexte trop court, « uqac », partie locale en majuscules (les mots du contexte sont repliés), « seal » logé
+dans l'identifiant (la repasse retire l'identifiant reformé). Son format est `seal-password-policy-v1` ; son champ
+`unicode` donne la version d'Unicode du générateur, dont NFKC et les minuscules dépendent : régénérer sous une autre
+version fait échouer `--check`, et la CI épingle Python. Chaque cas donne `password`, `username`, `email`,
+`localPart`, l'état des trois règles affichées par le client et le verdict du serveur :
+
+```json
+{
+  "name": "longueur : 15 points de code",
+  "password": "fjord-tuque-rak",
+  "username": "valentin",
+  "email": "valentin@exemple.ca",
+  "localPart": "valentin",
+  "rules": { "length": true, "context": true, "blocklist": true },
+  "accepted": true
+}
+```
+
+`rules.length` vaut l'étape 1, `rules.context` l'étape 4 (sur une suite valide) et `rules.blocklist`
+l'étape 2, comptée respectée seulement quand l'étape 1 l'est. `accepted` est vrai si les trois le sont.
+Le serveur relit `accepted` et `localPart` (par `EmailAddress`), le client les trois règles, `localPart` et
+`accepted`.
+
 ### 3.1 Liste de blocage
 
 `password-blocklist.txt` compte les 10 000 premiers mots de passe de 15 caractères ou plus, dans
@@ -156,6 +182,6 @@ Une entrée par ligne, en UTF-8, fins de ligne `\n`, toutes en ASCII.
 | Taille | 176 195 octets, 10 000 lignes |
 | Licence | MIT, copyright 2018 Daniel Miessler (`password-blocklist.LICENSE`) |
 
-Le serveur l'embarque comme ressource Maven et un test vérifie son empreinte ; le client la charge
-sur l'écran d'inscription seulement.
+Le serveur l'embarque comme ressource Maven et un test vérifie son empreinte ; le client l'importe en
+morceau séparé, chargé seulement par les écrans qui affichent les règles (ADR 0024, point 6 bis).
 

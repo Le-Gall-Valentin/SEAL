@@ -1,0 +1,1 @@
+export { loginPageMessages } from './messages'

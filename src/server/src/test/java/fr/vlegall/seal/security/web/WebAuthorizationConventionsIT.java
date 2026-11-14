@@ -26,7 +26,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * AUTH-16 vérifié sur toutes les routes, y compris celles à venir (d'après {@code WebAuthorizationConventionsTest} de
- * NIDO) : une session restreinte reçoit 403 partout, sauf sur la liste fermée d'AUTH-16.
+ * NIDO) : une session restreinte reçoit 403 sur toute route de l'API hors de la liste fermée d'AUTH-16, et les pages
+ * du client (ADR 0024, point 5).
  */
 @SealIntegrationTest
 class WebAuthorizationConventionsIT {
@@ -39,6 +40,17 @@ class WebAuthorizationConventionsIT {
             "POST /api/v1/auth/verify-email/resend",
             "POST /api/v1/auth/verify-email/change",
             "POST /api/v1/auth/logout");
+
+    /**
+     * ADR 0024, point 5 : pages du client, du HTML statique sans donnée, servies à toute session comme {@code /} ; la
+     * session restreinte doit pouvoir ouvrir l'écran de vérification.
+     */
+    private static final Set<String> CLIENT_PAGES = Set.of(
+            "GET /connexion",
+            "GET /inscription",
+            "GET /verification-courriel",
+            "GET /mot-de-passe/oublie",
+            "GET /mot-de-passe/nouveau");
 
     /** AUTH-53 : la déconnexion ferme la session ; essayée en dernier, elle ne fausse pas les autres routes. */
     private static final String LOGOUT = "POST /api/v1/auth/logout";
@@ -90,7 +102,9 @@ class WebAuthorizationConventionsIT {
     }
 
     @Test
-    @DisplayName("AUTH-16 : une session restreinte reçoit 403 sur toute route hors de la liste d'AUTH-16")
+    @DisplayName(
+            "AUTH-16 : une session restreinte reçoit 403 sur toute route de l'API hors de la liste d'AUTH-16, et les"
+                    + " pages du client")
     void auth16RestrictedSessionIsForbiddenEverywhereElse() throws Exception {
         AuthClient client = new AuthClient(mvc, mail);
         Cookie restricted =
@@ -105,8 +119,9 @@ class WebAuthorizationConventionsIT {
                     .andReturn()
                     .getResponse()
                     .getStatus();
+            boolean page = CLIENT_PAGES.contains(route);
             boolean permitted = RESTRICTED_SESSION_ROUTES.contains(route);
-            if (permitted ? status == 401 || status == 403 : status != 403) {
+            if (page ? status != 200 : permitted ? status == 401 || status == 403 : status != 403) {
                 wrong.add(route + " → " + status);
             }
         }
@@ -115,7 +130,8 @@ class WebAuthorizationConventionsIT {
                 .as("routes dont la réponse à une session restreinte contredit AUTH-16")
                 .isEmpty();
         assertThat(routes)
-                .as("la convention a bien regardé les routes de l'API")
-                .hasSizeGreaterThanOrEqualTo(6);
+                .as("la convention a bien regardé les routes de l'API et les pages du client")
+                .containsAll(RESTRICTED_SESSION_ROUTES)
+                .containsAll(CLIENT_PAGES);
     }
 }

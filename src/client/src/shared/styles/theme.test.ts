@@ -25,9 +25,13 @@ async function rule(candidate: string): Promise<string | undefined> {
   return start === -1 ? undefined : css.slice(start, css.indexOf('}', start) + 1)
 }
 
-const TOKENS = [
-  ...readFileSync(resolve(STYLES, 'tokens.css'), 'utf-8').matchAll(/--([a-z0-9-]+):/g),
-].map(([, name]) => name ?? '')
+const TOKENS_CSS = readFileSync(resolve(STYLES, 'tokens.css'), 'utf-8')
+
+function names(css: string): string[] {
+  return [...css.matchAll(/--([a-z0-9-]+):/g)].map(([, name]) => name ?? '')
+}
+
+const TOKENS = [...new Set(names(TOKENS_CSS))]
 
 describe('ADR 0016 : thème Tailwind sur les jetons de la maquette', () => {
   it('ADR 0016 : chaque couleur de tokens.css a ses classes, et chaque police la sienne', async () => {
@@ -60,5 +64,15 @@ describe('ADR 0016 : thème Tailwind sur les jetons de la maquette', () => {
     expect(await rule('rounded-lg')).toContain('8px')
     expect(await rule('text-lg')).toBeUndefined()
     expect(await rule('max-w-md')).toBeUndefined()
+  })
+})
+
+describe('ADR 0024 : thème sombre de la maquette', () => {
+  it('ADR 0024 : chaque couleur du thème clair a sa valeur sombre, sous prefers-color-scheme', () => {
+    const [light = '', dark = ''] = TOKENS_CSS.split('@media (prefers-color-scheme: dark)')
+    const colors = names(light).filter((name) => name !== 'sans' && name !== 'mono')
+
+    expect(colors.length).toBeGreaterThan(0)
+    expect(names(dark).toSorted()).toEqual(colors.toSorted())
   })
 })

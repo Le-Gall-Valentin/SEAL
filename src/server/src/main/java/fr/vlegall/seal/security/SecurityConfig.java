@@ -5,6 +5,7 @@ import fr.vlegall.seal.security.session.AbsoluteSessionTimeoutFilter;
 import fr.vlegall.seal.security.session.CredentialVersionFilter;
 import fr.vlegall.seal.security.session.CredentialVersions;
 import fr.vlegall.seal.security.session.SealAuthorities;
+import fr.vlegall.seal.security.web.ClientRoutesController;
 import fr.vlegall.seal.security.web.ProblemDetailsSecurityHandler;
 import fr.vlegall.seal.security.web.RequestBodyLimitFilter;
 import jakarta.servlet.DispatcherType;
@@ -81,6 +82,9 @@ class SecurityConfig {
         http.authorizeHttpRequests(requests -> requests
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
+                        .permitAll()
+                        // TRN-02, ADR 0024 (point 5) : adresses des écrans, qui renvoient ce même client.
+                        .requestMatchers(HttpMethod.GET, ClientRoutesController.PATHS.toArray(String[]::new))
                         .permitAll()
                         // AUTH-60 : jeton CSRF rechargé par le client.
                         .requestMatchers(HttpMethod.GET, "/api/v1/csrf")

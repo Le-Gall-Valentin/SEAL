@@ -78,6 +78,23 @@ async function expectAllowed(file: string, source: string) {
   expect(await importVerdict(file, source)).toEqual([])
 }
 
+// ADR 0024 (point 6 bis) : depuis eslint-fixtures/src/<couche>/<tranche>/<segment>/, six niveaux mènent à src/.
+const BLOCKLIST = '../../../../../../protocol/password-blocklist.txt'
+const PASSWORD_VECTORS = '../../../../../../protocol/vectors/password-policy.json'
+
+describe('ADR 0024 : liste de blocage de src/protocol', () => {
+  it('ADR 0024 : seul le segment api/ de entities/password importe la liste de blocage', async () => {
+    await expectAllowed('src/entities/password/api/passwordBlocklist.ts', BLOCKLIST)
+    await expectRefused('src/entities/password/model/usePasswordBlocklist.ts', BLOCKLIST)
+    await expectRefused('src/entities/user/api/userApi.ts', BLOCKLIST)
+    await expectRefused('src/features/register/api/registerApi.ts', BLOCKLIST)
+  })
+
+  it('ADR 0024 : aucun autre fichier de src/protocol ne s’importe', async () => {
+    await expectRefused('src/entities/password/api/passwordBlocklist.ts', PASSWORD_VECTORS)
+  })
+})
+
 describe('ADR 0012 : couches de Feature-Sliced Design', () => {
   it("QA-10 : une couche n'importe que des couches inférieures", async () => {
     await expectRefused('src/shared/ui/Button.ts', '@/features/sign-in')

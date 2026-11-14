@@ -58,7 +58,9 @@ forbidden=$(printf '%s\n' "$entries" \
   | grep -E '(^|/)(node_modules|target)/|^chat/src/(certs|data)/|(^|/)\.env$' || true)
 [ -z "$forbidden" ] || fail "fichiers interdits dans l'archive : $forbidden"
 for required in chat/README.md chat/presentation.pdf chat/src/client/package.json chat/src/server/pom.xml; do
-  printf '%s\n' "$entries" | grep -qx "$required" || fail "$required manque dans l'archive"
+  # Sans tube : grep -q s'arrête à la première ligne trouvée, et printf, coupé en pleine écriture, ferait échouer le
+  # tube sous pipefail alors que le fichier est bien là.
+  grep -qxF "$required" <<<"$entries" || fail "$required manque dans l'archive"
 done
 
 echo "projet.zip créé : $(printf '%s\n' "$entries" | wc -l | tr -d ' ') fichiers sous chat/"

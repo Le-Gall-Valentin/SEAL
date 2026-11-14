@@ -32,6 +32,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     https,
+    // ADR 0024 (point 6 bis) : le client lit aussi la liste de blocage de src/protocol, hors de sa racine.
+    fs: { allow: ['.', '../protocol/password-blocklist.txt'] },
     // TRN-23 : le navigateur ne voit qu'une origine ; Vite relaie l'API et la WebSocket vers Spring.
     // secure: false ne vaut que pour ce relais sur la boucle locale, en développement : Node ignore
     // l'autorité mkcert installée dans le système. La CSP stricte s'applique au build de production.

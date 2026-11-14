@@ -39,14 +39,21 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-soft-2: var(--accent-soft-2);
   --color-accent-text: var(--accent-text);
+  --color-accent-line: var(--accent-line);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-danger-line: var(--danger-line);
   --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-line: var(--warning-line);
   --color-fp-bg: var(--fp-bg);
   --color-fp-a: var(--fp-a);
   --color-fp-b: var(--fp-b);
   --color-fp-c: var(--fp-c);
+  --color-focus-glow: var(--focus-glow);
+
+  /* Carte de Connexion-Tablette, seule ombre de la maquette des écrans d'authentification. */
+  --shadow-card: 0 12px 32px -12px rgba(27, 31, 20, 0.22), 0 2px 6px rgba(27, 31, 20, 0.06);
 
   --font-sans: var(--sans);
   --font-mono: var(--mono);

@@ -1,12 +1,19 @@
-import { useMessages } from '@/shared/i18n'
-import { homeMessages } from '../i18n/messages'
+import { LogoutButton } from '@/features/logout'
+import { Wordmark } from '@/shared/ui'
 
-/** Page provisoire du lot 0 : l'écran de connexion de la maquette la remplace au lot 1. */
+/**
+ * Accueil provisoire du lot 1 (ADR 0024, point 2) : le logo et le seul bouton « Se déconnecter », jusqu'aux
+ * conversations (lot 3) et à la restauration des clés (noyau cryptographique). Écart temporaire à la maquette.
+ */
 export function HomePage() {
-  const t = useMessages(homeMessages)
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-[34px] leading-none font-extrabold tracking-tighter">{t('wordmark')}</h1>
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-bg px-5 font-sans text-ink">
+      <h1 className="m-0">
+        <Wordmark variant="panel" />
+      </h1>
+      <div className="w-full max-w-60">
+        <LogoutButton />
+      </div>
     </main>
   )
 }
