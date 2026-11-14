@@ -1,4 +1,5 @@
 import { useCurrentAccount } from '@/entities/session'
+import { LogoutButton } from '@/features/logout'
 import { VerifyEmailPanel } from '@/features/verify-email'
 import { useMessages } from '@/shared/i18n'
 import { AuthLayout } from '@/widgets/auth-layout'
@@ -6,7 +7,7 @@ import { verifyEmailPageMessages } from '../i18n'
 
 /**
  * Écran Verification-Courriel (AUTH-14), réservé au compte en attente : son adresse, l'expiration du code et les
- * renvois restants viennent de /me (AUTH-16).
+ * renvois restants viennent de /me (AUTH-16). « Se déconnecter » lui donne une issue (ADR 0024, point 10).
  */
 export function VerifyEmailPage() {
   const t = useMessages(verifyEmailPageMessages)
@@ -28,6 +29,7 @@ export function VerifyEmailPage() {
           </p>
         </header>
         <VerifyEmailPanel email={account.email} verification={account.verification} />
+        <LogoutButton />
       </div>
     </AuthLayout>
   )

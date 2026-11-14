@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { EMAIL_MAX_LENGTH } from '@/entities/account'
 import type { Account } from '@/entities/session'
 import { useMessages } from '@/shared/i18n'
@@ -35,9 +35,21 @@ function FailureView({ failure }: { readonly failure: VerifyFailure }) {
 export function VerifyEmailPanel({ email, verification }: VerifyEmailPanelProps) {
   const t = useMessages(verifyEmailMessages)
   const boxes = useRef<(HTMLInputElement | null)[]>([])
+  const emailField = useRef<HTMLInputElement>(null)
+  const changeLink = useRef<HTMLButtonElement>(null)
   const panel = useEmailVerification({ email, verification }, () => {
     boxes.current[0]?.focus()
   })
+  // ADR 0024, point 10 : le focus suit le champ « Courriel » ouvert sur place, puis revient au lien qui l'a ouvert.
+  const wasChanging = useRef(false)
+  useEffect(() => {
+    if (panel.changing) {
+      emailField.current?.focus()
+    } else if (wasChanging.current) {
+      changeLink.current?.focus()
+    }
+    wasChanging.current = panel.changing
+  }, [panel.changing])
   const remaining = panel.resendsRemaining
   return (
     <>
@@ -53,7 +65,7 @@ export function VerifyEmailPanel({ email, verification }: VerifyEmailPanelProps)
         <CodeInput
           cells={panel.cells}
           onChange={panel.setCells}
-          disabled={panel.locked}
+          disabled={panel.codeLocked}
           boxes={boxes}
         />
         <div className="flex justify-between gap-3 text-[13px] text-ink-3">
@@ -104,6 +116,7 @@ export function VerifyEmailPanel({ email, verification }: VerifyEmailPanelProps)
         {t('inactive')}{' '}
         {!panel.changing && (
           <button
+            ref={changeLink}
             type="button"
             className="font-semibold text-accent-text hover:text-accent-hover"
             onClick={panel.openChange}
@@ -129,6 +142,7 @@ export function VerifyEmailPanel({ email, verification }: VerifyEmailPanelProps)
             value={panel.newEmail}
             onChange={panel.setNewEmail}
             onBlur={panel.touchNewEmail}
+            inputRef={emailField}
             error={panel.newEmailInvalid ? t('invalidEmail') : null}
           />
           <div className="flex gap-2">

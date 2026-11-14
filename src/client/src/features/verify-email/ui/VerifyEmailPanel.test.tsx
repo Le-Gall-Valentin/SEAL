@@ -9,11 +9,15 @@ import {
   SessionApiProvider,
   useCurrentAccount,
 } from '@/entities/session'
-import { ApiError } from '@/shared/lib'
+import { ApiError, ClockProvider } from '@/shared/lib'
 import { VerifyEmailApiProvider } from '../model/verifyEmailApiPort'
 import { VerifyEmailPanel } from './VerifyEmailPanel'
 
 type IVerifyEmailApi = ComponentProps<typeof VerifyEmailApiProvider>['api']
+
+// Horloge figée : le compte à rebours ne dépend plus de l'heure du test (CLAUDE.md, horloge injectée).
+const NOW = Date.parse('2026-11-13T20:00:00Z')
+const CLOCK = { now: () => NOW }
 
 const PENDING: Account = {
   id: '0192f0c4-7b1a-7cc0-9a51-3f6f8e2d4b10',
@@ -21,7 +25,7 @@ const PENDING: Account = {
   displayName: 'Valentin',
   email: 'valentin@uqac.ca',
   status: 'PENDING_EMAIL',
-  verification: { codeExpiresAt: new Date(Date.now() + 90_000), resendsRemaining: 2 },
+  verification: { codeExpiresAt: new Date(NOW + 90_000), resendsRemaining: 2 },
 }
 
 // Le panneau reçoit le compte relu par /me, comme dans la page.
@@ -50,7 +54,7 @@ async function renderPanel(api: Partial<IVerifyEmailApi>, initial: Account = PEN
       account = {
         ...account,
         verification: {
-          codeExpiresAt: new Date(Date.now() + 600_000),
+          codeExpiresAt: new Date(NOW + 600_000),
           resendsRemaining: (account.verification?.resendsRemaining ?? 1) - 1,
         },
       }
@@ -71,7 +75,9 @@ async function renderPanel(api: Partial<IVerifyEmailApi>, initial: Account = PEN
     >
       <SessionApiProvider api={sessionApi}>
         <VerifyEmailApiProvider api={verifyApi}>
-          <Panel />
+          <ClockProvider clock={CLOCK}>
+            <Panel />
+          </ClockProvider>
         </VerifyEmailApiProvider>
       </SessionApiProvider>
     </QueryClientProvider>,
@@ -173,7 +179,7 @@ describe('AUTH-14, AUTH-17 : vérification du courriel', () => {
       {},
       {
         ...PENDING,
-        verification: { codeExpiresAt: new Date(Date.now() + 60_000), resendsRemaining: remaining },
+        verification: { codeExpiresAt: new Date(NOW + 60_000), resendsRemaining: remaining },
       },
     )
 
@@ -232,5 +238,111 @@ describe('AUTH-14, AUTH-17 : vérification du courriel', () => {
     await expect.element(screen.getByRole('button', { name: 'Envoyer le code' })).toBeDisabled()
     await screen.getByRole('button', { name: 'Annuler' }).click()
     await expect.element(screen.getByLabelText('Courriel', { exact: true })).not.toBeInTheDocument()
+  })
+
+  it('SEC-10 : un 429 du renvoi se lève à la fin de Retry-After, malgré le compte à rebours', async () => {
+    let attempts = 0
+    const { screen } = await renderPanel({
+      resend: () => {
+        attempts += 1
+        return attempts === 1
+          ? Promise.reject(new ApiError(429, 'RATE_LIMITED', { retryAfterSeconds: 1 }))
+          : Promise.resolve()
+      },
+    })
+    await screen.getByRole('button', { name: 'Renvoyer le code' }).click()
+    await expect.element(screen.getByRole('alert')).toMatchTextContent('Trop de tentatives')
+
+    await expect
+      .element(screen.getByRole('button', { name: 'Renvoyer le code' }), { timeout: 3000 })
+      .toBeEnabled()
+  })
+
+  it('AUTH-14, AUTH-17 : un 429 du renvoi laisse vérifier le code en cours, qui reste valable', async () => {
+    const { screen } = await renderPanel({
+      resend: () => Promise.reject(new ApiError(429, 'RATE_LIMITED', { retryAfterSeconds: 3600 })),
+    })
+    await screen.getByRole('button', { name: 'Renvoyer le code' }).click()
+    await expect.element(screen.getByRole('alert')).toMatchTextContent('Trop de tentatives')
+
+    await expect.element(screen.getByRole('button', { name: 'Renvoyer le code' })).toBeDisabled()
+    await box(screen, 1).fill('503271')
+    await expect.element(screen.getByRole('button', { name: 'Vérifier' })).toBeEnabled()
+  })
+
+  it('AUTH-17 : sans renvoi restant, « Envoyer le code » reste désactivé (limite partagée)', async () => {
+    const { screen } = await renderPanel(
+      {},
+      {
+        ...PENDING,
+        verification: { codeExpiresAt: new Date(NOW + 60_000), resendsRemaining: 0 },
+      },
+    )
+    await screen.getByRole('button', { name: 'Modifier le courriel' }).click()
+    await screen.getByLabelText('Courriel', { exact: true }).fill('noah@uqac.ca')
+
+    await expect.element(screen.getByRole('button', { name: 'Envoyer le code' })).toBeDisabled()
+  })
+
+  it('ADR 0024, point 10 : compte à rebours à zéro, le message s’affiche mais le serveur tranche', async () => {
+    const { screen, calls } = await renderPanel(
+      {},
+      {
+        ...PENDING,
+        verification: { codeExpiresAt: new Date(NOW - 1_000), resendsRemaining: 2 },
+      },
+    )
+
+    await expect
+      .element(screen.getByRole('alert'))
+      .toHaveTextContent('Ce code a expiré. Renvoyez-en un nouveau.')
+    await box(screen, 1).fill('503271')
+    await screen.getByRole('button', { name: 'Vérifier' }).click()
+    await expect.poll(() => calls).toEqual(['verify 503271'])
+  })
+
+  it('ADR 0024 : sans code vivant annoncé par /me, « Vérifier » reste désactivé', async () => {
+    const { screen } = await renderPanel(
+      {},
+      {
+        ...PENDING,
+        verification: { codeExpiresAt: null, resendsRemaining: 2 },
+      },
+    )
+    await box(screen, 1).fill('503271')
+
+    await expect.element(screen.getByRole('button', { name: 'Vérifier' })).toBeDisabled()
+  })
+
+  it('AUTH-14 : Retour arrière dans une case vide efface la précédente et y revient', async () => {
+    const { screen } = await renderPanel({})
+    await box(screen, 1).click()
+    await userEvent.keyboard('503')
+    await expect.element(box(screen, 4)).toHaveFocus()
+
+    await userEvent.keyboard('{Backspace}')
+
+    await expect.element(box(screen, 3)).toHaveFocus()
+    await expect.element(box(screen, 3)).toHaveValue('')
+    await expect.element(box(screen, 2)).toHaveValue('0')
+  })
+
+  it('ADR 0024, point 10 : le focus va au champ « Courriel » à l’ouverture, et revient au lien à l’annulation', async () => {
+    const { screen } = await renderPanel({})
+    await screen.getByRole('button', { name: 'Modifier le courriel' }).click()
+
+    await expect.element(screen.getByLabelText('Courriel', { exact: true })).toHaveFocus()
+    await screen.getByRole('button', { name: 'Annuler' }).click()
+
+    await expect.element(screen.getByRole('button', { name: 'Modifier le courriel' })).toHaveFocus()
+  })
+
+  it('ADR 0024, point 10 : après un envoi réussi à la nouvelle adresse, le focus revient au lien', async () => {
+    const { screen } = await renderPanel({})
+    await screen.getByRole('button', { name: 'Modifier le courriel' }).click()
+    await screen.getByLabelText('Courriel', { exact: true }).fill('noah@uqac.ca')
+    await screen.getByRole('button', { name: 'Envoyer le code' }).click()
+
+    await expect.element(screen.getByRole('button', { name: 'Modifier le courriel' })).toHaveFocus()
   })
 })

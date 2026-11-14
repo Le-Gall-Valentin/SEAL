@@ -1,22 +1,28 @@
 import { useEffect, useState } from 'react'
+import { useClock } from '@/shared/lib'
 import { secondsUntil } from './code'
 
 /**
- * AUTH-14 : secondes avant l'expiration du code, relues chaque seconde ; null sans code vivant. Après un renvoi, la
- * nouvelle expiration se compte depuis la dernière seconde relue, rattrapée au battement suivant.
+ * AUTH-14 : secondes avant l'expiration du code, relues chaque seconde par l'horloge injectée, jusqu'à zéro ; null
+ * sans code vivant.
  */
 export function useSecondsLeft(expiresAt: Date | null): number | null {
-  const [now, setNow] = useState(() => Date.now())
+  const clock = useClock()
+  const [now, setNow] = useState(() => clock.now())
   useEffect(() => {
     if (expiresAt === null) {
       return undefined
     }
     const timer = setInterval(() => {
-      setNow(Date.now())
+      const current = clock.now()
+      setNow(current)
+      if (current >= expiresAt.getTime()) {
+        clearInterval(timer)
+      }
     }, 1000)
     return () => {
       clearInterval(timer)
     }
-  }, [expiresAt])
+  }, [expiresAt, clock])
   return secondsUntil(expiresAt, now)
 }

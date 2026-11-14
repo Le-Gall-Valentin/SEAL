@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { type Ref, useId } from 'react'
 
 export const INPUT_CLASS =
   'h-11 w-full rounded-[10px] bg-surface px-3 font-sans text-[15px] text-ink inset-ring inset-ring-line-strong outline-none focus:inset-ring-accent focus:ring-3 focus:ring-focus-glow disabled:bg-sunken disabled:text-ink-3'
@@ -24,6 +24,8 @@ interface TextFieldProps {
   /** Erreur affichée sous le champ et annoncée ; null ou absente si le champ est valide. */
   readonly error?: string | null | undefined
   readonly onBlur?: (() => void) | undefined
+  /** Pour placer le focus sur le champ (ouverture d'un formulaire sur place). */
+  readonly inputRef?: Ref<HTMLInputElement> | undefined
 }
 
 /** Champ étiqueté des formulaires de la maquette, avec son aide et son erreur. */
@@ -38,6 +40,7 @@ export function TextField({
   hint,
   error,
   onBlur,
+  inputRef,
 }: TextFieldProps) {
   const id = useId()
   const hintId = `${id}-aide`
@@ -52,6 +55,7 @@ export function TextField({
         {label}
       </label>
       <input
+        ref={inputRef}
         id={id}
         type={type}
         value={value}

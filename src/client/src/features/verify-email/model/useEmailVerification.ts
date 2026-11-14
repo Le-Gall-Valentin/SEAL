@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { isEmailWellFormed } from '@/entities/account'
 import { type Account, refreshSession } from '@/entities/session'
 import { ApiError, useRetryAfterLock } from '@/shared/lib'
-import { CODE_LENGTH, verifyFailureOf, type VerifyFailure } from './code'
-import { useVerifyEmailApi } from './verifyEmailApiPort'
+import { CODE_LENGTH, verifyFailureOf } from './code'
 import { useSecondsLeft } from './useSecondsLeft'
+import { verificationView } from './verificationView'
+import { useVerifyEmailApi } from './verifyEmailApiPort'
 
 const EMPTY_CODE: readonly string[] = Array.from({ length: CODE_LENGTH }, () => '')
 
@@ -16,8 +16,9 @@ interface VerificationProps {
 
 /**
  * AUTH-14, AUTH-17 : vérification du code, renvoi et changement du courriel en attente. Une seule action à la fois
- * affiche son erreur ; un 429 suspend les trois jusqu'à la fin de Retry-After. Chaque réussite relit /me : le compte
- * à rebours et les renvois restants en viennent, et la garde mène à l'accueil une fois le compte actif.
+ * affiche son erreur. Le renvoi et le changement partagent leur limite : un 429 de l'un suspend les deux, jamais la
+ * vérification du code en cours. Chaque réussite relit /me : le compte à rebours et les renvois restants en viennent,
+ * et la garde mène à l'accueil une fois le compte actif.
  */
 export function useEmailVerification(
   { email, verification }: VerificationProps,
@@ -66,47 +67,53 @@ export function useEmailVerification(
     },
   })
 
-  const error = verify.error ?? resend.error ?? change.error
-  const resetAll = () => {
-    verify.reset()
+  const sendError = resend.error ?? change.error
+  const verifyLocked = useRetryAfterLock(verify.error, verify.reset)
+  const sendLocked = useRetryAfterLock(sendError, () => {
     resend.reset()
     change.reset()
-  }
-  const locked = useRetryAfterLock(error, resetAll)
-  const busy = locked || verify.isPending || resend.isPending || change.isPending
-  const seconds = useSecondsLeft(verification?.codeExpiresAt ?? null)
-  const expired = seconds === null || seconds === 0
-  const failure = error === null ? null : verifyFailureOf(error)
-  // Un refus de l'adresse s'affiche sous son champ, pas en alerte.
-  const fieldRefusal = error instanceof ApiError && error.fields.includes('email')
-  const alert: VerifyFailure | null =
-    failure !== null && !fieldRefusal ? failure : expired ? { kind: 'expired' } : null
-  const code = cells.join('')
-  const resendsRemaining = verification?.resendsRemaining ?? 0
+  })
+  const secondsLeft = useSecondsLeft(verification?.codeExpiresAt ?? null)
+  const view = verificationView({
+    code: cells.join(''),
+    secondsLeft,
+    codeAlive: verification?.codeExpiresAt !== null && verification?.codeExpiresAt !== undefined,
+    resendsRemaining: verification?.resendsRemaining ?? 0,
+    verifyError: verify.error,
+    sendError,
+    verifyLocked,
+    sendLocked,
+    pending: verify.isPending || resend.isPending || change.isPending,
+    newEmail,
+    newEmailTouched,
+    refusedEmail,
+  })
 
   /** Une action efface l'erreur et la confirmation de la précédente. */
   const start = () => {
-    resetAll()
+    verify.reset()
+    resend.reset()
+    change.reset()
     setSentTo(null)
   }
 
   return {
     cells,
     setCells,
-    secondsLeft: seconds ?? 0,
-    alert,
-    locked,
-    canVerify: code.length === CODE_LENGTH && !expired && !busy,
+    secondsLeft: secondsLeft ?? 0,
+    alert: view.alert,
+    codeLocked: verifyLocked,
+    canVerify: view.canVerify,
     verify: () => {
-      if (code.length === CODE_LENGTH && !expired && !busy) {
+      if (view.canVerify) {
         start()
-        verify.mutate(code)
+        verify.mutate(cells.join(''))
       }
     },
-    resendsRemaining,
-    canResend: resendsRemaining > 0 && !busy,
+    resendsRemaining: verification?.resendsRemaining ?? 0,
+    canResend: view.canResend,
     resend: () => {
-      if (resendsRemaining > 0 && !busy) {
+      if (view.canResend) {
         start()
         resend.mutate()
       }
@@ -127,12 +134,10 @@ export function useEmailVerification(
     touchNewEmail: () => {
       setNewEmailTouched(true)
     },
-    newEmailInvalid:
-      (newEmailTouched && newEmail !== '' && !isEmailWellFormed(newEmail)) ||
-      refusedEmail === newEmail,
-    canChange: isEmailWellFormed(newEmail) && refusedEmail !== newEmail && !busy,
+    newEmailInvalid: view.newEmailInvalid,
+    canChange: view.canChange,
     changeEmail: () => {
-      if (isEmailWellFormed(newEmail) && refusedEmail !== newEmail && !busy) {
+      if (view.canChange) {
         start()
         change.mutate(newEmail)
       }

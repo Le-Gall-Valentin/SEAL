@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
+import { LogoutApiProvider } from '@/features/logout'
 import { type IVerifyEmailApi, VerifyEmailApiProvider } from '@/features/verify-email'
 import { VerifyEmailPage } from './VerifyEmailPage'
 
@@ -27,9 +28,11 @@ describe('Écran Verification-Courriel', () => {
     const screen = await render(
       <QueryClientProvider client={new QueryClient()}>
         <SessionApiProvider api={sessionApi}>
-          <VerifyEmailApiProvider api={verifyApi}>
-            <VerifyEmailPage />
-          </VerifyEmailApiProvider>
+          <LogoutApiProvider api={{ logout: () => Promise.resolve() }}>
+            <VerifyEmailApiProvider api={verifyApi}>
+              <VerifyEmailPage />
+            </VerifyEmailApiProvider>
+          </LogoutApiProvider>
         </SessionApiProvider>
       </QueryClientProvider>,
     )
@@ -41,5 +44,7 @@ describe('Écran Verification-Courriel', () => {
     expect(address.element().parentElement?.textContent).toBe(
       'Saisissez le code à 6 chiffres envoyé à valentin.dupont@uqac.ca.',
     )
+    // ADR 0024, point 10 : la session restreinte a une issue.
+    await expect.element(screen.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
   })
 })
