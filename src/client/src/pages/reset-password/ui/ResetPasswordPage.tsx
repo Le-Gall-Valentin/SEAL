@@ -1,6 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { useCurrentAccount } from '@/entities/session'
 import { LogoutButton } from '@/features/logout'
-import { NewPasswordPanel, useResetToken } from '@/features/password-reset'
+import { NewPasswordPanel, useResetLink } from '@/features/password-reset'
 import { useMessages } from '@/shared/i18n'
 import { AuthLayout } from '@/widgets/auth-layout'
 import { resetPasswordPageMessages } from '../i18n'
@@ -12,15 +13,24 @@ import { resetPasswordPageMessages } from '../i18n'
  */
 export function ResetPasswordPage() {
   const t = useMessages(resetPasswordPageMessages)
-  const token = useResetToken()
+  const link = useResetLink()
   const account = useCurrentAccount()
+  const connected = account.data !== undefined && account.data !== null
+  // ADR 0024, point 10 : après « Se déconnecter », le focus va au formulaire qui remplace le message.
+  const content = useRef<HTMLDivElement>(null)
+  const wasConnected = useRef(false)
+  useEffect(() => {
+    if (wasConnected.current && !connected) {
+      content.current?.focus()
+    }
+    wasConnected.current = connected
+  }, [connected])
   if (account.isPending) {
     return null
   }
-  const connected = account.data !== undefined && account.data !== null
   return (
     <AuthLayout variant="neutral">
-      <div className="flex flex-col gap-4.5 sm:gap-5">
+      <div ref={content} tabIndex={-1} className="flex flex-col gap-4.5 outline-none sm:gap-5">
         {connected ? (
           <>
             <header className="flex flex-col gap-1.5">
@@ -32,7 +42,7 @@ export function ResetPasswordPage() {
             <LogoutButton />
           </>
         ) : (
-          <NewPasswordPanel token={token} />
+          <NewPasswordPanel key={link.linkId} token={link.token} linkId={link.linkId} />
         )}
       </div>
     </AuthLayout>

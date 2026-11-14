@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, NetworkError } from '@/shared/lib'
-import { minutesLeft, readResetToken, resetFailureOf } from './resetLink'
+import { linkState, minutesLeft, readResetToken, resetFailureOf } from './resetLink'
 
 const TOKEN = 'Ab0-_'.repeat(8) + 'xyz'
 
@@ -47,5 +47,34 @@ describe('AUTH-70, ADR 0024 : refus de la réinitialisation', () => {
     [new NetworkError(), { kind: 'network' }],
   ])('%s', (error, expected) => {
     expect(resetFailureOf(error)).toEqual(expected)
+  })
+})
+
+describe('AUTH-70, ADR 0024 : état du lien de Nouveau-Mot-de-passe', () => {
+  it.each([
+    ['sans jeton', { hasToken: false, linkDead: false, failure: null, loaded: false }, 'dead'],
+    [
+      'lien mort à la confirmation',
+      { hasToken: true, linkDead: true, failure: null, loaded: true },
+      'dead',
+    ],
+    [
+      'lien expiré à la lecture',
+      { hasToken: true, linkDead: false, failure: { kind: 'expired-link' }, loaded: false },
+      'dead',
+    ],
+    [
+      'panne de la lecture',
+      { hasToken: true, linkDead: false, failure: { kind: 'network' }, loaded: false },
+      'error',
+    ],
+    [
+      'lecture en cours',
+      { hasToken: true, linkDead: false, failure: null, loaded: false },
+      'loading',
+    ],
+    ['lien lu', { hasToken: true, linkDead: false, failure: null, loaded: true }, 'ready'],
+  ] as const)('ADR 0024 : %s', (_cas, input, expected) => {
+    expect(linkState(input)).toBe(expected)
   })
 })

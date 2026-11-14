@@ -46,3 +46,27 @@ export function resetFailureOf(error: unknown): ResetFailure {
     ? fieldFailure(error)
     : (BY_CODE.get(failure.code) ?? { kind: 'unexpected' })
 }
+
+/**
+ * ADR 0024 (points 9 et 10) : état de Nouveau-Mot-de-passe. « dead » : lien absent, inconnu, expiré ou servi ;
+ * « error » : panne de la lecture, à réessayer ; « loading » : lecture en cours ; « ready » : lien lu.
+ */
+export function linkState({
+  hasToken,
+  linkDead,
+  failure,
+  loaded,
+}: {
+  readonly hasToken: boolean
+  readonly linkDead: boolean
+  readonly failure: ResetFailure | null
+  readonly loaded: boolean
+}): 'dead' | 'error' | 'loading' | 'ready' {
+  if (!hasToken || linkDead || failure?.kind === 'expired-link') {
+    return 'dead'
+  }
+  if (failure !== null) {
+    return 'error'
+  }
+  return loaded ? 'ready' : 'loading'
+}

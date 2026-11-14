@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { PasswordBlocklistProvider } from '@/entities/password'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
-import { ApiError } from '@/shared/lib'
+import { ApiError, NetworkError } from '@/shared/lib'
 import { PasswordResetApiProvider } from '../model/passwordResetApiPort'
 import { ForgotPasswordForm } from './ForgotPasswordForm'
 import { NewPasswordPanel } from './NewPasswordPanel'
@@ -55,7 +55,7 @@ async function renderReset(
   const router = createMemoryRouter(
     [
       { path: '/mot-de-passe/oublie', element: <ForgotPasswordForm /> },
-      { path: '/mot-de-passe/nouveau', element: <NewPasswordPanel token={token} /> },
+      { path: '/mot-de-passe/nouveau', element: <NewPasswordPanel token={token} linkId={0} /> },
       { path: '/connexion', element: <LoginProbe /> },
     ],
     {
@@ -217,5 +217,37 @@ describe('AUTH-70, ADR 0022 : Nouveau-Mot-de-passe', () => {
           .filter({ hasText: 'Absent des mots de passe les plus courants' }),
       )
       .toHaveAttribute('data-state', 'unmet')
+  })
+
+  it('ADR 0024, point 10 : panne de la lecture du lien, « Réessayer » la relance', async () => {
+    let attempts = 0
+    const { screen, calls } = await renderReset({
+      inspect: () => {
+        attempts += 1
+        return attempts === 1
+          ? Promise.reject(new NetworkError())
+          : Promise.resolve({
+              username: 'valentin.dupont',
+              email: 'valentin@uqac.ca',
+              expiresAt: new Date(Date.now() + 600_000),
+            })
+      },
+    })
+
+    await expect
+      .element(screen.getByRole('alert'))
+      .toHaveTextContent('Connexion impossible. Vérifiez votre réseau puis réessayez.')
+    await screen.getByRole('button', { name: 'Réessayer' }).click()
+
+    await expect.element(screen.getByText('@valentin.dupont', { exact: true })).toBeVisible()
+    expect(calls).toEqual([`inspect ${TOKEN}`, `inspect ${TOKEN}`])
+  })
+
+  it('SEC-10 : lecture du lien refusée en 429, « Trop de tentatives »', async () => {
+    const { screen } = await renderReset({
+      inspect: () => Promise.reject(new ApiError(429, 'RATE_LIMITED', { retryAfterSeconds: 120 })),
+    })
+
+    await expect.element(screen.getByRole('alert')).toMatchTextContent('Réessayez dans 2 minutes.')
   })
 })

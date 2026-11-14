@@ -22,5 +22,6 @@ export const passwordResetMessages = defineMessages({
     submit: 'Enregistrer le mot de passe',
     deadLink: 'Ce lien n’est plus valable.',
     requestNew: 'Demander un nouveau lien',
+    retry: 'Réessayer',
   },
 })

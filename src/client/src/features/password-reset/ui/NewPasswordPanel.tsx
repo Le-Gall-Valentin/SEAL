@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { NewPasswordFields } from '@/entities/password'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
-import { Alert, FailureAlert, PrimaryButton, RateLimitedAlert } from '@/shared/ui'
+import { Alert, FailureAlert, PrimaryButton, RateLimitedAlert, SecondaryButton } from '@/shared/ui'
 import { passwordResetMessages } from '../i18n'
 import { useNewPassword } from '../model/useNewPassword'
 
@@ -18,9 +18,15 @@ function Title({ children }: { readonly children?: ReactNode }) {
 }
 
 /** AUTH-70, ADR 0022 : Nouveau-Mot-de-passe, pour le compte du lien. */
-export function NewPasswordPanel({ token }: { readonly token: string | null }) {
+interface NewPasswordPanelProps {
+  readonly token: string | null
+  /** Change à chaque nouveau lien, sans exposer le jeton. */
+  readonly linkId: number
+}
+
+export function NewPasswordPanel({ token, linkId }: NewPasswordPanelProps) {
   const t = useMessages(passwordResetMessages)
-  const panel = useNewPassword(token)
+  const panel = useNewPassword(token, linkId)
   if (panel.state === 'dead') {
     return (
       <>
@@ -42,7 +48,13 @@ export function NewPasswordPanel({ token }: { readonly token: string | null }) {
         {failure.kind === 'rate-limited' ? (
           <RateLimitedAlert minutes={failure.minutes} />
         ) : (
-          <FailureAlert failure={{ kind: failure.kind === 'network' ? 'network' : 'unexpected' }} />
+          <>
+            <FailureAlert
+              failure={{ kind: failure.kind === 'network' ? 'network' : 'unexpected' }}
+            />
+            {/* ADR 0024, point 10 : une panne de la lecture du lien se réessaie sur place. */}
+            <SecondaryButton onClick={panel.retryLink}>{t('retry')}</SecondaryButton>
+          </>
         )}
       </>
     )

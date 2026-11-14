@@ -2,7 +2,14 @@ import { useEffect, useRef } from 'react'
 import { EMAIL_MAX_LENGTH } from '@/entities/account'
 import type { Account } from '@/entities/session'
 import { useMessages } from '@/shared/i18n'
-import { Alert, FailureAlert, PrimaryButton, RateLimitedAlert, TextField } from '@/shared/ui'
+import {
+  Alert,
+  FailureAlert,
+  PrimaryButton,
+  RateLimitedAlert,
+  SecondaryButton,
+  TextField,
+} from '@/shared/ui'
 import { verifyEmailMessages } from '../i18n'
 import { formatCountdown, type VerifyFailure } from '../model/code'
 import { useEmailVerification } from '../model/useEmailVerification'
@@ -12,9 +19,6 @@ interface VerifyEmailPanelProps {
   readonly email: string
   readonly verification: Account['verification']
 }
-
-const SECONDARY_BUTTON =
-  'h-11 rounded-[10px] bg-surface px-4 font-sans text-[14.5px] font-semibold text-ink inset-ring inset-ring-line-strong'
 
 function FailureView({ failure }: { readonly failure: VerifyFailure }) {
   const t = useMessages(verifyEmailMessages)
@@ -149,9 +153,7 @@ export function VerifyEmailPanel({ email, verification }: VerifyEmailPanelProps)
             <div className="flex flex-1 flex-col">
               <PrimaryButton disabled={!panel.canChange}>{t('sendCode')}</PrimaryButton>
             </div>
-            <button type="button" className={SECONDARY_BUTTON} onClick={panel.cancelChange}>
-              {t('cancel')}
-            </button>
+            <SecondaryButton onClick={panel.cancelChange}>{t('cancel')}</SecondaryButton>
           </div>
         </form>
       )}

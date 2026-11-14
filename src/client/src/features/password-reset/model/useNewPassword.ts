@@ -10,8 +10,8 @@ import {
   usePasswordBlocklist,
 } from '@/entities/password'
 import { ROUTES } from '@/shared/config'
-import { useRetryAfterLock } from '@/shared/lib'
-import { minutesLeft, resetFailureOf } from './resetLink'
+import { useClock, useRetryAfterLock } from '@/shared/lib'
+import { linkState, minutesLeft, resetFailureOf } from './resetLink'
 import { usePasswordResetApi } from './passwordResetApiPort'
 
 /** État de navigation de la connexion après une réinitialisation réussie (ADR 0024, point 9). */
@@ -23,8 +23,9 @@ export interface PasswordResetDone {
  * AUTH-70, ADR 0022 : lecture du lien, puis choix du nouveau mot de passe, avec les règles d'AUTH-11 pour le compte du
  * lien. Une réussite mène à la connexion, sans session ouverte ; un lien mort affiche « Ce lien n'est plus valable. ».
  */
-export function useNewPassword(token: string | null) {
+export function useNewPassword(token: string | null, linkId: number) {
   const api = usePasswordResetApi()
+  const clock = useClock()
   const navigate = useNavigate()
   const blocklist = usePasswordBlocklist()
   const [password, setPassword] = useState('')
@@ -33,16 +34,16 @@ export function useNewPassword(token: string | null) {
   const [refusedPassword, setRefusedPassword] = useState<string | null>(null)
   const [linkDead, setLinkDead] = useState(false)
 
-  // Le jeton n'entre pas dans la clé : il ne vit que dans la fermeture, le temps de l'écran.
+  // Le jeton n'entre pas dans la clé : il ne vit que dans la fermeture ; linkId distingue un second lien.
   const link = useQuery({
-    queryKey: ['password-reset', 'inspect'],
+    queryKey: ['password-reset', 'inspect', linkId],
     queryFn: async () => {
       if (token === null) {
         throw new Error('jeton absent')
       }
       const link = await api.inspect(token)
       // « Ce lien expire dans N minutes », compté à la lecture du lien.
-      return { ...link, minutesLeft: minutesLeft(link.expiresAt, Date.now()) }
+      return { ...link, minutesLeft: minutesLeft(link.expiresAt, clock.now()) }
     },
     enabled: token !== null,
     staleTime: Infinity,
@@ -83,18 +84,16 @@ export function useNewPassword(token: string | null) {
     !mutation.isPending
 
   return {
-    /** « loading » tant que le lien n'est pas lu ; « dead » pour un lien absent, inconnu, expiré ou servi. */
-    state:
-      token === null ||
-      linkDead ||
-      (link.isError && resetFailureOf(link.error).kind === 'expired-link')
-        ? ('dead' as const)
-        : link.isError
-          ? ('error' as const)
-          : account === undefined
-            ? ('loading' as const)
-            : ('ready' as const),
+    state: linkState({
+      hasToken: token !== null,
+      linkDead,
+      failure: link.isError ? resetFailureOf(link.error) : null,
+      loaded: account !== undefined,
+    }),
     linkFailure: link.isError ? resetFailureOf(link.error) : null,
+    retryLink: () => {
+      void link.refetch()
+    },
     account,
     password,
     setPassword,
