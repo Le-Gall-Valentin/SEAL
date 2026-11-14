@@ -1,3 +1,5 @@
 export { ErrorBoundary } from './ErrorBoundary'
 export { rootErrorOptions, routerErrorHandler } from './errorReporting'
 export { createQueryClient } from './queryClient'
+export { ApiProviders } from './ApiProviders'
+export type { Apis } from './ApiProviders'
