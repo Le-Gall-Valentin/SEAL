@@ -121,6 +121,11 @@ class SecurityConfig {
                         // KEY-10, KEY-11, ADR 0025 (point 9) : clé de l'Autorité, pour la seule session complète.
                         .requestMatchers(HttpMethod.GET, "/api/v1/pki/ca")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // KEY-03, KEY-04, ADR 0025 (point 9) : défi et publication de l'identité, session complète.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/keys/challenge")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/keys/identity")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         .requestMatchers("/error")
                         .permitAll()
                         // Sonde de santé du conteneur, sur le port de gestion interne (A02).

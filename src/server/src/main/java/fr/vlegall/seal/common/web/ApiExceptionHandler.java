@@ -44,6 +44,10 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         }
         ResponseEntity<ProblemDetail> response = problem(
                 exception.code(), HttpStatusCode.valueOf(exception.code().status()));
+        ProblemDetail body = response.getBody();
+        if (body != null && !exception.fields().isEmpty()) {
+            body.setProperty(FIELDS, exception.fields());
+        }
         return exception
                 .retryAfter()
                 .map(delay -> ResponseEntity.status(response.getStatusCode())

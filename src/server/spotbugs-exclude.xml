@@ -78,6 +78,12 @@
         <Class name="fr.vlegall.seal.pki.infrastructure.web.PkiController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- /api/v1/keys : clés du seul compte de la session, session complète seulement, sans identifiant de compte dans
+         l'URL ni le corps (ADR 0025, point 9) : IdentityPublicationIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.keys.infrastructure.web.KeysController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /error, dispatch d'erreur du conteneur, sans donnée ni effet (ADR 0011) : CsrfIT.auth60ErrorEndpointIsCsrfProtected. -->
     <Match>
         <Class name="fr.vlegall.seal.common.web.ProblemDetailsErrorController"/>

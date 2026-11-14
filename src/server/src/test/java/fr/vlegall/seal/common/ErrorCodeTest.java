@@ -24,4 +24,11 @@ class ErrorCodeTest {
     void forStatusMapsEachStatus(int status, ErrorCode expected) {
         assertThat(ErrorCode.forStatus(status)).isEqualTo(expected);
     }
+
+    @ParameterizedTest
+    @CsvSource({"KEY_NOT_FOUND, 404", "INVALID_SIGNATURE, 422", "VAULT_VERSION_CONFLICT, 409"})
+    @DisplayName("ADR 0025, point 5 : chaque code de la cryptographie a son statut")
+    void adr0025CryptographyCodesHaveTheirStatus(ErrorCode code, int status) {
+        assertThat(code.status()).isEqualTo(status);
+    }
 }

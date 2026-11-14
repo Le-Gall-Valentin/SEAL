@@ -56,9 +56,9 @@ class SchemaMigrationIT {
     }
 
     @Test
-    @DisplayName("DATA-01 : le schéma vient des migrations Flyway V1 à V4, validées par Hibernate")
+    @DisplayName("DATA-01 : le schéma vient des migrations Flyway V1 à V5, validées par Hibernate")
     void data01SchemaComesFromFlyway() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
         assertThat(jdbc.queryForObject(
                         "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
                                 + "AND table_name IN ('users', 'messages', 'spring_session', 'spring_session_attributes')",
@@ -263,5 +263,13 @@ class SchemaMigrationIT {
                         String.class))
                 .isEqualTo("CREATE UNIQUE INDEX identity_certificates_one_unrevoked ON public.identity_certificates"
                         + " USING btree (user_id) WHERE (revoked_at IS NULL)");
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 8 : la base garde au plus un défi de preuve de possession par compte (V5)")
+    void adr0025OneChallengePerAccount() {
+        assertThat(jdbc.queryForObject(
+                        "SELECT indexdef FROM pg_indexes WHERE indexname = 'key_challenges_user_id'", String.class))
+                .isEqualTo("CREATE UNIQUE INDEX key_challenges_user_id ON public.key_challenges USING btree (user_id)");
     }
 }
