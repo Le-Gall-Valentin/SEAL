@@ -41,3 +41,16 @@ test('TRN-20, TRN-21 : le client est servi en HTTPS sous la CSP stricte, sans vi
   )
   expect(requests.filter((url) => !url.startsWith(`${baseURL ?? ''}/`))).toEqual([])
 })
+
+test('TRN-21 : l’onglet porte l’icône du phoque (Mascotte, pose « favicon »), servie par l’origine', async ({
+  page,
+}) => {
+  await page.goto('/connexion')
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg')
+
+  // Lue par le navigateur, qui reconnaît le certificat mkcert.
+  const icon = await page.goto('/favicon.svg')
+  expect(icon?.status()).toBe(200)
+  expect(icon?.headers()['content-type']).toContain('image/svg+xml')
+  expect(await icon?.text()).toContain('<rect width="32" height="32" rx="9" fill="#66741C"/>')
+})
