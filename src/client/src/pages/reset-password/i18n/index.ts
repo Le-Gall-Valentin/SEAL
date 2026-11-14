@@ -1,0 +1,1 @@
+export { resetPasswordPageMessages } from './messages'

@@ -4,6 +4,8 @@ import { RouterProvider } from 'react-router/dom'
 import { PasswordBlocklistProvider, passwordBlocklist } from '@/entities/password'
 import { SessionApiProvider, sessionApi } from '@/entities/session'
 import { LoginApiProvider, loginApi } from '@/features/login'
+import { LogoutApiProvider, logoutApi } from '@/features/logout'
+import { PasswordResetApiProvider, passwordResetApi } from '@/features/password-reset'
 import { RegisterApiProvider, registerApi } from '@/features/register'
 import { VerifyEmailApiProvider, verifyEmailApi } from '@/features/verify-email'
 import { LanguageProvider } from '@/shared/i18n'
@@ -28,10 +30,14 @@ export function App() {
               <LoginApiProvider api={loginApi}>
                 <RegisterApiProvider api={registerApi}>
                   <VerifyEmailApiProvider api={verifyEmailApi}>
-                    <RouterProvider
-                      router={router}
-                      onError={routerErrorHandler(import.meta.env.PROD)}
-                    />
+                    <PasswordResetApiProvider api={passwordResetApi}>
+                      <LogoutApiProvider api={logoutApi}>
+                        <RouterProvider
+                          router={router}
+                          onError={routerErrorHandler(import.meta.env.PROD)}
+                        />
+                      </LogoutApiProvider>
+                    </PasswordResetApiProvider>
                   </VerifyEmailApiProvider>
                 </RegisterApiProvider>
               </LoginApiProvider>

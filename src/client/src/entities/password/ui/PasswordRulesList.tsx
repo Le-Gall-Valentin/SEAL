@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { passwordMessages } from '../i18n'
 import type { PasswordRules, RuleState } from '../model/passwordPolicy'
@@ -31,8 +32,14 @@ function Rule({ state, children }: { readonly state: RuleState; readonly childre
   )
 }
 
-/** AUTH-11 : les trois règles en direct, puis la phrase sur la composition (Inscription-Telephone). */
-export function PasswordRulesList({ rules }: { readonly rules: PasswordRules }) {
+interface PasswordRulesListProps {
+  readonly rules: PasswordRules
+  /** Lignes ajoutées après les règles, propres à l'écran. */
+  readonly children?: ReactNode
+}
+
+/** AUTH-11 : les trois règles en direct (Inscription-Telephone, Nouveau-Mot-de-passe). */
+export function PasswordRulesList({ rules, children }: PasswordRulesListProps) {
   const t = useMessages(passwordMessages)
   return (
     <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px] leading-[1.35] text-ink-3">
@@ -41,7 +48,13 @@ export function PasswordRulesList({ rules }: { readonly rules: PasswordRules }) 
           {t(rule)}
         </Rule>
       ))}
-      <li className="pl-5">{t('composition')}</li>
+      {children}
     </ul>
   )
+}
+
+/** Inscription-Telephone : « Aucune règle de composition… », sans la phrase sur AUTH-12 (ADR 0007, point 9). */
+export function CompositionNote() {
+  const t = useMessages(passwordMessages)
+  return <li className="pl-5">{t('composition')}</li>
 }

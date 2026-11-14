@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { DISPLAY_NAME_MAX_LENGTH, EMAIL_MAX_LENGTH, USERNAME_MAX_LENGTH } from '@/entities/account'
-import { PasswordRulesList, StrengthMeter } from '@/entities/password'
+import { CompositionNote, PasswordRulesList, StrengthMeter } from '@/entities/password'
 import { useMessages } from '@/shared/i18n'
 import {
   FailureAlert,
@@ -77,7 +77,9 @@ export function RegisterForm() {
         />
         <div id={strengthId} className="flex flex-col gap-2">
           <StrengthMeter strength={form.strength} />
-          <PasswordRulesList rules={form.rules} />
+          <PasswordRulesList rules={form.rules}>
+            <CompositionNote />
+          </PasswordRulesList>
         </div>
         <PasswordField
           label={t('confirm')}

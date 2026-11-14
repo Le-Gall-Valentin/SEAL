@@ -1,7 +1,9 @@
 import { Navigate, type RouteObject } from 'react-router'
+import { ForgotPasswordPage } from '@/pages/forgot-password'
 import { HomePage } from '@/pages/home'
 import { LoginPage } from '@/pages/login'
 import { RegisterPage } from '@/pages/register'
+import { ResetPasswordPage } from '@/pages/reset-password'
 import { VerifyEmailPage } from '@/pages/verify-email'
 import { ROUTES } from '@/shared/config'
 import { RouteErrorBoundary } from './RouteErrorBoundary'
@@ -20,8 +22,11 @@ export const routes = withRootErrorBoundary([
     children: [
       { path: ROUTES.LOGIN, element: <LoginPage /> },
       { path: ROUTES.REGISTER, element: <RegisterPage /> },
+      { path: ROUTES.FORGOT_PASSWORD, element: <ForgotPasswordPage /> },
     ],
   },
+  // ADR 0024, point 9 : sans garde, pour qu'un navigateur connecté se déconnecte sans perdre le lien.
+  { path: ROUTES.RESET_PASSWORD, element: <ResetPasswordPage /> },
   // AUTH-16 : la session restreinte d'un compte en attente ne voit que la vérification.
   {
     element: <PendingRoute />,

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { render, renderHook } from 'vitest-browser-react'
 import { PasswordBlocklistProvider } from '../model/PasswordBlocklistProvider'
 import { usePasswordBlocklist } from '../model/usePasswordBlocklist'
-import { PasswordRulesList } from './PasswordRulesList'
+import { CompositionNote, PasswordRulesList } from './PasswordRulesList'
 import { StrengthMeter } from './StrengthMeter'
 
 function wrapper(load: () => Promise<readonly string[]>) {
@@ -38,7 +38,9 @@ describe('AUTH-11 : règles et jauge du mot de passe (Inscription-Telephone)', (
 
   it('AUTH-11 : textes de la maquette ; respectée en coche, sinon cercle vide gris (ADR 0024)', async () => {
     const screen = await render(
-      <PasswordRulesList rules={{ length: 'met', context: 'unmet', blocklist: 'unknown' }} />,
+      <PasswordRulesList rules={{ length: 'met', context: 'unmet', blocklist: 'unknown' }}>
+        <CompositionNote />
+      </PasswordRulesList>,
     )
 
     await expect

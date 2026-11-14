@@ -1,0 +1,1 @@
+export { forgotPasswordPageMessages } from './messages'
