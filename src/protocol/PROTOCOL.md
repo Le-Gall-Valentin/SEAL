@@ -96,8 +96,9 @@ une chaîne décimale (`JSON.parse` perd la précision au-delà de 2⁵³), `byt
 `text` et `uuid` une chaîne ; `list` porte ses `items`, `concat` ses `parts` et `struct` son `label`
 et ses `fields`, eux-mêmes des descripteurs. Les caractères hors ASCII sont échappés en `\uXXXX`.
 
-Les vecteurs sont produits par `tools/gen_vectors.py`, une troisième implémentation en Python, sans
-dépendance, indépendante de Java et de TypeScript. Pour les régénérer, depuis `src/protocol` :
+Les vecteurs sont produits par `tools/gen_vectors.py`, une troisième implémentation en Python,
+indépendante de Java et de TypeScript : bibliothèque standard seule, plus `cryptography` pour les signatures
+de la section 4. Pour les régénérer, depuis `src/protocol` :
 
 ```bash
 python3 tools/gen_vectors.py           # réécrit les fichiers de vectors/
@@ -185,3 +186,75 @@ Une entrée par ligne, en UTF-8, fins de ligne `\n`, toutes en ASCII.
 Le serveur l'embarque comme ressource Maven et un test vérifie son empreinte ; le client l'importe en
 morceau séparé, chargé seulement par les écrans qui affichent les règles (ADR 0024, point 6 bis).
 
+
+## 4. Identité : certificat, preuve de possession, sous-clé (KEY-03 à KEY-05, ADR 0025)
+
+Chaque compte a une clé d'identité Ed25519 (IK), certifiée par l'Autorité SEAL (CA, Ed25519), qui signe une
+sous-clé de chiffrement X25519 (EK). Toute signature est Ed25519 pur (RFC 8032), sur les octets canoniques de
+la structure. L'étiquette de chaque structure fixe son algorithme : aucun champ ne le négocie, et un autre
+algorithme serait une nouvelle version de l'étiquette (ADR 0025, point 11).
+
+### 4.1 Autorité
+
+| Élément | Valeur |
+| --- | --- |
+| Clé | Ed25519, générée au premier démarrage, `data/ca/seal-ca.p8` (PKCS#8, droits 600, KEY-10) |
+| `issuerKeyId` | les 8 premiers octets de SHA-256(clé publique brute de 32 octets) |
+| Empreinte | SHA-256(clé publique brute), 64 caractères hexadécimaux majuscules |
+| `GET /api/v1/pki/ca` | `{publicKey, keyId, fingerprint}`, octets en base64url |
+
+### 4.2 Certificat d'identité (KEY-04)
+
+```
+SealCertificate = struct("SEAL-cert-v1",
+    bytes(serial),        // 16 octets aléatoires
+    bytes(issuerKeyId),   // 8 octets
+    uuid(subjectId),      // identifiant interne du compte
+    text(username),       // identifiant définitif (AUTH-01, AUTH-03)
+    bytes(ikPublic),      // 32 octets, Ed25519
+    u64(notBefore),       // millisecondes Unix
+    u64(notAfter),        // notBefore + 397 jours
+    u8(usage))            // 0b11 : bit 0 signature et non-répudiation, bit 1 certification de sous-clés
+signature = Ed25519.sign(clé CA, SealCertificate)
+```
+
+Un compte a au plus un certificat non révoqué. Après son expiration, une nouvelle publication révoque l'ancien,
+motif « remplacé » (code 4 de X.509, ADR 0025, point 4).
+
+### 4.3 Preuve de possession (KEY-03)
+
+```
+ProofOfPossession = struct("SEAL-pop-v1", uuid(userId), bytes(ikPublic), bytes(challenge))
+signature = Ed25519.sign(IK, ProofOfPossession)
+```
+
+`challenge` fait 32 octets, tirés par le serveur (`POST /api/v1/keys/challenge`), valables 5 minutes et pour
+un seul usage. `userId` est celui de la session : une preuve faite pour un compte ne vaut pour aucun autre.
+
+### 4.4 Liaison de sous-clé (KEY-05)
+
+```
+SubkeyBinding = struct("SEAL-subkey-v1",
+    uuid(userId), bytes(certSerial), bytes(ekId),   // ekId : 16 octets aléatoires
+    text(kem),            // "DHKEM-X25519-HKDF-SHA256"
+    bytes(ekPublic),      // 32 octets, X25519
+    u64(createdAt), u64(expiresAt))                 // expiresAt = createdAt + 45 jours
+signature = Ed25519.sign(IK, SubkeyBinding)
+```
+
+Le serveur refuse une liaison dont `certSerial` n'est pas le certificat courant de l'appelant, un `ekId` déjà
+utilisé, un `createdAt` à plus de 5 minutes de son horloge ou une validité autre que 45 jours (ADR 0025,
+point 7). Il ne vérifie de `ekPublic` que sa longueur : l'émetteur rejette un secret partagé nul (RFC 9180).
+
+### 4.5 Vecteurs (QA-01, QA-02)
+
+- `vectors/ed25519-rfc8032.json` : les tests 1 à 3 de la RFC 8032, section 7.1, en hexadécimal.
+- `vectors/identity.json` : la CA, deux certificats, une preuve, une liaison, chacun avec ses champs, ses
+  octets canoniques et sa signature, plus six falsifications que toute implémentation DOIT refuser. Les clés
+  sont les graines publiques de la RFC 8032 (CA : test 1, IK : test 2, autre clé : test 3).
+
+`gen_vectors.py` les signe avec la bibliothèque `cryptography`, épinglée avec ses empreintes :
+
+```bash
+python3 -m pip install --require-hashes -r tools/requirements.txt
+```
