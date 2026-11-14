@@ -13,6 +13,7 @@ import {
 const PROTOCOL = new URL('../../../../../protocol/', import.meta.url)
 
 const VECTORS = z.object({
+  format: z.literal('seal-password-policy-v1'),
   cases: z.array(
     z.object({
       name: z.string(),

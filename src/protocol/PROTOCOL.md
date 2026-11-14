@@ -143,10 +143,13 @@ laisse ` sur le pont`, 12 points de code. Retirer `ann` d'abord aurait laissé `
 | `fjord-tuque-raquette` précédé de U+D800 seul | `valentin` | `valentin` | refusé (demi-paire isolée) |
 
 `vectors/password-policy.json`, produit par le même générateur (ADR 0024, point 6), reprend ce tableau et
-y ajoute les bornes : 14, 15, 128 et 129 points de code, phoques U+1F9AD (deux unités UTF-16 chacun),
-pleine chasse et ligatures ramenées par NFKC, entrées de la liste de blocage, casse, `+` dans le courriel,
-mot du contexte trop court, « uqac ». Chaque cas donne `password`, `username`, `email`, `localPart`,
-l'état des trois règles affichées par le client et le verdict du serveur :
+y ajoute les bornes : 14, 15, 128 et 129 points de code, en ASCII comme en phoques U+1F9AD (deux unités UTF-16
+chacun), pleine chasse et ligatures ramenées par NFKC, entrées de la liste de blocage, casse, `+` dans le courriel,
+mot du contexte trop court, « uqac », partie locale en majuscules (les mots du contexte sont repliés), « seal » logé
+dans l'identifiant (la repasse retire l'identifiant reformé). Son format est `seal-password-policy-v1` ; son champ
+`unicode` donne la version d'Unicode du générateur, dont NFKC et les minuscules dépendent : régénérer sous une autre
+version fait échouer `--check`, et la CI épingle Python. Chaque cas donne `password`, `username`, `email`,
+`localPart`, l'état des trois règles affichées par le client et le verdict du serveur :
 
 ```json
 {
@@ -162,7 +165,8 @@ l'état des trois règles affichées par le client et le verdict du serveur :
 
 `rules.length` vaut l'étape 1, `rules.context` l'étape 4 (sur une suite valide) et `rules.blocklist`
 l'étape 2, comptée respectée seulement quand l'étape 1 l'est. `accepted` est vrai si les trois le sont.
-Le serveur relit `accepted`, le client les trois règles et `accepted`.
+Le serveur relit `accepted` et `localPart` (par `EmailAddress`), le client les trois règles, `localPart` et
+`accepted`.
 
 ### 3.1 Liste de blocage
 

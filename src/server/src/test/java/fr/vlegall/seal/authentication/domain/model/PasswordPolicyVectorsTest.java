@@ -3,13 +3,11 @@ package fr.vlegall.seal.authentication.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.authentication.domain.port.out.Blocklist;
+import fr.vlegall.seal.authentication.infrastructure.security.ClasspathBlocklist;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,24 +27,19 @@ class PasswordPolicyVectorsTest {
     /** Le répertoire de travail des tests Maven est src/server. */
     private static final Path PROTOCOL = Path.of("..", "protocol");
 
-    private static List<JsonNode> cases() throws IOException {
-        JsonNode document = JsonMapper.builder()
+    private static JsonNode document() throws IOException {
+        return JsonMapper.builder()
                 .build()
                 .readTree(Files.readString(PROTOCOL.resolve("vectors").resolve("password-policy.json")));
-        return document.get("cases").valueStream().toList();
     }
 
-    /** La liste de blocage du dépôt, repliée comme le fait ClasspathBlocklist. */
-    private static Blocklist blocklist() throws IOException {
-        Set<String> entries;
-        try (Stream<String> lines = Files.lines(PROTOCOL.resolve("password-blocklist.txt"), StandardCharsets.UTF_8)) {
-            entries = lines.map(PasswordPolicy::fold).collect(Collectors.toUnmodifiableSet());
-        }
-        return entries::contains;
+    private static List<JsonNode> cases() throws IOException {
+        return document().get("cases").valueStream().toList();
     }
 
     static Stream<Arguments> vectors() throws IOException {
-        Blocklist blocklist = blocklist();
+        // La liste réelle du serveur : la ressource Maven copiée de src/protocol, repliée par l'adaptateur.
+        Blocklist blocklist = new ClasspathBlocklist();
         return cases().stream().map(vector -> Arguments.of(vector.get("name").asString(), vector, blocklist));
     }
 
@@ -61,6 +54,12 @@ class PasswordPolicyVectorsTest {
         assertThat(PasswordPolicy.accepts(password, personalWords, blocklist))
                 .as(name)
                 .isEqualTo(vector.get("accepted").asBoolean());
+    }
+
+    @Test
+    @DisplayName("AUTH-11 : le fichier déclare son format, propre à la politique des mots de passe")
+    void auth11VectorsDeclareTheirFormat() throws IOException {
+        assertThat(document().get("format").asString()).isEqualTo("seal-password-policy-v1");
     }
 
     @Test

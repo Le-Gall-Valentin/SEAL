@@ -14,6 +14,7 @@ Usage, depuis src/protocol :
 
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 import re
@@ -367,38 +368,57 @@ PASSWORD_CASES: list[tuple[str, str, str, str]] = [
     ("contexte : partie locale avant « + »", "annabelle sur le pont", "ann", "annabelle+seal@exemple.ca"),
     ("contexte : mot de moins de 3 points de code ignoré", "abababababababab", "zzz", "ab@exemple.ca"),
     ("contexte : « uqac » retiré", "uqacuqacuqacuqacuqac", "valentin", "valentin@exemple.ca"),
+    # Audit de la PR 5 : chaque cas ci-dessous fait échouer une implémentation fautive que les précédents laissaient passer.
+    ("contexte : partie locale en majuscules, repliée", "Valentin.Le-Gall et son phoque", "valentin", "Valentin.Le-Gall@exemple.ca"),
+    ("contexte : « seal » dans l'identifiant, repasse après son retrait", "valenSEALtin du lac", "valentin", "valentin@exemple.ca"),
+    ("longueur : 128 phoques U+1F9AD, 256 unités UTF-16", "\U0001f9ad" * 128, "valentin", "valentin@exemple.ca"),
+    ("longueur : 129 phoques U+1F9AD", "\U0001f9ad" * 129, "valentin", "valentin@exemple.ca"),
 ]
+
+# Version d'Unicode du générateur : NFKC et minuscules en dépendent. Elle est écrite dans le fichier, si bien qu'une
+# régénération sous une autre version fait échouer --check (la CI épingle Python).
+UNICODE_VERSION = unicodedata.unidata_version
 
 
 def build_password_policy() -> str:
     blocklist = load_blocklist()
     cases = []
     for name, password, username, email in PASSWORD_CASES:
-        cases.append(
-            {
-                "name": name,
-                "password": password,
-                "username": username,
-                "email": email,
-                "localPart": local_part(email),
-                **evaluate(password, username, email, blocklist),
-            }
-        )
+        case = {
+            "name": name,
+            "password": password,
+            "username": username,
+            "email": email,
+            "localPart": local_part(email),
+            **evaluate(password, username, email, blocklist),
+        }
+        # Une paire de substitution écrite en deux échappements serait vue ici comme deux demi-paires, mais recombinée
+        # par tout lecteur JSON : le cas doit survivre à l'aller-retour.
+        if json.loads(json.dumps(case)) != case:
+            raise AssertionError(f"le cas « {name} » ne survit pas à l'aller-retour JSON")
+        reread = json.loads(json.dumps(password))
+        if evaluate(reread, username, email, blocklist) != {k: case[k] for k in ("rules", "accepted")}:
+            raise AssertionError(f"le cas « {name} » change de verdict une fois relu")
+        cases.append(case)
     document = {
-        "format": "seal-vectors-v1",
+        "format": "seal-password-policy-v1",
         "subject": "Politique des mots de passe : PROTOCOL.md, section 3 (AUTH-11, ADR 0019, ADR 0024)",
         "generator": "src/protocol/tools/gen_vectors.py",
+        "unicode": UNICODE_VERSION,
         "cases": cases,
     }
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Vecteurs de référence de SEAL (PROTOCOL.md).")
+    parser.add_argument("--check", action="store_true", help="échoue si un fichier n'est pas à jour")
+    check = parser.parse_args().check
     outputs = [
         (OUTPUT, build(), f"{len(VALID)} cas valides, {len(INVALID)} cas à rejeter"),
         (PASSWORD_OUTPUT, build_password_policy(), f"{len(PASSWORD_CASES)} cas"),
     ]
-    if "--check" in sys.argv[1:]:
+    if check:
         stale = [path for path, content, _ in outputs if not path.exists() or path.read_text(encoding="ascii") != content]
         for path in stale:
             print(f"{path} n'est pas à jour : lancez python3 tools/gen_vectors.py", file=sys.stderr)
