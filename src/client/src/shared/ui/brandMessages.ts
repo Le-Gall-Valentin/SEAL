@@ -1,6 +1,6 @@
 import { defineMessages } from '@/shared/i18n'
 
-// Composants Phoque, Sceau et Empreinte de la maquette, et logo des écrans d'authentification.
+// Composants Phoque et Sceau de la maquette, et logo des écrans d'authentification.
 export const brandMessages = defineMessages({
   fr: {
     wordmark: 'seal',
@@ -8,6 +8,5 @@ export const brandMessages = defineMessages({
     phoqueNeutral: 'Le phoque SEAL',
     phoqueSearching: 'Le phoque SEAL cherche',
     sealVerified: 'Signature vérifiée',
-    fingerprint: 'Motif de la clé {fingerprint}',
   },
 })

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useMessages } from '@/shared/i18n'
-import { Empreinte, Phoque, Sceau, Wordmark } from '@/shared/ui'
+import { Empreinte } from '@/entities/key'
+import { Phoque, Sceau, Wordmark } from '@/shared/ui'
 import { authLayoutMessages } from '../i18n'
 
 // Empreinte d'exemple du panneau, celle de la maquette.

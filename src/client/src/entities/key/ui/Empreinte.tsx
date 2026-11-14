@@ -1,6 +1,6 @@
 import { useMessages } from '@/shared/i18n'
-import { brandMessages } from './brandMessages'
-import { type FingerprintCell, fingerprintCells, fingerprintLabel } from './fingerprint'
+import { keyMessages } from '../i18n'
+import { type FingerprintCell, fingerprintCells, fingerprintLabel } from '../model/fingerprint'
 
 // Taille 20 du panneau de marque : marge max(2, 10 %), rayon 22 %, arrondis comme dans la maquette.
 const SIZES = { 20: 'size-5 p-0.5 rounded-sm' } as const
@@ -27,7 +27,7 @@ interface EmpreinteProps {
 
 /** KEY-52 : motif 4 × 4 de l'empreinte d'une clé (composant Empreinte de la maquette, sans les blocs de texte). */
 export function Empreinte({ fingerprint, size }: EmpreinteProps) {
-  const t = useMessages(brandMessages)
+  const t = useMessages(keyMessages)
   return (
     <div
       role="img"
