@@ -38,7 +38,7 @@ public class CertificateRepositoryAdapter implements CertificateRepository {
     }
 
     /**
-     * ADR 0025, point 4 : l'index unique partiel {@code identity_certificates_one_unrevoked} départage deux publications
+     * ADR 0025, point 4 : l'index unique partiel {@code one_active_certificate} (V1) départage deux publications
      * concurrentes ; la perdante n'écrit rien, sans erreur qui ferait échouer la transaction.
      */
     @Override

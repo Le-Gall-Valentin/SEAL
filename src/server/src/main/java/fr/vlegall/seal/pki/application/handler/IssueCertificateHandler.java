@@ -37,7 +37,7 @@ public class IssueCertificateHandler implements IssueCertificateUseCase {
         Instant now = clock.instant();
         Optional<CertificateRecord> unrevoked = certificates.findUnrevoked(subject);
         if (unrevoked.isPresent()) {
-            if (unrevoked.get().isValidAt(now)) {
+            if (!unrevoked.get().renewableWith(ikPublic, now)) {
                 return Optional.empty();
             }
             certificates.revoke(unrevoked.get().serial(), now, RevocationReason.SUPERSEDED);

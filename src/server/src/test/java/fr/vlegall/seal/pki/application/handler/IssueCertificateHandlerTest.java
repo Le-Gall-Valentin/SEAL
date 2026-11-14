@@ -7,6 +7,7 @@ import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.pki.application.port.in.IssueCertificateUseCase;
 import fr.vlegall.seal.pki.domain.model.AuthorityKey;
 import fr.vlegall.seal.pki.domain.model.CertificateRecord;
+import fr.vlegall.seal.pki.domain.model.CertificateRecords;
 import fr.vlegall.seal.pki.domain.model.IssuedCertificate;
 import fr.vlegall.seal.pki.domain.model.RevocationReason;
 import fr.vlegall.seal.pki.domain.model.SealCertificate;
@@ -147,7 +148,7 @@ class IssueCertificateHandlerTest {
                     .filter(certificate -> certificate.subject().equals(subject))
                     .filter(certificate -> revoked.stream()
                             .noneMatch(revocation -> Arrays.equals(revocation.serial(), certificate.serial())))
-                    .map(CertificateRecord::of)
+                    .map(CertificateRecords::of)
                     .findFirst();
         }
 
@@ -164,5 +165,18 @@ class IssueCertificateHandlerTest {
         public void revoke(byte[] serial, Instant at, RevocationReason reason) {
             revoked.add(new Revocation(serial, at, reason));
         }
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 4 : après l'expiration, une autre clé n'est pas certifiée, sans sudo (KEY-34)")
+    void adr0025RenewalKeepsTheSameKey() {
+        handler(NOW).issue(SUBJECT, "valentin.dupont", IK);
+        Instant later = NOW.plus(SealCertificate.VALIDITY);
+        byte[] otherKey = new byte[32];
+        otherKey[0] = 1;
+
+        assertThat(handler(later).issue(SUBJECT, "valentin.dupont", otherKey)).isEmpty();
+        assertThat(certificates.revoked).isEmpty();
+        assertThat(certificates.inserted).hasSize(1);
     }
 }

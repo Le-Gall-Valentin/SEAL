@@ -82,11 +82,6 @@ public record SealCertificate(
                 Canonical.u8(usage));
     }
 
-    /** Vrai de {@code notBefore} inclus à {@code notAfter} exclu. */
-    public boolean isValidAt(Instant instant) {
-        return !instant.isBefore(notBefore) && instant.isBefore(notAfter);
-    }
-
     @Override
     public byte[] serial() {
         return serial.clone();

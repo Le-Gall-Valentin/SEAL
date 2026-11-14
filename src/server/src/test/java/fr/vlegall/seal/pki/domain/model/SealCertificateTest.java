@@ -88,11 +88,6 @@ class SealCertificateTest {
         assertThat(issued.notBefore()).isEqualTo(NOW);
         assertThat(issued.notAfter()).isEqualTo(NOW.plus(Duration.ofDays(397)));
         assertThat(issued.usage()).isEqualTo(SealCertificate.USAGE);
-        assertThat(issued.isValidAt(NOW)).isTrue();
-        assertThat(issued.isValidAt(NOW.plus(Duration.ofDays(397)).minusMillis(1)))
-                .isTrue();
-        assertThat(issued.isValidAt(NOW.plus(Duration.ofDays(397)))).isFalse();
-        assertThat(issued.isValidAt(NOW.minusMillis(1))).isFalse();
     }
 
     @Test

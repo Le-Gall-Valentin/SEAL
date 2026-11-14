@@ -6,8 +6,10 @@ import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.pki.domain.model.AuthorityKey;
 import fr.vlegall.seal.pki.domain.port.out.AuthoritySigner;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileAttribute;
@@ -23,8 +25,10 @@ import org.springframework.stereotype.Component;
  * Clé de l'Autorité SEAL (KEY-10, ADR 0025 point 12) : {@code seal-ca.p8} (PKCS#8) et {@code seal-ca.pub}
  * (SubjectPublicKeyInfo) dans le dossier {@code ca} des données, lisibles par le seul propriétaire. Générée au premier
  * démarrage dans un dossier temporaire, puis mise en place par un déplacement atomique (d'après {@code DataDirectory}
- * de NIDO) : jamais de demi-clé, jamais d'écrasement. Toute incohérence arrête le démarrage plutôt que de remplacer
- * l'Autorité, ce qui bloquerait tous les clients qui l'ont épinglée (KEY-11).
+ * de NIDO) : jamais de demi-clé, jamais d'écrasement. Un dossier {@code ca} vide, préparé par l'exploitant, compte
+ * comme absent. Toute incohérence (fichier seul, paire qui ne va pas ensemble, droits plus larges que ceux du
+ * propriétaire, lien symbolique) arrête le démarrage plutôt que de remplacer l'Autorité, ce qui bloquerait tous les
+ * clients qui l'ont épinglée (KEY-11).
  */
 @Component
 public final class FileCaKeyStore implements AuthoritySigner {
@@ -50,9 +54,15 @@ public final class FileCaKeyStore implements AuthoritySigner {
 
     FileCaKeyStore(Path directory) {
         Path ca = directory.toAbsolutePath().normalize();
-        if (!Files.exists(ca)) {
+        refuseSymbolicLink(ca);
+        if (!Files.exists(ca, LinkOption.NOFOLLOW_LINKS)) {
+            generate(ca);
+        } else if (isEmptyDirectory(ca)) {
+            // ADR 0025, point 12 : aucune Autorité n'a encore été écrite ; le dossier vide fait place à la paire.
+            delete(ca);
             generate(ca);
         }
+        requireOwnerOnly(ca, OWNER_ONLY_DIRECTORY, "700");
         this.privateKey = read(ca, PRIVATE_KEY_FILE);
         this.key = new AuthorityKey(publicKey(ca));
         if (!Ed25519.verify(key.publicKey(), PROBE, signProbe())) {
@@ -91,18 +101,61 @@ public final class FileCaKeyStore implements AuthoritySigner {
 
     private static byte[] read(Path ca, String name) {
         Path file = ca.resolve(name);
-        if (!Files.isRegularFile(file)) {
+        refuseSymbolicLink(file);
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalStateException("Autorité SEAL incomplète : " + name + " manque dans " + ca
                     + " ; restaurez la sauvegarde du volume de données, jamais une nouvelle paire (KEY-10)");
         }
-        try {
-            if (posix() && !OWNER_ONLY_FILE.containsAll(Files.getPosixFilePermissions(file))) {
-                throw new IllegalStateException(
-                        "Autorité SEAL : " + file + " doit être lisible par son seul propriétaire (droits 600)");
-            }
-            return Files.readAllBytes(file);
+        requireOwnerOnly(file, OWNER_ONLY_FILE, "600");
+        // Lecture sans suivre de lien, pour qu'un lien posé après la vérification ne soit pas lu non plus.
+        try (InputStream in = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
+            return in.readAllBytes();
         } catch (IOException e) {
             throw new IllegalStateException("Autorité SEAL : lecture de " + file + " impossible", e);
+        }
+    }
+
+    /** ADR 0025, point 12 : la paire vit dans le dossier {@code ca} lui-même, jamais derrière un lien. */
+    private static void refuseSymbolicLink(Path path) {
+        if (Files.isSymbolicLink(path)) {
+            throw new IllegalStateException("Autorité SEAL : " + path
+                    + " est un lien symbolique ; placez la paire dans le dossier ca du volume de données");
+        }
+    }
+
+    /** KEY-10 : dossier en 700 et fichiers en 600 au plus ; des droits plus étroits restent acceptés. */
+    private static void requireOwnerOnly(Path path, Set<PosixFilePermission> allowed, String mode) {
+        if (!posix()) {
+            return;
+        }
+        try {
+            if (!allowed.containsAll(Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS))) {
+                throw new IllegalStateException(
+                        "Autorité SEAL : " + path + " doit être réservé à son seul propriétaire (droits " + mode + ")");
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Autorité SEAL : droits de " + path + " illisibles", e);
+        }
+    }
+
+    private static boolean isEmptyDirectory(Path ca) {
+        if (!Files.isDirectory(ca, LinkOption.NOFOLLOW_LINKS)) {
+            return false;
+        }
+        try (var entries = Files.list(ca)) {
+            return entries.findAny().isEmpty();
+        } catch (IOException e) {
+            throw new IllegalStateException("Autorité SEAL : lecture de " + ca + " impossible", e);
+        }
+    }
+
+    /** Un arrêt entre cette suppression et le déplacement laisse un dossier absent, que le démarrage suivant remplit. */
+    private static void delete(Path ca) {
+        try {
+            Files.delete(ca);
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Autorité SEAL : le dossier vide " + ca + " ne peut pas être remplacé par la paire générée", e);
         }
     }
 

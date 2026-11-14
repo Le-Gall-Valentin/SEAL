@@ -20,19 +20,17 @@ public record CertificateRecord(byte[] serial, UserId subject, byte[] ikPublic, 
         Objects.requireNonNull(notAfter, "notAfter");
     }
 
-    /** Enregistrement d'un certificat qui vient d'être émis. */
-    public static CertificateRecord of(SealCertificate certificate) {
-        return new CertificateRecord(
-                certificate.serial(),
-                certificate.subject(),
-                certificate.ikPublic(),
-                certificate.notBefore(),
-                certificate.notAfter());
-    }
-
-    /** Vrai de {@code notBefore} inclus à {@code notAfter} exclu, comme {@link SealCertificate#isValidAt}. */
+    /** Vrai de {@code notBefore} inclus à {@code notAfter} exclu. */
     public boolean isValidAt(Instant instant) {
         return !instant.isBefore(notBefore) && instant.isBefore(notAfter);
+    }
+
+    /**
+     * KEY-12, KEY-34, ADR 0025 (point 4) : seul un certificat expiré se renouvelle, et pour la même clé d'identité ;
+     * une autre clé relève de la réinitialisation, réservée au mode sudo.
+     */
+    public boolean renewableWith(byte[] candidate, Instant instant) {
+        return !isValidAt(instant) && Arrays.equals(ikPublic, candidate);
     }
 
     @Override

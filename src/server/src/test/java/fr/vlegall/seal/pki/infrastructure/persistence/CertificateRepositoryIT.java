@@ -3,7 +3,7 @@ package fr.vlegall.seal.pki.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.common.UserId;
-import fr.vlegall.seal.pki.domain.model.CertificateRecord;
+import fr.vlegall.seal.pki.domain.model.CertificateRecords;
 import fr.vlegall.seal.pki.domain.model.IssuedCertificate;
 import fr.vlegall.seal.pki.domain.model.RevocationReason;
 import fr.vlegall.seal.pki.domain.model.SealCertificate;
@@ -63,7 +63,7 @@ class CertificateRepositoryIT {
 
         assertThat(certificates.save(issued)).isTrue();
 
-        assertThat(certificates.findUnrevoked(subject)).contains(CertificateRecord.of(issued.certificate()));
+        assertThat(certificates.findUnrevoked(subject)).contains(CertificateRecords.of(issued.certificate()));
         assertThat(jdbc.sql("SELECT cert_bytes FROM identity_certificates WHERE user_id = :user")
                         .param("user", subject.value())
                         .query(byte[].class)

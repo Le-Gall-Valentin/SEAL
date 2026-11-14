@@ -144,4 +144,49 @@ class FileCaKeyStoreTest {
 
         assertThat(store.key().publicKey()).hasSize(Ed25519.PUBLIC_KEY_BYTES);
     }
+
+    @Test
+    @DisplayName("ADR 0025, point 12 : un dossier ca vide, préparé par l'exploitant, reçoit une nouvelle paire")
+    void adr0025EmptyCaDirectoryReceivesAPair() throws IOException {
+        Files.createDirectory(ca());
+
+        FileCaKeyStore store = new FileCaKeyStore(ca());
+
+        assertThat(ca().resolve(FileCaKeyStore.PRIVATE_KEY_FILE)).isRegularFile();
+        assertThat(store.key().publicKey()).hasSize(Ed25519.PUBLIC_KEY_BYTES);
+    }
+
+    @Test
+    @DisplayName("KEY-10 : un dossier ca ouvert à d'autres que son propriétaire arrête le démarrage")
+    void key10WiderDirectoryPermissionsStopTheStart() throws IOException {
+        assumeThat(posix()).isTrue();
+        new FileCaKeyStore(ca());
+        Files.setPosixFilePermissions(ca(), PosixFilePermissions.fromString("rwxrwxrwx"));
+
+        assertThatThrownBy(() -> new FileCaKeyStore(ca()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("700");
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 12 : des liens symboliques vers une paire rangée ailleurs arrêtent le démarrage")
+    void adr0025SymbolicLinksStopTheStart() throws IOException {
+        assumeThat(posix()).isTrue();
+        new FileCaKeyStore(data.resolve("ailleurs"));
+        Path linked = Files.createDirectory(
+                ca(), PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+        for (String name : new String[] {FileCaKeyStore.PRIVATE_KEY_FILE, FileCaKeyStore.PUBLIC_KEY_FILE}) {
+            Files.createSymbolicLink(
+                    linked.resolve(name), data.resolve("ailleurs").resolve(name));
+        }
+
+        assertThatThrownBy(() -> new FileCaKeyStore(ca()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("lien symbolique");
+        Path linkedDirectory = data.resolve("ca-lien");
+        Files.createSymbolicLink(linkedDirectory, data.resolve("ailleurs"));
+        assertThatThrownBy(() -> new FileCaKeyStore(linkedDirectory))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("lien symbolique");
+    }
 }
