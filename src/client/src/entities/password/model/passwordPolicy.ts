@@ -1,3 +1,5 @@
+import { localPartOf } from '@/entities/account/@x/password'
+
 /**
  * AUTH-11, en direct : même algorithme que le serveur (PROTOCOL.md, section 3 ; ADR 0019, point 2), vérifié par les
  * vecteurs partagés (ADR 0024, point 6). Le serveur tranche à l'envoi (PASSWORD_TOO_WEAK).
@@ -34,16 +36,6 @@ export function foldPassword(value: string): string {
 /** Longueur en points de code (PROTOCOL.md, section 3), et non en graphèmes ni en unités UTF-16. */
 export function codePointLength(value: string): number {
   return Array.from(value).length
-}
-
-/** Partie locale du courriel, avant le premier « + » ou « @ » ; vide sans « @ ». */
-export function localPartOf(email: string): string {
-  const at = email.indexOf('@')
-  if (at < 0) {
-    return ''
-  }
-  const plus = email.indexOf('+')
-  return email.slice(0, plus >= 0 && plus < at ? plus : at)
 }
 
 function withoutContextWords(folded: string, context: PasswordContext): string {

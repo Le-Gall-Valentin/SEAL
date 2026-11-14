@@ -5,6 +5,7 @@ import { Alert } from './Alert'
 import { FailureAlert } from './FailureAlert'
 import { PasswordField } from './PasswordField'
 import { PrimaryButton } from './PrimaryButton'
+import { RateLimitedAlert } from './RateLimitedAlert'
 import { TextField } from './TextField'
 
 function ControlledPassword({ disabled = false }: { readonly disabled?: boolean }) {
@@ -96,4 +97,62 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
     await expect.element(button).toHaveAttribute('type', 'submit')
     await expect.element(button).toBeDisabled()
   })
+
+  it('TextField : aide et erreur sous le champ, reliées au champ ; l’erreur est annoncée (ADR 0024, point 9)', async () => {
+    const screen = await render(
+      <TextField
+        label="Nom affiché"
+        autoComplete="name"
+        maxLength={200}
+        value=""
+        onChange={() => undefined}
+        hint="Visible par vos amis. Modifiable à tout moment."
+        error="1 à 50 caractères, dont un visible au moins."
+      />,
+    )
+
+    const input = screen.getByLabelText('Nom affiché')
+    await expect.element(input).toHaveAttribute('aria-invalid', 'true')
+    await expect
+      .element(input)
+      .toHaveAccessibleDescription(
+        'Visible par vos amis. Modifiable à tout moment. 1 à 50 caractères, dont un visible au moins.',
+      )
+    const error = screen.getByText('1 à 50 caractères, dont un visible au moins.')
+    await expect.element(error).toBeVisible()
+    expect(error.element().closest('[aria-live="polite"]')).not.toBeNull()
+  })
+
+  it('TextField : sans erreur, le champ n’est pas marqué invalide', async () => {
+    const screen = await render(
+      <TextField
+        label="Courriel"
+        autoComplete="email"
+        maxLength={254}
+        value=""
+        onChange={() => undefined}
+      />,
+    )
+
+    await expect.element(screen.getByLabelText('Courriel')).not.toHaveAttribute('aria-invalid')
+  })
+
+  it.each([
+    [1, undefined, 'Réessayez dans 1 minute.'],
+    [5, undefined, 'Réessayez dans 5 minutes.'],
+    [
+      15,
+      'Vous pouvez aussi réinitialiser votre mot de passe.',
+      'Réessayez dans 15 minutes. Vous pouvez aussi réinitialiser votre mot de passe.',
+    ],
+  ] as const)(
+    'SEC-10, ADR 0015 : « Trop de tentatives », %i minute(s)',
+    async (minutes, hint, text) => {
+      const screen = await render(<RateLimitedAlert minutes={minutes} hint={hint} />)
+
+      const alert = screen.getByRole('alert')
+      await expect.element(alert.getByText('Trop de tentatives', { exact: true })).toBeVisible()
+      await expect.element(alert).toMatchTextContent(text)
+    },
+  )
 })

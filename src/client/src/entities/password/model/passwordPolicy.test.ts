@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { localPartOf } from '@/entities/account/@x/password'
 import {
   canSubmitPassword,
   evaluatePassword,
   foldPassword,
   isPasswordAccepted,
-  localPartOf,
 } from './passwordPolicy'
 
 // ADR 0024, point 6 : vecteurs produits par src/protocol/tools/gen_vectors.py, relus aussi par le serveur.
@@ -78,9 +78,5 @@ describe('AUTH-11 : politique des mots de passe, d’après les vecteurs du serv
     expect(isPasswordAccepted({ length: 'met', context: 'met', blocklist: 'unknown' })).toBe(false)
     expect(canSubmitPassword({ length: 'met', context: 'met', blocklist: 'unmet' })).toBe(false)
     expect(canSubmitPassword({ length: 'met', context: 'unmet', blocklist: 'met' })).toBe(false)
-  })
-
-  it('AUTH-11 : un courriel sans « @ » n’a pas de partie locale, et ne retire rien', () => {
-    expect(localPartOf('valentin')).toBe('')
   })
 })

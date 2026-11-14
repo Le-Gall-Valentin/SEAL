@@ -1,19 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { refreshSession } from '@/entities/session'
-import { ApiError } from '@/shared/lib'
+import { useRetryAfterLock } from '@/shared/lib'
 import type { Credentials } from '../api/ILoginApi'
 import { canSubmit, loginAlertOf } from './loginAlert'
 import { useLoginApi } from './loginApiContext'
-
-/** SEC-10 : un 429 sans Retry-After lisible bloque le formulaire une minute. */
-const DEFAULT_LOCK_SECONDS = 60
-
-function lockSeconds(error: unknown): number | null {
-  return error instanceof ApiError && error.code === 'RATE_LIMITED'
-    ? (error.retryAfterSeconds ?? DEFAULT_LOCK_SECONDS)
-    : null
-}
 
 /**
  * AUTH-20 à AUTH-22 : état du formulaire de connexion. Une réussite relit /me, et la garde de route mène à l'écran du
@@ -33,19 +24,7 @@ export function useLoginForm() {
     },
   })
   const { error, reset } = mutation
-  const lock = lockSeconds(error)
-
-  useEffect(() => {
-    if (lock === null) {
-      return undefined
-    }
-    const timer = setTimeout(reset, lock * 1000)
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [lock, reset])
-
-  const locked = lock !== null
+  const locked = useRetryAfterLock(error, reset)
   return {
     values,
     setLogin: (login: string) => {

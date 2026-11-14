@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { formMessages } from './formMessages'
-import { LABEL_CLASS } from './TextField'
+import { ERROR_CLASS, LABEL_CLASS } from './TextField'
 
 interface PasswordFieldProps {
   readonly label: string
@@ -11,6 +11,11 @@ interface PasswordFieldProps {
   /** SEC-01 : longueur maximale, celle du serveur. */
   readonly maxLength: number
   readonly disabled?: boolean
+  /** Élément qui décrit le champ (jauge et règles du mot de passe). */
+  readonly describedBy?: string | undefined
+  /** Erreur affichée sous le champ et annoncée ; null ou absente si le champ est valide. */
+  readonly error?: string | null | undefined
+  readonly onBlur?: (() => void) | undefined
 }
 
 /** Mot de passe masqué, avec « Afficher le mot de passe » (bouton à bascule, aria-pressed). */
@@ -21,8 +26,16 @@ export function PasswordField({
   autoComplete,
   maxLength,
   disabled = false,
+  describedBy,
+  error,
+  onBlur,
 }: PasswordFieldProps) {
   const id = useId()
+  const errorId = `${id}-erreur`
+  const hasError = error !== undefined && error !== null
+  const description = [describedBy ?? null, hasError ? errorId : null]
+    .filter((part) => part !== null)
+    .join(' ')
   const t = useMessages(formMessages)
   const [visible, setVisible] = useState(false)
   return (
@@ -40,6 +53,9 @@ export function PasswordField({
           disabled={disabled}
           spellCheck={false}
           autoCapitalize="none"
+          aria-invalid={hasError ? true : undefined}
+          aria-describedby={description === '' ? undefined : description}
+          onBlur={onBlur}
           className="min-w-0 flex-1 border-0 bg-transparent font-sans text-[15px] text-ink outline-none disabled:text-ink-3"
           onChange={(event) => {
             onChange(event.target.value)
@@ -70,6 +86,13 @@ export function PasswordField({
             <circle cx="12" cy="12" r="2.8" />
           </svg>
         </button>
+      </div>
+      <div aria-live="polite" className="empty:hidden">
+        {hasError && (
+          <span id={errorId} className={ERROR_CLASS}>
+            {error}
+          </span>
+        )}
       </div>
     </div>
   )

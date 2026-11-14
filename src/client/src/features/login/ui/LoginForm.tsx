@@ -1,7 +1,14 @@
 import { Link } from 'react-router'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
-import { Alert, FailureAlert, PasswordField, PrimaryButton, TextField } from '@/shared/ui'
+import {
+  Alert,
+  FailureAlert,
+  PasswordField,
+  PrimaryButton,
+  RateLimitedAlert,
+  TextField,
+} from '@/shared/ui'
 import { loginMessages } from '../i18n'
 import type { LoginAlert } from '../model/loginAlert'
 import { useLoginForm } from '../model/useLoginForm'
@@ -12,15 +19,7 @@ function LoginAlertView({ alert }: { readonly alert: LoginAlert }) {
     case 'invalid-credentials':
       return <Alert variant="error">{t('invalidCredentials')}</Alert>
     case 'rate-limited':
-      return (
-        <Alert variant="rate-limited" title={t('rateLimitedTitle')}>
-          {t('retryIn')}{' '}
-          <span className="font-semibold text-ink tabular-nums">
-            {alert.minutes === 1 ? t('oneMinute') : t('minutes', { count: alert.minutes })}
-          </span>
-          {t('resetHint')}
-        </Alert>
-      )
+      return <RateLimitedAlert minutes={alert.minutes} hint={t('resetHint')} />
     case 'network':
     case 'unexpected':
       return <FailureAlert failure={alert} />

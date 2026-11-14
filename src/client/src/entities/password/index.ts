@@ -6,7 +6,6 @@ export {
   canSubmitPassword,
   evaluatePassword,
   isPasswordAccepted,
-  localPartOf,
   MAX_PASSWORD_LENGTH,
 } from './model/passwordPolicy'
 export type { PasswordRules, RuleState } from './model/passwordPolicy'

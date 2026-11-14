@@ -5,6 +5,12 @@ export const INPUT_CLASS =
 
 export const LABEL_CLASS = 'text-[13px] font-semibold text-ink-2'
 
+/** Aide sous un champ (« Visible par vos amis… »). */
+export const HINT_CLASS = 'text-[13px] leading-[1.35] text-ink-3'
+
+/** Erreur sous un champ, comme « Déjà pris. » d'Identifiant-OAuth (ADR 0024, point 9). */
+export const ERROR_CLASS = 'text-[13px] leading-[1.35] font-semibold text-danger'
+
 interface TextFieldProps {
   readonly label: string
   readonly value: string
@@ -14,9 +20,13 @@ interface TextFieldProps {
   readonly maxLength: number
   readonly type?: 'text' | 'email'
   readonly disabled?: boolean
+  readonly hint?: string | undefined
+  /** Erreur affichée sous le champ et annoncée ; null ou absente si le champ est valide. */
+  readonly error?: string | null | undefined
+  readonly onBlur?: (() => void) | undefined
 }
 
-/** Champ étiqueté des formulaires de la maquette. */
+/** Champ étiqueté des formulaires de la maquette, avec son aide et son erreur. */
 export function TextField({
   label,
   value,
@@ -25,8 +35,17 @@ export function TextField({
   maxLength,
   type = 'text',
   disabled = false,
+  hint,
+  error,
+  onBlur,
 }: TextFieldProps) {
   const id = useId()
+  const hintId = `${id}-aide`
+  const errorId = `${id}-erreur`
+  const hasError = error !== undefined && error !== null
+  const describedBy = [hint !== undefined ? hintId : null, hasError ? errorId : null]
+    .filter((part) => part !== null)
+    .join(' ')
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className={LABEL_CLASS}>
@@ -41,11 +60,26 @@ export function TextField({
         disabled={disabled}
         spellCheck={false}
         autoCapitalize="none"
+        aria-invalid={hasError ? true : undefined}
+        aria-describedby={describedBy === '' ? undefined : describedBy}
         className={INPUT_CLASS}
         onChange={(event) => {
           onChange(event.target.value)
         }}
+        onBlur={onBlur}
       />
+      {hint !== undefined && (
+        <span id={hintId} className={HINT_CLASS}>
+          {hint}
+        </span>
+      )}
+      <div aria-live="polite" className="empty:hidden">
+        {hasError && (
+          <span id={errorId} className={ERROR_CLASS}>
+            {error}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
