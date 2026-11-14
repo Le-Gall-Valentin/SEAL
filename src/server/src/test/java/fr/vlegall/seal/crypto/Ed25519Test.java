@@ -4,9 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.KeyFactory;
+import java.security.MessageDigest;
+import java.security.Signature;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.HexFormat;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -98,10 +103,71 @@ class Ed25519Test {
     void adr0025OffCurvePublicKeyIsRejected() {
         Ed25519.GeneratedKey key = Ed25519.generate();
         byte[] message = new byte[] {1};
-        byte[] offCurve = HEX.parseHex("ff".repeat(32));
+        byte[] signature = Ed25519.sign(key.privateKey(), message);
+        // y = 2 : encodage canonique, hors des points d'ordre faible, mais d'aucun point de la courbe. Il passe la
+        // règle de l'ADR 0025 (point 14) et c'est la JCA qui le refuse, en exception : le chemin à éprouver.
+        byte[] offCurve = HEX.parseHex("02" + "00".repeat(31));
+        byte[] nonCanonical = HEX.parseHex("ff".repeat(32));
 
-        assertThat(Ed25519.verify(offCurve, message, Ed25519.sign(key.privateKey(), message)))
-                .isFalse();
+        assertThat(Ed25519.isWeakPoint(offCurve)).isFalse();
+        assertThat(Ed25519.verify(offCurve, message, signature)).isFalse();
+        assertThat(Ed25519.verify(nonCanonical, message, signature)).isFalse();
+    }
+
+    /** L, l'ordre du sous-groupe premier d'Ed25519 (RFC 8032, 5.1). */
+    private static final BigInteger GROUP_ORDER =
+            BigInteger.TWO.pow(252).add(new BigInteger("27742317777372353535851937790883648493"));
+
+    private static BigInteger littleEndian(byte[] bytes) {
+        byte[] bigEndian = new byte[bytes.length];
+        for (int i = 0; i < bytes.length; i++) {
+            bigEndian[i] = bytes[bytes.length - 1 - i];
+        }
+        return new BigInteger(1, bigEndian);
+    }
+
+    private static byte[] littleEndian32(BigInteger value) {
+        byte[] bigEndian = value.toByteArray();
+        byte[] out = new byte[32];
+        for (int i = 0; i < 32 && i < bigEndian.length; i++) {
+            out[i] = bigEndian[bigEndian.length - 1 - i];
+        }
+        return out;
+    }
+
+    private static boolean jcaAlone(byte[] publicKey, byte[] message, byte[] signature) throws Exception {
+        Signature verifier = Signature.getInstance("Ed25519");
+        verifier.initVerify(KeyFactory.getInstance("Ed25519")
+                .generatePublic(new X509EncodedKeySpec(Ed25519.toSubjectPublicKeyInfo(publicKey))));
+        verifier.update(message);
+        return verifier.verify(signature);
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 14 : un R neutre, que la JCA accepte du titulaire de la clé, est refusé")
+    void adr0025NeutralRIsRejectedEvenFromTheKeyHolder() throws Exception {
+        // Clé du test 1 de la RFC 8032 : son titulaire calcule a, puis S = k·a mod L pour R = point neutre (r = 0).
+        byte[] seed = HEX.parseHex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
+        byte[] publicKey = HEX.parseHex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
+        byte[] message = "SEAL".getBytes(StandardCharsets.UTF_8);
+        byte[] scalar =
+                java.util.Arrays.copyOf(MessageDigest.getInstance("SHA-512").digest(seed), 32);
+        scalar[0] &= (byte) 0xf8;
+        scalar[31] &= 0x7f;
+        scalar[31] |= 0x40;
+        byte[] neutral = HEX.parseHex("01" + "00".repeat(31));
+        MessageDigest digest = MessageDigest.getInstance("SHA-512");
+        digest.update(neutral);
+        digest.update(publicKey);
+        digest.update(message);
+        BigInteger k = littleEndian(digest.digest()).mod(GROUP_ORDER);
+        byte[] signature = Canonical.concat(
+                neutral, littleEndian32(k.multiply(littleEndian(scalar)).mod(GROUP_ORDER)));
+
+        assertThat(jcaAlone(publicKey, message, signature))
+                .as("la JCA seule l'accepte")
+                .isTrue();
+        assertThat(Ed25519.verify(publicKey, message, signature)).isFalse();
     }
 
     @Test

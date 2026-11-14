@@ -192,7 +192,8 @@ class IdentityPublicationIT {
     void adr0025OffCurveKeyIsRefused() throws Exception {
         Account account = account("pop_courbe");
         Map<String, Object> body = proof(account.id(), challenge(account), ik);
-        body.put("ikPublic", Base64Url.encode(HexFormat.of().parseHex("ff".repeat(32))));
+        // y = 2 : canonique, hors des points d'ordre faible, d'aucun point de la courbe : refusé par la JCA.
+        body.put("ikPublic", Base64Url.encode(HexFormat.of().parseHex("02" + "00".repeat(31))));
 
         publish(account, body)
                 .andExpect(status().isUnprocessableContent())
