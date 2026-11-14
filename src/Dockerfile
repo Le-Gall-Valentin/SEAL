@@ -8,6 +8,8 @@ WORKDIR /build/client
 COPY client/package.json client/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY client/ ./
+# ADR 0024 (point 6 bis) : le client importe la liste de blocage d'AUTH-11 depuis src/protocol.
+COPY protocol/password-blocklist.txt /build/protocol/
 RUN npm run build
 
 # ---- Serveur : Spring Boot, Maven Wrapper ----

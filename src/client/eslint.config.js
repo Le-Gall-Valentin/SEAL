@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import js from '@eslint/js'
 import prettier from 'eslint-config-prettier'
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
@@ -430,6 +431,8 @@ const LAYER_FOLDERS = { page: 'pages', widget: 'widgets', feature: 'features', e
 const SLICE_LAYERS = Object.keys(LAYER_FOLDERS)
 const SLICE_SEGMENTS = ['ui', 'model', 'api', 'lib', 'config', 'i18n']
 const SHARED_SEGMENTS = ['crypto', 'api', 'ws', 'i18n', 'ui', 'styles', 'lib', 'config']
+// src/protocol, hors de la racine du client : boundaries le décrit par son chemin absolu.
+const PROTOCOL_DIR = fileURLToPath(new URL('../protocol', import.meta.url))
 const SEGMENTS = SLICE_LAYERS.map((layer) => `${layer}-segment`)
 const segmentsOf = (layer) => (layer === 'entity' ? [...SLICE_SEGMENTS, '@x'] : SLICE_SEGMENTS)
 // Tranches des couches strictement inférieures, atteintes par leur index.ts ; shared, par l'index.ts d'un segment.
@@ -567,6 +570,8 @@ export default defineConfig(
           partialMatch: false,
         },
         { type: 'app', pattern: 'src/app', partialMatch: false },
+        // ADR 0024 (point 6 bis) : src/protocol, dont le client n'importe que la liste de blocage d'AUTH-11.
+        { type: 'protocol', pattern: PROTOCOL_DIR, partialMatch: false },
       ],
       'boundaries/files': [
         { pattern: 'src/main.tsx', category: 'entry' },
@@ -710,6 +715,18 @@ export default defineConfig(
                     },
                   },
                 ],
+              },
+            },
+            // ADR 0024 (point 6 bis) : la liste de blocage ne se lit que par le segment api/ de entities/password.
+            {
+              from: {
+                element: {
+                  type: 'entity-segment',
+                  captured: { slice: 'password', segment: 'api' },
+                },
+              },
+              allow: {
+                to: { element: { type: 'protocol', fileInternalPath: 'password-blocklist.txt' } },
               },
             },
             // Cryptographie : shared/crypto ne s'atteint que depuis un segment model/ ou depuis app, et

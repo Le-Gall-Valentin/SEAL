@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Produit les vecteurs de référence de l'encodage canonique (PROTOCOL.md, section 2 ; MSG-02).
+"""Produit les vecteurs de référence de SEAL, lus par les tests Java et TypeScript.
 
-Troisième implémentation de l'encodage, indépendante de Java et de TypeScript (ADR 0006) :
-les deux suites de tests relisent ces vecteurs, aucune ne se valide elle-même.
-Bibliothèque standard de Python uniquement.
+- vectors/canonical-encoding.json : encodage canonique (PROTOCOL.md, section 2 ; MSG-02, ADR 0006) ;
+- vectors/password-policy.json : politique des mots de passe (PROTOCOL.md, section 3 ; AUTH-11, ADR 0024).
+
+Troisième implémentation, indépendante de Java et de TypeScript : les deux suites de tests relisent ces
+vecteurs, aucune ne se valide elle-même. Bibliothèque standard de Python uniquement.
 
 Usage, depuis src/protocol :
-    python3 tools/gen_vectors.py           réécrit vectors/canonical-encoding.json
-    python3 tools/gen_vectors.py --check   échoue si le fichier diffère (CI)
+    python3 tools/gen_vectors.py           réécrit les fichiers de vectors/
+    python3 tools/gen_vectors.py --check   échoue si un fichier diffère (CI)
 """
 
 from __future__ import annotations
@@ -20,7 +22,10 @@ import sys
 import unicodedata
 from pathlib import Path
 
-OUTPUT = Path(__file__).resolve().parent.parent / "vectors" / "canonical-encoding.json"
+PROTOCOL_DIR = Path(__file__).resolve().parent.parent
+OUTPUT = PROTOCOL_DIR / "vectors" / "canonical-encoding.json"
+PASSWORD_OUTPUT = PROTOCOL_DIR / "vectors" / "password-policy.json"
+BLOCKLIST = PROTOCOL_DIR / "password-blocklist.txt"
 
 U32_MAX = 2**32 - 1
 U64_MAX = 2**63 - 1  # ADR 0006 : le long de Java est signé
@@ -275,17 +280,137 @@ def build() -> str:
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
 
 
+# Politique des mots de passe (PROTOCOL.md, section 3 ; AUTH-11).
+
+MIN_LENGTH = 15
+MAX_LENGTH = 128
+MIN_WORD_LENGTH = 3
+SERVICE_WORDS = ("seal", "uqac")
+
+
+def fold(value: str) -> str:
+    """NFKC puis minuscules par la correspondance de casse par défaut d'Unicode."""
+    return unicodedata.normalize("NFKC", value).lower()
+
+
+def well_formed(value: str) -> bool:
+    return not any(0xD800 <= ord(char) <= 0xDFFF for char in value)
+
+
+def local_part(email: str) -> str:
+    """Partie locale, avant le premier « + » ou « @ »."""
+    at = email.index("@")
+    plus = email.find("+")
+    return email[: plus if 0 <= plus < at else at]
+
+
+def without_context_words(folded: str, personal: list[str]) -> str:
+    words: list[str] = []
+    for word in [*personal, *SERVICE_WORDS]:
+        candidate = fold(word)
+        if len(candidate) >= MIN_WORD_LENGTH and candidate not in words:
+            words.append(candidate)
+    # Du plus long au plus court ; sorted est stable, même avec reverse.
+    ordered = sorted(words, key=len, reverse=True)
+    remaining = folded
+    removed = True
+    while removed:
+        removed = False
+        for word in ordered:
+            shorter = remaining.replace(word, "")
+            if len(shorter) < len(remaining):
+                remaining = shorter
+                removed = True
+    return remaining
+
+
+def load_blocklist() -> set[str]:
+    return {fold(line) for line in BLOCKLIST.read_text(encoding="utf-8").splitlines()}
+
+
+def evaluate(password: str, username: str, email: str, blocklist: set[str]) -> dict:
+    """État de chaque règle affichée par le client, et verdict du serveur."""
+    normalized = unicodedata.normalize("NFKC", password)
+    valid = well_formed(normalized)
+    length = valid and MIN_LENGTH <= len(normalized) <= MAX_LENGTH
+    folded = normalized.lower()
+    context = valid and len(without_context_words(folded, [username, local_part(email)])) >= MIN_LENGTH
+    blocklist_rule = length and folded not in blocklist
+    return {
+        "rules": {"length": length, "context": context, "blocklist": blocklist_rule},
+        "accepted": length and context and blocklist_rule,
+    }
+
+
+PASSWORD_CASES: list[tuple[str, str, str, str]] = [
+    ("PROTOCOL.md : « seal » répété, rien ne reste", "sealsealsealseal", "valentin", "valentin@exemple.ca"),
+    ("PROTOCOL.md : passes répétées", "sesealalsesealalsesealal", "valentin", "valentin@exemple.ca"),
+    ("PROTOCOL.md : identifiant retiré, « 2026 » reste", "valentin.le.gall2026", "valentin.le.gall", "v@exemple.ca"),
+    ("PROTOCOL.md : partie locale d'abord, 12 points de code restent", "annabelle sur le pont", "ann", "annabelle@exemple.ca"),
+    ("PROTOCOL.md : partie locale d'abord, 19 restent", "annabelle sur le pont du lac", "ann", "annabelle@exemple.ca"),
+    ("PROTOCOL.md : à longueur égale, l'identifiant d'abord (refusé)", "abababzzzzzzzzzzzzz", "aba", "bab@exemple.ca"),
+    ("PROTOCOL.md : à longueur égale, l'identifiant d'abord (accepté)", "abababzzzzzzzzzzzzz", "bab", "aba@exemple.ca"),
+    ("PROTOCOL.md : phrase de passe acceptée", "le phoque nage dans le port de seal", "valentin", "valentin@exemple.ca"),
+    ("PROTOCOL.md : demi-paire isolée", "\ud800fjord-tuque-raquette", "valentin", "valentin@exemple.ca"),
+    ("longueur : vide", "", "valentin", "valentin@exemple.ca"),
+    ("longueur : 14 points de code", "fjord-tuque-ra", "valentin", "valentin@exemple.ca"),
+    ("longueur : 15 points de code", "fjord-tuque-rak", "valentin", "valentin@exemple.ca"),
+    ("longueur : 128 points de code", ("phoque " * 19)[:128].ljust(128, "x"), "valentin", "valentin@exemple.ca"),
+    ("longueur : 129 points de code", ("phoque " * 19)[:128].ljust(129, "x"), "valentin", "valentin@exemple.ca"),
+    ("longueur : 15 phoques U+1F9AD, 30 unités UTF-16", "\U0001f9ad" * 15, "valentin", "valentin@exemple.ca"),
+    ("longueur : 14 phoques U+1F9AD", "\U0001f9ad" * 14, "valentin", "valentin@exemple.ca"),
+    ("NFKC : pleine chasse ramenée à l'ASCII", "ｆｊｏｒｄ－ｔｕｑｕｅ－ｒａｑｕｅｔｔｅ", "valentin", "valentin@exemple.ca"),
+    ("NFKC : 8 ligatures ﬁ comptent 16 points de code", "ﬁ" * 8, "valentin", "valentin@exemple.ca"),
+    ("liste de blocage : entrée telle quelle", "Mailcreated5240", "valentin", "valentin@exemple.ca"),
+    ("liste de blocage : comparée en minuscules", "MAILCREATED5240", "valentin", "valentin@exemple.ca"),
+    ("contexte : identifiant retiré sans tenir compte de la casse", "Valentin aime le fjord", "valentin", "valentin@exemple.ca"),
+    ("contexte : partie locale avant « + »", "annabelle sur le pont", "ann", "annabelle+seal@exemple.ca"),
+    ("contexte : mot de moins de 3 points de code ignoré", "abababababababab", "zzz", "ab@exemple.ca"),
+    ("contexte : « uqac » retiré", "uqacuqacuqacuqacuqac", "valentin", "valentin@exemple.ca"),
+]
+
+
+def build_password_policy() -> str:
+    blocklist = load_blocklist()
+    cases = []
+    for name, password, username, email in PASSWORD_CASES:
+        cases.append(
+            {
+                "name": name,
+                "password": password,
+                "username": username,
+                "email": email,
+                "localPart": local_part(email),
+                **evaluate(password, username, email, blocklist),
+            }
+        )
+    document = {
+        "format": "seal-vectors-v1",
+        "subject": "Politique des mots de passe : PROTOCOL.md, section 3 (AUTH-11, ADR 0019, ADR 0024)",
+        "generator": "src/protocol/tools/gen_vectors.py",
+        "cases": cases,
+    }
+    return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
+
+
 def main() -> int:
-    content = build()
+    outputs = [
+        (OUTPUT, build(), f"{len(VALID)} cas valides, {len(INVALID)} cas à rejeter"),
+        (PASSWORD_OUTPUT, build_password_policy(), f"{len(PASSWORD_CASES)} cas"),
+    ]
     if "--check" in sys.argv[1:]:
-        if not OUTPUT.exists() or OUTPUT.read_text(encoding="ascii") != content:
-            print(f"{OUTPUT} n'est pas à jour : lancez python3 tools/gen_vectors.py", file=sys.stderr)
+        stale = [path for path, content, _ in outputs if not path.exists() or path.read_text(encoding="ascii") != content]
+        for path in stale:
+            print(f"{path} n'est pas à jour : lancez python3 tools/gen_vectors.py", file=sys.stderr)
+        if stale:
             return 1
-        print(f"{OUTPUT.name} est à jour ({len(VALID)} cas valides, {len(INVALID)} cas à rejeter)")
+        for path, _, summary in outputs:
+            print(f"{path.name} est à jour ({summary})")
         return 0
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(content, encoding="ascii")
-    print(f"{OUTPUT.name} écrit ({len(VALID)} cas valides, {len(INVALID)} cas à rejeter)")
+    for path, content, summary in outputs:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="ascii")
+        print(f"{path.name} écrit ({summary})")
     return 0
 
 
