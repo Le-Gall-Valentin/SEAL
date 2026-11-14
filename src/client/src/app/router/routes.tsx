@@ -2,9 +2,10 @@ import { Navigate, type RouteObject } from 'react-router'
 import { HomePage } from '@/pages/home'
 import { LoginPage } from '@/pages/login'
 import { RegisterPage } from '@/pages/register'
+import { VerifyEmailPage } from '@/pages/verify-email'
 import { ROUTES } from '@/shared/config'
 import { RouteErrorBoundary } from './RouteErrorBoundary'
-import { AnonymousRoute } from './routeGuards'
+import { AnonymousRoute, PendingRoute } from './routeGuards'
 
 /** Route racine sans chemin : toute erreur de rendu d'une route enfant aboutit à l'état « Erreur de chargement » (A10). */
 export function withRootErrorBoundary(children: RouteObject[]): RouteObject[] {
@@ -20,6 +21,11 @@ export const routes = withRootErrorBoundary([
       { path: ROUTES.LOGIN, element: <LoginPage /> },
       { path: ROUTES.REGISTER, element: <RegisterPage /> },
     ],
+  },
+  // AUTH-16 : la session restreinte d'un compte en attente ne voit que la vérification.
+  {
+    element: <PendingRoute />,
+    children: [{ path: ROUTES.VERIFY_EMAIL, element: <VerifyEmailPage /> }],
   },
   // Aucun écran « page introuvable » dans la maquette : une adresse inconnue ramène à l'accueil (ADR 0012).
   { path: '*', element: <Navigate to="/" replace /> },

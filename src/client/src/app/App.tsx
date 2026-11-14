@@ -5,6 +5,7 @@ import { PasswordBlocklistProvider, passwordBlocklist } from '@/entities/passwor
 import { SessionApiProvider, sessionApi } from '@/entities/session'
 import { LoginApiProvider, loginApi } from '@/features/login'
 import { RegisterApiProvider, registerApi } from '@/features/register'
+import { VerifyEmailApiProvider, verifyEmailApi } from '@/features/verify-email'
 import { LanguageProvider } from '@/shared/i18n'
 import { createQueryClient, ErrorBoundary, routerErrorHandler } from './providers'
 import { routes } from './router'
@@ -26,10 +27,12 @@ export function App() {
             <PasswordBlocklistProvider api={passwordBlocklist}>
               <LoginApiProvider api={loginApi}>
                 <RegisterApiProvider api={registerApi}>
-                  <RouterProvider
-                    router={router}
-                    onError={routerErrorHandler(import.meta.env.PROD)}
-                  />
+                  <VerifyEmailApiProvider api={verifyEmailApi}>
+                    <RouterProvider
+                      router={router}
+                      onError={routerErrorHandler(import.meta.env.PROD)}
+                    />
+                  </VerifyEmailApiProvider>
                 </RegisterApiProvider>
               </LoginApiProvider>
             </PasswordBlocklistProvider>
