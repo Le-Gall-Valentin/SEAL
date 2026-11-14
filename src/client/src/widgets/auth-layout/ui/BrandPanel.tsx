@@ -18,13 +18,16 @@ function Bullet({ icon, children }: { readonly icon: ReactNode; readonly childre
   )
 }
 
-/** Panneau de marque de Connexion-Ordinateur, à gauche du formulaire sur ordinateur. */
+/**
+ * Panneau de marque de Connexion-Ordinateur, à gauche du formulaire sur ordinateur. ADR 0024, point 11 : il occupe la
+ * moitié de la largeur, son bloc central y est centré ; le logo et le pied restent à gauche.
+ */
 export function BrandPanel() {
   const t = useMessages(authLayoutMessages)
   return (
-    <aside className="hidden min-h-screen flex-[1_1_440px] flex-col justify-between gap-8 border-r border-line bg-accent-soft px-14 py-12 lg:flex">
+    <aside className="hidden min-h-screen flex-col justify-between gap-8 border-r border-line bg-accent-soft px-14 py-12 lg:flex">
       <Wordmark variant="panel" />
-      <div className="flex max-w-[448px] flex-col gap-7">
+      <div className="flex w-full max-w-[448px] flex-col gap-7 self-center">
         <Phoque variant="waving" size={200} />
         <p className="m-0 text-[34px] leading-[1.12] font-bold tracking-[-0.03em] text-balance">
           {t('tagline')}

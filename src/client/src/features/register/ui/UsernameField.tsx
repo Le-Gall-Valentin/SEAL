@@ -115,7 +115,7 @@ export function UsernameField({
                 <button
                   key={suggestion}
                   type="button"
-                  className="min-h-11 rounded-full bg-accent-soft px-3 font-mono text-[13px] text-accent-text"
+                  className="min-h-11 max-w-full rounded-full bg-accent-soft px-3 font-mono text-[13px] wrap-anywhere text-accent-text"
                   onClick={() => {
                     onChange(suggestion)
                   }}

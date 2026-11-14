@@ -11,7 +11,7 @@ export function HomePage() {
       <h1 className="m-0">
         <Wordmark variant="panel" />
       </h1>
-      <div className="w-60">
+      <div className="w-full max-w-60">
         <LogoutButton />
       </div>
     </main>

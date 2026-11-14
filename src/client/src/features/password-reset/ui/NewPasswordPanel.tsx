@@ -66,7 +66,7 @@ export function NewPasswordPanel({ token, linkId }: NewPasswordPanelProps) {
       <Title>
         <p className="m-0 leading-[1.45] text-ink-3">
           {t('forAccount')}{' '}
-          <span className="font-mono text-[14px] text-ink-2">{`@${panel.account.username}`}</span>
+          <span className="font-mono text-[14px] wrap-anywhere text-ink-2">{`@${panel.account.username}`}</span>
           {t('period')} {minutes === 1 ? t('expiresInOne') : t('expiresInMany', { count: minutes })}
         </p>
       </Title>

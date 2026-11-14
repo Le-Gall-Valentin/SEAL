@@ -75,11 +75,11 @@ export function VerifyEmailPanel({ email, verification }: VerifyEmailPanelProps)
         </div>
         <PrimaryButton disabled={!panel.canVerify}>{t('submit')}</PrimaryButton>
       </form>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3">
         <button
           type="button"
           disabled={!panel.canResend}
-          className="-ml-3 inline-flex min-h-11 items-center gap-2 rounded-[10px] px-3 font-sans text-[14px] font-semibold text-accent-text disabled:opacity-55"
+          className="-ml-3 inline-flex min-h-11 items-center gap-2 rounded-[10px] px-3 font-sans text-[14px] font-semibold whitespace-nowrap text-accent-text disabled:opacity-55"
           onClick={panel.resend}
         >
           <svg
@@ -105,7 +105,7 @@ export function VerifyEmailPanel({ email, verification }: VerifyEmailPanelProps)
               : t('resendsMany', { count: remaining })}
         </span>
       </div>
-      <p role="status" className="m-0 text-[13px] text-ink-2 empty:hidden">
+      <p role="status" className="m-0 text-[13px] wrap-anywhere text-ink-2 empty:hidden">
         {panel.sentTo !== null && t('sent', { email: panel.sentTo })}
       </p>
       <p className="m-0 text-[13px] leading-[1.4] text-ink-3">

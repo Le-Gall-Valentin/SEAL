@@ -13,7 +13,8 @@ interface CodeInputProps {
 
 /**
  * AUTH-14 : six cases d'un chiffre (Verification-Courriel). Le clavier numérique du système remplace celui que dessine
- * la maquette (inputmode="numeric") ; un code collé ou proposé par le système remplit les cases suivantes.
+ * la maquette (inputmode="numeric") ; un code collé ou proposé par le système remplit les cases suivantes. ADR 0024,
+ * point 11 : 48 px par case au plus, et toutes rétrécissent ensemble sur un téléphone de moins de 376 px.
  */
 export function CodeInput({ cells, onChange, disabled, boxes }: CodeInputProps) {
   const t = useMessages(verifyEmailMessages)
@@ -34,7 +35,7 @@ export function CodeInput({ cells, onChange, disabled, boxes }: CodeInputProps) 
           autoComplete={index === 0 ? 'one-time-code' : 'off'}
           value={cell}
           disabled={disabled}
-          className="h-14 w-12 rounded-[10px] bg-surface text-center font-mono text-[22px] font-medium text-ink inset-ring inset-ring-line-strong outline-none focus:ring-3 focus:inset-ring-[1.5px] focus:ring-focus-glow focus:inset-ring-accent disabled:bg-sunken disabled:text-ink-3 nth-3:mr-2"
+          className="h-14 max-w-12 min-w-0 flex-1 rounded-[10px] bg-surface text-center font-mono text-[22px] font-medium text-ink inset-ring inset-ring-line-strong outline-none focus:ring-3 focus:inset-ring-[1.5px] focus:ring-focus-glow focus:inset-ring-accent disabled:bg-sunken disabled:text-ink-3 nth-3:mr-2"
           onFocus={(event) => {
             event.target.select()
           }}

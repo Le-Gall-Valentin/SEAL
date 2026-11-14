@@ -2,7 +2,7 @@ import { type Ref, useId } from 'react'
 import { FieldError, FieldLabel } from './Field'
 
 const INPUT_CLASS =
-  'h-11 w-full rounded-[10px] bg-surface px-3 font-sans text-[15px] text-ink inset-ring inset-ring-line-strong outline-none focus:inset-ring-accent focus:ring-3 focus:ring-focus-glow disabled:bg-sunken disabled:text-ink-3'
+  'h-11 w-full min-w-0 rounded-[10px] bg-surface px-3 font-sans text-[15px] text-ink inset-ring inset-ring-line-strong outline-none focus:inset-ring-accent focus:ring-3 focus:ring-focus-glow disabled:bg-sunken disabled:text-ink-3'
 
 /** Aide sous un champ (« Visible par vos amis… »). */
 const HINT_CLASS = 'text-[13px] leading-[1.35] text-ink-3'

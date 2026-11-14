@@ -24,7 +24,7 @@ export function VerifyEmailPage() {
           </h1>
           <p className="m-0 leading-[1.45] text-ink-3">
             {t('instruction')}{' '}
-            <span className="font-mono text-[14px] text-ink-2">{account.email}</span>
+            <span className="font-mono text-[14px] wrap-anywhere text-ink-2">{account.email}</span>
             {t('period')}
           </p>
         </header>
