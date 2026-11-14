@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationObserver, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { render, renderHook } from 'vitest-browser-react'
@@ -57,5 +57,37 @@ describe('entities/session : compte courant', () => {
 
     expect(client.getQueryData(SESSION_QUERY_KEY)).toBeNull()
     expect(client.getQueryData(['conversations'])).toBeUndefined()
+  })
+
+  it('AUTH-53 : la fin de session oublie aussi les mutations, et les mots de passe qu’elles portaient', async () => {
+    const client = new QueryClient()
+    await new MutationObserver(client, {
+      mutationFn: (credentials: { password: string }) =>
+        Promise.resolve(credentials.password.length),
+    }).mutate({ password: 'fjord-tuque-raquette' })
+    expect(client.getMutationCache().getAll()).toHaveLength(1)
+
+    endSession(client)
+
+    expect(client.getMutationCache().getAll()).toHaveLength(0)
+  })
+
+  it('AUTH-16 : un compte lu récemment n’est pas relu à chaque écran monté', async () => {
+    let calls = 0
+    const api: ISessionApi = {
+      me: () => {
+        calls += 1
+        return Promise.resolve(ACCOUNT)
+      },
+      reloadCsrf: () => Promise.resolve(),
+    }
+    const client = new QueryClient()
+    const first = await renderHook(() => useCurrentAccount(), { wrapper: wrapper(client, api) })
+    await expect.poll(() => first.result.current.data).toEqual(ACCOUNT)
+
+    const second = await renderHook(() => useCurrentAccount(), { wrapper: wrapper(client, api) })
+
+    expect(second.result.current.data).toEqual(ACCOUNT)
+    expect(calls).toBe(1)
   })
 })

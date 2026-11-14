@@ -1,9 +1,15 @@
-import { QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { createMemoryRouter, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { type Account, type ISessionApi, SessionApiProvider } from '@/entities/session'
+import {
+  type Account,
+  type ISessionApi,
+  SESSION_QUERY_KEY,
+  SessionApiProvider,
+} from '@/entities/session'
 import { ApiError, NetworkError } from '@/shared/lib'
 import { createQueryClient } from '../providers'
 import { ActiveRoute, AnonymousRoute, PendingRoute } from './routeGuards'
@@ -35,6 +41,31 @@ function ExpiringPage() {
   return <p>{query.isError ? 'Session perdue' : 'Données'}</p>
 }
 
+// Un formulaire en cours de saisie, et une relecture de /me (comme au retour du focus) qu'on déclenche à la demande.
+function TypingPage() {
+  const client = useQueryClient()
+  const [value, setValue] = useState('')
+  return (
+    <>
+      <input
+        aria-label="saisie"
+        value={value}
+        onChange={(event) => {
+          setValue(event.target.value)
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          void client.refetchQueries({ queryKey: SESSION_QUERY_KEY })
+        }}
+      >
+        relire
+      </button>
+    </>
+  )
+}
+
 const TREE: RouteObject[] = [
   {
     element: <AnonymousRoute />,
@@ -49,6 +80,7 @@ const TREE: RouteObject[] = [
     children: [
       { path: '/', element: <p>Accueil</p> },
       { path: '/expire', element: <ExpiringPage /> },
+      { path: '/saisie', element: <TypingPage /> },
     ],
   },
 ]
@@ -115,5 +147,21 @@ describe('AUTH-16 : gardes de route selon le compte courant', () => {
 
     await expect.element(screen.getByText('Accueil')).toBeVisible()
     expect(calls).toBe(2)
+  })
+
+  it('A10 : une relecture de /me qui échoue garde l’écran et la saisie en cours, le compte étant connu', async () => {
+    let calls = 0
+    const { screen } = await renderAt('/saisie', () => {
+      calls += 1
+      return calls === 1 ? Promise.resolve(ACTIVE) : Promise.reject(new NetworkError())
+    })
+    await screen.getByLabelText('saisie').fill('503271')
+    await screen.getByRole('button', { name: 'relire' }).click()
+
+    await expect.poll(() => calls).toBe(2)
+    await expect.element(screen.getByLabelText('saisie')).toHaveValue('503271')
+    await expect
+      .element(screen.getByRole('heading', { name: 'Impossible de charger' }))
+      .not.toBeInTheDocument()
   })
 })

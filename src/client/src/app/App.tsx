@@ -12,6 +12,7 @@ import { LanguageProvider } from '@/shared/i18n'
 import {
   ApiProviders,
   type Apis,
+  bootstrap,
   createQueryClient,
   ErrorBoundary,
   routerErrorHandler,
@@ -32,8 +33,7 @@ const apis: Apis = {
   logout: logoutApi,
 }
 
-// AUTH-60 : jeton CSRF rechargé au démarrage. Un échec est sans suite : la première requête non sûre le recharge.
-sessionApi.reloadCsrf().catch(() => undefined)
+bootstrap(apis)
 
 export function App() {
   return (

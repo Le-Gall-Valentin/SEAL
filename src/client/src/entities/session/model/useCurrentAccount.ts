@@ -4,11 +4,16 @@ import { useSessionApi } from './sessionApiPort'
 /** Clé du compte courant : /me est la seule source de la session (ADR 0024, point 7). */
 export const SESSION_QUERY_KEY = ['session', 'me'] as const
 
+const SESSION_STALE_TIME_MS = 30_000
+
 export function useCurrentAccount() {
   const api = useSessionApi()
   return useQuery({
     queryKey: SESSION_QUERY_KEY,
     queryFn: ({ signal }) => api.me(signal),
+    // Chaque écran monte sa garde : sans délai, /me serait relu à chaque changement d'écran. Les transitions
+    // (connexion, vérification, déconnexion) le relisent explicitement, et tout 401 termine la session.
+    staleTime: SESSION_STALE_TIME_MS,
   })
 }
 
@@ -17,6 +22,8 @@ export function useCurrentAccount() {
  * gardes de route mènent alors à la connexion.
  */
 export function endSession(client: QueryClient): void {
+  // Les mutations gardent leurs variables, mots de passe compris : elles partent aussi.
+  client.getMutationCache().clear()
   client.removeQueries({
     predicate: (query) => query.queryHash !== hashKey(SESSION_QUERY_KEY),
   })
