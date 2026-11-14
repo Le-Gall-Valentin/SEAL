@@ -7,7 +7,7 @@ interface WordmarkProps {
   readonly variant: 'panel' | 'header'
 }
 
-/** Logo « seal » suivi du sceau vérifié ; un span, pour tenir dans un titre (accueil provisoire). */
+/** Logo « seal » suivi du sceau, décoratif ; un span, pour tenir dans un titre (accueil provisoire). */
 export function Wordmark({ variant }: WordmarkProps) {
   const t = useMessages(brandMessages)
   return variant === 'panel' ? (
@@ -15,14 +15,14 @@ export function Wordmark({ variant }: WordmarkProps) {
       <span className="text-[34px] leading-none font-extrabold tracking-[-0.05em]">
         {t('wordmark')}
       </span>
-      <Sceau variant="verified" size={10} />
+      <Sceau variant="verified" size={10} decorative />
     </span>
   ) : (
     <span className="flex items-baseline gap-0.5">
       <span className="text-[26px] leading-none font-extrabold tracking-[-0.05em] sm:text-[28px]">
         {t('wordmark')}
       </span>
-      <Sceau variant="verified" size={8} />
+      <Sceau variant="verified" size={8} decorative />
     </span>
   )
 }

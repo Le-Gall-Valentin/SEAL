@@ -8,16 +8,20 @@ interface SceauProps {
   /** États du composant Sceau de la maquette ; seul « vérifié » sert avant la messagerie (lot 4). */
   readonly variant: 'verified'
   readonly size: keyof typeof SIZES
+  /**
+   * ADR 0024, point 10 : sceau décoratif (logo, identifiant libre), masqué aux lecteurs d'écran ; « Signature vérifiée »
+   * reste réservé aux signatures.
+   */
+  readonly decorative?: boolean
 }
 
 /** Sceau de vérification, aux couleurs du thème. */
-export function Sceau({ size }: SceauProps) {
+export function Sceau({ size, decorative = false }: SceauProps) {
   const t = useMessages(brandMessages)
   return (
     <svg
       viewBox="0 0 16 16"
-      role="img"
-      aria-label={t('sealVerified')}
+      {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': t('sealVerified') })}
       className={`block flex-none ${SIZES[size]}`}
     >
       <path d={SEAL_PATH} className="fill-accent" />

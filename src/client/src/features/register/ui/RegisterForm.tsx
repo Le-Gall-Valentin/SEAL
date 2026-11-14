@@ -1,7 +1,7 @@
 import { DISPLAY_NAME_MAX_LENGTH, EMAIL_MAX_LENGTH, USERNAME_MAX_LENGTH } from '@/entities/account'
 import { CompositionNote, NewPasswordFields } from '@/entities/password'
 import { useMessages } from '@/shared/i18n'
-import { FailureAlert, PrimaryButton, RateLimitedAlert, TextField } from '@/shared/ui'
+import { FormAlert, PrimaryButton, TextField } from '@/shared/ui'
 import { registerMessages } from '../i18n'
 import { useRegisterForm } from '../model/useRegisterForm'
 import { FinalUsernameNotice } from './FinalUsernameNotice'
@@ -16,10 +16,7 @@ export function RegisterForm() {
   const form = useRegisterForm()
   return (
     <>
-      {form.alert?.kind === 'rate-limited' && <RateLimitedAlert minutes={form.alert.minutes} />}
-      {(form.alert?.kind === 'network' || form.alert?.kind === 'unexpected') && (
-        <FailureAlert failure={form.alert} />
-      )}
+      <FormAlert failure={form.alert} />
       <form
         className="flex flex-col gap-3.5 sm:gap-5 lg:gap-4"
         noValidate

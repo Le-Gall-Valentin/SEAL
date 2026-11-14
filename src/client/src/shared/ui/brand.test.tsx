@@ -46,10 +46,19 @@ describe('Composants de marque de la maquette (Phoque, Sceau, Empreinte)', () =>
     expect(image.element().children).toHaveLength(16)
   })
 
-  it('Wordmark : « seal » suivi du sceau vérifié', async () => {
+  it('ADR 0024, point 10 : Sceau décoratif, masqué aux lecteurs d’écran', async () => {
+    const screen = await render(<Sceau variant="verified" size={18} decorative />)
+
+    await expect.element(screen.getByRole('img')).not.toBeInTheDocument()
+    expect(screen.container.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('ADR 0024, point 10 : Wordmark, « seal » suivi d’un sceau décoratif', async () => {
     const screen = await render(<Wordmark variant="panel" />)
 
     await expect.element(screen.getByText('seal')).toBeVisible()
-    await expect.element(screen.getByRole('img', { name: 'Signature vérifiée' })).toBeVisible()
+    await expect
+      .element(screen.getByRole('img', { name: 'Signature vérifiée' }))
+      .not.toBeInTheDocument()
   })
 })

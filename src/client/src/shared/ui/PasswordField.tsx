@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { formMessages } from './formMessages'
-import { ERROR_CLASS, LABEL_CLASS } from './TextField'
+import { FieldError, FieldLabel } from './Field'
 
 interface PasswordFieldProps {
   readonly label: string
@@ -40,9 +40,7 @@ export function PasswordField({
   const [visible, setVisible] = useState(false)
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className={LABEL_CLASS}>
-        {label}
-      </label>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <div className="flex h-11 items-center rounded-[10px] bg-surface pl-3 inset-ring inset-ring-line-strong focus-within:ring-3 focus-within:ring-focus-glow focus-within:inset-ring-accent has-disabled:bg-sunken sm:pr-1">
         <input
           id={id}
@@ -87,13 +85,7 @@ export function PasswordField({
           </svg>
         </button>
       </div>
-      <div aria-live="polite" className="empty:hidden">
-        {hasError && (
-          <span id={errorId} className={ERROR_CLASS}>
-            {error}
-          </span>
-        )}
-      </div>
+      <FieldError id={errorId} error={hasError ? error : null} />
     </div>
   )
 }

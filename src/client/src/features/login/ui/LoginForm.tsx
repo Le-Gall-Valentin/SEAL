@@ -2,14 +2,7 @@ import { Link } from 'react-router'
 import { PASSWORD_INPUT_MAX_LENGTH } from '@/entities/password'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
-import {
-  Alert,
-  FailureAlert,
-  PasswordField,
-  PrimaryButton,
-  RateLimitedAlert,
-  TextField,
-} from '@/shared/ui'
+import { Alert, FormAlert, PasswordField, PrimaryButton, TextField } from '@/shared/ui'
 import { loginMessages } from '../i18n'
 import type { LoginAlert } from '../model/loginAlert'
 import { useLoginForm } from '../model/useLoginForm'
@@ -20,10 +13,10 @@ function LoginAlertView({ alert }: { readonly alert: LoginAlert }) {
     case 'invalid-credentials':
       return <Alert variant="error">{t('invalidCredentials')}</Alert>
     case 'rate-limited':
-      return <RateLimitedAlert minutes={alert.minutes} hint={t('resetHint')} />
+      return <FormAlert failure={alert} rateLimitedHint={t('resetHint')} />
     case 'network':
     case 'unexpected':
-      return <FailureAlert failure={alert} />
+      return <FormAlert failure={alert} />
   }
 }
 

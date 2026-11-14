@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { useMessages } from '@/shared/i18n'
-import { ERROR_CLASS, LABEL_CLASS, Sceau } from '@/shared/ui'
+import { ErrorText, FieldLabel, Sceau } from '@/shared/ui'
 import { registerMessages } from '../i18n'
 import type { UsernameStatus } from '../model/useUsernameAvailability'
 
@@ -16,7 +16,7 @@ interface UsernameFieldProps {
 function StatusIcon({ status }: { readonly status: UsernameStatus }) {
   switch (status.kind) {
     case 'available':
-      return <Sceau variant="verified" size={18} />
+      return <Sceau variant="verified" size={18} decorative />
     case 'taken':
     case 'invalid':
     case 'reserved':
@@ -53,11 +53,11 @@ function StatusText({ status, fromEmail }: Pick<UsernameFieldProps, 'status' | '
         </>
       )
     case 'taken':
-      return <span className={ERROR_CLASS}>{t('taken')}</span>
+      return <ErrorText>{t('taken')}</ErrorText>
     case 'invalid':
-      return <span className={ERROR_CLASS}>{t('invalidUsername')}</span>
+      return <ErrorText>{t('invalidUsername')}</ErrorText>
     case 'reserved':
-      return <span className={ERROR_CLASS}>{t('reserved')}</span>
+      return <ErrorText>{t('reserved')}</ErrorText>
     case 'empty':
     case 'checking':
     case 'unknown':
@@ -79,9 +79,7 @@ export function UsernameField({
   const refused = status.kind === 'taken' || status.kind === 'invalid' || status.kind === 'reserved'
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className={LABEL_CLASS}>
-        {t('username')}
-      </label>
+      <FieldLabel htmlFor={id}>{t('username')}</FieldLabel>
       <div className="flex h-11 items-center gap-1.5 rounded-[10px] bg-surface px-3 inset-ring inset-ring-line-strong focus-within:ring-3 focus-within:ring-focus-glow focus-within:inset-ring-accent">
         <span aria-hidden="true" className="font-mono text-[15px] text-ink-3">
           @

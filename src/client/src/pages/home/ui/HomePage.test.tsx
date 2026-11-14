@@ -49,9 +49,8 @@ describe('ADR 0024, point 2 : accueil provisoire du lot 1', () => {
       </QueryClientProvider>,
     )
 
-    const logo = screen.getByRole('heading', { level: 1 })
-    await expect.element(logo).toHaveTextContent('seal')
-    await expect.element(logo.getByRole('img', { name: 'Signature vérifiée' })).toBeVisible()
+    // Le sceau du logo est décoratif (ADR 0024, point 10) : le titre se lit « seal ».
+    await expect.element(screen.getByRole('heading', { level: 1, name: 'seal' })).toBeVisible()
     expect(screen.getByRole('button').elements()).toHaveLength(1)
     await expect.element(screen.getByText('connecté', { exact: true })).toBeVisible()
 

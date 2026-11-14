@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { Alert } from './Alert'
 import { FailureAlert } from './FailureAlert'
+import { FormAlert } from './FormAlert'
 import { PasswordField } from './PasswordField'
 import { PrimaryButton } from './PrimaryButton'
 import { RateLimitedAlert } from './RateLimitedAlert'
@@ -155,4 +156,26 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
       await expect.element(alert).toMatchTextContent(text)
     },
   )
+
+  it.each([
+    [{ kind: 'network' }, 'Connexion impossible. Vérifiez votre réseau puis réessayez.'],
+    [{ kind: 'unexpected' }, 'Une erreur inattendue est survenue. Réessayez.'],
+    [
+      { kind: 'rate-limited', minutes: 3 },
+      'Trop de tentativesRéessayez dans 3 minutes. Plus tard.',
+    ],
+  ] as const)(
+    'ADR 0024, point 8 : FormAlert affiche l’alerte de l’échec %o',
+    async (failure, text) => {
+      const screen = await render(<FormAlert failure={failure} rateLimitedHint="Plus tard." />)
+
+      await expect.element(screen.getByRole('alert')).toHaveTextContent(text)
+    },
+  )
+
+  it('ADR 0024 : FormAlert sans échec n’affiche rien', async () => {
+    const screen = await render(<FormAlert failure={null} />)
+
+    expect(screen.container.textContent).toBe('')
+  })
 })

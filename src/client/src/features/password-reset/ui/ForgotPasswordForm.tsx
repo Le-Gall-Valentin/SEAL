@@ -1,6 +1,6 @@
 import { EMAIL_MAX_LENGTH } from '@/entities/account'
 import { useMessages } from '@/shared/i18n'
-import { FailureAlert, Notice, PrimaryButton, RateLimitedAlert, TextField } from '@/shared/ui'
+import { FormAlert, Notice, PrimaryButton, TextField } from '@/shared/ui'
 import { passwordResetMessages } from '../i18n'
 import { useForgotPassword } from '../model/useForgotPassword'
 
@@ -10,10 +10,7 @@ export function ForgotPasswordForm() {
   const form = useForgotPassword()
   return (
     <>
-      {form.alert?.kind === 'rate-limited' && <RateLimitedAlert minutes={form.alert.minutes} />}
-      {(form.alert?.kind === 'network' || form.alert?.kind === 'unexpected') && (
-        <FailureAlert failure={form.alert} />
-      )}
+      <FormAlert failure={form.alert} />
       <form
         className="flex flex-col gap-3.5 sm:gap-5 lg:gap-4"
         noValidate

@@ -2,14 +2,7 @@ import { useEffect, useRef } from 'react'
 import { EMAIL_MAX_LENGTH } from '@/entities/account'
 import type { Account } from '@/entities/session'
 import { useMessages } from '@/shared/i18n'
-import {
-  Alert,
-  FailureAlert,
-  PrimaryButton,
-  RateLimitedAlert,
-  SecondaryButton,
-  TextField,
-} from '@/shared/ui'
+import { Alert, FormAlert, PrimaryButton, SecondaryButton, TextField } from '@/shared/ui'
 import { verifyEmailMessages } from '../i18n'
 import { formatCountdown, type VerifyFailure } from '../model/code'
 import { useEmailVerification } from '../model/useEmailVerification'
@@ -28,10 +21,9 @@ function FailureView({ failure }: { readonly failure: VerifyFailure }) {
     case 'expired':
       return <Alert variant="error">{t('expired')}</Alert>
     case 'rate-limited':
-      return <RateLimitedAlert minutes={failure.minutes} />
     case 'network':
     case 'unexpected':
-      return <FailureAlert failure={failure} />
+      return <FormAlert failure={failure} />
   }
 }
 
