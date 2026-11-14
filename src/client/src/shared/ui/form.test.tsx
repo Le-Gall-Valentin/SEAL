@@ -24,7 +24,7 @@ function ControlledPassword({ disabled = false }: { readonly disabled?: boolean 
 }
 
 describe('Champs, alertes et bouton des formulaires (maquette des écrans d’authentification)', () => {
-  it('TextField : champ étiqueté, autocomplete et longueur maximale transmis (SEC-01)', async () => {
+  it('SEC-01 : TextField, champ étiqueté, autocomplete et longueur maximale transmis', async () => {
     let typed = ''
     const screen = await render(
       <TextField
@@ -70,7 +70,7 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
       .toBeDisabled()
   })
 
-  it('Alert : annoncée dès son affichage, avec son titre', async () => {
+  it('ADR 0024, point 8 : Alert, annoncée dès son affichage, avec son titre', async () => {
     const screen = await render(
       <Alert variant="rate-limited" title="Trop de tentatives">
         Réessayez plus tard.
@@ -91,7 +91,7 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
     await expect.element(screen.getByRole('alert')).toHaveTextContent(text)
   })
 
-  it('PrimaryButton : bouton d’envoi, désactivable', async () => {
+  it('AUTH-20 : PrimaryButton, bouton d’envoi, désactivable', async () => {
     const screen = await render(<PrimaryButton disabled>Se connecter</PrimaryButton>)
 
     const button = screen.getByRole('button', { name: 'Se connecter' })
@@ -99,7 +99,7 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
     await expect.element(button).toBeDisabled()
   })
 
-  it('TextField : aide et erreur sous le champ, reliées au champ ; l’erreur est annoncée (ADR 0024, point 9)', async () => {
+  it('ADR 0024, point 9 : TextField, aide et erreur sous le champ, reliées au champ ; l’erreur est annoncée', async () => {
     const screen = await render(
       <TextField
         label="Nom affiché"
@@ -124,7 +124,7 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
     expect(error.element().closest('[aria-live="polite"]')).not.toBeNull()
   })
 
-  it('TextField : sans erreur, le champ n’est pas marqué invalide', async () => {
+  it('ADR 0024, point 9 : TextField sans erreur, le champ n’est pas marqué invalide', async () => {
     const screen = await render(
       <TextField
         label="Courriel"

@@ -9,26 +9,29 @@ function sizeOf(element: Element) {
   return { width, height }
 }
 
-describe('Composants de marque de la maquette (Phoque, Sceau, Empreinte)', () => {
+describe('AUTH-20 : composants de marque des écrans d’authentification (Phoque, Sceau)', () => {
   it.each([
     ['waving', 'Le phoque SEAL vous salue'],
     ['neutral', 'Le phoque SEAL'],
     ['searching', 'Le phoque SEAL cherche'],
-  ] as const)('Phoque : la pose %s porte le libellé de la maquette', async (variant, label) => {
-    const screen = await render(<Phoque variant={variant} size={64} />)
+  ] as const)(
+    'AUTH-20 : Phoque, la pose %s porte le libellé de la maquette',
+    async (variant, label) => {
+      const screen = await render(<Phoque variant={variant} size={64} />)
 
-    const image = screen.getByRole('img', { name: label })
-    await expect.element(image).toBeVisible()
-    expect(sizeOf(image.element())).toEqual({ width: 64, height: 64 })
-  })
+      const image = screen.getByRole('img', { name: label })
+      await expect.element(image).toBeVisible()
+      expect(sizeOf(image.element())).toEqual({ width: 64, height: 64 })
+    },
+  )
 
-  it.each([64, 88, 200] as const)('Phoque : taille %i px', async (size) => {
+  it.each([64, 88, 200] as const)('AUTH-20 : Phoque, taille %i px', async (size) => {
     const screen = await render(<Phoque variant="waving" size={size} />)
 
     expect(sizeOf(screen.getByRole('img').element())).toEqual({ width: size, height: size })
   })
 
-  it.each([8, 10, 18] as const)('Sceau : « Signature vérifiée », %i px', async (size) => {
+  it.each([8, 10, 18] as const)('KEY-50 : Sceau « Signature vérifiée », %i px', async (size) => {
     const screen = await render(<Sceau variant="verified" size={size} />)
 
     const image = screen.getByRole('img', { name: 'Signature vérifiée' })

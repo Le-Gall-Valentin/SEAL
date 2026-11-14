@@ -146,18 +146,22 @@ describe('shared/api : client HTTP de SEAL', () => {
   it.each([
     [
       'un corps qui n’est pas du JSON',
+      502,
       () => new Response('<html>Bad gateway</html>', { status: 502 }),
     ],
-    ['un Problem Details sans code', () => problem(500, { status: 500, title: 'Erreur' })],
-    ['un code inconnu', () => problem(409, { status: 409, code: 'CODE_FUTUR' })],
-  ])('QA-05 : %s devient INTERNAL_ERROR, avec le statut reçu', async (_cas, response) => {
-    stubFetch(response)
+    ['un Problem Details sans code', 500, () => problem(500, { status: 500, title: 'Erreur' })],
+    ['un code inconnu', 409, () => problem(409, { status: 409, code: 'CODE_FUTUR' })],
+  ])(
+    'QA-05 : %s devient INTERNAL_ERROR, avec le statut reçu (%i)',
+    async (_cas, status, response) => {
+      stubFetch(response)
 
-    const error = await rejection(request('/api/v1/auth/me', ACCOUNT))
+      const error = await rejection(request('/api/v1/auth/me', ACCOUNT))
 
-    expect(error).toBeInstanceOf(ApiError)
-    expect((error as ApiError).code).toBe('INTERNAL_ERROR')
-  })
+      expect(error).toBeInstanceOf(ApiError)
+      expect(error).toMatchObject({ code: 'INTERNAL_ERROR', status })
+    },
+  )
 
   it('SEC-10 : un 429 garde le délai de Retry-After, en secondes', async () => {
     stubFetch(() => problem(429, { status: 429, code: 'RATE_LIMITED' }, { 'Retry-After': '61' }))

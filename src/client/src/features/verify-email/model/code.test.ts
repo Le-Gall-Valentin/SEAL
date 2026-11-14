@@ -53,7 +53,7 @@ describe('AUTH-14, ADR 0024 : refus de la vérification', () => {
     ],
     [new NetworkError(), { kind: 'network' }],
     [new ApiError(400, 'VALIDATION_FAILED'), { kind: 'unexpected' }],
-  ])('%s', (error, expected) => {
+  ])('AUTH-14, ADR 0024 : %s', (error, expected) => {
     expect(verifyFailureOf(error)).toEqual(expected)
   })
 })

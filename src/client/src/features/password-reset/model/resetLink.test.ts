@@ -45,7 +45,7 @@ describe('AUTH-70, ADR 0024 : refus de la réinitialisation', () => {
     ],
     [new ApiError(403, 'FORBIDDEN'), { kind: 'unexpected' }],
     [new NetworkError(), { kind: 'network' }],
-  ])('%s', (error, expected) => {
+  ])('AUTH-70, ADR 0024 : %s', (error, expected) => {
     expect(resetFailureOf(error)).toEqual(expected)
   })
 })
