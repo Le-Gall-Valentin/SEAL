@@ -7,7 +7,7 @@ import { useRegisterApi } from './registerApiPort'
 export type UsernameStatus =
   | { readonly kind: 'empty' }
   | { readonly kind: 'invalid' }
-  | { readonly kind: 'reserved' }
+  | { readonly kind: 'reserved'; readonly suggestions: readonly string[] }
   | { readonly kind: 'checking' }
   | { readonly kind: 'available' }
   | { readonly kind: 'taken'; readonly suggestions: readonly string[] }
@@ -21,33 +21,34 @@ export function usernameAvailabilityKey(username: string) {
   return ['username-availability', username] as const
 }
 
-/** AUTH-01, AUTH-02 : ce que le client sait sans le serveur. */
-function localStatus(username: string): UsernameStatus | null {
-  if (username === '') {
-    return { kind: 'empty' }
-  }
-  if (!isUsernameWellFormed(username)) {
-    return { kind: 'invalid' }
-  }
-  return isReservedUsername(username) ? { kind: 'reserved' } : null
-}
+/** Toutes les disponibilités lues : un refus à l'envoi les rend périmées (AUTH-05). */
+export const USERNAME_AVAILABILITY_KEY = ['username-availability'] as const
 
-/** AUTH-05 : disponibilité en direct de l'identifiant, après un délai. */
+/**
+ * AUTH-05 : disponibilité en direct de l'identifiant, après un délai. Un identifiant mal formé (AUTH-01) se signale
+ * sans le serveur ; un réservé (AUTH-02) aussi, mais le serveur est interrogé pour ses suggestions libres.
+ */
 export function useUsernameAvailability(username: string): UsernameStatus {
   const api = useRegisterApi()
   const debounced = useDebouncedValue(username, AVAILABILITY_DELAY_MS)
-  const local = localStatus(debounced)
+  const wellFormed = isUsernameWellFormed(debounced)
   const query = useQuery({
     queryKey: usernameAvailabilityKey(debounced),
     queryFn: ({ signal }) => api.usernameAvailability(debounced, signal),
-    enabled: local === null,
+    enabled: wellFormed,
     staleTime: 30_000,
   })
   if (username !== debounced) {
     return { kind: 'checking' }
   }
-  if (local !== null) {
-    return local
+  if (debounced === '') {
+    return { kind: 'empty' }
+  }
+  if (!wellFormed) {
+    return { kind: 'invalid' }
+  }
+  if (isReservedUsername(debounced)) {
+    return { kind: 'reserved', suggestions: query.data?.suggestions ?? [] }
   }
   if (query.isPending) {
     return { kind: 'checking' }

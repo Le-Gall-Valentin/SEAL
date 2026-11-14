@@ -109,23 +109,24 @@ export function UsernameField({
         >
           <StatusText status={status} fromEmail={fromEmail} />
         </div>
-        {status.kind === 'taken' && status.suggestions.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[13px] text-ink-3">
-            <span>{t('suggestions')}</span>
-            {status.suggestions.map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                className="min-h-11 rounded-full bg-accent-soft px-3 font-mono text-[13px] text-accent-text"
-                onClick={() => {
-                  onChange(suggestion)
-                }}
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        )}
+        {(status.kind === 'taken' || status.kind === 'reserved') &&
+          status.suggestions.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[13px] text-ink-3">
+              <span>{t('suggestions')}</span>
+              {status.suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  className="min-h-11 rounded-full bg-accent-soft px-3 font-mono text-[13px] text-accent-text"
+                  onClick={() => {
+                    onChange(suggestion)
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
       </div>
     </div>
   )

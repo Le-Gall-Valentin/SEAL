@@ -7,3 +7,4 @@ export {
   USERNAME_MAX_LENGTH,
   usernameSuggestionFrom,
 } from './model/username'
+export { DISPLAY_NAME_SCHEMA, EMAIL_SCHEMA, USERNAME_SCHEMA } from './model/schemas'

@@ -1,14 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import {
-  isDisplayNameValid,
-  isEmailWellFormed,
-  localPartOf,
-  usernameSuggestionFrom,
-} from '@/entities/account'
-import {
-  canSubmitPassword,
-  confirmMismatch,
   evaluatePassword,
   passwordStrength,
   rulesAfterRefusal,
@@ -17,42 +9,23 @@ import {
 import { refreshSession } from '@/entities/session'
 import { useRetryAfterLock } from '@/shared/lib'
 import type { Registration } from '../api/IRegisterApi'
+import {
+  proposeUsername,
+  type RegisterRefusals,
+  type RegisterValues,
+  registerView,
+  statusAfterRefusal,
+  usernameFromEmail,
+} from './registerForm'
 import { registerFailureOf } from './registerFailure'
 import { useRegisterApi } from './registerApiPort'
-import {
-  type UsernameStatus,
-  usernameAvailabilityKey,
-  useUsernameAvailability,
-} from './useUsernameAvailability'
+import { USERNAME_AVAILABILITY_KEY, useUsernameAvailability } from './useUsernameAvailability'
 
-interface Values {
-  readonly email: string
+interface Values extends RegisterValues {
   readonly username: string
-  readonly displayName: string
-  readonly password: string
-  readonly confirm: string
-}
-
-/** Valeurs refusées par le serveur : l'erreur reste affichée tant que le champ garde cette valeur. */
-interface Refused {
-  readonly email?: string
-  readonly displayName?: string
-  readonly password?: string
-  readonly username?: { readonly value: string; readonly reason: 'taken' | 'invalid' | 'reserved' }
 }
 
 const INITIAL: Values = { email: '', username: '', displayName: '', password: '', confirm: '' }
-
-/** Statut affiché : un refus du serveur prime tant que la disponibilité ne l'a pas confirmé. */
-function statusAfterRefusal(status: UsernameStatus, refused: Refused, username: string) {
-  const refusal = refused.username
-  if (refusal === undefined || refusal.value !== username || status.kind === 'taken') {
-    return status
-  }
-  return refusal.reason === 'taken'
-    ? ({ kind: 'taken', suggestions: [] } as const)
-    : ({ kind: refusal.reason } as const)
-}
 
 /**
  * AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : état du formulaire d'inscription. Tant que l'utilisateur ne l'a pas modifié,
@@ -66,14 +39,17 @@ export function useRegisterForm() {
   const [values, setValues] = useState<Values>(INITIAL)
   const [usernameEdited, setUsernameEdited] = useState(false)
   const [touched, setTouched] = useState({ email: false, displayName: false, confirm: false })
-  const [refused, setRefused] = useState<Refused>({})
+  const [refused, setRefused] = useState<RegisterRefusals>({})
 
-  const username = usernameEdited
-    ? values.username
-    : localPartOf(values.email) === ''
-      ? ''
-      : usernameSuggestionFrom(values.email)
-  const usernameStatus = statusAfterRefusal(useUsernameAvailability(username), refused, username)
+  // AUTH-04 : tant qu'il n'est pas modifié, l'identifiant suit le courriel, et la première suggestion libre remplace
+  // une base prise ou réservée (étape 5).
+  const base = usernameEdited ? values.username : usernameFromEmail(values.email)
+  const baseStatus = useUsernameAvailability(base)
+  const proposal = usernameEdited
+    ? { username: base, status: baseStatus }
+    : proposeUsername(base, baseStatus)
+  const username = proposal.username
+  const usernameStatus = statusAfterRefusal(proposal.status, refused.username, username)
   const rules = rulesAfterRefusal(
     evaluatePassword(values.password, { username, email: values.email }, blocklist),
     refused.password ?? null,
@@ -92,7 +68,8 @@ export function useRegisterForm() {
             username: { value: submitted.username, reason: failure.reason },
           }))
           if (failure.reason === 'taken') {
-            void client.invalidateQueries({ queryKey: usernameAvailabilityKey(submitted.username) })
+            // Les suggestions lues ont pu vieillir : la base et l'identifiant refusé sont relus.
+            void client.invalidateQueries({ queryKey: USERNAME_AVAILABILITY_KEY })
           }
           return
         case 'email':
@@ -120,26 +97,8 @@ export function useRegisterForm() {
       ? failure
       : null
 
-  const emailInvalid =
-    (touched.email && values.email !== '' && !isEmailWellFormed(values.email)) ||
-    refused.email === values.email
-  const displayNameInvalid =
-    (touched.displayName && values.displayName !== '' && !isDisplayNameValid(values.displayName)) ||
-    refused.displayName === values.displayName
-  const mismatch = confirmMismatch({
-    password: values.password,
-    confirm: values.confirm,
-    confirmTouched: touched.confirm,
-  })
-  const valid =
-    isEmailWellFormed(values.email) &&
-    refused.email !== values.email &&
-    (usernameStatus.kind === 'available' || usernameStatus.kind === 'unknown') &&
-    isDisplayNameValid(values.displayName) &&
-    refused.displayName !== values.displayName &&
-    canSubmitPassword(rules) &&
-    values.confirm === values.password
-  const canSubmit = valid && !locked && !mutation.isPending
+  const view = registerView({ values, username, status: usernameStatus, rules, touched, refused })
+  const canSubmit = view.valid && !locked && !mutation.isPending
 
   const set = (field: keyof Values) => (value: string) => {
     setValues((current) => ({ ...current, [field]: value }))
@@ -166,9 +125,9 @@ export function useRegisterForm() {
     usernameFromEmail: !usernameEdited,
     rules,
     strength: passwordStrength(values.password, rules),
-    emailInvalid,
-    displayNameInvalid,
-    confirmMismatch: mismatch,
+    emailInvalid: view.emailInvalid,
+    displayNameInvalid: view.displayNameInvalid,
+    confirmMismatch: view.confirmMismatch,
     alert,
     locked,
     canSubmit,

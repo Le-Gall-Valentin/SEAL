@@ -1,3 +1,5 @@
+import { localPartOf } from './email'
+
 /** AUTH-01 : 3 à 20 caractères, minuscules et chiffres, « . » et « _ » isolés entre deux alphanumériques. */
 const USERNAME = /^(?=.{3,20}$)[a-z0-9]+(?:[._][a-z0-9]+)*$/
 
@@ -51,10 +53,7 @@ function truncate(value: string, max: number): string {
  * 20 caractères au plus ; « user » s'il en reste moins de 3.
  */
 export function usernameSuggestionFrom(email: string): string {
-  const at = email.indexOf('@')
-  const plus = email.indexOf('+')
-  const local = at < 0 ? email : email.slice(0, plus >= 0 && plus < at ? plus : at)
-  const folded = local
+  const folded = localPartOf(email)
     .normalize('NFKD')
     .replace(/\p{M}+/gu, '')
     .toLowerCase()

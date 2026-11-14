@@ -3,6 +3,7 @@ import type { ComponentProps } from 'react'
 import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { PasswordBlocklistProvider } from '@/entities/password'
 import {
@@ -29,6 +30,8 @@ const PENDING: Account = {
 }
 
 const TAKEN = new Set(['valentin.dupont'])
+// Le serveur refuse aussi les noms réservés, et propose pour eux comme pour les pris (ADR 0019).
+const RESERVED = new Set(['admin'])
 const PASSWORD = 'fjord-tuque-raquette'
 
 function CurrentAccountProbe() {
@@ -49,8 +52,8 @@ async function renderForm(register: (registration: Registration) => Promise<void
     usernameAvailability: (username) => {
       checked.push(username)
       return Promise.resolve(
-        TAKEN.has(username)
-          ? { available: false, suggestions: ['valentin.dupont2', 'valentin_dupont'] }
+        TAKEN.has(username) || RESERVED.has(username)
+          ? { available: false, suggestions: [`${username}2`, `${username}_x`] }
           : { available: true, suggestions: [] },
       )
     },
@@ -127,17 +130,34 @@ describe('AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d’inscription', ()
       .toBeVisible()
   })
 
-  it('AUTH-04, AUTH-05 : identifiant proposé à partir du courriel, puis disponible', async () => {
+  it('AUTH-04, étape 5 : identifiant tiré du courriel déjà pris, la première suggestion libre est proposée', async () => {
     const { screen, checked } = await renderForm(() => Promise.resolve())
 
     await field(screen, 'Courriel').fill('Valentin.Dupont+seal@uqac.ca')
 
-    await expect.element(field(screen, 'Identifiant')).toHaveValue('valentin.dupont')
-    await expect.element(screen.getByText('Déjà pris.')).toBeVisible()
-    await field(screen, 'Identifiant').fill('valentin.d')
+    await expect.element(field(screen, 'Identifiant')).toHaveValue('valentin.dupont2')
     await expect.element(screen.getByText('Disponible', { exact: true })).toBeVisible()
-    // Une requête par pause de la saisie, pas une par touche.
-    expect(checked).not.toContain('valentin.')
+    await expect.element(screen.getByText('· Proposé à partir de votre courriel.')).toBeVisible()
+    expect(checked).toContain('valentin.dupont')
+  })
+
+  it('AUTH-04, étape 5 : identifiant tiré du courriel réservé, la première suggestion libre est proposée', async () => {
+    const { screen } = await renderForm(() => Promise.resolve())
+
+    await field(screen, 'Courriel').fill('admin@uqac.ca')
+
+    await expect.element(field(screen, 'Identifiant')).toHaveValue('admin2')
+    await expect.element(screen.getByText('· Proposé à partir de votre courriel.')).toBeVisible()
+  })
+
+  it('AUTH-05 : une seule requête par pause de la saisie, pas une par touche', async () => {
+    const { screen, checked } = await renderForm(() => Promise.resolve())
+
+    await field(screen, 'Identifiant').click()
+    await userEvent.keyboard('valentin.d')
+
+    await expect.element(screen.getByText('Disponible', { exact: true })).toBeVisible()
+    expect(checked).toEqual(['valentin.d'])
   })
 
   it('AUTH-04 : « Proposé à partir de votre courriel » tant que l’identifiant suit le courriel', async () => {
@@ -147,34 +167,42 @@ describe('AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d’inscription', ()
 
     await expect.element(screen.getByText('Disponible', { exact: true })).toBeVisible()
     await expect.element(screen.getByText('· Proposé à partir de votre courriel.')).toBeVisible()
-    await expect.element(screen.getByRole('img', { name: 'Signature vérifiée' })).toBeVisible()
   })
 
-  it('AUTH-05 : identifiant pris, « Déjà pris. » et suggestions à choisir', async () => {
+  it('AUTH-05 : identifiant saisi et pris, « Déjà pris. » et suggestions à choisir', async () => {
     const { screen } = await renderForm(() => Promise.resolve())
     await field(screen, 'Identifiant').fill('valentin.dupont')
 
     await expect.element(screen.getByText('Déjà pris.')).toBeVisible()
     await expect.element(screen.getByText('Suggestions :')).toBeVisible()
-    await screen.getByRole('button', { name: 'valentin_dupont' }).click()
+    await screen.getByRole('button', { name: 'valentin.dupont_x' }).click()
 
-    await expect.element(field(screen, 'Identifiant')).toHaveValue('valentin_dupont')
+    await expect.element(field(screen, 'Identifiant')).toHaveValue('valentin.dupont_x')
     await expect.element(screen.getByText('Disponible', { exact: true })).toBeVisible()
+    await expect
+      .element(screen.getByText('· Proposé à partir de votre courriel.'))
+      .not.toBeInTheDocument()
   })
 
-  it.each([
-    ['Va', '3 à 20 caractères : minuscules, chiffres, et « . » ou « _ » entre deux.'],
-    ['admin', 'Réservé.'],
-  ])(
-    'AUTH-01, AUTH-02 : « %s » affiche « %s » sans interroger le serveur',
-    async (username, text) => {
-      const { screen, checked } = await renderForm(() => Promise.resolve())
-      await field(screen, 'Identifiant').fill(username)
+  it('AUTH-01 : identifiant mal formé, signalé sans interroger le serveur', async () => {
+    const { screen, checked } = await renderForm(() => Promise.resolve())
+    await field(screen, 'Identifiant').fill('Va')
 
-      await expect.element(screen.getByText(text)).toBeVisible()
-      expect(checked).not.toContain(username)
-    },
-  )
+    await expect
+      .element(
+        screen.getByText('3 à 20 caractères : minuscules, chiffres, et « . » ou « _ » entre deux.'),
+      )
+      .toBeVisible()
+    expect(checked).not.toContain('Va')
+  })
+
+  it('AUTH-02 : identifiant saisi et réservé, « Réservé. » et suggestions à choisir', async () => {
+    const { screen } = await renderForm(() => Promise.resolve())
+    await field(screen, 'Identifiant').fill('admin')
+
+    await expect.element(screen.getByText('Réservé.')).toBeVisible()
+    await expect.element(screen.getByRole('button', { name: 'admin2' })).toBeVisible()
+  })
 
   it('AUTH-11 : règles et jauge en direct', async () => {
     const { screen } = await renderForm(() => Promise.resolve())
@@ -232,16 +260,20 @@ describe('AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d’inscription', ()
     ])
   })
 
-  it('AUTH-05 : identifiant pris entre-temps, « Déjà pris. » au retour du serveur', async () => {
+  it('AUTH-04, AUTH-05 : identifiant proposé, pris entre-temps, la suggestion libre suivante est proposée', async () => {
     const { screen } = await renderForm(() => {
       TAKEN.add('valentin')
       return Promise.reject(new ApiError(409, 'USERNAME_TAKEN'))
     })
-    await fillValid(screen)
-    await screen.getByRole('button', { name: 'Créer mon compte' }).click()
+    try {
+      await fillValid(screen)
+      await screen.getByRole('button', { name: 'Créer mon compte' }).click()
 
-    await expect.element(screen.getByText('Déjà pris.')).toBeVisible()
-    TAKEN.delete('valentin')
+      await expect.element(field(screen, 'Identifiant')).toHaveValue('valentin2')
+      await expect.element(screen.getByText('· Proposé à partir de votre courriel.')).toBeVisible()
+    } finally {
+      TAKEN.delete('valentin')
+    }
   })
 
   it('SEC-10 : 429, « Trop de tentatives » et le délai', async () => {
