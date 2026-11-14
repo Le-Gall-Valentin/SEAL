@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PASSWORD_INPUT_MAX_LENGTH } from '@/entities/password'
 import { failureOf } from '@/shared/lib'
 import type { Credentials } from '../api/ILoginApi'
 
@@ -23,7 +24,7 @@ export function loginAlertOf(error: unknown): LoginAlert {
 /** SEC-01 : bornes de LoginRequest côté serveur (ADR 0021, point 3). */
 const CREDENTIALS = z.object({
   login: z.string().trim().min(1).max(254),
-  password: z.string().min(1).max(512),
+  password: z.string().min(1).max(PASSWORD_INPUT_MAX_LENGTH),
 })
 
 export function canSubmit(credentials: Credentials): boolean {

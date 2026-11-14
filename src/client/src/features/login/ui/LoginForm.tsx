@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { PASSWORD_INPUT_MAX_LENGTH } from '@/entities/password'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import {
@@ -52,7 +53,7 @@ export function LoginForm() {
         <PasswordField
           label={t('password')}
           autoComplete="current-password"
-          maxLength={512}
+          maxLength={PASSWORD_INPUT_MAX_LENGTH}
           value={form.values.password}
           onChange={form.setPassword}
           disabled={form.locked}

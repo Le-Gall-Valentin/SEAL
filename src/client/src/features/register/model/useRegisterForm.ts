@@ -8,9 +8,10 @@ import {
 } from '@/entities/account'
 import {
   canSubmitPassword,
+  confirmMismatch,
   evaluatePassword,
-  type PasswordRules,
   passwordStrength,
+  rulesAfterRefusal,
   usePasswordBlocklist,
 } from '@/entities/password'
 import { refreshSession } from '@/entities/session'
@@ -53,17 +54,6 @@ function statusAfterRefusal(status: UsernameStatus, refused: Refused, username: 
     : ({ kind: refusal.reason } as const)
 }
 
-/** Le serveur a refusé ce mot de passe : seule la liste de blocage échappait au client (liste non chargée). */
-function rulesAfterRefusal(
-  rules: PasswordRules,
-  refused: Refused,
-  password: string,
-): PasswordRules {
-  return refused.password === password && rules.blocklist !== 'unmet'
-    ? { ...rules, blocklist: 'unmet' }
-    : rules
-}
-
 /**
  * AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : état du formulaire d'inscription. Tant que l'utilisateur ne l'a pas modifié,
  * l'identifiant suit la suggestion tirée du courriel (AUTH-04). Une réussite relit /me ; la garde mène alors à la
@@ -86,7 +76,7 @@ export function useRegisterForm() {
   const usernameStatus = statusAfterRefusal(useUsernameAvailability(username), refused, username)
   const rules = rulesAfterRefusal(
     evaluatePassword(values.password, { username, email: values.email }, blocklist),
-    refused,
+    refused.password ?? null,
     values.password,
   )
 
@@ -136,10 +126,11 @@ export function useRegisterForm() {
   const displayNameInvalid =
     (touched.displayName && values.displayName !== '' && !isDisplayNameValid(values.displayName)) ||
     refused.displayName === values.displayName
-  const confirmMismatch =
-    values.confirm !== '' &&
-    values.confirm !== values.password &&
-    (touched.confirm || values.confirm.length >= values.password.length)
+  const mismatch = confirmMismatch({
+    password: values.password,
+    confirm: values.confirm,
+    confirmTouched: touched.confirm,
+  })
   const valid =
     isEmailWellFormed(values.email) &&
     refused.email !== values.email &&
@@ -177,7 +168,7 @@ export function useRegisterForm() {
     strength: passwordStrength(values.password, rules),
     emailInvalid,
     displayNameInvalid,
-    confirmMismatch,
+    confirmMismatch: mismatch,
     alert,
     locked,
     canSubmit,

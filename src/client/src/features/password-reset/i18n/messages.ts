@@ -18,8 +18,6 @@ export const passwordResetMessages = defineMessages({
     minutes: '{count} minutes',
     period: '.',
     newPassword: 'Nouveau mot de passe',
-    confirm: 'Confirmer le mot de passe',
-    mismatch: 'Les mots de passe ne correspondent pas.',
     sessionsNote: 'Toutes vos sessions seront fermées. Reconnectez-vous ensuite.',
     submit: 'Enregistrer le mot de passe',
     deadLink: 'Ce lien n’est plus valable.',

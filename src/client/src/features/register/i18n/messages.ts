@@ -18,8 +18,6 @@ export const registerMessages = defineMessages({
     displayNameHint: 'Visible par vos amis. Modifiable à tout moment.',
     invalidDisplayName: '1 à 50 caractères, dont un visible au moins.',
     password: 'Mot de passe',
-    confirm: 'Confirmer le mot de passe',
-    mismatch: 'Les mots de passe ne correspondent pas.',
     submit: 'Créer mon compte',
   },
 })

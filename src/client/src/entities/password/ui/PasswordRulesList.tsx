@@ -6,6 +6,7 @@ import type { PasswordRules, RuleState } from '../model/passwordPolicy'
 const RULES = ['length', 'context', 'blocklist'] as const
 
 function Rule({ state, children }: { readonly state: RuleState; readonly children: string }) {
+  const t = useMessages(passwordMessages)
   const met = state === 'met'
   return (
     <li
@@ -28,6 +29,8 @@ function Rule({ state, children }: { readonly state: RuleState; readonly childre
         {met ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : <circle cx="12" cy="12" r="7" />}
       </svg>
       {children}
+      {/* ADR 0024, point 10 : l'état, que l'icône et la couleur ne disent pas aux lecteurs d'écran. */}
+      <span className="sr-only"> {met ? t('met') : t('unmet')}</span>
     </li>
   )
 }

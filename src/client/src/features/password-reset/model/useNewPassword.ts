@@ -3,9 +3,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import {
   canSubmitPassword,
+  confirmMismatch,
   evaluatePassword,
-  type PasswordRules,
   passwordStrength,
+  rulesAfterRefusal,
   usePasswordBlocklist,
 } from '@/entities/password'
 import { ROUTES } from '@/shared/config'
@@ -71,14 +72,9 @@ export function useNewPassword(token: string | null) {
     { username: account?.username ?? '', email: account?.email ?? '' },
     blocklist,
   )
-  // Le serveur a refusé ce mot de passe : seule la liste de blocage échappait au client.
-  const rules: PasswordRules =
-    refusedPassword === password && evaluated.blocklist !== 'unmet'
-      ? { ...evaluated, blocklist: 'unmet' }
-      : evaluated
+  const rules = rulesAfterRefusal(evaluated, refusedPassword, password)
   const failure = mutation.error === null ? null : resetFailureOf(mutation.error)
-  const confirmMismatch =
-    confirm !== '' && confirm !== password && (confirmTouched || confirm.length >= password.length)
+  const mismatch = confirmMismatch({ password, confirm, confirmTouched })
   const canSubmit =
     account !== undefined &&
     canSubmitPassword(rules) &&
@@ -109,7 +105,7 @@ export function useNewPassword(token: string | null) {
     },
     rules,
     strength: passwordStrength(password, rules),
-    confirmMismatch,
+    confirmMismatch: mismatch,
     alert:
       failure !== null &&
       (failure.kind === 'rate-limited' ||

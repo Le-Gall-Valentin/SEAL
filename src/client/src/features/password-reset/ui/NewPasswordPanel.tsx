@@ -1,14 +1,11 @@
-import { type ReactNode, useId } from 'react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { PasswordRulesList, StrengthMeter } from '@/entities/password'
+import { NewPasswordFields } from '@/entities/password'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
-import { Alert, FailureAlert, PasswordField, PrimaryButton, RateLimitedAlert } from '@/shared/ui'
+import { Alert, FailureAlert, PrimaryButton, RateLimitedAlert } from '@/shared/ui'
 import { passwordResetMessages } from '../i18n'
 import { useNewPassword } from '../model/useNewPassword'
-
-/** SEC-01 : borne de PasswordResetConfirmRequest côté serveur, avant normalisation. */
-const PASSWORD_INPUT_MAX = 512
 
 function Title({ children }: { readonly children?: ReactNode }) {
   const t = useMessages(passwordResetMessages)
@@ -24,7 +21,6 @@ function Title({ children }: { readonly children?: ReactNode }) {
 export function NewPasswordPanel({ token }: { readonly token: string | null }) {
   const t = useMessages(passwordResetMessages)
   const panel = useNewPassword(token)
-  const strengthId = useId()
   if (panel.state === 'dead') {
     return (
       <>
@@ -78,26 +74,16 @@ export function NewPasswordPanel({ token }: { readonly token: string | null }) {
           panel.submit()
         }}
       >
-        <PasswordField
-          label={t('newPassword')}
-          autoComplete="new-password"
-          maxLength={PASSWORD_INPUT_MAX}
-          value={panel.password}
-          onChange={panel.setPassword}
-          describedBy={strengthId}
-        />
-        <div id={strengthId} className="flex flex-col gap-2">
-          <StrengthMeter strength={panel.strength} />
-          <PasswordRulesList rules={panel.rules} />
-        </div>
-        <PasswordField
-          label={t('confirm')}
-          autoComplete="new-password"
-          maxLength={PASSWORD_INPUT_MAX}
-          value={panel.confirm}
-          onChange={panel.setConfirm}
-          onBlur={panel.touchConfirm}
-          error={panel.confirmMismatch ? t('mismatch') : null}
+        <NewPasswordFields
+          passwordLabel={t('newPassword')}
+          password={panel.password}
+          confirm={panel.confirm}
+          onPasswordChange={panel.setPassword}
+          onConfirmChange={panel.setConfirm}
+          onConfirmBlur={panel.touchConfirm}
+          confirmMismatch={panel.confirmMismatch}
+          rules={panel.rules}
+          strength={panel.strength}
         />
         <div
           role="note"
