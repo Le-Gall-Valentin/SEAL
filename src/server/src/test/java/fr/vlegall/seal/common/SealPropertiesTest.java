@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,11 +17,13 @@ class SealPropertiesTest {
     private static final SealProperties.Security SECURITY = new SealProperties.Security(Duration.ofSeconds(300));
     private static final SealProperties.Session SESSION = new SealProperties.Session(Duration.ofHours(12));
     private static final SealProperties.Mail MAIL = new SealProperties.Mail("SEAL <noreply@seal.localhost>");
+    private static final Path DATA = Path.of("data");
 
     @Test
     @DisplayName("TRN-02 : l'origine WebSocket dérive de l'origine HTTPS unique")
     void trn02WebSocketOriginDerivesFromTheHttpsOrigin() {
-        SealProperties properties = new SealProperties(URI.create("https://localhost:8443"), SECURITY, SESSION, MAIL);
+        SealProperties properties =
+                new SealProperties(URI.create("https://localhost:8443"), SECURITY, SESSION, MAIL, DATA);
 
         assertThat(properties.webSocketOrigin()).isEqualTo("wss://localhost:8443");
     }
@@ -43,7 +46,7 @@ class SealPropertiesTest {
     void trn02RejectsAnythingButABareHttpsOrigin(String origin) {
         URI uri = URI.create(origin);
 
-        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties(uri, SECURITY, SESSION, MAIL));
+        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties(uri, SECURITY, SESSION, MAIL, DATA));
     }
 
     @Test
@@ -58,10 +61,10 @@ class SealPropertiesTest {
     void missingSettingsPreventStartup() {
         URI origin = URI.create("https://localhost:8443");
 
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties(null, SECURITY, SESSION, MAIL));
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, null, SESSION, MAIL));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(null, SECURITY, SESSION, MAIL, DATA));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, null, SESSION, MAIL, DATA));
         assertThatNullPointerException().isThrownBy(() -> new SealProperties.Security(null));
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, null, MAIL));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, null, MAIL, DATA));
         assertThatNullPointerException().isThrownBy(() -> new SealProperties.Session(null));
     }
 
@@ -76,8 +79,18 @@ class SealPropertiesTest {
     @DisplayName("AUTH-14 : l'expéditeur des courriels est obligatoire et non vide")
     void auth14MailSenderIsRequired() {
         URI origin = URI.create("https://localhost:8443");
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, SESSION, null));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, SESSION, null, DATA));
         assertThatNullPointerException().isThrownBy(() -> new SealProperties.Mail(null));
         assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties.Mail(" "));
+    }
+
+    @Test
+    @DisplayName("KEY-10 : le dossier des données que SEAL génère lui-même est obligatoire")
+    void key10DataDirectoryIsRequired() {
+        URI origin = URI.create("https://localhost:8443");
+
+        assertThat(new SealProperties(origin, SECURITY, SESSION, MAIL, DATA).dataDir())
+                .isEqualTo(DATA);
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, SESSION, MAIL, null));
     }
 }

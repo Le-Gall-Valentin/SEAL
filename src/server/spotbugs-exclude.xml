@@ -73,6 +73,11 @@
         <Class name="fr.vlegall.seal.security.web.ClientRoutesController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- GET /api/v1/pki/ca, clé publique de l'Autorité, session complète seulement (ADR 0025, point 9) : PkiIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.pki.infrastructure.web.PkiController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /error, dispatch d'erreur du conteneur, sans donnée ni effet (ADR 0011) : CsrfIT.auth60ErrorEndpointIsCsrfProtected. -->
     <Match>
         <Class name="fr.vlegall.seal.common.web.ProblemDetailsErrorController"/>
@@ -86,6 +91,20 @@
     <Match>
         <Class name="fr.vlegall.seal.common.web.ProblemDetailsErrorController"/>
         <Bug pattern="SPRING_CSRF_UNRESTRICTED_REQUEST_MAPPING"/>
+    </Match>
+
+    <!--
+      PATH_TRAVERSAL_IN : le dossier de la clé de l'Autorité vient de seal.data-dir, réglé par l'exploitant
+      (SEAL_DATA_DIR, KEY-10), jamais d'une requête ; les noms de fichiers sont des constantes (ADR 0025, point 12).
+      CRLF_INJECTION_LOGS : seule l'empreinte de la CA est journalisée, 64 chiffres hexadécimaux calculés par SEAL,
+      sans retour à la ligne possible. Exclusions limitées à cette classe.
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.pki.infrastructure.ca.FileCaKeyStore"/>
+        <Or>
+            <Bug pattern="PATH_TRAVERSAL_IN"/>
+            <Bug pattern="CRLF_INJECTION_LOGS"/>
+        </Or>
     </Match>
 
     <!--

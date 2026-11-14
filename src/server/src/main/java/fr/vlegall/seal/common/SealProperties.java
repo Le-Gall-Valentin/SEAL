@@ -1,6 +1,7 @@
 package fr.vlegall.seal.common;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -12,15 +13,18 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param security paramètres des en-têtes de sécurité
  * @param session durées de vie des sessions
  * @param mail expédition des courriels
+ * @param dataDir dossier de ce que SEAL génère lui-même, comme la clé de l'Autorité (KEY-10) : {@code /data} dans
+ *     l'image (volume {@code app-data}), {@code ../data}, soit {@code src/data}, hors de Git, en local
  */
 @ConfigurationProperties("seal")
-public record SealProperties(URI origin, Security security, Session session, Mail mail) {
+public record SealProperties(URI origin, Security security, Session session, Mail mail, Path dataDir) {
 
     public SealProperties {
         Objects.requireNonNull(origin, "seal.origin est obligatoire");
         Objects.requireNonNull(security, "seal.security est obligatoire");
         Objects.requireNonNull(session, "seal.session est obligatoire");
         Objects.requireNonNull(mail, "seal.mail est obligatoire");
+        Objects.requireNonNull(dataDir, "seal.data-dir est obligatoire");
         // TRN-02 : une origine HTTPS canonique, sans chemin ni identifiants, sert à la fois l'API, le client et la
         // WebSocket ; elle doit être écrite comme le navigateur l'envoie dans l'en-tête Origin (hôte en minuscules,
         // port
