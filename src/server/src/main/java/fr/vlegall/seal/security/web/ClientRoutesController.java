@@ -5,8 +5,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
- * ADR 0024, point 5 : les adresses des écrans du client, ouvertes directement ou rechargées, renvoient le client
- * compilé. C'est une liste fermée, lue par GET : toute autre adresse garde son comportement.
+ * TRN-02, ADR 0024 (point 5) : les adresses des écrans du client, ouvertes directement ou rechargées, renvoient le
+ * client compilé, sur l'origine unique. C'est une liste fermée, lue par GET : toute autre adresse garde son
+ * comportement.
  */
 @Controller
 public class ClientRoutesController {
@@ -15,7 +16,7 @@ public class ClientRoutesController {
     private static final String REGISTER = "/inscription";
     private static final String VERIFY_EMAIL = "/verification-courriel";
     private static final String FORGOT_PASSWORD = "/mot-de-passe/oublie";
-    // ADR 0022 : adresse du lien envoyé par courriel.
+    // AUTH-70, ADR 0022 : adresse du lien envoyé par courriel.
     private static final String RESET_PASSWORD = "/mot-de-passe/nouveau";
 
     /** Adresses ouvertes à tous par {@code SecurityConfig}, comme {@code /} : du HTML statique, sans donnée. */

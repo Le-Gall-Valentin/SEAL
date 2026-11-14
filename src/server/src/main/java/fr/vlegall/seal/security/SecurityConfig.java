@@ -83,7 +83,7 @@ class SecurityConfig {
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
                         .permitAll()
-                        // ADR 0024, point 5 : adresses des écrans, qui renvoient ce même client.
+                        // TRN-02, ADR 0024 (point 5) : adresses des écrans, qui renvoient ce même client.
                         .requestMatchers(HttpMethod.GET, ClientRoutesController.PATHS.toArray(String[]::new))
                         .permitAll()
                         // AUTH-60 : jeton CSRF rechargé par le client.

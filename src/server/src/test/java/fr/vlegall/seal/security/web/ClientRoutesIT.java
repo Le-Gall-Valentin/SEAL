@@ -2,6 +2,7 @@ package fr.vlegall.seal.security.web;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpMethod;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** ADR 0024, point 5 : le serveur renvoie le client pour les seules adresses de ses écrans, lues par GET. */
@@ -95,6 +97,15 @@ class ClientRoutesIT {
         mvc.perform(client.unsafe(post(path), null, null))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+                .andExpect(forwardedUrl(null));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"HEAD", "OPTIONS"})
+    @DisplayName("A01 : les écrans ne se lisent que par GET ; HEAD et OPTIONS restent refusés en 401")
+    void a01OnlyGetServesTheScreens(String method) throws Exception {
+        mvc.perform(request(HttpMethod.valueOf(method), "/connexion").secure(true))
+                .andExpect(status().isUnauthorized())
                 .andExpect(forwardedUrl(null));
     }
 }

@@ -26,7 +26,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * AUTH-16 vérifié sur toutes les routes, y compris celles à venir (d'après {@code WebAuthorizationConventionsTest} de
- * NIDO) : une session restreinte reçoit 403 partout, sauf sur la liste fermée d'AUTH-16.
+ * NIDO) : une session restreinte reçoit 403 sur toute route de l'API hors de la liste fermée d'AUTH-16, et les pages
+ * du client (ADR 0024, point 5).
  */
 @SealIntegrationTest
 class WebAuthorizationConventionsIT {
@@ -101,7 +102,9 @@ class WebAuthorizationConventionsIT {
     }
 
     @Test
-    @DisplayName("AUTH-16 : une session restreinte reçoit 403 sur toute route hors de la liste d'AUTH-16")
+    @DisplayName(
+            "AUTH-16 : une session restreinte reçoit 403 sur toute route de l'API hors de la liste d'AUTH-16, et les"
+                    + " pages du client")
     void auth16RestrictedSessionIsForbiddenEverywhereElse() throws Exception {
         AuthClient client = new AuthClient(mvc, mail);
         Cookie restricted =
@@ -127,7 +130,8 @@ class WebAuthorizationConventionsIT {
                 .as("routes dont la réponse à une session restreinte contredit AUTH-16")
                 .isEmpty();
         assertThat(routes)
-                .as("la convention a bien regardé les routes de l'API")
-                .hasSizeGreaterThanOrEqualTo(6);
+                .as("la convention a bien regardé les routes de l'API et les pages du client")
+                .containsAll(RESTRICTED_SESSION_ROUTES)
+                .containsAll(CLIENT_PAGES);
     }
 }
