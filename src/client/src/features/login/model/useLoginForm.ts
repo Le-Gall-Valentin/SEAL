@@ -18,7 +18,9 @@ export function useLoginForm() {
     mutationFn: (credentials: Credentials) => api.login(credentials),
     onSuccess: () => refreshSession(client),
     onError: (error) => {
-      if (loginAlertOf(error).kind === 'invalid-credentials') {
+      // AUTH-21 : refus ; AUTH-22, Connexion-Telephone : « Trop de tentatives » montre le mot de passe vidé.
+      const kind = loginAlertOf(error).kind
+      if (kind === 'invalid-credentials' || kind === 'rate-limited') {
         setValues((current) => ({ ...current, password: '' }))
       }
     },
@@ -38,7 +40,8 @@ export function useLoginForm() {
     canSubmit: !locked && !mutation.isPending && canSubmit(values),
     submit: () => {
       if (!locked && !mutation.isPending && canSubmit(values)) {
-        mutation.mutate(values)
+        // ADR 0024, point 10 : l'identifiant part sans ses espaces de début et de fin (clavier de téléphone).
+        mutation.mutate({ login: values.login.trim(), password: values.password })
       }
     },
   }

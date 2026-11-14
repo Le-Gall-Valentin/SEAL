@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError } from '@/shared/lib'
+import { ApiError, NetworkError } from '@/shared/lib'
 
 const calls: string[] = []
 const requestNoContent = vi.fn<(path: string, options?: unknown) => Promise<void>>()
@@ -44,5 +44,14 @@ describe('features/login : adaptateur de POST /api/v1/auth/login', () => {
       code: 'INVALID_CREDENTIALS',
     })
     expect(reloadCsrf).not.toHaveBeenCalled()
+  })
+
+  it('AUTH-60, A10 : une connexion réussie reste réussie si le rechargement du jeton échoue', async () => {
+    requestNoContent.mockResolvedValue(undefined)
+    reloadCsrf.mockRejectedValue(new NetworkError())
+
+    await expect(
+      loginApi.login({ login: 'valentin', password: 'fjord-tuque-raquette' }),
+    ).resolves.toBeUndefined()
   })
 })

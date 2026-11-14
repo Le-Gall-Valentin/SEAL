@@ -1,8 +1,10 @@
-import { Link, useLocation } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { LoginForm } from '@/features/login'
 import type { PasswordResetDone } from '@/features/password-reset'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
+import { useMounted } from '@/shared/lib'
 import { Notice } from '@/shared/ui'
 import { AuthLayout } from '@/widgets/auth-layout'
 import { loginPageMessages } from '../i18n'
@@ -20,8 +22,18 @@ function isPasswordResetDone(state: unknown): state is PasswordResetDone {
 /** Écran Connexion (AUTH-20) ; les boutons OAuth arrivent au lot 2 (ADR 0024, point 3). */
 export function LoginPage() {
   const t = useMessages(loginPageMessages)
-  // React Router type l'état d'historique en any : il n'est lu qu'à travers isPasswordResetDone.
-  const state: unknown = useLocation().state
+  const location = useLocation()
+  const navigate = useNavigate()
+  // React Router type l'état d'historique en any : il n'est lu qu'à travers isPasswordResetDone, une seule fois.
+  const historyState: unknown = location.state
+  const [passwordSaved] = useState(() => isPasswordResetDone(historyState))
+  const mounted = useMounted()
+  // Lue, la confirmation quitte l'historique : un rechargement ou un retour ne la réaffiche pas.
+  useEffect(() => {
+    if (isPasswordResetDone(historyState)) {
+      void navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [historyState, location.pathname, navigate])
   return (
     <AuthLayout variant="waving">
       <div className="flex flex-col gap-4.5 sm:gap-5">
@@ -30,7 +42,7 @@ export function LoginPage() {
           <p className="m-0 text-ink-3">{t('subtitle')}</p>
         </header>
         <div role="status" className="empty:hidden">
-          {isPasswordResetDone(state) && <Notice variant="success">{t('passwordSaved')}</Notice>}
+          {passwordSaved && mounted && <Notice variant="success">{t('passwordSaved')}</Notice>}
         </div>
         <LoginForm />
         <p className="m-0 text-center text-[13px] text-ink-3">

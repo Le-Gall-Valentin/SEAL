@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { z } from 'zod'
+import { NetworkError } from '@/shared/lib'
 
 const calls: string[] = []
 const requestNoContent = vi.fn<(path: string, options?: unknown) => Promise<void>>()
@@ -62,5 +63,12 @@ describe('features/register : adaptateur de l’inscription et de la disponibili
     request.mockResolvedValue({ available: 'oui', suggestions: [] })
 
     await expect(registerApi.usernameAvailability('valentin')).rejects.toThrow()
+  })
+
+  it('AUTH-60, A10 : une inscription réussie reste réussie si le rechargement du jeton échoue', async () => {
+    requestNoContent.mockResolvedValue(undefined)
+    reloadCsrf.mockRejectedValue(new NetworkError())
+
+    await expect(registerApi.register(REGISTRATION)).resolves.toBeUndefined()
   })
 })

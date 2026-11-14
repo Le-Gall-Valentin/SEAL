@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const calls: string[] = []
 const requestNoContent = vi.fn<(path: string, options?: unknown) => Promise<void>>()
 
+let csrfFails = false
+
 vi.mock('@/shared/api', () => ({
   requestNoContent: (path: string, options?: unknown) => {
     calls.push(`requestNoContent ${path}`)
@@ -10,7 +12,7 @@ vi.mock('@/shared/api', () => ({
   },
   reloadCsrf: () => {
     calls.push('reloadCsrf')
-    return Promise.resolve()
+    return csrfFails ? Promise.reject(new Error('réseau')) : Promise.resolve()
   },
 }))
 
@@ -19,6 +21,7 @@ const { verifyEmailApi } = await import('./verifyEmailApi')
 describe('features/verify-email : adaptateur de la vérification du courriel', () => {
   afterEach(() => {
     calls.length = 0
+    csrfFails = false
     vi.resetAllMocks()
   })
 
@@ -48,5 +51,11 @@ describe('features/verify-email : adaptateur de la vérification du courriel', (
       method: 'POST',
       body: { email: 'noah@uqac.ca' },
     })
+  })
+
+  it('AUTH-60, A10 : une vérification réussie reste réussie si le rechargement du jeton échoue', async () => {
+    csrfFails = true
+
+    await expect(verifyEmailApi.verify('503271')).resolves.toBeUndefined()
   })
 })

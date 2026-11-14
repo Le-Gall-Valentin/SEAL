@@ -16,7 +16,7 @@ async function renderLogin(state: unknown) {
   const router = createMemoryRouter([{ path: '/connexion', element: <LoginPage /> }], {
     initialEntries: [{ pathname: '/connexion', state }],
   })
-  return render(
+  const screen = await render(
     <QueryClientProvider client={new QueryClient()}>
       <SessionApiProvider api={sessionApi}>
         <LoginApiProvider api={loginApi}>
@@ -25,12 +25,18 @@ async function renderLogin(state: unknown) {
       </SessionApiProvider>
     </QueryClientProvider>,
   )
+  return Object.assign(screen, { router })
 }
 
 describe('Écran Connexion', () => {
   it('ADR 0024 : après une réinitialisation, « Mot de passe enregistré. Connectez-vous avec le nouveau. »', async () => {
     const screen = await renderLogin({ passwordReset: true })
 
+    await expect
+      .element(screen.getByRole('status'))
+      .toMatchTextContent('Mot de passe enregistré. Connectez-vous avec le nouveau.')
+    // Lue une fois, la confirmation quitte l'historique : un rechargement ne la réaffiche pas.
+    await expect.poll((): unknown => screen.router.state.location.state).toBeNull()
     await expect
       .element(screen.getByRole('status'))
       .toMatchTextContent('Mot de passe enregistré. Connectez-vous avec le nouveau.')

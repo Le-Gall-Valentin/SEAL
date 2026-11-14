@@ -165,6 +165,8 @@ describe('AUTH-20 à AUTH-22 : formulaire de connexion', () => {
       )
     await expect.element(screen.getByLabelText('Identifiant ou courriel')).toBeDisabled()
     await expect.element(screen.getByLabelText('Mot de passe', { exact: true })).toBeDisabled()
+    // Connexion-Telephone : le mot de passe est vidé dans l'état « Trop de tentatives ».
+    await expect.element(screen.getByLabelText('Mot de passe', { exact: true })).toHaveValue('')
     await expect.element(screen.getByRole('button', { name: 'Se connecter' })).toBeDisabled()
     await expect.element(screen.getByRole('link', { name: 'Mot de passe oublié ?' })).toBeVisible()
 
@@ -191,5 +193,14 @@ describe('AUTH-20 à AUTH-22 : formulaire de connexion', () => {
     await expect
       .element(screen.getByRole('alert'))
       .toHaveTextContent('Connexion impossible. Vérifiez votre réseau puis réessayez.')
+  })
+
+  it('ADR 0024, point 10 : l’identifiant part sans ses espaces de début et de fin', async () => {
+    const { screen, harness } = await renderForm(() => Promise.resolve())
+    await screen.getByLabelText('Identifiant ou courriel').fill('  valentin ')
+    await screen.getByLabelText('Mot de passe', { exact: true }).fill('secret')
+    await screen.getByRole('button', { name: 'Se connecter' }).click()
+
+    await expect.poll(() => harness.sent).toEqual([{ login: 'valentin', password: 'secret' }])
   })
 })

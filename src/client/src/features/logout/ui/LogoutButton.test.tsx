@@ -7,6 +7,7 @@ import {
   SessionApiProvider,
   useCurrentAccount,
 } from '@/entities/session'
+import { ApiError, NetworkError } from '@/shared/lib'
 import { LogoutApiProvider } from '../model/logoutApiPort'
 import { LogoutButton } from './LogoutButton'
 
@@ -60,4 +61,33 @@ describe('AUTH-53 : « Se déconnecter »', () => {
     expect(calls).toBe(1)
     expect(client.getQueryData(['conversations'])).toBeUndefined()
   })
+
+  it.each([
+    [new NetworkError(), 'Connexion impossible. Vérifiez votre réseau puis réessayez.'],
+    [new ApiError(500, 'INTERNAL_ERROR'), 'Une erreur inattendue est survenue. Réessayez.'],
+  ])(
+    'ADR 0024, point 10 : une déconnexion qui échoue le dit, et la session reste affichée',
+    async (error, text) => {
+      const sessionApi: ISessionApi = {
+        me: () => Promise.resolve(ACTIVE),
+        reloadCsrf: () => Promise.resolve(),
+      }
+      const screen = await render(
+        <QueryClientProvider client={new QueryClient()}>
+          <SessionApiProvider api={sessionApi}>
+            <LogoutApiProvider api={{ logout: () => Promise.reject(error) }}>
+              <Probe />
+              <LogoutButton />
+            </LogoutApiProvider>
+          </SessionApiProvider>
+        </QueryClientProvider>,
+      )
+      await expect.element(screen.getByText('valentin')).toBeVisible()
+
+      await screen.getByRole('button', { name: 'Se déconnecter' }).click()
+
+      await expect.element(screen.getByRole('alert')).toHaveTextContent(text)
+      await expect.element(screen.getByText('valentin')).toBeVisible()
+    },
+  )
 })

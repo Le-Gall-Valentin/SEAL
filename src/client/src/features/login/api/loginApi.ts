@@ -8,7 +8,8 @@ export const loginApi: ILoginApi = {
       method: 'POST',
       body: { login: credentials.login, password: credentials.password },
     })
-    // AUTH-60 : la connexion change la session et retire le cookie XSRF-TOKEN (ADR 0019).
-    await reloadCsrf()
+    // AUTH-60 : la connexion change la session et retire le cookie XSRF-TOKEN (ADR 0019). Un échec ne défait pas la
+    // connexion réussie : la première requête non sûre rechargera le jeton absent (shared/api).
+    await reloadCsrf().catch(() => undefined)
   },
 }

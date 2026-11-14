@@ -21,8 +21,9 @@ export const registerApi: IRegisterApi = {
         password: registration.password,
       },
     })
-    // AUTH-60 : l'inscription ouvre une session et retire le cookie XSRF-TOKEN (ADR 0019).
-    await reloadCsrf()
+    // AUTH-60 : l'inscription ouvre une session et retire le cookie XSRF-TOKEN (ADR 0019). Un échec ne défait pas
+    // l'inscription réussie : la première requête non sûre rechargera le jeton absent (shared/api).
+    await reloadCsrf().catch(() => undefined)
   },
   usernameAvailability(username, signal) {
     return request(
