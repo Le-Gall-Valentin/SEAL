@@ -57,8 +57,10 @@ compile SEAL, ce qui prend quelques minutes.
 
 Ouvrez ensuite :
 
-- SEAL : <https://localhost:8443>
-- les courriels envoyés par SEAL, capturés par Mailpit : <http://localhost:8025>
+- SEAL : <https://localhost:8443>, qui s'ouvre sur l'écran de connexion ; « Créer un compte » mène à
+  l'inscription ;
+- les courriels envoyés par SEAL, capturés par Mailpit : <http://localhost:8025>, où arrivent le code de
+  vérification du courriel et le lien de réinitialisation du mot de passe.
 
 Pour arrêter SEAL : `docker compose down`. Pour effacer aussi la base et les données :
 `docker compose down -v`.
