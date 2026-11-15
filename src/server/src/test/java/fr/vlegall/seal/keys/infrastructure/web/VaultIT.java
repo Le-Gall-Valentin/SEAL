@@ -1,5 +1,6 @@
 package fr.vlegall.seal.keys.infrastructure.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -9,10 +10,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import fr.vlegall.seal.common.web.Base64Url;
 import fr.vlegall.seal.keys.domain.model.Vault;
 import fr.vlegall.seal.support.AuthClient;
+import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /** KEY-32, KEY-33, QA-05 : coffre opaque, versionné, du seul compte de la session (ADR 0025, point 6). */
 @SealIntegrationTest
@@ -160,5 +165,30 @@ class VaultIT {
         mvc.perform(client.from(put(VAULT)).cookie(account.session))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("KEY-32, A06 : douze premiers coffres simultanés, un seul écrit ; les autres reçoivent 409")
+    void key32ConcurrentWritesLetOneThrough() throws Exception {
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "coffre_course");
+        List<MockHttpServletRequestBuilder> requests = new ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            requests.add(account.unsafe(put(VAULT), vault(1, 16, i)));
+        }
+
+        List<Integer> statuses = Race.run(
+                requests.size(),
+                index -> mvc.perform(requests.get(index))
+                        .andReturn()
+                        .getResponse()
+                        .getStatus());
+
+        assertThat(statuses)
+                .containsOnly(204, 409)
+                .filteredOn(code -> code == 204)
+                .hasSize(1);
+        read(account)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vaultVersion").value(1));
     }
 }

@@ -135,17 +135,25 @@ class PublishIdentityHandlerTest {
     }
 
     @Test
-    @DisplayName("KEY-03 : un défi expiré, inconnu ou d'un autre compte ne prouve rien")
-    void key03ExpiredUnknownOrForeignChallengeIsRefused() {
+    @DisplayName("KEY-03 : le défi encore valide d'un autre compte, ou un défi inconnu, ne prouve rien")
+    void key03ForeignOrUnknownChallengeIsRefused() {
         byte[] foreign = creator().create(OTHER).value();
+        creator().create(USER);
+
+        assertThat(publisher().publish(USER, ik.publicKey(), foreign, sign(USER, foreign)))
+                .isInstanceOf(IdentityPublication.ChallengeExpired.class);
+        assertThat(publisher().publish(USER, ik.publicKey(), new byte[32], sign(USER, new byte[32])))
+                .isInstanceOf(IdentityPublication.ChallengeExpired.class);
+        assertThat(challenges.live).containsKeys(USER, OTHER);
+    }
+
+    @Test
+    @DisplayName("KEY-03 : un défi de 5 minutes est expiré à l'instant de son échéance")
+    void key03ExpiredChallengeIsRefused() {
         byte[] mine = creator().create(USER).value();
         now = NOW.plus(Challenge.VALIDITY);
 
         assertThat(publisher().publish(USER, ik.publicKey(), mine, sign(USER, mine)))
-                .isInstanceOf(IdentityPublication.ChallengeExpired.class);
-        assertThat(publisher().publish(USER, ik.publicKey(), foreign, sign(USER, foreign)))
-                .isInstanceOf(IdentityPublication.ChallengeExpired.class);
-        assertThat(publisher().publish(USER, ik.publicKey(), new byte[32], sign(USER, new byte[32])))
                 .isInstanceOf(IdentityPublication.ChallengeExpired.class);
     }
 

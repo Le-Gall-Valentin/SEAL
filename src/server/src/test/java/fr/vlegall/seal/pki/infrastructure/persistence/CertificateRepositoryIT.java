@@ -3,16 +3,22 @@ package fr.vlegall.seal.pki.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.crypto.Ed25519;
+import fr.vlegall.seal.pki.application.port.in.IssueCertificateUseCase;
 import fr.vlegall.seal.pki.domain.model.CertificateRecords;
 import fr.vlegall.seal.pki.domain.model.IssuedCertificate;
 import fr.vlegall.seal.pki.domain.model.RevocationReason;
 import fr.vlegall.seal.pki.domain.model.SealCertificate;
 import fr.vlegall.seal.pki.domain.port.out.CertificateRepository;
 import fr.vlegall.seal.support.AuthClient;
+import fr.vlegall.seal.support.MutableClock;
+import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +43,12 @@ class CertificateRepositoryIT {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private IssueCertificateUseCase issuance;
+
+    @Autowired
+    private MutableClock clock;
 
     @AfterEach
     void resetMail() {
@@ -104,5 +116,31 @@ class CertificateRepositoryIT {
                                 row.getTimestamp("revoked_at").toInstant() + " " + row.getInt("revocation_reason"))
                         .single())
                 .isEqualTo(later.truncatedTo(ChronoUnit.MICROS) + " 4");
+    }
+
+    @Test
+    @DisplayName("ADR 0025, point 4, A06 : douze renouvellements simultanés ne laissent qu'un certificat non révoqué")
+    void adr0025ConcurrentRenewalsKeepOneUnrevokedCertificate() throws Exception {
+        UserId subject = account("cert_course");
+        byte[] ikPublic = Ed25519.generate().publicKey();
+        assertThat(issuance.issue(subject, "cert_course", ikPublic)).isPresent();
+        Instant now = clock.instant();
+        jdbc.sql(
+                        "UPDATE identity_certificates SET not_before = :notBefore, not_after = :notAfter WHERE user_id = :user")
+                .param("notBefore", Timestamp.from(now.minus(SealCertificate.VALIDITY)))
+                .param("notAfter", Timestamp.from(now.minusSeconds(1)))
+                .param("user", subject.value())
+                .update();
+
+        List<Boolean> renewed = Race.run(
+                12, index -> issuance.issue(subject, "cert_course", ikPublic).isPresent());
+
+        assertThat(renewed).filteredOn(Boolean::booleanValue).hasSize(1);
+        assertThat(jdbc.sql("SELECT count(*) FILTER (WHERE revoked_at IS NULL) || '/' || count(*)"
+                                + " FROM identity_certificates WHERE user_id = :user")
+                        .param("user", subject.value())
+                        .query(String.class)
+                        .single())
+                .isEqualTo("1/2");
     }
 }
