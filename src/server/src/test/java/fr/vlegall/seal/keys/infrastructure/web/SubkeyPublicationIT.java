@@ -10,6 +10,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.common.web.Base64Url;
 import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
+import fr.vlegall.seal.pki.domain.model.SealCertificate;
 import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.MutableClock;
 import fr.vlegall.seal.support.Race;
@@ -18,6 +19,7 @@ import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -363,5 +365,33 @@ class SubkeyPublicationIT {
 
     private long count(String sql, KeysTestClient account) {
         return jdbc.sql(sql).param("user", account.id).query(Long.class).single();
+    }
+
+    @Test
+    @DisplayName("KEY-05, KEY-12, ADR 0025 (point 15) : après un renouvellement, les sous-clés de l'ancien certificat"
+            + " ne bloquent pas le nouveau")
+    void adr0025RenewalIsNotBlockedByTheOldSubkeys() throws Exception {
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_renouvelle");
+        byte[] first = account.publishIdentity();
+        Instant now = now();
+        Instant expires = now.plus(SubkeyBinding.VALIDITY);
+        for (int i = 0; i < 3; i++) {
+            publish(account, binding(account, first, freshEkId(), now, expires, account.ik))
+                    .andExpect(status().isNoContent());
+        }
+        // Le certificat vieillit en base : avancer l'horloge ferait aussi tomber la session (AUTH-52).
+        jdbc.sql(
+                        "UPDATE identity_certificates SET not_before = :notBefore, not_after = :notAfter WHERE serial = :serial")
+                .param("notBefore", Timestamp.from(now.minus(SealCertificate.VALIDITY)))
+                .param("notAfter", Timestamp.from(now.minusSeconds(1)))
+                .param("serial", first)
+                .update();
+        byte[] renewed = account.publishIdentity();
+
+        publish(account, binding(account, renewed, freshEkId(), now, expires, account.ik))
+                .andExpect(status().isNoContent());
+        publish(account, binding(account, first, freshEkId(), now, expires, account.ik))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"));
     }
 }

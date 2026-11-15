@@ -252,7 +252,8 @@ signature = Ed25519.sign(IK, SubkeyBinding)
 Le serveur ramène `createdAt` et `expiresAt` à la milliseconde, comme la signature, puis refuse une liaison dont
 `certSerial` n'est pas le certificat courant de l'appelant, un `ekId` déjà utilisé, un `createdAt` à plus de
 5 minutes de son horloge ou une validité autre que 45 jours (ADR 0025, point 7). Un compte a au plus trois
-sous-clés non expirées : au-delà, la publication est refusée (403, ADR 0025, point 15). Le serveur ne vérifie de
+sous-clés non expirées pour son certificat courant : au-delà, la publication est refusée (403, ADR 0025,
+point 15) ; celles d'un ancien certificat ne comptent pas. Le serveur ne vérifie de
 `ekPublic` que sa longueur : l'émetteur rejette un secret partagé nul (RFC 9180).
 
 ### 4.5 Vecteurs (QA-01, QA-02)

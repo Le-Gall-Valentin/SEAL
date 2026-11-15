@@ -11,7 +11,7 @@ public final class SubkeyPolicy {
     /** ADR 0025, point 7 : écart toléré entre l'horloge du client et celle du serveur. */
     public static final Duration CLOCK_SKEW = Duration.ofMinutes(5);
 
-    /** ADR 0025, point 15 : sous-clés non expirées au plus par compte. */
+    /** ADR 0025, point 15 : sous-clés non expirées au plus pour le certificat courant d'un compte. */
     public static final int MAX_LIVE = 3;
 
     private SubkeyPolicy() {}

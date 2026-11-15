@@ -94,9 +94,22 @@ class PublishSubkeyHandlerTest {
     }
 
     private SubkeyPublication publishFresh(int ekIdByte) {
+        return publishFresh(SERIAL, ekIdByte);
+    }
+
+    private SubkeyPublication publishFresh(byte[] certSerial, int ekIdByte) {
         byte[] ekId = filled(16, ekIdByte);
         Instant expires = now.plus(SubkeyBinding.VALIDITY);
-        return handler().publish(USER, SERIAL, ekId, EK_PUBLIC, now, expires, sign(USER, ekId, now, expires, ik));
+        SubkeyBinding binding = new SubkeyBinding(USER, certSerial, ekId, SubkeyBinding.KEM, EK_PUBLIC, now, expires);
+        return handler()
+                .publish(
+                        USER,
+                        certSerial,
+                        ekId,
+                        EK_PUBLIC,
+                        now,
+                        expires,
+                        Ed25519.sign(ik.privateKey(), binding.encode()));
     }
 
     @Test
@@ -224,6 +237,19 @@ class PublishSubkeyHandlerTest {
         assertThat(publishFresh(5)).isInstanceOf(SubkeyPublication.Published.class);
     }
 
+    @Test
+    @DisplayName("KEY-05, KEY-12, ADR 0025 (point 15) : les sous-clés d'un ancien certificat ne comptent pas pour le"
+            + " nouveau")
+    void adr0025SubkeysOfAnOldCertificateDoNotCount() {
+        for (int i = 1; i <= SubkeyPolicy.MAX_LIVE; i++) {
+            assertThat(publishFresh(i)).isInstanceOf(SubkeyPublication.Published.class);
+        }
+        byte[] renewed = filled(16, 8);
+        current = Optional.of(new CurrentCertificate(renewed, ik.publicKey()));
+
+        assertThat(publishFresh(renewed, 4)).isInstanceOf(SubkeyPublication.Published.class);
+    }
+
     /** Table subkeys en mémoire : ekId unique, et le verrou du compte noté avant chaque comptage. */
     private static final class FakeSubkeys implements SubkeyRepository {
         final List<byte[]> ekIds = new ArrayList<>();
@@ -236,10 +262,11 @@ class PublishSubkeyHandlerTest {
         }
 
         @Override
-        public int countLive(UserId user, Instant at) {
+        public int countLive(UserId user, byte[] certSerial, Instant at) {
             calls.add("count");
             return (int) bindings.stream()
                     .filter(binding -> binding.user().equals(user))
+                    .filter(binding -> Arrays.equals(binding.certSerial(), certSerial))
                     .filter(binding -> at.isBefore(binding.expiresAt()))
                     .count();
         }

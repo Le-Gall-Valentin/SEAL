@@ -68,7 +68,7 @@ public class PublishSubkeyHandler implements PublishSubkeyUseCase {
             return new SubkeyPublication.InvalidSignature();
         }
         subkeys.lockAccount(user);
-        if (subkeys.countLive(user, now) >= SubkeyPolicy.MAX_LIVE) {
+        if (subkeys.countLive(user, certSerial, now) >= SubkeyPolicy.MAX_LIVE) {
             return new SubkeyPublication.LimitReached();
         }
         if (!subkeys.save(binding, signature)) {

@@ -33,9 +33,11 @@ public class SubkeyRepositoryAdapter implements SubkeyRepository {
     }
 
     @Override
-    public int countLive(UserId user, Instant at) {
-        return jdbc.sql("SELECT count(*) FROM subkeys WHERE user_id = :user AND expires_at > :at")
+    public int countLive(UserId user, byte[] certSerial, Instant at) {
+        return jdbc.sql("SELECT count(*) FROM subkeys"
+                        + " WHERE user_id = :user AND cert_serial = :certSerial AND expires_at > :at")
                 .param("user", user.value())
+                .param("certSerial", certSerial)
                 .param("at", Timestamp.from(at))
                 .query(Integer.class)
                 .single();
