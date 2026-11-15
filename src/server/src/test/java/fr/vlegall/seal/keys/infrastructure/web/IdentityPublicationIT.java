@@ -26,6 +26,7 @@ import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
@@ -192,7 +193,7 @@ class IdentityPublicationIT {
     void key03ConcurrentProofsOnOneChallengeIssueOneCertificate() throws Exception {
         KeysTestClient account = account("pop_course");
         Map<String, Object> body = account.proof();
-        List<MockHttpServletRequestBuilder> requests = new java.util.ArrayList<>();
+        List<MockHttpServletRequestBuilder> requests = new ArrayList<>();
         for (int i = 0; i < 12; i++) {
             requests.add(account.unsafe(put(IDENTITY), body));
         }

@@ -5,9 +5,8 @@ sa sécurité ne repose que sur les clés. Il précise, à l'octet près, les se
 charges ; client (TypeScript) et serveur (Java) DOIVENT produire exactement les encodages décrits ici.
 
 Les mots DOIT, NE DOIT PAS et PEUT ont le sens de la RFC 2119. Les sections sur les messages, les
-groupes et la non-répudiation s'ajouteront avec leurs lots ; toute
-modification d'un format met à jour, dans le même commit, ce document, les vecteurs de `vectors/` et
-les tests Java et TypeScript.
+groupes et la non-répudiation s'ajouteront avec leurs lots ; toute modification d'un format met à
+jour, dans le même commit, ce document, les vecteurs de `vectors/` et les tests Java et TypeScript.
 
 ## 1. Conventions
 

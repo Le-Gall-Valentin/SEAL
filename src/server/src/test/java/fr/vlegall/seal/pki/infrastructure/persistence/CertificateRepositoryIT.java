@@ -119,7 +119,8 @@ class CertificateRepositoryIT {
     }
 
     @Test
-    @DisplayName("ADR 0025, point 4, A06 : douze renouvellements simultanés ne laissent qu'un certificat non révoqué")
+    @DisplayName(
+            "KEY-12, A06, ADR 0025 (point 4) : douze renouvellements simultanés ne laissent qu'un certificat non révoqué")
     void adr0025ConcurrentRenewalsKeepOneUnrevokedCertificate() throws Exception {
         UserId subject = account("cert_course");
         byte[] ikPublic = Ed25519.generate().publicKey();

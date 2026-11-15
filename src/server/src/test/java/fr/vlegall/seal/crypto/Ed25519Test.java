@@ -3,31 +3,29 @@ package fr.vlegall.seal.crypto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.io.IOException;
+import fr.vlegall.seal.support.ProtocolVectors;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.MessageDigest;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
 /** QA-01 : Ed25519 par la JCA, sur les vecteurs officiels de la RFC 8032 (section 7.1, tests 1 à 3). */
 @DisplayName("QA-01 : Ed25519")
 class Ed25519Test {
 
     /** Le répertoire de travail des tests Maven est src/server. */
-    private static final Path VECTORS = Path.of("..", "protocol", "vectors", "ed25519-rfc8032.json");
-
     private static final HexFormat HEX = HexFormat.of();
 
     /** En-tête PKCS#8 d'une clé privée Ed25519 (RFC 8410), suivi de la graine de 32 octets. */
@@ -35,9 +33,8 @@ class Ed25519Test {
         return Canonical.concat(HEX.parseHex("302e020100300506032b657004220420"), seed);
     }
 
-    private static Stream<JsonNode> rfcTests() throws IOException {
-        JsonNode document = JsonMapper.builder().build().readTree(Files.readString(VECTORS));
-        return document.get("tests").valueStream();
+    private static Stream<JsonNode> rfcTests() {
+        return ProtocolVectors.rfc8032().cases("tests");
     }
 
     private static byte[] hex(JsonNode test, String field) {
@@ -46,7 +43,7 @@ class Ed25519Test {
 
     @TestFactory
     @DisplayName("QA-01 : la signature d'un test de la RFC 8032 est reproduite à l'octet près")
-    Stream<DynamicTest> qa01SignsLikeTheRfc() throws IOException {
+    Stream<DynamicTest> qa01SignsLikeTheRfc() {
         return rfcTests()
                 .map(test -> DynamicTest.dynamicTest(
                         test.get("name").asString(),
@@ -56,7 +53,7 @@ class Ed25519Test {
 
     @TestFactory
     @DisplayName("QA-01 : la signature d'un test de la RFC 8032 est vérifiée avec sa clé publique brute")
-    Stream<DynamicTest> qa01VerifiesTheRfc() throws IOException {
+    Stream<DynamicTest> qa01VerifiesTheRfc() {
         return rfcTests()
                 .map(test -> DynamicTest.dynamicTest(
                         test.get("name").asString(),
@@ -150,8 +147,7 @@ class Ed25519Test {
         byte[] seed = HEX.parseHex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         byte[] publicKey = HEX.parseHex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
         byte[] message = "SEAL".getBytes(StandardCharsets.UTF_8);
-        byte[] scalar =
-                java.util.Arrays.copyOf(MessageDigest.getInstance("SHA-512").digest(seed), 32);
+        byte[] scalar = Arrays.copyOf(MessageDigest.getInstance("SHA-512").digest(seed), 32);
         scalar[0] &= (byte) 0xf8;
         scalar[31] &= 0x7f;
         scalar[31] |= 0x40;
@@ -237,22 +233,14 @@ class Ed25519Test {
     }
 
     /** Les 8 points d'ordre faible et 6 autres encodages des mêmes points (vectors/identity.json, smallOrder). */
-    private static java.util.List<byte[]> weakEncodings(String section) throws IOException {
-        JsonNode smallOrder = JsonMapper.builder()
-                .build()
-                .readTree(Files.readString(Path.of("..", "protocol", "vectors", "identity.json")))
-                .get("smallOrder");
-        return smallOrder
-                .get(section)
-                .valueStream()
-                .map(point -> java.util.Base64.getUrlDecoder().decode(point.asString()))
-                .toList();
+    private static List<byte[]> weakEncodings(String section) {
+        return ProtocolVectors.identity().smallOrder(section);
     }
 
     @Test
     @DisplayName("ADR 0025, point 14 : la règle refuse les 14 encodages d'ordre faible ou non canoniques, et eux seuls")
-    void adr0025WeakEncodingRuleCoversEveryEncoding() throws IOException {
-        java.util.List<byte[]> weak = new java.util.ArrayList<>(weakEncodings("points"));
+    void adr0025WeakEncodingRuleCoversEveryEncoding() {
+        List<byte[]> weak = new ArrayList<>(weakEncodings("points"));
         weak.addAll(weakEncodings("otherEncodings"));
 
         assertThat(weak).hasSize(14);
@@ -267,10 +255,10 @@ class Ed25519Test {
 
     @Test
     @DisplayName("QA-04, ADR 0025 : aucune clé ni aucun R d'ordre faible ne vérifie, alors que la JCA l'accepterait")
-    void qa04SmallOrderKeysAndRAreRejected() throws IOException {
-        java.util.List<byte[]> weak = new java.util.ArrayList<>(weakEncodings("points"));
+    void qa04SmallOrderKeysAndRAreRejected() {
+        List<byte[]> weak = new ArrayList<>(weakEncodings("points"));
         weak.addAll(weakEncodings("otherEncodings"));
-        byte[] message = "n'importe quel message".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] message = "n'importe quel message".getBytes(StandardCharsets.UTF_8);
         Ed25519.GeneratedKey genuine = Ed25519.generate();
 
         for (byte[] key : weak) {

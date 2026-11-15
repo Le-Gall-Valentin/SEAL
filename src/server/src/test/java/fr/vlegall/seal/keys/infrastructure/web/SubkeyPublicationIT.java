@@ -241,7 +241,7 @@ class SubkeyPublicationIT {
     }
 
     @Test
-    @DisplayName("ADR 0025, point 7 : une date extrême, en ISO 8601 ou en nombre, donne 400 et jamais 500")
+    @DisplayName("KEY-05, ADR 0025 (point 7) : une date extrême, en ISO 8601 ou en nombre, donne 400 et jamais 500")
     void adr0025ExtremeDatesAreRefusedWithoutServerError() throws Exception {
         KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_extreme");
         byte[] serial = account.publishIdentity();
@@ -260,7 +260,8 @@ class SubkeyPublicationIT {
     }
 
     @Test
-    @DisplayName("ADR 0025, point 7 : des dates au-delà de la milliseconde sont gardées à la milliseconde signée")
+    @DisplayName(
+            "KEY-05, ADR 0025 (point 7) : des dates au-delà de la milliseconde sont gardées à la milliseconde signée")
     void adr0025SubMillisecondDatesKeepTheSignedMillisecond() throws Exception {
         KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_microsecondes");
         byte[] serial = account.publishIdentity();
@@ -284,7 +285,8 @@ class SubkeyPublicationIT {
     }
 
     @Test
-    @DisplayName("ADR 0025, point 15 : une quatrième sous-clé non expirée donne 403 FORBIDDEN, sans rien écrire")
+    @DisplayName(
+            "KEY-05, ADR 0025 (point 15) : une quatrième sous-clé non expirée donne 403 FORBIDDEN, sans rien écrire")
     void adr0025FourthLiveSubkeyIsForbidden() throws Exception {
         KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_plafond");
         byte[] serial = account.publishIdentity();
@@ -307,7 +309,7 @@ class SubkeyPublicationIT {
     }
 
     @Test
-    @DisplayName("ADR 0025, point 15, A06 : six publications simultanées n'enregistrent que trois sous-clés")
+    @DisplayName("KEY-05, A06, ADR 0025 (point 15) : six publications simultanées n'enregistrent que trois sous-clés")
     void adr0025ConcurrentPublicationsKeepTheLimit() throws Exception {
         KeysTestClient account = KeysTestClient.account(mvc, mail, "ek_course");
         byte[] serial = account.publishIdentity();

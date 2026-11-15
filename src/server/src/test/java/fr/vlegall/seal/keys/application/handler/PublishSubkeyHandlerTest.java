@@ -179,7 +179,7 @@ class PublishSubkeyHandlerTest {
     }
 
     @Test
-    @DisplayName("ADR 0025, point 7 : des dates extrêmes sont hors des bornes, sans débordement de calcul")
+    @DisplayName("KEY-05, ADR 0025 (point 7) : des dates extrêmes sont hors des bornes, sans débordement de calcul")
     void adr0025ExtremeDatesAreOutOfBoundsWithoutOverflow() {
         byte[] anySignature = new byte[64];
 
@@ -208,7 +208,8 @@ class PublishSubkeyHandlerTest {
     }
 
     @Test
-    @DisplayName("ADR 0025, point 15 : au plus trois sous-clés non expirées, comptées sous le verrou du compte")
+    @DisplayName(
+            "KEY-05, ADR 0025 (point 15) : au plus trois sous-clés non expirées, comptées sous le verrou du compte")
     void adr0025AtMostThreeLiveSubkeys() {
         assertThat(publishFresh(1)).isInstanceOf(SubkeyPublication.Published.class);
         assertThat(publishFresh(2)).isInstanceOf(SubkeyPublication.Published.class);

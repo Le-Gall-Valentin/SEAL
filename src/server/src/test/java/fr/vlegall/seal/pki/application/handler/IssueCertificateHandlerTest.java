@@ -120,6 +120,20 @@ class IssueCertificateHandlerTest {
         assertThat(later.current(SUBJECT)).isEmpty();
     }
 
+    @Test
+    @DisplayName(
+            "KEY-12, ADR 0025 (point 4) : après l'expiration, une autre clé n'est pas certifiée, sans sudo (KEY-34)")
+    void adr0025RenewalKeepsTheSameKey() {
+        handler(NOW).issue(SUBJECT, "valentin.dupont", IK);
+        Instant later = NOW.plus(SealCertificate.VALIDITY);
+        byte[] otherKey = new byte[32];
+        otherKey[0] = 1;
+
+        assertThat(handler(later).issue(SUBJECT, "valentin.dupont", otherKey)).isEmpty();
+        assertThat(certificates.revoked).isEmpty();
+        assertThat(certificates.inserted).hasSize(1);
+    }
+
     private record Revocation(byte[] serial, Instant at, RevocationReason reason) {
         @Override
         public boolean equals(Object other) {
@@ -165,18 +179,5 @@ class IssueCertificateHandlerTest {
         public void revoke(byte[] serial, Instant at, RevocationReason reason) {
             revoked.add(new Revocation(serial, at, reason));
         }
-    }
-
-    @Test
-    @DisplayName("ADR 0025, point 4 : après l'expiration, une autre clé n'est pas certifiée, sans sudo (KEY-34)")
-    void adr0025RenewalKeepsTheSameKey() {
-        handler(NOW).issue(SUBJECT, "valentin.dupont", IK);
-        Instant later = NOW.plus(SealCertificate.VALIDITY);
-        byte[] otherKey = new byte[32];
-        otherKey[0] = 1;
-
-        assertThat(handler(later).issue(SUBJECT, "valentin.dupont", otherKey)).isEmpty();
-        assertThat(certificates.revoked).isEmpty();
-        assertThat(certificates.inserted).hasSize(1);
     }
 }

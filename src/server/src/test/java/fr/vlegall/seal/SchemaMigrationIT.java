@@ -19,7 +19,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Les migrations V1 et V2 (schéma de la section 13 du CDC, tables par contexte) s'appliquent sur PostgreSQL 18. */
+/** Les migrations V1 à V4 (schéma de la section 13 du CDC, tables par contexte) s'appliquent sur PostgreSQL 18. */
 @SealIntegrationTest
 @Transactional
 class SchemaMigrationIT {

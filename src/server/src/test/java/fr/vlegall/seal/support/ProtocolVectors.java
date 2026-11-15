@@ -29,6 +29,11 @@ public final class ProtocolVectors {
         return read("identity.json");
     }
 
+    /** vectors/ed25519-rfc8032.json : tests 1 à 3 de la RFC 8032, section 7.1, en hexadécimal (QA-01). */
+    public static ProtocolVectors rfc8032() {
+        return read("ed25519-rfc8032.json");
+    }
+
     private static ProtocolVectors read(String file) {
         try {
             return new ProtocolVectors(
@@ -61,6 +66,18 @@ public final class ProtocolVectors {
             throw new IllegalStateException("vecteurs : aucun cas dans " + section);
         }
         return cases.stream();
+    }
+
+    /** Encodages d'ordre faible de la section {@code smallOrder} ({@code points}, {@code otherEncodings}), un au moins. */
+    public List<byte[]> smallOrder(String encodings) {
+        return nonEmpty(
+                        "smallOrder." + encodings,
+                        document.path("smallOrder")
+                                .path(encodings)
+                                .valueStream()
+                                .toList())
+                .map(point -> Base64.getUrlDecoder().decode(point.asString()))
+                .toList();
     }
 
     /** Clé publique brute d'un signataire des vecteurs ({@code ca}, {@code ik}, {@code other}). */

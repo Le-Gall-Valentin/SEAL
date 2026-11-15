@@ -10,6 +10,9 @@ import java.util.Optional;
  */
 public interface ActiveUsernameQuery {
 
-    /** Identifiant définitif, sans {@code @}, du compte s'il est actif ; vide pour un compte en attente, supprimé ou inconnu. */
+    /**
+     * Identifiant définitif, sans {@code @}, du compte s'il est actif ; vide pour un compte en attente, supprimé ou
+     * inconnu.
+     */
     Optional<String> activeUsername(UserId user);
 }

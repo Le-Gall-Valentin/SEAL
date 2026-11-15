@@ -146,7 +146,8 @@ class FileCaKeyStoreTest {
     }
 
     @Test
-    @DisplayName("ADR 0025, point 12 : un dossier ca vide, préparé par l'exploitant, reçoit une nouvelle paire")
+    @DisplayName(
+            "KEY-10, ADR 0025 (point 12) : un dossier ca vide, préparé par l'exploitant, reçoit une nouvelle paire")
     void adr0025EmptyCaDirectoryReceivesAPair() throws IOException {
         Files.createDirectory(ca());
 
@@ -169,7 +170,8 @@ class FileCaKeyStoreTest {
     }
 
     @Test
-    @DisplayName("ADR 0025, point 12 : des liens symboliques vers une paire rangée ailleurs arrêtent le démarrage")
+    @DisplayName(
+            "KEY-10, ADR 0025 (point 12) : des liens symboliques vers une paire rangée ailleurs arrêtent le démarrage")
     void adr0025SymbolicLinksStopTheStart() throws IOException {
         assumeThat(posix()).isTrue();
         new FileCaKeyStore(data.resolve("ailleurs"));
