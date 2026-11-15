@@ -21,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -295,6 +296,20 @@ final class ContextRules {
                         "org.springframework.security.crypto.bcrypt..",
                         "org.springframework.security.crypto.scrypt..",
                         "org.springframework.security.crypto.password4j..");
+    }
+
+    // ADR 0008 (moindre privilège), ADR 0025 (point 17) : AccountLookupQuery livre courriel et mots personnels ; seul
+    // authentication en a besoin. Ses types imbriqués (Contact) comptent aussi.
+    static ArchRule onlyAuthenticationLooksUpAccounts(String root) {
+        return noClasses()
+                .that()
+                .resideInAPackage(root + "..")
+                .and()
+                .resideOutsideOfPackages(root + ".authentication..", root + ".identity..")
+                .should()
+                .dependOnClassesThat()
+                .haveNameMatching(
+                        Pattern.quote(root + ".identity.application.port.in.AccountLookupQuery") + "(\\$.*)?");
     }
 
     // Règle 12, complétée par l'ADR 0018

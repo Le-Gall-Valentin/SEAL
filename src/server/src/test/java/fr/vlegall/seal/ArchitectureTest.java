@@ -124,6 +124,12 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("ADR 0008, ADR 0025 (point 17) : seul authentication lit les coordonnées d'un compte")
+    void onlyAuthenticationLooksUpAccounts() {
+        ContextRules.onlyAuthenticationLooksUpAccounts(ROOT).check(CLASSES);
+    }
+
+    @Test
     @DisplayName("ADR 0018, règle 12 : aucune classe n'importe Bouncy Castle")
     void noDirectBouncyCastle() {
         ContextRules.noDirectBouncyCastle(ROOT).check(CLASSES);
