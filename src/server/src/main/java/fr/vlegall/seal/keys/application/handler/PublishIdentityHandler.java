@@ -7,6 +7,7 @@ import fr.vlegall.seal.keys.application.port.in.PublishIdentityUseCase;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
 import fr.vlegall.seal.keys.domain.model.IdentityPublication;
 import fr.vlegall.seal.keys.domain.model.ProofOfPossession;
+import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.port.out.AccountPort;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
 import fr.vlegall.seal.keys.domain.port.out.ChallengeRepository;
@@ -49,7 +50,7 @@ public class PublishIdentityHandler implements PublishIdentityUseCase {
         }
         // userId vient de la session : une preuve signée pour un autre compte ne vérifie pas (PROTOCOL.md, 4.3).
         if (!new ProofOfPossession(user, ikPublic, challenge).isSignedBy(signature)) {
-            events.signatureRejected();
+            events.signatureRejected(user, SignedStructure.PROOF_OF_POSSESSION);
             return new IdentityPublication.InvalidSignature();
         }
         Optional<IdentityCertificate> certificate =

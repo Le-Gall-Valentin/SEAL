@@ -4,6 +4,7 @@ import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.keys.application.port.in.PublishSubkeyUseCase;
 import fr.vlegall.seal.keys.domain.model.CurrentCertificate;
+import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
 import fr.vlegall.seal.keys.domain.model.SubkeyPolicy;
 import fr.vlegall.seal.keys.domain.model.SubkeyPublication;
@@ -63,7 +64,7 @@ public class PublishSubkeyHandler implements PublishSubkeyUseCase {
         SubkeyBinding binding =
                 new SubkeyBinding(user, certSerial, ekId, SubkeyBinding.KEM, ekPublic, created, expires);
         if (!binding.isSignedBy(current.get().ikPublic(), signature)) {
-            events.signatureRejected();
+            events.signatureRejected(user, SignedStructure.SUBKEY_BINDING);
             return new SubkeyPublication.InvalidSignature();
         }
         subkeys.lockAccount(user);

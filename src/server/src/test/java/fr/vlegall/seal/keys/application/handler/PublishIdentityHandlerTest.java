@@ -11,6 +11,7 @@ import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
 import fr.vlegall.seal.keys.domain.model.IdentityPublication;
 import fr.vlegall.seal.keys.domain.model.IssuedChallenge;
 import fr.vlegall.seal.keys.domain.model.ProofOfPossession;
+import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.port.out.AccountPort;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
 import fr.vlegall.seal.keys.domain.port.out.ChallengeRepository;
@@ -41,7 +42,7 @@ class PublishIdentityHandlerTest {
     private final List<UserId> published = new ArrayList<>();
     private final Map<UserId, String> usernames = new HashMap<>(Map.of(USER, "valentin", OTHER, "autre"));
     private final Ed25519.GeneratedKey ik = Ed25519.generate();
-    private int rejectedSignatures;
+    private final List<String> rejectedSignatures = new ArrayList<>();
     private Instant now = NOW;
     private int nextByte = 1;
 
@@ -72,8 +73,8 @@ class PublishIdentityHandlerTest {
             public void subkeyPublished(UserId user, byte[] ekId) {}
 
             @Override
-            public void signatureRejected() {
-                rejectedSignatures++;
+            public void signatureRejected(UserId user, SignedStructure structure) {
+                rejectedSignatures.add(user.value() + "/" + structure);
             }
         };
         return new PublishIdentityHandler(challenges, accounts, certification, events, clock());
@@ -164,7 +165,7 @@ class PublishIdentityHandlerTest {
 
         assertThat(publisher().publish(USER, ik.publicKey(), challenge, sign(OTHER, challenge)))
                 .isInstanceOf(IdentityPublication.InvalidSignature.class);
-        assertThat(rejectedSignatures).isEqualTo(1);
+        assertThat(rejectedSignatures).containsExactly(USER.value() + "/PROOF_OF_POSSESSION");
     }
 
     @Test

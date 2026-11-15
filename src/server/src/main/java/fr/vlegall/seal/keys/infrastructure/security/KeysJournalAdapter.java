@@ -1,6 +1,7 @@
 package fr.vlegall.seal.keys.infrastructure.security;
 
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.port.out.KeyEventPort;
 import fr.vlegall.seal.security.journal.SecurityEvent;
 import fr.vlegall.seal.security.journal.SecurityEventType;
@@ -36,12 +37,20 @@ public class KeysJournalAdapter implements KeyEventPort {
     }
 
     /**
-     * A09 (CDC section 15) : alerte sur les échecs cryptographiques ; une ligne fixe, sans compte ni octet reçu (SEC-21),
-     * reliée à sa requête par l'identifiant de corrélation du journal.
+     * A09 (CDC section 15) : alerte sur les échecs cryptographiques répétés, avec la route et le compte, pour voir qui
+     * les accumule ; aucune valeur reçue, ni clé, ni signature, ni défi (SEC-21). L'identifiant de corrélation du
+     * journal relie la ligne à sa requête.
      */
     @Override
-    public void signatureRejected() {
-        LOG.warn("Signature refusée à la publication d'une clé (INVALID_SIGNATURE)");
+    public void signatureRejected(UserId user, SignedStructure structure) {
+        LOG.warn("Signature refusée (INVALID_SIGNATURE) sur {}, compte {}", route(structure), user.value());
+    }
+
+    private static String route(SignedStructure structure) {
+        return switch (structure) {
+            case PROOF_OF_POSSESSION -> "PUT /api/v1/keys/identity";
+            case SUBKEY_BINDING -> "POST /api/v1/keys/subkeys";
+        };
     }
 
     @Override

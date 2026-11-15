@@ -6,6 +6,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.keys.domain.model.CurrentCertificate;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
+import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
 import fr.vlegall.seal.keys.domain.model.SubkeyPolicy;
 import fr.vlegall.seal.keys.domain.model.SubkeyPublication;
@@ -39,7 +40,7 @@ class PublishSubkeyHandlerTest {
     private final FakeSubkeys subkeys = new FakeSubkeys();
     private final List<byte[]> saved = subkeys.ekIds;
     private final List<byte[]> published = new ArrayList<>();
-    private int rejectedSignatures;
+    private final List<String> rejectedSignatures = new ArrayList<>();
     private Instant now = NOW;
     private Optional<CurrentCertificate> current = Optional.of(new CurrentCertificate(SERIAL, ik.publicKey()));
 
@@ -71,8 +72,8 @@ class PublishSubkeyHandlerTest {
             }
 
             @Override
-            public void signatureRejected() {
-                rejectedSignatures++;
+            public void signatureRejected(UserId user, SignedStructure structure) {
+                rejectedSignatures.add(user.value() + "/" + structure);
             }
         };
         return new PublishSubkeyHandler(certification, subkeys, events, Clock.fixed(now, ZoneOffset.UTC));
@@ -142,7 +143,8 @@ class PublishSubkeyHandlerTest {
         assertThat(publish(NOW, expires, sign(OTHER, NOW, expires, ik)))
                 .isInstanceOf(SubkeyPublication.InvalidSignature.class);
         assertThat(saved).isEmpty();
-        assertThat(rejectedSignatures).isEqualTo(2);
+        assertThat(rejectedSignatures)
+                .containsExactly(USER.value() + "/SUBKEY_BINDING", USER.value() + "/SUBKEY_BINDING");
     }
 
     @Test

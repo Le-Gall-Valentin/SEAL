@@ -183,11 +183,14 @@ class SubkeyPublicationIT {
                 .andExpect(jsonPath("$.code").value("INVALID_SIGNATURE"));
 
         assertThat(output.getOut().lines())
-                .anyMatch(line -> line.contains("WARN") && line.contains("Signature refusée"));
+                .anyMatch(line -> line.contains("WARN")
+                        && line.contains("Signature refusée")
+                        && line.contains("POST /api/v1/keys/subkeys")
+                        && line.contains(account.id.toString()));
         assertThat(output.getAll())
                 .doesNotContain((String) forged.get("signature"))
                 .doesNotContain((String) forged.get("ekId"))
-                .doesNotContain(account.id.toString());
+                .doesNotContain((String) forged.get("ekPublic"));
     }
 
     @Test

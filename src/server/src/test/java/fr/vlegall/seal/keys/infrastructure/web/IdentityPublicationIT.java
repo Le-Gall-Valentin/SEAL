@@ -148,7 +148,12 @@ class IdentityPublicationIT {
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("INVALID_SIGNATURE"));
 
-        assertThat(output.getOut().lines().filter(line -> line.contains("WARN") && line.contains("Signature refusée")))
+        assertThat(output.getOut()
+                        .lines()
+                        .filter(line -> line.contains("WARN")
+                                && line.contains("Signature refusée")
+                                && line.contains("PUT /api/v1/keys/identity")
+                                && line.contains(account.id.toString())))
                 .hasSize(2);
         assertThat(output.getAll())
                 .doesNotContain((String) forged.get("signature"))
