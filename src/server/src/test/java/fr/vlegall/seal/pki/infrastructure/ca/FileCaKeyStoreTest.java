@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assumptions.assumeThat;
 
 import fr.vlegall.seal.crypto.Ed25519;
+import fr.vlegall.seal.support.Race;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +19,8 @@ import org.junit.jupiter.api.io.TempDir;
 /** KEY-10, ADR 0025 (point 12) : la clé de l'Autorité, générée une fois, relue ensuite, jamais remplacée. */
 @DisplayName("KEY-10 : clé de l'Autorité SEAL")
 class FileCaKeyStoreTest {
+
+    private static final String LOST = "démarrage perdu";
 
     @TempDir
     Path data;
@@ -190,5 +194,31 @@ class FileCaKeyStoreTest {
         assertThatThrownBy(() -> new FileCaKeyStore(linkedDirectory))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("lien symbolique");
+    }
+
+    @Test
+    @DisplayName("KEY-10 : seize premiers démarrages simultanés gardent une seule Autorité, sans clé privée orpheline")
+    void key10ConcurrentFirstStartsLeaveNoOrphanKey() throws Exception {
+        for (boolean preparedEmpty : new boolean[] {false, true}) {
+            Path root = Files.createDirectory(data.resolve(preparedEmpty ? "vide" : "absent"));
+            Path ca = root.resolve("ca");
+            if (preparedEmpty) {
+                Files.createDirectory(ca);
+            }
+
+            List<String> fingerprints = Race.run(16, index -> {
+                try {
+                    return new FileCaKeyStore(ca).key().fingerprint();
+                } catch (IllegalStateException lost) {
+                    return LOST;
+                }
+            });
+
+            String kept = new FileCaKeyStore(ca).key().fingerprint();
+            assertThat(fingerprints).allMatch(outcome -> outcome.equals(kept) || outcome.equals(LOST));
+            try (var entries = Files.list(root)) {
+                assertThat(entries).as("restes de génération dans " + root).containsExactly(ca);
+            }
+        }
     }
 }

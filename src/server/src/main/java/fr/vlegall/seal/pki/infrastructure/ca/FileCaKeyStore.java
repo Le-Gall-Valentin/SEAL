@@ -107,7 +107,8 @@ public final class FileCaKeyStore implements AuthoritySigner {
                     + " ; restaurez la sauvegarde du volume de données, jamais une nouvelle paire (KEY-10)");
         }
         requireOwnerOnly(file, OWNER_ONLY_FILE, "600");
-        // Lecture sans suivre de lien, pour qu'un lien posé après la vérification ne soit pas lu non plus.
+        // Le fichier lui-même n'est jamais suivi s'il est un lien. Le dossier n'est contrôlé qu'au démarrage : un lien
+        // posé entre-temps suppose l'uid du serveur, hors du modèle de menace (section 3 du CDC, ADR 0025 point 12).
         try (InputStream in = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
             return in.readAllBytes();
         } catch (IOException e) {
@@ -171,15 +172,32 @@ public final class FileCaKeyStore implements AuthoritySigner {
                     ? Files.createTempDirectory(
                             parent, ca.getFileName() + ".", PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIRECTORY))
                     : Files.createTempDirectory(parent, ca.getFileName() + ".");
-            Ed25519.GeneratedKey generated = Ed25519.generate();
-            write(staging.resolve(PRIVATE_KEY_FILE), generated.privateKey());
-            write(staging.resolve(PUBLIC_KEY_FILE), Ed25519.toSubjectPublicKeyInfo(generated.publicKey()));
-            Files.move(staging, ca, StandardCopyOption.ATOMIC_MOVE);
+            try {
+                Ed25519.GeneratedKey generated = Ed25519.generate();
+                write(staging.resolve(PRIVATE_KEY_FILE), generated.privateKey());
+                write(staging.resolve(PUBLIC_KEY_FILE), Ed25519.toSubjectPublicKeyInfo(generated.publicKey()));
+                Files.move(staging, ca, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException | RuntimeException e) {
+                // KEY-10 : une génération perdue (démarrage concurrent, déplacement refusé) ne laisse aucune clé privée
+                // orpheline dans le volume ni dans ses sauvegardes.
+                discard(staging, e);
+                throw e;
+            }
         } catch (IOException e) {
             throw new IllegalStateException(
                     "Autorité SEAL : impossible d'écrire à côté de " + ca
                             + " ; seal.data-dir doit être un dossier inscriptible qui survit aux redémarrages",
                     e);
+        }
+    }
+
+    private static void discard(Path staging, Exception failure) {
+        try {
+            Files.deleteIfExists(staging.resolve(PRIVATE_KEY_FILE));
+            Files.deleteIfExists(staging.resolve(PUBLIC_KEY_FILE));
+            Files.deleteIfExists(staging);
+        } catch (IOException cleanup) {
+            failure.addSuppressed(cleanup);
         }
     }
 
