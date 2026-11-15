@@ -7,7 +7,8 @@ import fr.vlegall.seal.common.web.Base64Url;
 import fr.vlegall.seal.keys.application.port.in.CreateChallengeUseCase;
 import fr.vlegall.seal.keys.application.port.in.PublishIdentityUseCase;
 import fr.vlegall.seal.keys.application.port.in.PublishSubkeyUseCase;
-import fr.vlegall.seal.keys.application.port.in.VaultUseCase;
+import fr.vlegall.seal.keys.application.port.in.SaveVaultUseCase;
+import fr.vlegall.seal.keys.application.port.in.VaultQuery;
 import fr.vlegall.seal.keys.domain.model.IdentityPublication;
 import fr.vlegall.seal.keys.domain.model.SubkeyPublication;
 import fr.vlegall.seal.keys.infrastructure.web.dto.CertificateView;
@@ -38,17 +39,20 @@ public class KeysController {
     private final CreateChallengeUseCase challenges;
     private final PublishIdentityUseCase identities;
     private final PublishSubkeyUseCase subkeys;
-    private final VaultUseCase vaults;
+    private final VaultQuery vaults;
+    private final SaveVaultUseCase vaultSaver;
 
     public KeysController(
             CreateChallengeUseCase challenges,
             PublishIdentityUseCase identities,
             PublishSubkeyUseCase subkeys,
-            VaultUseCase vaults) {
+            VaultQuery vaults,
+            SaveVaultUseCase vaultSaver) {
         this.challenges = challenges;
         this.identities = identities;
         this.subkeys = subkeys;
         this.vaults = vaults;
+        this.vaultSaver = vaultSaver;
     }
 
     /** KEY-03 : 32 octets, 5 minutes ; remplace le défi précédent (ADR 0025, point 8). */
@@ -108,7 +112,7 @@ public class KeysController {
     @PutMapping("/vault")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void saveVault(@CurrentUser UserId user, @Valid @RequestBody VaultRequest body) {
-        if (!vaults.save(user, body.toVault())) {
+        if (!vaultSaver.save(user, body.toVault())) {
             throw new SealException(ErrorCode.VAULT_VERSION_CONFLICT);
         }
     }

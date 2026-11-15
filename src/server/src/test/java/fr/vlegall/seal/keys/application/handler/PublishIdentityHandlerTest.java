@@ -181,18 +181,21 @@ class PublishIdentityHandlerTest {
         assertThat(certification.issued).isEmpty();
     }
 
+    /** Défi tel que {@code key_challenges} le garde : son haché et son expiration. */
+    private record Stored(byte[] hash, Instant expiresAt) {}
+
     /** Table key_challenges en mémoire : un défi vivant par compte. */
     private final class FakeChallenges implements ChallengeRepository {
-        final Map<UserId, Challenge.Stored> live = new HashMap<>();
+        final Map<UserId, Stored> live = new HashMap<>();
 
         @Override
         public void renew(UserId user, byte[] hash, Instant expiresAt) {
-            live.put(user, new Challenge.Stored(hash, expiresAt));
+            live.put(user, new Stored(hash.clone(), expiresAt));
         }
 
         @Override
         public boolean consume(UserId user, byte[] hash, Instant at) {
-            Challenge.Stored stored = live.get(user);
+            Stored stored = live.get(user);
             if (stored == null || !Arrays.equals(stored.hash(), hash) || !at.isBefore(stored.expiresAt())) {
                 return false;
             }
