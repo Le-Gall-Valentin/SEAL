@@ -55,12 +55,15 @@ public final class FileCaKeyStore implements AuthoritySigner {
     FileCaKeyStore(Path directory) {
         Path ca = directory.toAbsolutePath().normalize();
         refuseSymbolicLink(ca);
+        boolean generated = false;
         if (!Files.exists(ca, LinkOption.NOFOLLOW_LINKS)) {
             generate(ca);
+            generated = true;
         } else if (isEmptyDirectory(ca)) {
             // ADR 0025, point 12 : aucune Autorité n'a encore été écrite ; le dossier vide fait place à la paire.
             delete(ca);
             generate(ca);
+            generated = true;
         }
         requireOwnerOnly(ca, OWNER_ONLY_DIRECTORY, "700");
         this.privateKey = read(ca, PRIVATE_KEY_FILE);
@@ -71,6 +74,15 @@ public final class FileCaKeyStore implements AuthoritySigner {
         }
         // KEY-10 : l'empreinte, publique, est journalisée ; jamais la clé privée (SEC-21).
         LOG.info("Autorité SEAL, empreinte SHA-256 : {}", key.fingerprint());
+        if (generated) {
+            // KEY-11, ADR 0025 (point 17) : attendue au premier démarrage, une nouvelle Autorité bloque après coup tous
+            // les clients qui ont épinglé la précédente ; une restauration ratée ne doit pas passer inaperçue.
+            LOG.warn(
+                    "Nouvelle Autorité SEAL générée dans {}, empreinte SHA-256 : {} ; si une Autorité existait déjà,"
+                            + " restaurez la sauvegarde du volume de données",
+                    ca,
+                    key.fingerprint());
+        }
     }
 
     @Override

@@ -14,10 +14,14 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 /** KEY-10, ADR 0025 (point 12) : la clé de l'Autorité, générée une fois, relue ensuite, jamais remplacée. */
 @DisplayName("KEY-10 : clé de l'Autorité SEAL")
+@ExtendWith(OutputCaptureExtension.class)
 class FileCaKeyStoreTest {
 
     private static final String LOST = "démarrage perdu";
@@ -220,5 +224,20 @@ class FileCaKeyStoreTest {
                 assertThat(entries).as("restes de génération dans " + root).containsExactly(ca);
             }
         }
+    }
+
+    @Test
+    @DisplayName("KEY-11, ADR 0025 (point 17) : une Autorité générée est signalée en WARN avec son empreinte, une"
+            + " Autorité relue ne l'est pas")
+    void key11GeneratedAuthorityIsSignalled(CapturedOutput output) {
+        String fingerprint = new FileCaKeyStore(ca()).key().fingerprint();
+        new FileCaKeyStore(ca());
+
+        assertThat(output.getOut()
+                        .lines()
+                        .filter(line -> line.contains("WARN") && line.contains("Nouvelle Autorité SEAL")))
+                .singleElement()
+                .asString()
+                .contains(fingerprint);
     }
 }
