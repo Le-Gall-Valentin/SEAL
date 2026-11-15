@@ -1,10 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { CanonicalEncodingError } from './canonical'
 import {
   type CertificateFields,
   encodeCertificate,
   encodeProofOfPossession,
   encodeSubkeyBinding,
+  KEM,
+  type Kem,
   type ProofOfPossessionFields,
   type SubkeyBindingFields,
 } from './identity'
@@ -41,16 +44,25 @@ function number(json: Json, field: string): number {
   return value
 }
 
+/** ADR 0006, PROTOCOL.md 2.5 : un u64 est une chaîne décimale, que JSON.parse ne peut arrondir. */
+function decimal(json: Json, field: string): number {
+  const value = string(json, field)
+  if (!/^(0|[1-9][0-9]*)$/.test(value)) throw new Error(`${field} : u64 décimal attendu`)
+  return Number(value)
+}
+
+function kem(json: Json, field: string): Kem {
+  const value = string(json, field)
+  if (value !== KEM) throw new Error(`${field} : ${KEM} attendu`)
+  return value
+}
+
 function b64url(json: Json, field: string): Uint8Array<ArrayBuffer> {
-  const base64 = string(json, field).replaceAll('-', '+').replaceAll('_', '/')
-  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+  return Uint8Array.from(Buffer.from(string(json, field), 'base64url'))
 }
 
 function hex(json: Json, field: string): Uint8Array<ArrayBuffer> {
-  const value = string(json, field)
-  return Uint8Array.from({ length: value.length / 2 }, (_, i) =>
-    parseInt(value.slice(2 * i, 2 * i + 2), 16),
-  )
+  return Uint8Array.from(Buffer.from(string(json, field), 'hex'))
 }
 
 const identity = record(JSON.parse(readFileSync(IDENTITY, 'utf8')))
@@ -64,8 +76,8 @@ function certificateFields(fields: Json): CertificateFields {
     subjectId: string(fields, 'subjectId'),
     username: string(fields, 'username'),
     ikPublic: b64url(fields, 'ikPublic'),
-    notBefore: number(fields, 'notBefore'),
-    notAfter: number(fields, 'notAfter'),
+    notBefore: decimal(fields, 'notBefore'),
+    notAfter: decimal(fields, 'notAfter'),
     usage: number(fields, 'usage'),
   }
 }
@@ -83,10 +95,10 @@ function bindingFields(fields: Json): SubkeyBindingFields {
     userId: string(fields, 'userId'),
     certSerial: b64url(fields, 'certSerial'),
     ekId: b64url(fields, 'ekId'),
-    kem: string(fields, 'kem'),
+    kem: kem(fields, 'kem'),
     ekPublic: b64url(fields, 'ekPublic'),
-    createdAt: number(fields, 'createdAt'),
-    expiresAt: number(fields, 'expiresAt'),
+    createdAt: decimal(fields, 'createdAt'),
+    expiresAt: decimal(fields, 'expiresAt'),
   }
 }
 
@@ -96,7 +108,16 @@ const ENCODERS: Record<string, (fields: Json) => Uint8Array> = {
   subkeyBinding: (fields) => encodeSubkeyBinding(bindingFields(fields)),
 }
 
-const SECTIONS = { certificates: 'certificate', proofs: 'proof', subkeyBindings: 'subkeyBinding' }
+/** Section des vecteurs, structure encodée et exigence qu'elle sert. */
+const SECTIONS = [
+  { section: 'certificates', structure: 'certificate', requirement: 'KEY-04' },
+  { section: 'proofs', structure: 'proof', requirement: 'KEY-03' },
+  { section: 'subkeyBindings', structure: 'subkeyBinding', requirement: 'KEY-05' },
+] as const
+
+const REQUIREMENTS: Record<string, string> = Object.fromEntries(
+  SECTIONS.map(({ structure, requirement }) => [structure, requirement]),
+)
 
 function publicKey(role: string): Uint8Array<ArrayBuffer> {
   return b64url(record(keys[role]), 'publicKey')
@@ -112,9 +133,22 @@ async function verifies(
 }
 
 describe('QA-02 : structures signées de l’identité (PROTOCOL.md, section 4)', () => {
-  for (const [section, structure] of Object.entries(SECTIONS)) {
+  // Les tests naissent des vecteurs : une section vidée ferait disparaître ses tests sans échec.
+  it('QA-02 : chaque section des vecteurs a au moins un cas, et chaque structure une falsification', () => {
+    const forgeries = records(identity['forgeries'])
+    for (const { section, structure } of SECTIONS) {
+      expect(records(identity[section]).length, section).toBeGreaterThan(0)
+      expect(
+        forgeries.filter((forgery) => string(forgery, 'structure') === structure).length,
+        structure,
+      ).toBeGreaterThan(0)
+    }
+    expect(records(rfc8032['tests']).length).toBeGreaterThan(0)
+  })
+
+  for (const { section, structure, requirement } of SECTIONS) {
     for (const vector of records(identity[section])) {
-      it(`QA-02 : ${string(vector, 'name')}, encodé à l’octet près et signé`, async () => {
+      it(`${requirement}, QA-02 : ${string(vector, 'name')}, encodé à l’octet près et signé`, async () => {
         const encoded = ENCODERS[structure]?.(record(vector['fields']))
         if (encoded === undefined) throw new Error(`structure inconnue : ${structure}`)
 
@@ -127,8 +161,9 @@ describe('QA-02 : structures signées de l’identité (PROTOCOL.md, section 4)'
   }
 
   for (const forgery of records(identity['forgeries'])) {
-    it(`QA-04 : ${string(forgery, 'name')}, refusé`, async () => {
-      const encoder = ENCODERS[string(forgery, 'structure')]
+    const structure = string(forgery, 'structure')
+    it(`${REQUIREMENTS[structure] ?? structure}, QA-04 : ${string(forgery, 'name')}, refusé`, async () => {
+      const encoder = ENCODERS[structure]
       if (encoder === undefined) throw new Error('structure inconnue')
       const encoded = encoder(record(forgery['fields']))
 
@@ -141,24 +176,7 @@ describe('QA-02 : structures signées de l’identité (PROTOCOL.md, section 4)'
 
 describe('QA-01 : Ed25519 de WebCrypto sur la RFC 8032, section 7.1', () => {
   // En-tête PKCS#8 d'une clé privée Ed25519 (RFC 8410), suivi de la graine de 32 octets.
-  const PKCS8_PREFIX = Uint8Array.of(
-    0x30,
-    0x2e,
-    0x02,
-    0x01,
-    0x00,
-    0x30,
-    0x05,
-    0x06,
-    0x03,
-    0x2b,
-    0x65,
-    0x70,
-    0x04,
-    0x22,
-    0x04,
-    0x20,
-  )
+  const PKCS8_PREFIX = Uint8Array.from(Buffer.from('302e020100300506032b657004220420', 'hex'))
 
   for (const test of records(rfc8032['tests'])) {
     it(`QA-01 : ${string(test, 'name')}, signature reproduite et vérifiée`, async () => {
@@ -182,11 +200,11 @@ describe('KEY-04 : bornes des champs', () => {
   const fields = certificateFields(record(records(identity['certificates'])[0]?.['fields']))
 
   it('KEY-04 : une date hors du domaine u64 est refusée', () => {
-    expect(() => encodeCertificate({ ...fields, notBefore: -1 })).toThrow()
-    expect(() => encodeCertificate({ ...fields, notAfter: 1.5 })).toThrow()
+    expect(() => encodeCertificate({ ...fields, notBefore: -1 })).toThrow(CanonicalEncodingError)
+    expect(() => encodeCertificate({ ...fields, notAfter: 1.5 })).toThrow(CanonicalEncodingError)
   })
 
   it('KEY-04 : un usage hors d’un octet est refusé', () => {
-    expect(() => encodeCertificate({ ...fields, usage: 256 })).toThrow()
+    expect(() => encodeCertificate({ ...fields, usage: 256 })).toThrow(CanonicalEncodingError)
   })
 })

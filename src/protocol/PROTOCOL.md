@@ -4,8 +4,8 @@ Ce document est la référence publique du protocole de SEAL : conformément au 
 sa sécurité ne repose que sur les clés. Il précise, à l'octet près, les sections 6 à 9 du cahier des
 charges ; client (TypeScript) et serveur (Java) DOIVENT produire exactement les encodages décrits ici.
 
-Les mots DOIT, NE DOIT PAS et PEUT ont le sens de la RFC 2119. Les sections sur les clés et
-certificats, les messages, les groupes et la non-répudiation s'ajouteront avec leurs lots ; toute
+Les mots DOIT, NE DOIT PAS et PEUT ont le sens de la RFC 2119. Les sections sur les messages, les
+groupes et la non-répudiation s'ajouteront avec leurs lots ; toute
 modification d'un format met à jour, dans le même commit, ce document, les vecteurs de `vectors/` et
 les tests Java et TypeScript.
 
@@ -205,7 +205,7 @@ sans clé privée serait certifiée (ADR 0025, point 14).
 
 | Élément | Valeur |
 | --- | --- |
-| Clé | Ed25519, générée au premier démarrage, `data/ca/seal-ca.p8` (PKCS#8, droits 600, KEY-10) |
+| Clé | Ed25519, générée au premier démarrage : `data/ca/seal-ca.p8` (clé privée, PKCS#8) et `data/ca/seal-ca.pub` (clé publique, SubjectPublicKeyInfo), droits 600 dans un dossier en 700 (KEY-10) |
 | `issuerKeyId` | les 8 premiers octets de SHA-256(clé publique brute de 32 octets) |
 | Empreinte | SHA-256(clé publique brute), 64 caractères hexadécimaux majuscules |
 | `GET /api/v1/pki/ca` | `{publicKey, keyId, fingerprint}`, octets en base64url |
@@ -225,8 +225,9 @@ SealCertificate = struct("SEAL-cert-v1",
 signature = Ed25519.sign(clé CA, SealCertificate)
 ```
 
-Un compte a au plus un certificat non révoqué. Après son expiration, une nouvelle publication révoque l'ancien,
-motif « remplacé » (code 4 de X.509, ADR 0025, point 4).
+Un compte a au plus un certificat non révoqué. Après son expiration, une nouvelle publication de la **même** clé
+d'identité révoque l'ancien, motif « remplacé » (code 4 de X.509) ; une autre clé est refusée, car changer de clé
+est une réinitialisation, réservée au mode sudo (KEY-12, KEY-34, ADR 0025, point 4).
 
 ### 4.3 Preuve de possession (KEY-03)
 
@@ -249,17 +250,20 @@ SubkeyBinding = struct("SEAL-subkey-v1",
 signature = Ed25519.sign(IK, SubkeyBinding)
 ```
 
-Le serveur refuse une liaison dont `certSerial` n'est pas le certificat courant de l'appelant, un `ekId` déjà
-utilisé, un `createdAt` à plus de 5 minutes de son horloge ou une validité autre que 45 jours (ADR 0025,
-point 7). Il ne vérifie de `ekPublic` que sa longueur : l'émetteur rejette un secret partagé nul (RFC 9180).
+Le serveur ramène `createdAt` et `expiresAt` à la milliseconde, comme la signature, puis refuse une liaison dont
+`certSerial` n'est pas le certificat courant de l'appelant, un `ekId` déjà utilisé, un `createdAt` à plus de
+5 minutes de son horloge ou une validité autre que 45 jours (ADR 0025, point 7). Un compte a au plus trois
+sous-clés non expirées : au-delà, la publication est refusée (403, ADR 0025, point 15). Le serveur ne vérifie de
+`ekPublic` que sa longueur : l'émetteur rejette un secret partagé nul (RFC 9180).
 
 ### 4.5 Vecteurs (QA-01, QA-02)
 
 - `vectors/ed25519-rfc8032.json` : les tests 1 à 3 de la RFC 8032, section 7.1, en hexadécimal.
 - `vectors/identity.json` : la CA, deux certificats, une preuve, une liaison, chacun avec ses champs, ses
-  octets canoniques et sa signature, plus six falsifications que toute implémentation DOIT refuser, et les 8 points
-  d'ordre faible (`smallOrder`) : aucune clé ni aucun `R` pris parmi eux ne DOIT vérifier. Les clés sont les graines
-  publiques de la RFC 8032 (CA : test 1, IK : test 2, autre clé : test 3).
+  octets canoniques et sa signature, plus huit falsifications que toute implémentation DOIT refuser, et les 8 points
+  d'ordre faible (`smallOrder`) : aucune clé ni aucun `R` pris parmi eux ne DOIT vérifier. Les dates (`u64`) y sont
+  des chaînes décimales, comme en 2.5 ; les octets, du base64url. Les clés sont les graines publiques de la
+  RFC 8032 (CA : test 1, IK : test 2, autre clé : test 3).
 
 `gen_vectors.py` les signe avec la bibliothèque `cryptography`, épinglée avec ses empreintes :
 

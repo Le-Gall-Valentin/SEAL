@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import tools.jackson.databind.JsonNode;
@@ -37,15 +38,29 @@ public final class ProtocolVectors {
         }
     }
 
-    /** Les cas d'une section du fichier ({@code certificates}, {@code proofs}…). */
+    /**
+     * Les cas d'une section du fichier ({@code certificates}, {@code proofs}…). Une section absente ou vide est une
+     * erreur : sinon, ses tests dynamiques disparaîtraient sans échec, et un encodeur faux resterait vert.
+     */
     public Stream<JsonNode> cases(String section) {
-        return document.get(section).valueStream();
+        return nonEmpty(section, document.path(section).valueStream().toList());
     }
 
-    /** Les falsifications d'une structure ({@code certificate}, {@code proof}, {@code subkeyBinding}). */
+    /** Les falsifications d'une structure ({@code certificate}, {@code proof}, {@code subkeyBinding}), une au moins. */
     public Stream<JsonNode> forgeries(String structure) {
-        return cases("forgeries")
-                .filter(forgery -> structure.equals(forgery.get("structure").asString()));
+        return nonEmpty(
+                "forgeries de " + structure,
+                cases("forgeries")
+                        .filter(forgery ->
+                                structure.equals(forgery.get("structure").asString()))
+                        .toList());
+    }
+
+    private static Stream<JsonNode> nonEmpty(String section, List<JsonNode> cases) {
+        if (cases.isEmpty()) {
+            throw new IllegalStateException("vecteurs : aucun cas dans " + section);
+        }
+        return cases.stream();
     }
 
     /** Clé publique brute d'un signataire des vecteurs ({@code ca}, {@code ik}, {@code other}). */
@@ -67,8 +82,15 @@ public final class ProtocolVectors {
         return UUID.fromString(node.get(field).asString());
     }
 
-    /** Millisecondes Unix d'une structure signée. */
+    /**
+     * Millisecondes Unix d'une structure signée : un {@code u64} en chaîne décimale (ADR 0006, point 5 ; PROTOCOL.md,
+     * 2.5). Un nombre JSON est refusé : au-delà de 2^53, {@code JSON.parse} en perdrait la précision côté client.
+     */
     public static Instant instant(JsonNode node, String field) {
-        return Instant.ofEpochMilli(node.get(field).longValue());
+        JsonNode value = node.get(field);
+        if (value == null || !value.isString()) {
+            throw new IllegalArgumentException(field + " : u64 attendu en chaîne décimale");
+        }
+        return Instant.ofEpochMilli(Long.parseUnsignedLong(value.asString()));
     }
 }

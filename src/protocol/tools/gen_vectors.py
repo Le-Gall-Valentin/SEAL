@@ -553,8 +553,8 @@ def certificate_struct(f: dict) -> dict:
         UUID(f["subjectId"]),
         TEXT(f["username"]),
         BYTES(from_b64url(f["ikPublic"])),
-        U64(f["notBefore"]),
-        U64(f["notAfter"]),
+        U64(int(f["notBefore"])),
+        U64(int(f["notAfter"])),
         U8(f["usage"]),
     )
 
@@ -571,8 +571,8 @@ def binding_struct(f: dict) -> dict:
         BYTES(from_b64url(f["ekId"])),
         TEXT(f["kem"]),
         BYTES(from_b64url(f["ekPublic"])),
-        U64(f["createdAt"]),
-        U64(f["expiresAt"]),
+        U64(int(f["createdAt"])),
+        U64(int(f["expiresAt"])),
     )
 
 
@@ -586,8 +586,9 @@ def certificate_fields(username: str = "valentin.dupont") -> dict:
         "subjectId": USER_ID,
         "username": username,
         "ikPublic": b64url(public_key(IK_SEED)),
-        "notBefore": NOT_BEFORE,
-        "notAfter": NOT_BEFORE + CERTIFICATE_VALIDITY_DAYS * DAY_MS,
+        # u64 en chaîne décimale, comme dans canonical-encoding.json (ADR 0006, point 5 ; PROTOCOL.md, 2.5).
+        "notBefore": str(NOT_BEFORE),
+        "notAfter": str(NOT_BEFORE + CERTIFICATE_VALIDITY_DAYS * DAY_MS),
         "usage": USAGE,
     }
 
@@ -603,8 +604,8 @@ def binding_fields() -> dict:
         "ekId": b64url(EK_ID),
         "kem": KEM,
         "ekPublic": b64url(EK_PUBLIC),
-        "createdAt": NOT_BEFORE,
-        "expiresAt": NOT_BEFORE + SUBKEY_VALIDITY_DAYS * DAY_MS,
+        "createdAt": str(NOT_BEFORE),
+        "expiresAt": str(NOT_BEFORE + SUBKEY_VALIDITY_DAYS * DAY_MS),
     }
 
 
@@ -629,7 +630,9 @@ def build_identity() -> str:
     cert_bytes = encode(certificate_struct(certificate))
     proof_bytes = encode(proof_struct(proof))
     binding_bytes = encode(binding_struct(binding))
-    longer = dict(certificate, notAfter=certificate["notAfter"] + DAY_MS)
+    longer = dict(certificate, notAfter=str(int(certificate["notAfter"]) + DAY_MS))
+    signature_only = dict(certificate, usage=USAGE ^ 0b10)
+    swapped = dict(binding, createdAt=binding["expiresAt"], expiresAt=binding["createdAt"])
     other_user = proof_fields(VICTIM_ID)
     flipped = bytearray(sign(IK_SEED, binding_bytes))
     flipped[0] ^= 0x01
@@ -657,7 +660,8 @@ def build_identity() -> str:
         "proofs": [signed("preuve de possession du défi", "proof", proof, "ik")],
         "subkeyBindings": [signed("liaison de la sous-clé X25519, 45 jours", "subkeyBinding", binding, "ik")],
         "smallOrder": {
-            "rule": "Une clé publique ou un R d'ordre faible est refusé avant toute vérification (PROTOCOL.md, 4.5)",
+            "rule": "Une clé publique ou un R d'ordre faible est refusé avant toute vérification"
+            " (PROTOCOL.md, introduction de la section 4)",
             "points": [b64url(bytes.fromhex(point)) for point in SMALL_ORDER_POINTS],
             "otherEncodings": [b64url(bytes.fromhex(encoding)) for encoding in SMALL_ORDER_OTHER_ENCODINGS],
             "message": b64url("n'importe quel message".encode("utf-8")),
@@ -665,6 +669,13 @@ def build_identity() -> str:
         "forgeries": [
             forgery("certificat prolongé d'un jour après signature", "certificate", longer, sign(CA_SEED, cert_bytes), "ca"),
             forgery("certificat signé par une autre clé que la CA", "certificate", certificate, sign(OTHER_SEED, cert_bytes), "ca"),
+            forgery(
+                "certificat dont le bit de certification est effacé après signature",
+                "certificate",
+                signature_only,
+                sign(CA_SEED, cert_bytes),
+                "ca",
+            ),
             forgery(
                 "preuve signée sous une autre étiquette (séparation de domaine)",
                 "proof",
@@ -675,6 +686,13 @@ def build_identity() -> str:
             forgery("preuve d'un compte présentée pour un autre", "proof", other_user, sign(IK_SEED, proof_bytes), "ik"),
             forgery("liaison vérifiée avec une autre clé que l'IK", "subkeyBinding", binding, sign(IK_SEED, binding_bytes), "other"),
             forgery("liaison dont un bit de la signature est inversé", "subkeyBinding", binding, bytes(flipped), "ik"),
+            forgery(
+                "liaison dont createdAt et expiresAt sont permutés après signature",
+                "subkeyBinding",
+                swapped,
+                sign(IK_SEED, binding_bytes),
+                "ik",
+            ),
         ],
     }
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"

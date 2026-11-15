@@ -24,12 +24,16 @@ export interface ProofOfPossessionFields {
   readonly challenge: Uint8Array
 }
 
+/** KEY-05 : seul mécanisme d'encapsulation accepté avant X-Wing (P2, ADR 0025 point 7). */
+export const KEM = 'DHKEM-X25519-HKDF-SHA256'
+export type Kem = typeof KEM
+
 /** Champs de la liaison de sous-clé (section 4.4) ; dates en millisecondes Unix. */
 export interface SubkeyBindingFields {
   readonly userId: string
   readonly certSerial: Uint8Array
   readonly ekId: Uint8Array
-  readonly kem: string
+  readonly kem: Kem
   readonly ekPublic: Uint8Array
   readonly createdAt: number
   readonly expiresAt: number
