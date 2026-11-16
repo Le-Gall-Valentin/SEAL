@@ -2,12 +2,17 @@ package fr.vlegall.seal.authentication.infrastructure.security;
 
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
+import fr.vlegall.seal.common.PasswordPepper;
 import fr.vlegall.seal.common.Unicode;
+import fr.vlegall.seal.crypto.Digests;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,13 +20,15 @@ import org.springframework.stereotype.Component;
 
 /**
  * Argon2id par l'{@link Argon2PasswordEncoder} de Spring Security, dans un {@link DelegatingPasswordEncoder} pour
- * pouvoir durcir les paramètres plus tard (AUTH-13, ADR 0018). Chaque calcul occupe 19 Mio : un sémaphore équitable en
- * borne le nombre simultané, sans délai d'abandon (ADR 0019, point 3).
+ * pouvoir durcir les paramètres plus tard (AUTH-13, ADR 0018). Le mot de passe est d'abord poivré : Argon2id porte sur
+ * base64(HMAC-SHA256(poivre, mot de passe)), et le haché sur le préfixe {@code {argon2-p1}} (ADR 0026). Chaque calcul
+ * occupe 19 Mio : un sémaphore équitable en borne le nombre simultané, sans délai d'abandon (ADR 0019, point 3).
  */
 @Component
 public final class Argon2PasswordHasher implements PasswordHasher {
 
-    static final String ENCODING_ID = "argon2";
+    /** ADR 0026, point 3 : Argon2id avec le poivre n° 1 ; un autre poivre prendra un autre identifiant. */
+    static final String ENCODING_ID = "argon2-p1";
 
     // AUTH-13 : minimum OWASP.
     private static final int SALT_LENGTH = 16;
@@ -37,12 +44,15 @@ public final class Argon2PasswordHasher implements PasswordHasher {
     /** Mot de passe du haché leurre : il n'a rien de secret, son résultat n'est jamais lu (AUTH-21). */
     private static final String DECOY_PASSWORD = "leurre-de-temps-constant-AUTH-21";
 
+    private final byte[] pepper;
     private final PasswordEncoder encoder;
     private final Semaphore permits;
     private volatile @Nullable String decoy;
 
-    public Argon2PasswordHasher() {
+    @Autowired
+    public Argon2PasswordHasher(PasswordPepper pepper) {
         this(
+                pepper.value(),
                 new DelegatingPasswordEncoder(
                         ENCODING_ID,
                         Map.of(
@@ -54,7 +64,8 @@ public final class Argon2PasswordHasher implements PasswordHasher {
         decoy();
     }
 
-    Argon2PasswordHasher(PasswordEncoder encoder, int permits) {
+    Argon2PasswordHasher(byte[] pepper, PasswordEncoder encoder, int permits) {
+        this.pepper = Objects.requireNonNull(pepper, "pepper").clone();
         this.encoder = Objects.requireNonNull(encoder, "encoder");
         this.permits = new Semaphore(permits, true);
     }
@@ -66,21 +77,25 @@ public final class Argon2PasswordHasher implements PasswordHasher {
 
     @Override
     public String hash(Password password) {
-        return bounded(() -> Objects.requireNonNull(encoder.encode(password.value()), "haché"));
+        String peppered = peppered(password.value());
+        return bounded(() -> Objects.requireNonNull(encoder.encode(peppered), "haché"));
     }
 
     /**
-     * Une demi-paire isolée ne s'encode pas en UTF-8 : elle ne correspond à rien, sans erreur (échec fermé). Le calcul
-     * a quand même lieu, sur le leurre, pour que la durée ne dise rien du compte (AUTH-21).
+     * Une demi-paire isolée ne s'encode pas en UTF-8, et un haché non reconnu, comme celui d'avant le poivre, ne se
+     * vérifie pas (ADR 0026, point 4) : ils ne correspondent à rien, sans erreur (échec fermé). Le calcul a quand même
+     * lieu, sur le leurre, pour que la durée ne dise rien du compte (AUTH-21).
      */
     @Override
     public boolean matches(Password password, String encoded) {
-        if (!Unicode.isWellFormed(password.value())) {
+        if (!Unicode.isWellFormed(password.value()) || !recognises(encoded)) {
             String decoyHash = decoy();
-            bounded(() -> encoder.matches(DECOY_PASSWORD, decoyHash));
+            String decoyPeppered = peppered(DECOY_PASSWORD);
+            bounded(() -> encoder.matches(decoyPeppered, decoyHash));
             return false;
         }
-        return bounded(() -> encoder.matches(password.value(), encoded));
+        String peppered = peppered(password.value());
+        return bounded(() -> encoder.matches(peppered, encoded));
     }
 
     /** Préfixe aux paramètres de SEAL, puis un sel et une sortie non vides. */
@@ -111,6 +126,18 @@ public final class Argon2PasswordHasher implements PasswordHasher {
             }
         }
         return current;
+    }
+
+    /**
+     * ADR 0026, point 2 : base64(HMAC-SHA256(poivre, mot de passe en UTF-8)). Un mot de passe mal formé n'arrive
+     * jamais jusqu'ici (AUTH-11) ; s'il y arrivait, il serait refusé plutôt qu'encodé avec un caractère de remplacement.
+     */
+    private String peppered(String password) {
+        if (!Unicode.isWellFormed(password)) {
+            throw new IllegalArgumentException("mot de passe mal formé : rien à hacher");
+        }
+        return Base64.getEncoder()
+                .encodeToString(Digests.hmacSha256(pepper, password.getBytes(StandardCharsets.UTF_8)));
     }
 
     private <T> T bounded(Supplier<T> computation) {

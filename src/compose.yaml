@@ -39,6 +39,7 @@ services:
       SEAL_DB_USER: seal
       SEAL_DB_PASSWORD: ${SEAL_DB_PASSWORD:?SEAL_DB_PASSWORD est vide, lancez scripts/gen-certs.sh}
       SEAL_DATA_KEY: ${SEAL_DATA_KEY:?SEAL_DATA_KEY est vide, lancez scripts/gen-certs.sh}
+      SEAL_PASSWORD_PEPPER: ${SEAL_PASSWORD_PEPPER:?SEAL_PASSWORD_PEPPER est vide, lancez scripts/gen-certs.sh}
       SEAL_TLS_CERTIFICATE: file:/certs/localhost.pem
       SEAL_TLS_PRIVATE_KEY: file:/certs/localhost-key.pem
       # AUTH-14 : serveur SMTP de Mailpit, sur le réseau interne.

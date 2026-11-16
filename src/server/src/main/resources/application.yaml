@@ -110,3 +110,6 @@ seal:
   # KEY-10 : clé de l'Autorité et autres données générées par SEAL. Le Dockerfile fixe SEAL_DATA_DIR=/data (volume
   # app-data) ; en local, depuis src/server, ../data désigne src/data, hors de Git et de projet.zip.
   data-dir: ${SEAL_DATA_DIR:../data}
+  passwords:
+    # AUTH-13, ADR 0026 : poivre des mots de passe, 32 octets en base64, sans valeur par défaut (échec fermé).
+    pepper: ${SEAL_PASSWORD_PEPPER}

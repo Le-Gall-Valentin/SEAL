@@ -192,7 +192,7 @@ class RegistrationIT {
                 .single();
         assertThat(stored).isEqualTo(Digests.sha256(code.getBytes(StandardCharsets.US_ASCII)));
         assertThat(count(
-                        "SELECT count(*) FROM user_credentials WHERE user_id = ? AND password_hash LIKE '{argon2}%'",
+                        "SELECT count(*) FROM user_credentials WHERE user_id = ? AND password_hash LIKE '{argon2-p1}$argon2id$%'",
                         id))
                 .isEqualTo(1);
     }

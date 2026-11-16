@@ -70,6 +70,10 @@ Au premier démarrage, SEAL génère la clé de son Autorité de certification d
 est à sauvegarder : `docker compose down -v` l'efface aussi, et une nouvelle Autorité rend invalides tous les
 certificats déjà émis.
 
+Le fichier `.env` est à sauvegarder lui aussi : il porte le poivre des mots de passe (`SEAL_PASSWORD_PEPPER`,
+ADR 0026), gardé hors de la base. Sans lui, aucun mot de passe enregistré ne se vérifie plus, et chaque compte
+devrait passer par « mot de passe oublié ».
+
 ## Développement
 
 Il faut JDK 25 et Node.js 24 LTS (`sdk env` et `nvm use` lisent `.sdkmanrc` et `.nvmrc`).

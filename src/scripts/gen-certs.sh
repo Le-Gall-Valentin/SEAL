@@ -41,10 +41,18 @@ if [ ! -f .env ]; then
 fi
 chmod 600 .env
 
-# Remplit NOM= s'il est vide ; ne touche jamais une valeur déjà présente.
+# Remplit NOM= s'il est vide, ou l'ajoute à un .env plus ancien qui ne l'a pas encore ; ne touche jamais une
+# valeur déjà présente.
 fill_secret() {
   local name=$1 value=$2 tmp
-  if grep -q "^${name}=\$" .env; then
+  if ! grep -q "^${name}=" .env; then
+    # Une dernière ligne sans saut de ligne recevrait la variable collée à elle.
+    if [ -s .env ] && [ -n "$(tail -c 1 .env)" ]; then
+      echo >>.env
+    fi
+    printf '%s=%s\n' "$name" "$value" >>.env
+    echo "${name} ajouté"
+  elif grep -q "^${name}=\$" .env; then
     tmp=$(mktemp)
     sed "s|^${name}=\$|${name}=${value}|" .env >"$tmp"
     cat "$tmp" >.env
@@ -59,6 +67,8 @@ random_base64() {
 
 # SEC-22 : 32 octets aléatoires en base64.
 fill_secret SEAL_DATA_KEY "$(random_base64 32)"
+# AUTH-13, ADR 0026 : poivre des mots de passe, 32 octets aléatoires en base64.
+fill_secret SEAL_PASSWORD_PEPPER "$(random_base64 32)"
 # Sans + ni / ni =, pour rester sûr dans une URL JDBC ou une ligne de commande.
 fill_secret SEAL_DB_PASSWORD "$(random_base64 32 | tr -d '+/=')"
 
