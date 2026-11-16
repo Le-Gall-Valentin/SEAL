@@ -81,7 +81,7 @@ class CredentialStorageIT {
     void auth13StoringRequiresATransaction() {
         UserId user = new UserId(UUID.randomUUID());
 
-        assertThatThrownBy(() -> initialPassword.store(user, "{argon2}$argon2id$x"))
+        assertThatThrownBy(() -> initialPassword.store(user, "{argon2-p1}$argon2id$x"))
                 .isInstanceOf(IllegalTransactionStateException.class);
     }
 

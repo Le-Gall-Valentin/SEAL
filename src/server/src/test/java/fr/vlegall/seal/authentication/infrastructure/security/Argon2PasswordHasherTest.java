@@ -20,6 +20,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -278,5 +280,73 @@ class Argon2PasswordHasherTest {
     void a06PermitsFollowTheProcessors() {
         assertThat(Argon2PasswordHasher.defaultPermits())
                 .isEqualTo(Math.max(2, Runtime.getRuntime().availableProcessors()));
+    }
+
+    /** Sel de 18 octets et sortie de 32 octets, en base64 sans remplissage : une forme valide. */
+    private static final String SALT = "c2Vsc2Vsc2Vsc2Vsc2Vsc2Vs";
+
+    private static final String OUTPUT = "A".repeat(43);
+
+    @Test
+    @DisplayName("ADR 0026, point 7 : un haché aux paramètres durcis, dans les bornes, reste vérifiable")
+    void adr0026HardenedParametersStillVerify() {
+        String peppered = encoded(Digests.hmacSha256(PEPPER, PASSWORD.getBytes(StandardCharsets.UTF_8)));
+        String hardened = "{argon2-p1}" + new Argon2PasswordEncoder(16, 32, 1, 32_768, 3).encode(peppered);
+
+        assertThat(hasher.matches(Password.fromInput(PASSWORD), hardened)).isTrue();
+        assertThat(hasher.recognises(hardened))
+                .as("seuls les paramètres d'aujourd'hui sont enregistrés")
+                .isFalse();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT + "$AA",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$!!!!$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$c2Vs$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "{argon2-p1}$argon2id$v=19$m=4194304,t=2,p=1$" + SALT + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=4096,t=2,p=1$" + SALT + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=1,p=1$" + SALT + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=11,p=1$" + SALT + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=0$" + SALT + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=5$" + SALT + "$" + "A",
+                "{argon2-p1}$argon2i$v=19$m=19456,t=2,p=1$" + SALT + "$" + "A",
+                "{argon2-p1}$argon2id$v=16$m=19456,t=2,p=1$" + SALT + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT + "$" + "A" + "$x",
+                "{argon2-p1}"
+            })
+    @DisplayName("AUTH-21, ADR 0026 (point 7) : un haché corrompu ou hors bornes coûte une vérification, sur le leurre")
+    void auth21MalformedHashesCostOneDecoyVerification(String stored) {
+        String malformed = stored.endsWith("$A") ? stored.substring(0, stored.length() - 1) + OUTPUT : stored;
+        List<String> verified = new ArrayList<>();
+        PasswordEncoder recording = new PasswordEncoder() {
+            @Override
+            public String encode(CharSequence raw) {
+                return "{argon2-p1}leurre";
+            }
+
+            @Override
+            public boolean matches(CharSequence raw, String encoded) {
+                verified.add(encoded);
+                return true;
+            }
+        };
+        Argon2PasswordHasher measured = new Argon2PasswordHasher(PEPPER, recording, 2);
+
+        assertThat(measured.matches(Password.fromInput(PASSWORD), malformed)).isFalse();
+        assertThat(verified).containsExactly("{argon2-p1}leurre");
+    }
+
+    @Test
+    @DisplayName("AUTH-13, ADR 0026 : seul un haché aux paramètres d'aujourd'hui, sel de 16 octets et sortie de 32, est"
+            + " enregistrable")
+    void auth13RecognisesChecksTheSaltAndOutputSizes() {
+        assertThat(hasher.recognises("{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$c2Vs$" + OUTPUT))
+                .isFalse();
+        assertThat(hasher.recognises("{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT + "$AA"))
+                .isFalse();
+        assertThat(hasher.recognises("{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT.substring(2) + "$" + OUTPUT))
+                .isTrue();
     }
 }

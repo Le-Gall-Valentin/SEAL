@@ -9,8 +9,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
@@ -38,8 +41,17 @@ public final class Argon2PasswordHasher implements PasswordHasher {
     private static final int ITERATIONS = 2;
 
     /** Préfixe d'un haché aux paramètres ci-dessus, avant le sel et la sortie en base64. */
-    private static final String PREFIX =
-            "{" + ENCODING_ID + "}$argon2id$v=19$m=" + MEMORY_KIB + ",t=" + ITERATIONS + ",p=" + PARALLELISM + "$";
+    // ADR 0026, point 7 : bornes d'un haché vérifiable. Le plancher est celui d'AUTH-13 ; le plafond borne ce qu'une
+    // ligne altérée de la base pourrait imposer en mémoire et en temps.
+    private static final int MAX_MEMORY_KIB = 65_536;
+
+    private static final int MAX_ITERATIONS = 10;
+    private static final int MAX_PARALLELISM = 4;
+    private static final int MAX_SALT_OR_HASH_LENGTH = 64;
+
+    /** {@code {argon2-p1}$argon2id$v=19$m=…,t=…,p=…$sel$sortie}, sel et sortie en base64 sans remplissage. */
+    private static final Pattern FORM = Pattern.compile(Pattern.quote("{" + ENCODING_ID + "}$argon2id$v=19$m=")
+            + "(\\d{1,9}),t=(\\d{1,9}),p=(\\d{1,9})\\$([A-Za-z0-9+/]{1,128})\\$([A-Za-z0-9+/]{1,128})");
 
     /** Mot de passe du haché leurre : il n'a rien de secret, son résultat n'est jamais lu (AUTH-21). */
     private static final String DECOY_PASSWORD = "leurre-de-temps-constant-AUTH-21";
@@ -88,7 +100,8 @@ public final class Argon2PasswordHasher implements PasswordHasher {
      */
     @Override
     public boolean matches(Password password, String encoded) {
-        if (!Unicode.isWellFormed(password.value()) || !recognises(encoded)) {
+        if (!Unicode.isWellFormed(password.value())
+                || shape(encoded).filter(Shape::verifiable).isEmpty()) {
             String decoyHash = decoy();
             String decoyPeppered = peppered(DECOY_PASSWORD);
             bounded(() -> encoder.matches(decoyPeppered, decoyHash));
@@ -98,14 +111,10 @@ public final class Argon2PasswordHasher implements PasswordHasher {
         return bounded(() -> encoder.matches(peppered, encoded));
     }
 
-    /** Préfixe aux paramètres de SEAL, puis un sel et une sortie non vides. */
+    /** Haché neuf, aux paramètres exacts d'aujourd'hui (AUTH-13) : seul enregistrable. */
     @Override
     public boolean recognises(String encoded) {
-        if (!encoded.startsWith(PREFIX)) {
-            return false;
-        }
-        String[] saltAndHash = encoded.substring(PREFIX.length()).split("\\$", -1);
-        return saltAndHash.length == 2 && !saltAndHash[0].isEmpty() && !saltAndHash[1].isEmpty();
+        return shape(encoded).filter(Shape::current).isPresent();
     }
 
     @Override
@@ -138,6 +147,53 @@ public final class Argon2PasswordHasher implements PasswordHasher {
         }
         return Base64.getEncoder()
                 .encodeToString(Digests.hmacSha256(pepper, password.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    /** Forme d'un haché {@code {argon2-p1}} : ses paramètres et les tailles décodées de son sel et de sa sortie. */
+    private static Optional<Shape> shape(String encoded) {
+        Matcher form = FORM.matcher(encoded);
+        if (!form.matches()) {
+            return Optional.empty();
+        }
+        return Optional.of(new Shape(
+                Integer.parseInt(form.group(1)),
+                Integer.parseInt(form.group(2)),
+                Integer.parseInt(form.group(3)),
+                decodedLength(form.group(4)),
+                decodedLength(form.group(5))));
+    }
+
+    /** Taille décodée d'un base64 sans remplissage, -1 s'il est illisible. */
+    private static int decodedLength(String base64) {
+        try {
+            return Base64.getDecoder().decode(base64).length;
+        } catch (IllegalArgumentException e) {
+            return -1;
+        }
+    }
+
+    private record Shape(int memory, int iterations, int parallelism, int saltLength, int hashLength) {
+
+        /** ADR 0026, point 7 : dans les bornes, donc vérifiable, même après un durcissement des paramètres. */
+        boolean verifiable() {
+            return between(memory, MEMORY_KIB, MAX_MEMORY_KIB)
+                    && between(iterations, ITERATIONS, MAX_ITERATIONS)
+                    && between(parallelism, PARALLELISM, MAX_PARALLELISM)
+                    && between(saltLength, SALT_LENGTH, MAX_SALT_OR_HASH_LENGTH)
+                    && between(hashLength, HASH_LENGTH, MAX_SALT_OR_HASH_LENGTH);
+        }
+
+        boolean current() {
+            return memory == MEMORY_KIB
+                    && iterations == ITERATIONS
+                    && parallelism == PARALLELISM
+                    && saltLength == SALT_LENGTH
+                    && hashLength == HASH_LENGTH;
+        }
+
+        private static boolean between(int value, int min, int max) {
+            return value >= min && value <= max;
+        }
     }
 
     private <T> T bounded(Supplier<T> computation) {

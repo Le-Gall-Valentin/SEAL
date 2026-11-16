@@ -39,6 +39,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
@@ -197,7 +199,8 @@ class LoginIT {
     }
 
     @Test
-    @DisplayName("AUTH-21 : inconnu, mauvais mot de passe, supprimé ou courriel en attente : même réponse, même durée")
+    @DisplayName("AUTH-21, ADR 0026 : inconnu, mauvais mot de passe, supprimé, courriel en attente, haché d'avant le"
+            + " poivre ou corrompu : même réponse, même durée")
     void auth21FailuresAreIndistinguishable() throws Exception {
         Registered known = active(unique("connu"));
         Registered deleted = active(unique("supprime"));
@@ -205,11 +208,22 @@ class LoginIT {
                 .param(deleted.id())
                 .update();
         Registered waiting = pending(unique("enattente"));
+        // ADR 0026, point 4 : Argon2id sans poivre, sous l'ancien préfixe, avec le vrai mot de passe.
+        Registered unpeppered = withHash(
+                active(unique("sanspoivre")),
+                new DelegatingPasswordEncoder(
+                                "argon2", Map.of("argon2", new Argon2PasswordEncoder(16, 32, 1, 19_456, 2)))
+                        .encode(PASSWORD));
+        // ADR 0026, point 7 : préfixe et paramètres justes, sortie d'un octet (une ligne altérée de la base).
+        Registered corrupt =
+                withHash(active(unique("corrompu")), "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$c2Vsc2Vsc2Vsc2Vs$AA");
         List<String[]> cases = List.of(
                 new String[] {"inconnu." + UUID.randomUUID().toString().substring(0, 6), PASSWORD},
                 new String[] {known.username(), "mauvais-mot-de-passe-long"},
                 new String[] {deleted.username(), PASSWORD},
-                new String[] {waiting.email(), PASSWORD});
+                new String[] {waiting.email(), PASSWORD},
+                new String[] {unpeppered.username(), PASSWORD},
+                new String[] {corrupt.username(), PASSWORD});
         List<Map<String, Object>> shapes = new ArrayList<>();
         List<List<Long>> durations = new ArrayList<>();
         cases.forEach(c -> durations.add(new ArrayList<>()));
@@ -238,6 +252,15 @@ class LoginIT {
         long slowest = Collections.max(medians);
         long fastest = Collections.min(medians);
         assertThat((double) slowest / fastest).as("médianes %s", medians).isLessThan(1.25);
+    }
+
+    /** Remplace le haché enregistré, comme le ferait une base d'avant le poivre ou altérée. */
+    private Registered withHash(Registered account, String hash) {
+        jdbc.sql("UPDATE user_credentials SET password_hash = ? WHERE user_id = ?")
+                .param(hash)
+                .param(account.id())
+                .update();
+        return account;
     }
 
     private static long median(List<Long> values) {

@@ -39,6 +39,8 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.SimpleMailMessage;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -260,6 +262,33 @@ class PasswordResetIT {
                 .isEqualTo(401);
         assertThat(login(account.username(), NEW_PASSWORD).getResponse().getStatus())
                 .isEqualTo(204);
+    }
+
+    @Test
+    @DisplayName("ADR 0026, point 4 : un compte haché avant le poivre se reprend par « mot de passe oublié »")
+    void adr0026UnpepperedAccountRecoversByReset() throws Exception {
+        Registered account = active(unique("avantpoivre"));
+        jdbc.sql("UPDATE user_credentials SET password_hash = ? WHERE user_id = ?")
+                .param(new DelegatingPasswordEncoder(
+                                "argon2", Map.of("argon2", new Argon2PasswordEncoder(16, 32, 1, 19_456, 2)))
+                        .encode(PASSWORD))
+                .param(account.id())
+                .update();
+        assertThat(login(account.username(), PASSWORD).getResponse().getStatus())
+                .isEqualTo(401);
+
+        assertThat(confirm(client, requestToken(account), NEW_PASSWORD)
+                        .getResponse()
+                        .getStatus())
+                .isEqualTo(204);
+
+        assertThat(login(account.username(), NEW_PASSWORD).getResponse().getStatus())
+                .isEqualTo(204);
+        assertThat(jdbc.sql("SELECT password_hash FROM user_credentials WHERE user_id = ?")
+                        .param(account.id())
+                        .query(String.class)
+                        .single())
+                .startsWith("{argon2-p1}$argon2id$");
     }
 
     @Test
