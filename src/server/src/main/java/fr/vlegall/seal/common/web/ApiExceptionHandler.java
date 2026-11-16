@@ -44,6 +44,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         }
         ResponseEntity<ProblemDetail> response = problem(
                 exception.code(), HttpStatusCode.valueOf(exception.code().status()));
+        ProblemDetail body = response.getBody();
+        if (body != null && !exception.fields().isEmpty()) {
+            // ADR 0010 : liste triée, sans doublon, comme celle des erreurs de validation.
+            body.setProperty(
+                    FIELDS, exception.fields().stream().distinct().sorted().toList());
+        }
         return exception
                 .retryAfter()
                 .map(delay -> ResponseEntity.status(response.getStatusCode())

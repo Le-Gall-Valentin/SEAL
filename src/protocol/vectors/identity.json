@@ -1,0 +1,227 @@
+{
+  "format": "seal-identity-v1",
+  "subject": "Identit\u00e9 : PROTOCOL.md, section 4 (KEY-03 \u00e0 KEY-05, KEY-10, QA-02, ADR 0025)",
+  "generator": "src/protocol/tools/gen_vectors.py",
+  "keys": {
+    "ca": {
+      "seed": "nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A",
+      "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+    },
+    "ik": {
+      "seed": "TM0Imyj_ltqdtsNG7BFOD1uKMZ81q6Yk2oz27U-4pvs",
+      "publicKey": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw"
+    },
+    "other": {
+      "seed": "xaqN9D-fg3vtt0QvMdy3sWbThTUHbwlLhc46LgtEWPc",
+      "publicKey": "_FHNjmIYoaONpH7QAjDwWAgW7RO6MwOsXeuRFUiQgCU"
+    }
+  },
+  "authority": {
+    "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+    "keyId": "If4x36FUomE",
+    "fingerprint": "21FE31DFA154A261626BF854046FD2271B7BED4B6ABE45AA58877EF47F9721B9"
+  },
+  "certificates": [
+    {
+      "name": "certificat : usage signature et certification",
+      "fields": {
+        "serial": "EBESExQVFhcYGRobHB0eHw",
+        "issuerKeyId": "If4x36FUomE",
+        "subjectId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "username": "valentin.dupont",
+        "ikPublic": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+        "notBefore": "1794009600000",
+        "notAfter": "1828310400000",
+        "usage": 3
+      },
+      "signer": "ca",
+      "encoded": "AAAADFNFQUwtY2VydC12MQAAABAQERITFBUWFxgZGhscHR4fAAAACCH-Md-hVKJhAZL3of__cACAAAAAAAChHAAAAA92YWxlbnRpbi5kdXBvbnQAAAAgPUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0ZgwAAAGhs04QAAAAAamvyrwAAw",
+      "signature": "D4QLHx9r93c8O-8m5K5_YIKALCYsR70W9AFXJT-LHGoH5sYhaIZaMIxFhCFpi3qKCiXouPgCkkGNIc0P7TslAw"
+    },
+    {
+      "name": "certificat : identifiant de 20 caract\u00e8res, avec . et _ (AUTH-01)",
+      "fields": {
+        "serial": "EBESExQVFhcYGRobHB0eHw",
+        "issuerKeyId": "If4x36FUomE",
+        "subjectId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "username": "anne_marie.tremblay2",
+        "ikPublic": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+        "notBefore": "1794009600000",
+        "notAfter": "1828310400000",
+        "usage": 3
+      },
+      "signer": "ca",
+      "encoded": "AAAADFNFQUwtY2VydC12MQAAABAQERITFBUWFxgZGhscHR4fAAAACCH-Md-hVKJhAZL3of__cACAAAAAAAChHAAAABRhbm5lX21hcmllLnRyZW1ibGF5MgAAACA9QBfD6EOJWpK3CqdNG368nJgszy7ElozAzVXxKvRmDAAAAaGzThAAAAABqa_KvAAD",
+      "signature": "1fHIa7qtFyPfLgiir2ScVOYjxPsOZyAyv-E_9Q3xD7MT8MdAemBJfsAZXKTzNgCfO0wLUbF8xKRsdWlzWdRABw"
+    }
+  ],
+  "proofs": [
+    {
+      "name": "preuve de possession du d\u00e9fi",
+      "fields": {
+        "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "ikPublic": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+        "challenge": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8"
+      },
+      "signer": "ik",
+      "encoded": "AAAAC1NFQUwtcG9wLXYxAZL3of__cACAAAAAAAChHAAAACA9QBfD6EOJWpK3CqdNG368nJgszy7ElozAzVXxKvRmDAAAACBgYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1-fw",
+      "signature": "WwPm8uRrFBAOx7apvHTthQihHBHWIITXRd7gn6IoXMKC16Q0gZ9kcQDVIDHZMwYzvgDKTMVHTqKWSWVEdYkDCQ"
+    }
+  ],
+  "subkeyBindings": [
+    {
+      "name": "liaison de la sous-cl\u00e9 X25519, 45 jours",
+      "fields": {
+        "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "certSerial": "EBESExQVFhcYGRobHB0eHw",
+        "ekId": "ICEiIyQlJicoKSorLC0uLw",
+        "kem": "DHKEM-X25519-HKDF-SHA256",
+        "ekPublic": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+        "createdAt": "1794009600000",
+        "expiresAt": "1797897600000"
+      },
+      "signer": "ik",
+      "encoded": "AAAADlNFQUwtc3Via2V5LXYxAZL3of__cACAAAAAAAChHAAAABAQERITFBUWFxgZGhscHR4fAAAAECAhIiMkJSYnKCkqKywtLi8AAAAYREhLRU0tWDI1NTE5LUhLREYtU0hBMjU2AAAAIEBBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fAAABobNOEAAAAAGimww8AA",
+      "signature": "DXwyap_OqgfDPGZu19-nF8ib2LbKJ0pV8VV0SGGWtDsJbipvCU_K5oOGFqUIEAdh83Dtzqt1WoxfBDocPSsiCA"
+    }
+  ],
+  "smallOrder": {
+    "rule": "Une cl\u00e9 publique ou un R d'ordre faible est refus\u00e9 avant toute v\u00e9rification (PROTOCOL.md, introduction de la section 4)",
+    "points": [
+      "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "7P_______________________________________38",
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA",
+      "xxdqcD1N2E-6PAt2DRBnDyogU_osOczGTsf9d5KsA3o",
+      "xxdqcD1N2E-6PAt2DRBnDyogU_osOczGTsf9d5KsA_o",
+      "JuiVj8KyJ7BFw_SJ8u-Y8NXfrAXTxjM5sTgCiG1T_AU",
+      "JuiVj8KyJ7BFw_SJ8u-Y8NXfrAXTxjM5sTgCiG1T_IU"
+    ],
+    "otherEncodings": [
+      "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA",
+      "7P________________________________________8",
+      "7f_______________________________________38",
+      "7f________________________________________8",
+      "7v_______________________________________38",
+      "7v________________________________________8"
+    ],
+    "message": "bidpbXBvcnRlIHF1ZWwgbWVzc2FnZQ"
+  },
+  "forgeries": [
+    {
+      "name": "certificat prolong\u00e9 d'un jour apr\u00e8s signature",
+      "structure": "certificate",
+      "fields": {
+        "serial": "EBESExQVFhcYGRobHB0eHw",
+        "issuerKeyId": "If4x36FUomE",
+        "subjectId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "username": "valentin.dupont",
+        "ikPublic": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+        "notBefore": "1794009600000",
+        "notAfter": "1828396800000",
+        "usage": 3
+      },
+      "verifier": "ca",
+      "signature": "D4QLHx9r93c8O-8m5K5_YIKALCYsR70W9AFXJT-LHGoH5sYhaIZaMIxFhCFpi3qKCiXouPgCkkGNIc0P7TslAw"
+    },
+    {
+      "name": "certificat sign\u00e9 par une autre cl\u00e9 que la CA",
+      "structure": "certificate",
+      "fields": {
+        "serial": "EBESExQVFhcYGRobHB0eHw",
+        "issuerKeyId": "If4x36FUomE",
+        "subjectId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "username": "valentin.dupont",
+        "ikPublic": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+        "notBefore": "1794009600000",
+        "notAfter": "1828310400000",
+        "usage": 3
+      },
+      "verifier": "ca",
+      "signature": "OWn400tb8UTnAv3TW6iszTUFCn5LvlbgwrYTAdtxoEV5ElfTvoSzj1UCA51XSk_M8uukoN5Vh5nDS0AIA9DBBQ"
+    },
+    {
+      "name": "certificat dont le bit de certification est effac\u00e9 apr\u00e8s signature",
+      "structure": "certificate",
+      "fields": {
+        "serial": "EBESExQVFhcYGRobHB0eHw",
+        "issuerKeyId": "If4x36FUomE",
+        "subjectId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "username": "valentin.dupont",
+        "ikPublic": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+        "notBefore": "1794009600000",
+        "notAfter": "1828310400000",
+        "usage": 1
+      },
+      "verifier": "ca",
+      "signature": "D4QLHx9r93c8O-8m5K5_YIKALCYsR70W9AFXJT-LHGoH5sYhaIZaMIxFhCFpi3qKCiXouPgCkkGNIc0P7TslAw"
+    },
+    {
+      "name": "preuve sign\u00e9e sous une autre \u00e9tiquette (s\u00e9paration de domaine)",
+      "structure": "proof",
+      "fields": {
+        "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "ikPublic": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+        "challenge": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8"
+      },
+      "verifier": "ik",
+      "signature": "EsdfHfmn_kUuUA1XuE2lnJZDHjqmupZ2o-9-XV_-goVgC0_9T9iMg4cofff4QWm7Y7K6Fd4IMRQ-WTJ936i_CA"
+    },
+    {
+      "name": "preuve d'un compte pr\u00e9sent\u00e9e pour un autre",
+      "structure": "proof",
+      "fields": {
+        "userId": "0192f7a1-ffff-7000-8000-000000000b0b",
+        "ikPublic": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+        "challenge": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8"
+      },
+      "verifier": "ik",
+      "signature": "WwPm8uRrFBAOx7apvHTthQihHBHWIITXRd7gn6IoXMKC16Q0gZ9kcQDVIDHZMwYzvgDKTMVHTqKWSWVEdYkDCQ"
+    },
+    {
+      "name": "liaison v\u00e9rifi\u00e9e avec une autre cl\u00e9 que l'IK",
+      "structure": "subkeyBinding",
+      "fields": {
+        "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "certSerial": "EBESExQVFhcYGRobHB0eHw",
+        "ekId": "ICEiIyQlJicoKSorLC0uLw",
+        "kem": "DHKEM-X25519-HKDF-SHA256",
+        "ekPublic": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+        "createdAt": "1794009600000",
+        "expiresAt": "1797897600000"
+      },
+      "verifier": "other",
+      "signature": "DXwyap_OqgfDPGZu19-nF8ib2LbKJ0pV8VV0SGGWtDsJbipvCU_K5oOGFqUIEAdh83Dtzqt1WoxfBDocPSsiCA"
+    },
+    {
+      "name": "liaison dont un bit de la signature est invers\u00e9",
+      "structure": "subkeyBinding",
+      "fields": {
+        "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "certSerial": "EBESExQVFhcYGRobHB0eHw",
+        "ekId": "ICEiIyQlJicoKSorLC0uLw",
+        "kem": "DHKEM-X25519-HKDF-SHA256",
+        "ekPublic": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+        "createdAt": "1794009600000",
+        "expiresAt": "1797897600000"
+      },
+      "verifier": "ik",
+      "signature": "DHwyap_OqgfDPGZu19-nF8ib2LbKJ0pV8VV0SGGWtDsJbipvCU_K5oOGFqUIEAdh83Dtzqt1WoxfBDocPSsiCA"
+    },
+    {
+      "name": "liaison dont createdAt et expiresAt sont permut\u00e9s apr\u00e8s signature",
+      "structure": "subkeyBinding",
+      "fields": {
+        "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "certSerial": "EBESExQVFhcYGRobHB0eHw",
+        "ekId": "ICEiIyQlJicoKSorLC0uLw",
+        "kem": "DHKEM-X25519-HKDF-SHA256",
+        "ekPublic": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+        "createdAt": "1797897600000",
+        "expiresAt": "1794009600000"
+      },
+      "verifier": "ik",
+      "signature": "DXwyap_OqgfDPGZu19-nF8ib2LbKJ0pV8VV0SGGWtDsJbipvCU_K5oOGFqUIEAdh83Dtzqt1WoxfBDocPSsiCA"
+    }
+  ]
+}

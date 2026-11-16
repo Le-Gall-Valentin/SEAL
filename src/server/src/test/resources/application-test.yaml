@@ -1,0 +1,3 @@
+# Profil test : les données générées (clé de l'Autorité, KEY-10) restent dans target, jamais dans src/data.
+seal:
+  data-dir: target/test-data

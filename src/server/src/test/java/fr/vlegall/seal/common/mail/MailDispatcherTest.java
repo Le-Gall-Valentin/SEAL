@@ -9,6 +9,7 @@ import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.logging.CorrelationIdFilter;
 import fr.vlegall.seal.support.RecordingMailSender;
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +41,8 @@ class MailDispatcherTest {
                 URI.create("https://localhost:8443"),
                 new SealProperties.Security(Duration.ofMinutes(5)),
                 new SealProperties.Session(Duration.ofHours(12)),
-                new SealProperties.Mail("SEAL <noreply@seal.localhost>"));
+                new SealProperties.Mail("SEAL <noreply@seal.localhost>"),
+                Path.of("data"));
         return new MailDispatcher(sender, properties, background);
     }
 

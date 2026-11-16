@@ -25,4 +25,9 @@ public record Account(
             throw new IllegalArgumentException("seul un compte supprimé n'a pas de courriel");
         }
     }
+
+    /** AUTH-16 : compte actif, donc courriel vérifié ; ni en attente, ni supprimé. */
+    public boolean isActive() {
+        return status == AccountStatus.ACTIVE;
+    }
 }

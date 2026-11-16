@@ -107,3 +107,6 @@ seal:
   mail:
     # ADR 0019, point 8 : valeur fixe, rien à régler.
     from: "SEAL <noreply@seal.localhost>"
+  # KEY-10 : clé de l'Autorité et autres données générées par SEAL. Le Dockerfile fixe SEAL_DATA_DIR=/data (volume
+  # app-data) ; en local, depuis src/server, ../data désigne src/data, hors de Git et de projet.zip.
+  data-dir: ${SEAL_DATA_DIR:../data}

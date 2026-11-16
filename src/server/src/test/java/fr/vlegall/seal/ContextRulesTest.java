@@ -17,6 +17,7 @@ import fr.vlegall.archfixture.alpha.infrastructure.persistence.entity.AlphaEntit
 import fr.vlegall.archfixture.alpha.infrastructure.persistence.repository.AlphaJpaRepository;
 import fr.vlegall.archfixture.alpha.infrastructure.web.ControllerUsingUseCase;
 import fr.vlegall.archfixture.authentication.infrastructure.HashingAdapter;
+import fr.vlegall.archfixture.authentication.infrastructure.identity.AccountLookupAdapter;
 import fr.vlegall.archfixture.beta.application.port.in.BetaUseCase;
 import fr.vlegall.archfixture.beta.infrastructure.alpha.AlphaAdapter;
 import fr.vlegall.archfixture.common.FixtureProperties;
@@ -184,6 +185,14 @@ class ContextRulesTest {
                 "Argon2Adapter",
                 "Password4jAdapter");
         expectAllowed(ContextRules.onlyAuthenticationHandlesPasswords(ROOT), HashingAdapter.class, AlphaThing.class);
+    }
+
+    @Test
+    @DisplayName("ADR 0008, ADR 0025 (point 17) : seul authentication dépend d'AccountLookupQuery, Contact compris")
+    void adr0025OnlyAuthenticationLooksUpAccounts() {
+        expectViolations(ContextRules.onlyAuthenticationLooksUpAccounts(ROOT), "ContactAdapter", "LookupAdapter");
+        expectAllowed(
+                ContextRules.onlyAuthenticationLooksUpAccounts(ROOT), AccountLookupAdapter.class, AlphaThing.class);
     }
 
     @Test

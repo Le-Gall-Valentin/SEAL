@@ -27,7 +27,14 @@ public enum ErrorCode {
     /** AUTH-14 : aucun code vivant (expiré, consommé, remplacé ou épuisé par les 5 essais). */
     CODE_EXPIRED(422),
     /** AUTH-21 : tout échec de connexion, sans en dire la raison (ADR 0021, point 1). */
-    INVALID_CREDENTIALS(401);
+    INVALID_CREDENTIALS(401),
+    // Cryptographie : statuts fixés par l'ADR 0025, point 5.
+    /** Le certificat ou le coffre désigné n'existe pas (KEY-05, KEY-32). */
+    KEY_NOT_FOUND(404),
+    /** Signature fausse, ou clé publique hors de la courbe (KEY-03, KEY-05). */
+    INVALID_SIGNATURE(422),
+    /** KEY-32 : la version du coffre n'est pas celle qui suit la version enregistrée. */
+    VAULT_VERSION_CONFLICT(409);
 
     private final int status;
 

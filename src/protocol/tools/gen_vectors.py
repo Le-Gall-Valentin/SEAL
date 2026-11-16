@@ -2,10 +2,14 @@
 """Produit les vecteurs de référence de SEAL, lus par les tests Java et TypeScript.
 
 - vectors/canonical-encoding.json : encodage canonique (PROTOCOL.md, section 2 ; MSG-02, ADR 0006) ;
-- vectors/password-policy.json : politique des mots de passe (PROTOCOL.md, section 3 ; AUTH-11, ADR 0024).
+- vectors/password-policy.json : politique des mots de passe (PROTOCOL.md, section 3 ; AUTH-11, ADR 0024) ;
+- vectors/ed25519-rfc8032.json : vecteurs officiels d'Ed25519 (RFC 8032, section 7.1 ; QA-01) ;
+- vectors/identity.json : certificat, preuve de possession et liaison de sous-clé (PROTOCOL.md, section 4 ;
+  KEY-03 à KEY-05, QA-02, ADR 0025).
 
 Troisième implémentation, indépendante de Java et de TypeScript : les deux suites de tests relisent ces
-vecteurs, aucune ne se valide elle-même. Bibliothèque standard de Python uniquement.
+vecteurs, aucune ne se valide elle-même. Bibliothèque standard de Python, plus `cryptography` pour signer en
+Ed25519 (ADR 0025, point 3), installée par : python3 -m pip install --require-hashes -r tools/requirements.txt
 
 Usage, depuis src/protocol :
     python3 tools/gen_vectors.py           réécrit les fichiers de vectors/
@@ -16,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import re
 import struct as binary
@@ -26,6 +31,8 @@ from pathlib import Path
 PROTOCOL_DIR = Path(__file__).resolve().parent.parent
 OUTPUT = PROTOCOL_DIR / "vectors" / "canonical-encoding.json"
 PASSWORD_OUTPUT = PROTOCOL_DIR / "vectors" / "password-policy.json"
+RFC8032_OUTPUT = PROTOCOL_DIR / "vectors" / "ed25519-rfc8032.json"
+IDENTITY_OUTPUT = PROTOCOL_DIR / "vectors" / "identity.json"
 BLOCKLIST = PROTOCOL_DIR / "password-blocklist.txt"
 
 U32_MAX = 2**32 - 1
@@ -410,6 +417,287 @@ def build_password_policy() -> str:
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
 
 
+# ---------------------------------------------------------------------------------------------
+# Ed25519 et identité (QA-01, QA-02, PROTOCOL.md section 4, ADR 0025). Ed25519 est déterministe : les signatures
+# sont stables d'une génération à l'autre, et chaque implémentation doit les reproduire à l'octet près.
+# ---------------------------------------------------------------------------------------------
+
+
+def ed25519():
+    """Module Ed25519 de `cryptography`, importé à la demande pour que l'erreur dise quoi installer."""
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ed25519 as module
+        from cryptography.hazmat.primitives import serialization
+    except ImportError as error:
+        raise SystemExit(
+            "gen_vectors.py : la bibliothèque cryptography manque ; lancez "
+            "python3 -m pip install --require-hashes -r tools/requirements.txt"
+        ) from error
+    return module, serialization
+
+
+def sha256(data: bytes) -> bytes:
+    return hashlib.sha256(data).digest()
+
+
+def public_key(seed: bytes) -> bytes:
+    module, serialization = ed25519()
+    key = module.Ed25519PrivateKey.from_private_bytes(seed).public_key()
+    return key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+
+def sign(seed: bytes, message: bytes) -> bytes:
+    module, _ = ed25519()
+    return module.Ed25519PrivateKey.from_private_bytes(seed).sign(message)
+
+
+def verifies(public: bytes, message: bytes, signature: bytes) -> bool:
+    module, _ = ed25519()
+    try:
+        module.Ed25519PublicKey.from_public_bytes(public).verify(signature, message)
+        return True
+    except Exception:  # InvalidSignature : la seule réponse attendue d'une signature fausse
+        return False
+
+
+# RFC 8032, section 7.1, tests 1 à 3 : clé secrète, clé publique, message, signature, en hexadécimal comme la RFC.
+RFC8032_TESTS = [
+    (
+        "TEST 1, message vide",
+        "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+        "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+        "",
+        "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
+    ),
+    (
+        "TEST 2, un octet",
+        "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+        "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+        "72",
+        "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00",
+    ),
+    (
+        "TEST 3, deux octets",
+        "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+        "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+        "af82",
+        "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a",
+    ),
+]
+
+
+def build_rfc8032() -> str:
+    tests = []
+    for name, secret, public, message, signature in RFC8032_TESTS:
+        # La bibliothèque doit retrouver la RFC : sinon, ni elle ni les vecteurs SEAL qu'elle signe ne font foi.
+        if public_key(bytes.fromhex(secret)).hex() != public or sign(bytes.fromhex(secret), bytes.fromhex(message)).hex() != signature:
+            raise AssertionError(f"cryptography ne reproduit pas la RFC 8032, {name}")
+        tests.append({"name": name, "secretKey": secret, "publicKey": public, "message": message, "signature": signature})
+    document = {
+        "format": "seal-ed25519-rfc8032-v1",
+        "subject": "Vecteurs officiels d'Ed25519 : RFC 8032, section 7.1, tests 1 à 3 (QA-01), en hexadécimal",
+        "generator": "src/protocol/tools/gen_vectors.py",
+        "tests": tests,
+    }
+    return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
+
+
+# Clés des vecteurs d'identité : les graines publiques des tests 1 à 3 de la RFC 8032, jamais de vraies clés.
+CA_SEED = bytes.fromhex(RFC8032_TESTS[0][1])
+IK_SEED = bytes.fromhex(RFC8032_TESTS[1][1])
+OTHER_SEED = bytes.fromhex(RFC8032_TESTS[2][1])
+SIGNERS = {"ca": CA_SEED, "ik": IK_SEED, "other": OTHER_SEED}
+
+USER_ID = SENDER_ID
+VICTIM_ID = RECIPIENT_ID
+NOT_BEFORE = 1_794_009_600_000
+DAY_MS = 86_400_000
+CERTIFICATE_VALIDITY_DAYS = 397  # KEY-04, section 6.2
+SUBKEY_VALIDITY_DAYS = 45  # KEY-21
+KEM = "DHKEM-X25519-HKDF-SHA256"
+USAGE = 0b11  # bit 0 : signature et non-répudiation ; bit 1 : certification de sous-clés
+EK_ID = bytes(range(0x20, 0x30))
+EK_PUBLIC = bytes(range(0x40, 0x60))  # 32 octets : la liaison ne vérifie pas le point X25519 (ADR 0025)
+CHALLENGE = bytes(range(0x60, 0x80))
+
+# Les 8 points d'ordre faible d'Ed25519, en encodage canonique (la liste de libsodium). Avec une telle clé, et R pris
+# parmi eux, l'équation de vérification tient pour tout message : certaines bibliothèques, dont la JCA de la JDK 25,
+# acceptent alors une signature sans clé privée. SEAL refuse ces clés et ces R (PROTOCOL.md, section 4).
+SMALL_ORDER_POINTS = [
+    "0100000000000000000000000000000000000000000000000000000000000000",  # neutre, ordre 1
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # ordre 2
+    "0000000000000000000000000000000000000000000000000000000000000000",  # ordre 4
+    "0000000000000000000000000000000000000000000000000000000000000080",  # ordre 4
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",  # ordre 8
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",  # ordre 8
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",  # ordre 8
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85",  # ordre 8
+]
+
+# Autres encodages des mêmes points, refusés aussi : bit de signe posé sur x nul, et y non canonique (y = p, y = p + 1).
+SMALL_ORDER_OTHER_ENCODINGS = [
+    "0100000000000000000000000000000000000000000000000000000000000080",  # neutre, bit de signe
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",  # ordre 2, bit de signe
+    "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # y = p, soit 0
+    "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",  # y = p, bit de signe
+    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # y = p + 1, soit 1
+    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",  # y = p + 1, bit de signe
+]
+
+
+def certificate_struct(f: dict) -> dict:
+    return STRUCT(
+        "SEAL-cert-v1",
+        BYTES(from_b64url(f["serial"])),
+        BYTES(from_b64url(f["issuerKeyId"])),
+        UUID(f["subjectId"]),
+        TEXT(f["username"]),
+        BYTES(from_b64url(f["ikPublic"])),
+        U64(int(f["notBefore"])),
+        U64(int(f["notAfter"])),
+        U8(f["usage"]),
+    )
+
+
+def proof_struct(f: dict, label: str = "SEAL-pop-v1") -> dict:
+    return STRUCT(label, UUID(f["userId"]), BYTES(from_b64url(f["ikPublic"])), BYTES(from_b64url(f["challenge"])))
+
+
+def binding_struct(f: dict) -> dict:
+    return STRUCT(
+        "SEAL-subkey-v1",
+        UUID(f["userId"]),
+        BYTES(from_b64url(f["certSerial"])),
+        BYTES(from_b64url(f["ekId"])),
+        TEXT(f["kem"]),
+        BYTES(from_b64url(f["ekPublic"])),
+        U64(int(f["createdAt"])),
+        U64(int(f["expiresAt"])),
+    )
+
+
+STRUCTURES = {"certificate": certificate_struct, "proof": proof_struct, "subkeyBinding": binding_struct}
+
+
+def certificate_fields(username: str = "valentin.dupont") -> dict:
+    return {
+        "serial": b64url(SERIAL),
+        "issuerKeyId": b64url(sha256(public_key(CA_SEED))[:8]),
+        "subjectId": USER_ID,
+        "username": username,
+        "ikPublic": b64url(public_key(IK_SEED)),
+        # u64 en chaîne décimale, comme dans canonical-encoding.json (ADR 0006, point 5 ; PROTOCOL.md, 2.5).
+        "notBefore": str(NOT_BEFORE),
+        "notAfter": str(NOT_BEFORE + CERTIFICATE_VALIDITY_DAYS * DAY_MS),
+        "usage": USAGE,
+    }
+
+
+def proof_fields(user: str = USER_ID) -> dict:
+    return {"userId": user, "ikPublic": b64url(public_key(IK_SEED)), "challenge": b64url(CHALLENGE)}
+
+
+def binding_fields() -> dict:
+    return {
+        "userId": USER_ID,
+        "certSerial": b64url(SERIAL),
+        "ekId": b64url(EK_ID),
+        "kem": KEM,
+        "ekPublic": b64url(EK_PUBLIC),
+        "createdAt": str(NOT_BEFORE),
+        "expiresAt": str(NOT_BEFORE + SUBKEY_VALIDITY_DAYS * DAY_MS),
+    }
+
+
+def signed(name: str, structure: str, fields: dict, signer: str) -> dict:
+    encoded = encode(STRUCTURES[structure](fields))
+    return {"name": name, "fields": fields, "signer": signer, "encoded": b64url(encoded), "signature": b64url(sign(SIGNERS[signer], encoded))}
+
+
+def forgery(name: str, structure: str, fields: dict, signature: bytes, verifier: str) -> dict:
+    encoded = encode(STRUCTURES[structure](fields))
+    public = public_key(SIGNERS[verifier])
+    # Chaque falsification doit être refusée par la bibliothèque de référence elle-même.
+    if verifies(public, encoded, signature):
+        raise AssertionError(f"la falsification « {name} » passe la vérification")
+    return {"name": name, "structure": structure, "fields": fields, "verifier": verifier, "signature": b64url(signature)}
+
+
+def build_identity() -> str:
+    certificate = certificate_fields()
+    proof = proof_fields()
+    binding = binding_fields()
+    cert_bytes = encode(certificate_struct(certificate))
+    proof_bytes = encode(proof_struct(proof))
+    binding_bytes = encode(binding_struct(binding))
+    longer = dict(certificate, notAfter=str(int(certificate["notAfter"]) + DAY_MS))
+    signature_only = dict(certificate, usage=USAGE ^ 0b10)
+    swapped = dict(binding, createdAt=binding["expiresAt"], expiresAt=binding["createdAt"])
+    other_user = proof_fields(VICTIM_ID)
+    flipped = bytearray(sign(IK_SEED, binding_bytes))
+    flipped[0] ^= 0x01
+    document = {
+        "format": "seal-identity-v1",
+        "subject": "Identité : PROTOCOL.md, section 4 (KEY-03 à KEY-05, KEY-10, QA-02, ADR 0025)",
+        "generator": "src/protocol/tools/gen_vectors.py",
+        "keys": {
+            role: {"seed": b64url(seed), "publicKey": b64url(public_key(seed))} for role, seed in SIGNERS.items()
+        },
+        "authority": {
+            "publicKey": b64url(public_key(CA_SEED)),
+            "keyId": b64url(sha256(public_key(CA_SEED))[:8]),
+            "fingerprint": sha256(public_key(CA_SEED)).hex().upper(),
+        },
+        "certificates": [
+            signed("certificat : usage signature et certification", "certificate", certificate, "ca"),
+            signed(
+                "certificat : identifiant de 20 caractères, avec . et _ (AUTH-01)",
+                "certificate",
+                certificate_fields("anne_marie.tremblay2"),
+                "ca",
+            ),
+        ],
+        "proofs": [signed("preuve de possession du défi", "proof", proof, "ik")],
+        "subkeyBindings": [signed("liaison de la sous-clé X25519, 45 jours", "subkeyBinding", binding, "ik")],
+        "smallOrder": {
+            "rule": "Une clé publique ou un R d'ordre faible est refusé avant toute vérification"
+            " (PROTOCOL.md, introduction de la section 4)",
+            "points": [b64url(bytes.fromhex(point)) for point in SMALL_ORDER_POINTS],
+            "otherEncodings": [b64url(bytes.fromhex(encoding)) for encoding in SMALL_ORDER_OTHER_ENCODINGS],
+            "message": b64url("n'importe quel message".encode("utf-8")),
+        },
+        "forgeries": [
+            forgery("certificat prolongé d'un jour après signature", "certificate", longer, sign(CA_SEED, cert_bytes), "ca"),
+            forgery("certificat signé par une autre clé que la CA", "certificate", certificate, sign(OTHER_SEED, cert_bytes), "ca"),
+            forgery(
+                "certificat dont le bit de certification est effacé après signature",
+                "certificate",
+                signature_only,
+                sign(CA_SEED, cert_bytes),
+                "ca",
+            ),
+            forgery(
+                "preuve signée sous une autre étiquette (séparation de domaine)",
+                "proof",
+                proof,
+                sign(IK_SEED, encode(proof_struct(proof, "SEAL-pop-v2"))),
+                "ik",
+            ),
+            forgery("preuve d'un compte présentée pour un autre", "proof", other_user, sign(IK_SEED, proof_bytes), "ik"),
+            forgery("liaison vérifiée avec une autre clé que l'IK", "subkeyBinding", binding, sign(IK_SEED, binding_bytes), "other"),
+            forgery("liaison dont un bit de la signature est inversé", "subkeyBinding", binding, bytes(flipped), "ik"),
+            forgery(
+                "liaison dont createdAt et expiresAt sont permutés après signature",
+                "subkeyBinding",
+                swapped,
+                sign(IK_SEED, binding_bytes),
+                "ik",
+            ),
+        ],
+    }
+    return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Vecteurs de référence de SEAL (PROTOCOL.md).")
     parser.add_argument("--check", action="store_true", help="échoue si un fichier n'est pas à jour")
@@ -417,6 +705,8 @@ def main() -> int:
     outputs = [
         (OUTPUT, build(), f"{len(VALID)} cas valides, {len(INVALID)} cas à rejeter"),
         (PASSWORD_OUTPUT, build_password_policy(), f"{len(PASSWORD_CASES)} cas"),
+        (RFC8032_OUTPUT, build_rfc8032(), f"{len(RFC8032_TESTS)} tests"),
+        (IDENTITY_OUTPUT, build_identity(), "certificats, preuve, liaison et falsifications"),
     ]
     if check:
         stale = [path for path, content, _ in outputs if not path.exists() or path.read_text(encoding="ascii") != content]

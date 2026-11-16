@@ -71,6 +71,24 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("ADR 0025, point 5 : une SealException qui nomme des champs les liste dans fields")
+    void adr0025SealExceptionListsItsFields() throws Exception {
+        mvc.perform(get("/probe/duplicate"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields", contains("ekId")));
+        mvc.perform(get("/probe/rejected")).andExpect(jsonPath("$.fields").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("ADR 0010 : les champs d'une SealException sont triés, sans doublon, comme ceux de la validation")
+    void adr0010SealExceptionFieldsAreSortedWithoutDuplicates() throws Exception {
+        mvc.perform(get("/probe/out-of-bounds"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields", contains("createdAt", "expiresAt")));
+    }
+
+    @Test
     @DisplayName("ADR 0010 : un paramètre invalide répond 400 VALIDATION_FAILED et liste le paramètre")
     void adr0010InvalidParameterListsTheField() throws Exception {
         mvc.perform(get("/probe/check").param("u", "ab"))
@@ -163,6 +181,16 @@ class ApiExceptionHandlerTest {
         @GetMapping("/rejected")
         String rejected() {
             throw new SealException(ErrorCode.REQUEST_REJECTED);
+        }
+
+        @GetMapping("/duplicate")
+        String duplicate() {
+            throw new SealException(ErrorCode.VALIDATION_FAILED, "ekId");
+        }
+
+        @GetMapping("/out-of-bounds")
+        String outOfBounds() {
+            throw new SealException(ErrorCode.VALIDATION_FAILED, "expiresAt", "createdAt", "expiresAt");
         }
 
         @GetMapping("/check")

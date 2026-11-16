@@ -65,6 +65,11 @@ Ouvrez ensuite :
 Pour arrêter SEAL : `docker compose down`. Pour effacer aussi la base et les données :
 `docker compose down -v`.
 
+Au premier démarrage, SEAL génère la clé de son Autorité de certification dans le volume `app-data`
+(`/data/ca`) et écrit son empreinte dans le journal : `docker compose logs app | grep Autorité`. Ce volume
+est à sauvegarder : `docker compose down -v` l'efface aussi, et une nouvelle Autorité rend invalides tous les
+certificats déjà émis.
+
 ## Développement
 
 Il faut JDK 25 et Node.js 24 LTS (`sdk env` et `nvm use` lisent `.sdkmanrc` et `.nvmrc`).
@@ -80,4 +85,5 @@ Il faut JDK 25 et Node.js 24 LTS (`sdk env` et `nvm use` lisent `.sdkmanrc` et `
 | Archive de remise `projet.zip` | `src` | `./scripts/package.sh` (Windows, non testé : `scripts\package.ps1`) |
 
 Le serveur et les tests d'intégration ont besoin de Docker (Testcontainers), et le serveur en
-développement des certificats de `src/certs`.
+développement des certificats de `src/certs`. Lancé depuis `src/server`, il range la clé de son Autorité dans
+`src/data/ca`, hors de Git et de `projet.zip` ; les tests, dans `src/server/target/test-data`.

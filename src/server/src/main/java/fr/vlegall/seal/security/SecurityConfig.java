@@ -45,6 +45,9 @@ class SecurityConfig {
     /** SEC-01, A06 : 16 Kio au plus pour un corps sous {@code /api/v1/auth/} (ADR 0019, point 5). */
     static final int AUTH_BODY_LIMIT = 16 * 1024;
 
+    /** SEC-01, A06 : 64 Kio au plus pour un corps sous {@code /api/v1/keys/}, coffre compris (ADR 0025, point 6). */
+    static final int KEYS_BODY_LIMIT = 64 * 1024;
+
     /** TRN-20, TRN-21 : aucune ressource tierce, aucun script ni style en ligne. */
     static String contentSecurityPolicy(SealProperties seal) {
         return "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
@@ -118,6 +121,21 @@ class SecurityConfig {
                                 "/api/v1/auth/verify-email/resend",
                                 "/api/v1/auth/verify-email/change")
                         .hasAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL)
+                        // KEY-10, KEY-11, ADR 0025 (point 9) : clé de l'Autorité, pour la seule session complète.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/pki/ca")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // KEY-03, KEY-04, ADR 0025 (point 9) : défi et publication de l'identité, session complète.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/keys/challenge")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/keys/identity")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // KEY-05, KEY-32, KEY-33 : sous-clés et coffre du compte, session complète.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/keys/subkeys")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/keys/vault")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/keys/vault")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         .requestMatchers("/error")
                         .permitAll()
                         // Sonde de santé du conteneur, sur le port de gestion interne (A02).
@@ -148,6 +166,13 @@ class SecurityConfig {
                         new RequestBodyLimitFilter(
                                 PathPatternRequestMatcher.withDefaults().matcher("/api/v1/auth/**"),
                                 AUTH_BODY_LIMIT,
+                                problemDetails::rejectTooLarge),
+                        HeaderWriterFilter.class)
+                // Chemins disjoints : chaque requête ne passe que par le filtre de sa limite.
+                .addFilterAfter(
+                        new RequestBodyLimitFilter(
+                                PathPatternRequestMatcher.withDefaults().matcher("/api/v1/keys/**"),
+                                KEYS_BODY_LIMIT,
                                 problemDetails::rejectTooLarge),
                         HeaderWriterFilter.class)
                 .headers(headers -> headers.contentSecurityPolicy(

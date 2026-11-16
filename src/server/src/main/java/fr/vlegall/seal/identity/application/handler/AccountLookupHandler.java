@@ -5,7 +5,6 @@ import fr.vlegall.seal.common.Unicode;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.AccountLookupQuery;
 import fr.vlegall.seal.identity.domain.model.Account;
-import fr.vlegall.seal.identity.domain.model.AccountStatus;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.PersonalWords;
 import fr.vlegall.seal.identity.domain.model.Username;
@@ -59,7 +58,7 @@ public class AccountLookupHandler implements AccountLookupQuery {
     }
 
     private Optional<Account> findActive(UserId user) {
-        return users.findById(user).filter(account -> account.status() == AccountStatus.ACTIVE);
+        return users.findById(user).filter(Account::isActive);
     }
 
     /** Un compte actif a toujours un courriel : seul un compte supprimé n'en a pas ({@link Account}). */

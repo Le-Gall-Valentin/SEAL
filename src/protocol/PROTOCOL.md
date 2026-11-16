@@ -4,10 +4,9 @@ Ce document est la référence publique du protocole de SEAL : conformément au 
 sa sécurité ne repose que sur les clés. Il précise, à l'octet près, les sections 6 à 9 du cahier des
 charges ; client (TypeScript) et serveur (Java) DOIVENT produire exactement les encodages décrits ici.
 
-Les mots DOIT, NE DOIT PAS et PEUT ont le sens de la RFC 2119. Les sections sur les clés et
-certificats, les messages, les groupes et la non-répudiation s'ajouteront avec leurs lots ; toute
-modification d'un format met à jour, dans le même commit, ce document, les vecteurs de `vectors/` et
-les tests Java et TypeScript.
+Les mots DOIT, NE DOIT PAS et PEUT ont le sens de la RFC 2119. Les sections sur les messages, les
+groupes et la non-répudiation s'ajouteront avec leurs lots ; toute modification d'un format met à
+jour, dans le même commit, ce document, les vecteurs de `vectors/` et les tests Java et TypeScript.
 
 ## 1. Conventions
 
@@ -96,8 +95,9 @@ une chaîne décimale (`JSON.parse` perd la précision au-delà de 2⁵³), `byt
 `text` et `uuid` une chaîne ; `list` porte ses `items`, `concat` ses `parts` et `struct` son `label`
 et ses `fields`, eux-mêmes des descripteurs. Les caractères hors ASCII sont échappés en `\uXXXX`.
 
-Les vecteurs sont produits par `tools/gen_vectors.py`, une troisième implémentation en Python, sans
-dépendance, indépendante de Java et de TypeScript. Pour les régénérer, depuis `src/protocol` :
+Les vecteurs sont produits par `tools/gen_vectors.py`, une troisième implémentation en Python,
+indépendante de Java et de TypeScript : bibliothèque standard seule, plus `cryptography` pour les signatures
+de la section 4. Pour les régénérer, depuis `src/protocol` :
 
 ```bash
 python3 tools/gen_vectors.py           # réécrit les fichiers de vectors/
@@ -185,3 +185,88 @@ Une entrée par ligne, en UTF-8, fins de ligne `\n`, toutes en ASCII.
 Le serveur l'embarque comme ressource Maven et un test vérifie son empreinte ; le client l'importe en
 morceau séparé, chargé seulement par les écrans qui affichent les règles (ADR 0024, point 6 bis).
 
+
+## 4. Identité : certificat, preuve de possession, sous-clé (KEY-03 à KEY-05, ADR 0025)
+
+Chaque compte a une clé d'identité Ed25519 (IK), certifiée par l'Autorité SEAL (CA, Ed25519), qui signe une
+sous-clé de chiffrement X25519 (EK). Toute signature est Ed25519 pur (RFC 8032), sur les octets canoniques de
+la structure. L'étiquette de chaque structure fixe son algorithme : aucun champ ne le négocie, et un autre
+algorithme serait une nouvelle version de l'étiquette (ADR 0025, point 11).
+
+Toute vérification refuse d'abord une clé publique ou un `R` (les 32 premiers octets de la signature) d'ordre
+faible ou non canonique, comme libsodium : bit de signe effacé, `y` lu en petit-boutiste ne DOIT être ni supérieur ou
+égal à p = 2²⁵⁵ − 19, ni l'un des `y` des 8 points d'ordre faible (0, 1, p − 1 et les deux `y` d'ordre 8). La section
+`smallOrder` de `vectors/identity.json` donne ces 8 points et 6 autres encodages des mêmes points. Avec eux, l'équation de vérification
+tient pour tout message, et des bibliothèques courantes, dont la JCA de la JDK 25, acceptent la signature : une clé
+sans clé privée serait certifiée (ADR 0025, point 14).
+
+### 4.1 Autorité
+
+| Élément | Valeur |
+| --- | --- |
+| Clé | Ed25519, générée au premier démarrage : `data/ca/seal-ca.p8` (clé privée, PKCS#8) et `data/ca/seal-ca.pub` (clé publique, SubjectPublicKeyInfo), droits 600 dans un dossier en 700 (KEY-10) |
+| `issuerKeyId` | les 8 premiers octets de SHA-256(clé publique brute de 32 octets) |
+| Empreinte | SHA-256(clé publique brute), 64 caractères hexadécimaux majuscules |
+| `GET /api/v1/pki/ca` | `{publicKey, keyId, fingerprint}`, octets en base64url |
+
+### 4.2 Certificat d'identité (KEY-04)
+
+```
+SealCertificate = struct("SEAL-cert-v1",
+    bytes(serial),        // 16 octets aléatoires
+    bytes(issuerKeyId),   // 8 octets
+    uuid(subjectId),      // identifiant interne du compte
+    text(username),       // identifiant définitif (AUTH-01, AUTH-03)
+    bytes(ikPublic),      // 32 octets, Ed25519
+    u64(notBefore),       // millisecondes Unix
+    u64(notAfter),        // notBefore + 397 jours
+    u8(usage))            // 0b11 : bit 0 signature et non-répudiation, bit 1 certification de sous-clés
+signature = Ed25519.sign(clé CA, SealCertificate)
+```
+
+Un compte a au plus un certificat non révoqué. Après son expiration, une nouvelle publication de la **même** clé
+d'identité révoque l'ancien, motif « remplacé » (code 4 de X.509) ; une autre clé est refusée, car changer de clé
+est une réinitialisation, réservée au mode sudo (KEY-12, KEY-34, ADR 0025, point 4).
+
+### 4.3 Preuve de possession (KEY-03)
+
+```
+ProofOfPossession = struct("SEAL-pop-v1", uuid(userId), bytes(ikPublic), bytes(challenge))
+signature = Ed25519.sign(IK, ProofOfPossession)
+```
+
+`challenge` fait 32 octets, tirés par le serveur (`POST /api/v1/keys/challenge`), valables 5 minutes et pour
+un seul usage. `userId` est celui de la session : une preuve faite pour un compte ne vaut pour aucun autre.
+
+### 4.4 Liaison de sous-clé (KEY-05)
+
+```
+SubkeyBinding = struct("SEAL-subkey-v1",
+    uuid(userId), bytes(certSerial), bytes(ekId),   // ekId : 16 octets aléatoires
+    text(kem),            // "DHKEM-X25519-HKDF-SHA256"
+    bytes(ekPublic),      // 32 octets, X25519
+    u64(createdAt), u64(expiresAt))                 // expiresAt = createdAt + 45 jours
+signature = Ed25519.sign(IK, SubkeyBinding)
+```
+
+Le serveur ramène `createdAt` et `expiresAt` à la milliseconde, comme la signature, puis refuse une liaison dont
+`certSerial` n'est pas le certificat courant de l'appelant, un `ekId` déjà utilisé, un `createdAt` à plus de
+5 minutes de son horloge ou une validité autre que 45 jours (ADR 0025, point 7). Un compte a au plus trois
+sous-clés non expirées pour son certificat courant : au-delà, la publication est refusée (403, ADR 0025,
+point 15) ; celles d'un ancien certificat ne comptent pas. Le serveur ne vérifie de
+`ekPublic` que sa longueur : l'émetteur rejette un secret partagé nul (RFC 9180).
+
+### 4.5 Vecteurs (QA-01, QA-02)
+
+- `vectors/ed25519-rfc8032.json` : les tests 1 à 3 de la RFC 8032, section 7.1, en hexadécimal.
+- `vectors/identity.json` : la CA, deux certificats, une preuve, une liaison, chacun avec ses champs, ses
+  octets canoniques et sa signature, plus huit falsifications que toute implémentation DOIT refuser, et les 8 points
+  d'ordre faible (`smallOrder`) : aucune clé ni aucun `R` pris parmi eux ne DOIT vérifier. Les dates (`u64`) y sont
+  des chaînes décimales, comme en 2.5 ; les octets, du base64url. Les clés sont les graines publiques de la
+  RFC 8032 (CA : test 1, IK : test 2, autre clé : test 3).
+
+`gen_vectors.py` les signe avec la bibliothèque `cryptography`, épinglée avec ses empreintes :
+
+```bash
+python3 -m pip install --require-hashes -r tools/requirements.txt
+```
