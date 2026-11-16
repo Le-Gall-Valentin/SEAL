@@ -47,10 +47,20 @@ class PasswordPepperTest {
         String notBase64 = "pas-du-base64-secret!";
         String sixteenBytes = Base64.getEncoder().encodeToString(new byte[16]);
 
-        assertThatThrownBy(() -> new PasswordPepper(null)).hasMessageContaining("SEAL_PASSWORD_PEPPER");
+        assertThatThrownBy(() -> new PasswordPepper(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SEAL_PASSWORD_PEPPER");
         assertThatThrownBy(() -> new PasswordPepper(""))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("32 octets");
+                .hasMessageContaining("SEAL_PASSWORD_PEPPER");
+        for (int length : new int[] {31, 33, 64}) {
+            String wrongSize = Base64.getEncoder().encodeToString(new byte[length]);
+            assertThatThrownBy(() -> new PasswordPepper(wrongSize))
+                    .as("%d octets", length)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("32 octets")
+                    .hasMessageNotContaining(wrongSize);
+        }
         assertThatThrownBy(() -> new PasswordPepper(notBase64))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageNotContaining(notBase64)

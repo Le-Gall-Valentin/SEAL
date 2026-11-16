@@ -1,7 +1,6 @@
 package fr.vlegall.seal.common;
 
 import java.util.Base64;
-import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -20,19 +19,28 @@ public final class PasswordPepper {
 
     /** @param pepper 32 octets en base64 */
     public PasswordPepper(String pepper) {
-        Objects.requireNonNull(pepper, "seal.passwords.pepper est obligatoire : remplissez SEAL_PASSWORD_PEPPER");
+        if (pepper == null || pepper.isBlank()) {
+            throw new IllegalArgumentException(
+                    "SEAL_PASSWORD_PEPPER est vide : lancez scripts/gen-certs.sh (seal.passwords.pepper, ADR 0026)");
+        }
         byte[] decoded;
         try {
             decoded = Base64.getDecoder().decode(pepper);
         } catch (IllegalArgumentException e) {
             // Sans cause chaînée : le message de java.util.Base64 cite le caractère fautif, un morceau du secret
             // (SEC-21).
-            throw new IllegalArgumentException("seal.passwords.pepper doit valoir " + BYTES + " octets en base64");
+            throw invalid();
         }
         if (decoded.length != BYTES) {
-            throw new IllegalArgumentException("seal.passwords.pepper doit valoir " + BYTES + " octets en base64");
+            throw invalid();
         }
         this.value = decoded;
+    }
+
+    /** Message fixe, sans la valeur reçue (SEC-21). */
+    private static IllegalArgumentException invalid() {
+        return new IllegalArgumentException(
+                "SEAL_PASSWORD_PEPPER (seal.passwords.pepper) doit valoir " + BYTES + " octets en base64");
     }
 
     /** Une copie : l'appelant ne peut pas modifier le poivre. */
