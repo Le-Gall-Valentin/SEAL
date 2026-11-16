@@ -16,6 +16,7 @@ import fr.vlegall.seal.support.MutableClock;
 import fr.vlegall.seal.support.PasswordHashingProbe;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import fr.vlegall.seal.support.UnpepperedHashes;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,8 +40,6 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.SimpleMailMessage;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -269,9 +268,7 @@ class PasswordResetIT {
     void adr0026UnpepperedAccountRecoversByReset() throws Exception {
         Registered account = active(unique("avantpoivre"));
         jdbc.sql("UPDATE user_credentials SET password_hash = ? WHERE user_id = ?")
-                .param(new DelegatingPasswordEncoder(
-                                "argon2", Map.of("argon2", new Argon2PasswordEncoder(16, 32, 1, 19_456, 2)))
-                        .encode(PASSWORD))
+                .param(UnpepperedHashes.of(PASSWORD))
                 .param(account.id())
                 .update();
         assertThat(login(account.username(), PASSWORD).getResponse().getStatus())

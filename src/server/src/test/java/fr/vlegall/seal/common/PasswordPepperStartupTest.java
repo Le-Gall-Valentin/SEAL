@@ -53,7 +53,7 @@ class PasswordPepperStartupTest {
     void sec22MissingVariableIsNamed(CapturedOutput output) {
         assertThatThrownBy(() -> application(environment(Map.of())).run()).isNotNull();
 
-        assertThat(output.getAll()).contains("SEAL_PASSWORD_PEPPER");
+        assertThat(output.getAll()).contains("SEAL_PASSWORD_PEPPER est vide");
     }
 
     static Stream<Arguments> invalidPeppers() {

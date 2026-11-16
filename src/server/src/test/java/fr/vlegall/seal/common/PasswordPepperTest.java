@@ -49,10 +49,10 @@ class PasswordPepperTest {
 
         assertThatThrownBy(() -> new PasswordPepper(null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("SEAL_PASSWORD_PEPPER");
+                .hasMessageContaining("SEAL_PASSWORD_PEPPER est vide");
         assertThatThrownBy(() -> new PasswordPepper(""))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("SEAL_PASSWORD_PEPPER");
+                .hasMessageContaining("SEAL_PASSWORD_PEPPER est vide");
         for (int length : new int[] {31, 33, 64}) {
             String wrongSize = Base64.getEncoder().encodeToString(new byte[length]);
             assertThatThrownBy(() -> new PasswordPepper(wrongSize))

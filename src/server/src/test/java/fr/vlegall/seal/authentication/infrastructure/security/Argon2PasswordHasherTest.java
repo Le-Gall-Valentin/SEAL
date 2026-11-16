@@ -6,12 +6,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.common.PasswordPepper;
 import fr.vlegall.seal.crypto.Digests;
+import fr.vlegall.seal.support.UnpepperedHashes;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 class Argon2PasswordHasherTest {
@@ -135,7 +134,7 @@ class Argon2PasswordHasherTest {
 
     /** Haché d'avant l'ADR 0026 : Argon2id sans poivre, préfixé par {argon2}. */
     private static String legacyHash() {
-        return new DelegatingPasswordEncoder("argon2", Map.of("argon2", plainArgon2())).encode(PASSWORD);
+        return UnpepperedHashes.of(PASSWORD);
     }
 
     @Test
@@ -287,6 +286,46 @@ class Argon2PasswordHasherTest {
 
     private static final String OUTPUT = "A".repeat(43);
 
+    // Tailles en base64 sans remplissage : 16, 15, 64 et 65 octets de sel ou de sortie, 31 octets de sortie.
+    private static final String SALT16 = "c2Vsc2Vsc2Vsc2Vsc2Vsc2";
+    private static final String SALT15 = "AAAAAAAAAAAAAAAAAAAA";
+    private static final String BYTES64 =
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    private static final String BYTES65 =
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    private static final String OUTPUT31 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    private static final String OUTPUT_LITERAL = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {
+                "{argon2-p1}$argon2id$v=19$m=65536,t=2,p=1$",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=10,p=1$",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=4$"
+            })
+    @DisplayName("ADR 0026, point 7 : un haché aux bornes hautes est vérifié pour lui-même, pas par le leurre")
+    void adr0026UpperBoundsAreVerified(String prefix) {
+        for (String stored : new String[] {prefix + SALT16 + "$" + OUTPUT_LITERAL, prefix + BYTES64 + "$" + BYTES64}) {
+            List<String> verified = new ArrayList<>();
+            PasswordEncoder recording = new PasswordEncoder() {
+                @Override
+                public String encode(CharSequence raw) {
+                    return "{argon2-p1}leurre";
+                }
+
+                @Override
+                public boolean matches(CharSequence raw, String encoded) {
+                    verified.add(encoded);
+                    return true;
+                }
+            };
+
+            assertThat(new Argon2PasswordHasher(PEPPER, recording, 2).matches(Password.fromInput(PASSWORD), stored))
+                    .isTrue();
+            assertThat(verified).containsExactly(stored);
+        }
+    }
+
     @Test
     @DisplayName("ADR 0026, point 7 : un haché aux paramètres durcis, dans les bornes, reste vérifiable")
     void adr0026HardenedParametersStillVerify() {
@@ -314,7 +353,17 @@ class Argon2PasswordHasherTest {
                 "{argon2-p1}$argon2i$v=19$m=19456,t=2,p=1$" + SALT + "$" + "A",
                 "{argon2-p1}$argon2id$v=16$m=19456,t=2,p=1$" + SALT + "$" + "A",
                 "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT + "$" + "A" + "$x",
-                "{argon2-p1}"
+                "{argon2-p1}",
+                // Ancrage : une forme valide précédée ou suivie d'autre chose n'est pas un haché.
+                "x{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT16 + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT16 + "$" + OUTPUT_LITERAL + "$x",
+                // Bornes de l'ADR 0026, point 7, franchies d'une unité.
+                "{argon2-p1}$argon2id$v=19$m=19455,t=2,p=1$" + SALT16 + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=65537,t=2,p=1$" + SALT16 + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT15 + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + BYTES65 + "$" + "A",
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT16 + "$" + OUTPUT31,
+                "{argon2-p1}$argon2id$v=19$m=19456,t=2,p=1$" + SALT16 + "$" + BYTES65
             })
     @DisplayName("AUTH-21, ADR 0026 (point 7) : un haché corrompu ou hors bornes coûte une vérification, sur le leurre")
     void auth21MalformedHashesCostOneDecoyVerification(String stored) {

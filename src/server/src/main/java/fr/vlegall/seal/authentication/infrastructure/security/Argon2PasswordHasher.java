@@ -25,7 +25,8 @@ import org.springframework.stereotype.Component;
  * Argon2id par l'{@link Argon2PasswordEncoder} de Spring Security, dans un {@link DelegatingPasswordEncoder} pour
  * pouvoir durcir les paramètres plus tard (AUTH-13, ADR 0018). Le mot de passe est d'abord poivré : Argon2id porte sur
  * base64(HMAC-SHA256(poivre, mot de passe)), et le haché sur le préfixe {@code {argon2-p1}} (ADR 0026). Chaque calcul
- * occupe 19 Mio : un sémaphore équitable en borne le nombre simultané, sans délai d'abandon (ADR 0019, point 3).
+ * occupe 19 Mio, 64 Mio au plus pour un haché durci dans les bornes de l'ADR 0026 : un sémaphore équitable en borne le
+ * nombre simultané, sans délai d'abandon (ADR 0019, point 3).
  */
 @Component
 public final class Argon2PasswordHasher implements PasswordHasher {
@@ -40,7 +41,6 @@ public final class Argon2PasswordHasher implements PasswordHasher {
     private static final int MEMORY_KIB = 19_456;
     private static final int ITERATIONS = 2;
 
-    /** Préfixe d'un haché aux paramètres ci-dessus, avant le sel et la sortie en base64. */
     // ADR 0026, point 7 : bornes d'un haché vérifiable. Le plancher est celui d'AUTH-13 ; le plafond borne ce qu'une
     // ligne altérée de la base pourrait imposer en mémoire et en temps.
     private static final int MAX_MEMORY_KIB = 65_536;
@@ -82,7 +82,7 @@ public final class Argon2PasswordHasher implements PasswordHasher {
         this.permits = new Semaphore(permits, true);
     }
 
-    /** Un calcul par processeur, au moins 2 : la mémoire reste bornée à N × 19 Mio. */
+    /** Un calcul par processeur, au moins 2 : la mémoire reste bornée à N × 64 Mio (N × 19 Mio aujourd'hui). */
     static int defaultPermits() {
         return Math.max(2, Runtime.getRuntime().availableProcessors());
     }

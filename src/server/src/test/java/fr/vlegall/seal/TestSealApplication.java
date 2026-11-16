@@ -2,8 +2,8 @@ package fr.vlegall.seal;
 
 import fr.vlegall.seal.common.PasswordPepper;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
-import org.jspecify.annotations.Nullable;
 import org.springframework.boot.SpringApplication;
 
 /**
@@ -17,11 +17,10 @@ public class TestSealApplication {
     static final String PEPPER_VARIABLE = "SEAL_PASSWORD_PEPPER";
 
     public static void main(String[] args) {
-        String given = System.getenv(PEPPER_VARIABLE);
-        if (given == null || given.isBlank()) {
+        if (!pepperGiven(args)) {
             // La base Testcontainers est jetable : un poivre jetable ne perd rien. Docker et la production restent en
             // échec fermé ; la valeur n'est jamais affichée (SEC-21).
-            System.setProperty(PEPPER_VARIABLE, developmentPepper(given));
+            System.setProperty(PEPPER_VARIABLE, randomPepper());
             System.err.println("SEAL en développement : poivre des mots de passe aléatoire, propre à ce lancement"
                     + " (ADR 0026, point 8)");
         }
@@ -30,11 +29,16 @@ public class TestSealApplication {
                 .run(args);
     }
 
-    /** Le poivre donné par l'environnement, ou 32 octets aléatoires en base64 s'il manque (ADR 0026, point 8). */
-    static String developmentPepper(@Nullable String given) {
-        if (given != null && !given.isBlank()) {
-            return given;
-        }
+    /** Vrai si un poivre est déjà donné : par l'environnement, une propriété système ou la ligne de commande. */
+    static boolean pepperGiven(String[] args) {
+        String fromEnvironment = System.getenv(PEPPER_VARIABLE);
+        return (fromEnvironment != null && !fromEnvironment.isBlank())
+                || System.getProperty(PEPPER_VARIABLE) != null
+                || Arrays.stream(args).anyMatch(arg -> arg.startsWith("--seal.passwords.pepper="));
+    }
+
+    /** 32 octets aléatoires en base64 (ADR 0026, point 8). */
+    static String randomPepper() {
         byte[] pepper = new byte[PasswordPepper.BYTES];
         new SecureRandom().nextBytes(pepper);
         return Base64.getEncoder().encodeToString(pepper);
