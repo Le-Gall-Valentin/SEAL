@@ -1,7 +1,8 @@
 ﻿# Prépare SEAL pour un lancement local sous Windows (section 17 du CDC, ADR 0004).
 # NON TESTÉ : l'équipe ne dispose pas d'environnement Windows. Transposition de gen-certs.sh :
 #   1. installe l'autorité locale de mkcert et crée un certificat pour localhost, 127.0.0.1 et ::1 ;
-#   2. crée .env à partir de .env.example s'il n'existe pas, puis remplit les secrets vides.
+#   2. crée .env à partir de .env.example s'il n'existe pas, puis remplit les secrets vides et ajoute ceux qui
+#      manquent à un .env plus ancien, sans jamais toucher une valeur présente (ADR 0026, point 9).
 # Usage, depuis src\ : powershell -ExecutionPolicy Bypass -File scripts\gen-certs.ps1
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')

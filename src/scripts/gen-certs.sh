@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Prépare SEAL pour un lancement local (section 17 du CDC, ADR 0004) :
 #   1. installe l'autorité locale de mkcert et crée un certificat pour localhost, 127.0.0.1 et ::1 ;
-#   2. crée .env à partir de .env.example s'il n'existe pas, puis remplit les secrets vides.
+#   2. crée .env à partir de .env.example s'il n'existe pas, puis remplit les secrets vides et ajoute ceux qui
+#      manquent à un .env plus ancien, sans jamais toucher une valeur présente (ADR 0026, point 9).
 # Testé sous Linux ; non testé sous macOS. Sous Windows : scripts\gen-certs.ps1 (non testé).
 # Usage, depuis src/ : ./scripts/gen-certs.sh
 set -euo pipefail
@@ -42,9 +43,10 @@ fi
 chmod 600 .env
 
 # Remplit NOM= s'il est vide, ou l'ajoute à un .env plus ancien qui ne l'a pas encore ; ne touche jamais une
-# valeur déjà présente.
+# valeur déjà présente. La valeur ne passe en argument d'aucun autre processus, que tout compte local pourrait lire
+# dans /proc/<pid>/cmdline : seuls des commandes internes du shell la manipulent (ADR 0026, point 9).
 fill_secret() {
-  local name=$1 value=$2 tmp
+  local name=$1 value=$2 line content=""
   if ! grep -q "^${name}=" .env; then
     # Une dernière ligne sans saut de ligne recevrait la variable collée à elle.
     if [ -s .env ] && [ -n "$(tail -c 1 .env)" ]; then
@@ -53,10 +55,14 @@ fill_secret() {
     printf '%s=%s\n' "$name" "$value" >>.env
     echo "${name} ajouté"
   elif grep -q "^${name}=\$" .env; then
-    tmp=$(mktemp)
-    sed "s|^${name}=\$|${name}=${value}|" .env >"$tmp"
-    cat "$tmp" >.env
-    rm -f "$tmp"
+    while IFS= read -r line || [ -n "$line" ]; do
+      if [ "$line" = "${name}=" ]; then
+        line="${name}=${value}"
+      fi
+      content+="${line}"$'\n'
+    done <.env
+    # Réécrit le fichier en place : il garde ses droits (600).
+    printf '%s' "$content" >.env
     echo "${name} généré"
   fi
 }
