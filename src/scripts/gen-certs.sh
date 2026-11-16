@@ -44,7 +44,7 @@ chmod 600 .env
 
 # Remplit NOM= s'il est vide, ou l'ajoute à un .env plus ancien qui ne l'a pas encore ; ne touche jamais une
 # valeur déjà présente. La valeur ne passe en argument d'aucun autre processus, que tout compte local pourrait lire
-# dans /proc/<pid>/cmdline : seuls des commandes internes du shell la manipulent (ADR 0026, point 9).
+# dans /proc/<pid>/cmdline : seules des commandes internes du shell la manipulent (ADR 0026, point 9).
 fill_secret() {
   local name=$1 value=$2 line content=""
   if ! grep -q "^${name}=" .env; then
