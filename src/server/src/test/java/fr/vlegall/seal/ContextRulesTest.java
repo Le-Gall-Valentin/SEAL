@@ -18,6 +18,7 @@ import fr.vlegall.archfixture.alpha.infrastructure.persistence.repository.AlphaJ
 import fr.vlegall.archfixture.alpha.infrastructure.web.ControllerUsingUseCase;
 import fr.vlegall.archfixture.authentication.infrastructure.HashingAdapter;
 import fr.vlegall.archfixture.authentication.infrastructure.identity.AccountLookupAdapter;
+import fr.vlegall.archfixture.authentication.infrastructure.security.PepperedHasher;
 import fr.vlegall.archfixture.beta.application.port.in.BetaUseCase;
 import fr.vlegall.archfixture.beta.infrastructure.alpha.AlphaAdapter;
 import fr.vlegall.archfixture.common.FixtureProperties;
@@ -193,6 +194,13 @@ class ContextRulesTest {
         expectViolations(ContextRules.onlyAuthenticationLooksUpAccounts(ROOT), "ContactAdapter", "LookupAdapter");
         expectAllowed(
                 ContextRules.onlyAuthenticationLooksUpAccounts(ROOT), AccountLookupAdapter.class, AlphaThing.class);
+    }
+
+    @Test
+    @DisplayName("ADR 0026, point 10 : seul authentication dépend du poivre des mots de passe")
+    void adr0026OnlyAuthenticationReadsThePepper() {
+        expectViolations(ContextRules.onlyAuthenticationReadsThePepper(ROOT), "PepperReader");
+        expectAllowed(ContextRules.onlyAuthenticationReadsThePepper(ROOT), PepperedHasher.class, AlphaThing.class);
     }
 
     @Test
