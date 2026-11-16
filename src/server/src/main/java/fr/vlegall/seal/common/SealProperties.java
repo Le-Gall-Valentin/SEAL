@@ -4,7 +4,6 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
-import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
@@ -51,8 +50,13 @@ public record SealProperties(URI origin, Security security, Session session, Mai
      * un autre dossier (KEY-10, ADR 0025 point 12).
      */
     @ConstructorBinding
-    public SealProperties(URI origin, Security security, Session session, Mail mail, @Nullable String dataDir) {
-        this(origin, security, session, mail, dataDir == null ? null : Path.of(dataDir));
+    public SealProperties(URI origin, Security security, Session session, Mail mail, String dataDir) {
+        this(
+                origin,
+                security,
+                session,
+                mail,
+                Path.of(Objects.requireNonNull(dataDir, "seal.data-dir est obligatoire")));
     }
 
     /** Origine de la WebSocket sécurisée, citée dans la directive {@code connect-src} de la CSP (section 12.3). */

@@ -93,5 +93,9 @@ class SealPropertiesTest {
                 .isEqualTo(DATA);
         assertThatNullPointerException()
                 .isThrownBy(() -> new SealProperties(origin, SECURITY, SESSION, MAIL, (Path) null));
+        // Constructeur de liaison (KEY-10) : un seal.data-dir absent est refusé avec le même message.
+        assertThatNullPointerException()
+                .isThrownBy(() -> new SealProperties(origin, SECURITY, SESSION, MAIL, (String) null))
+                .withMessageContaining("seal.data-dir");
     }
 }
