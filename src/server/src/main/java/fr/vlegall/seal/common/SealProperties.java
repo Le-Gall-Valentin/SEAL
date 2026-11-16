@@ -4,7 +4,9 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 /**
  * Paramètres propres à SEAL, sous le préfixe {@code seal}.
@@ -40,6 +42,17 @@ public record SealProperties(URI origin, Security security, Session session, Mai
             throw new IllegalArgumentException(
                     "seal.origin doit être une origine https canonique sans chemin : " + origin);
         }
+    }
+
+    /**
+     * Constructeur de liaison : {@code seal.data-dir} arrive en texte et devient un chemin de fichiers par
+     * {@link Path#of}. La conversion par défaut de Spring passerait par le chargeur de ressources du contexte, qui est,
+     * dans le serveur web, le contexte servlet : {@code ../data} y était refusé, et une ressource acceptée aurait désigné
+     * un autre dossier (KEY-10, ADR 0025 point 12).
+     */
+    @ConstructorBinding
+    public SealProperties(URI origin, Security security, Session session, Mail mail, @Nullable String dataDir) {
+        this(origin, security, session, mail, dataDir == null ? null : Path.of(dataDir));
     }
 
     /** Origine de la WebSocket sécurisée, citée dans la directive {@code connect-src} de la CSP (section 12.3). */
