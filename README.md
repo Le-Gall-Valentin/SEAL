@@ -70,13 +70,17 @@ Au premier démarrage, SEAL génère la clé de son Autorité de certification d
 est à sauvegarder : `docker compose down -v` l'efface aussi, et une nouvelle Autorité rend invalides tous les
 certificats déjà émis.
 
+Le fichier `.env` est à sauvegarder lui aussi : il porte le poivre des mots de passe (`SEAL_PASSWORD_PEPPER`,
+ADR 0026), gardé hors de la base. Sans lui, aucun mot de passe enregistré ne se vérifie plus, et chaque compte
+devrait passer par « mot de passe oublié ».
+
 ## Développement
 
 Il faut JDK 25 et Node.js 24 LTS (`sdk env` et `nvm use` lisent `.sdkmanrc` et `.nvmrc`).
 
 | Tâche | Dossier | Commande |
 | --- | --- | --- |
-| Serveur, avec un PostgreSQL jetable (Testcontainers) | `src/server` | `./mvnw spring-boot:test-run` |
+| Serveur, avec un PostgreSQL jetable (Testcontainers) et, sans `SEAL_PASSWORD_PEPPER`, un poivre jetable | `src/server` | `./mvnw spring-boot:test-run` |
 | Client, sur <https://localhost:5173>, relayé vers le serveur | `src/client` | `npm ci`, puis `npm run dev` |
 | Navigateur des tests du client et de bout en bout, une fois après `npm ci` | `src/client` | `npx playwright install --with-deps --only-shell chromium` (sans `--with-deps` sur macOS et Windows) |
 | Tests, formatage, analyse statique et couverture du serveur | `src/server` | `./mvnw verify` |

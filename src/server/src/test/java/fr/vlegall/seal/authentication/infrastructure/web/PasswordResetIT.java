@@ -16,6 +16,7 @@ import fr.vlegall.seal.support.MutableClock;
 import fr.vlegall.seal.support.PasswordHashingProbe;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import fr.vlegall.seal.support.UnpepperedHashes;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
 import java.time.Instant;
@@ -260,6 +261,31 @@ class PasswordResetIT {
                 .isEqualTo(401);
         assertThat(login(account.username(), NEW_PASSWORD).getResponse().getStatus())
                 .isEqualTo(204);
+    }
+
+    @Test
+    @DisplayName("ADR 0026, point 4 : un compte haché avant le poivre se reprend par « mot de passe oublié »")
+    void adr0026UnpepperedAccountRecoversByReset() throws Exception {
+        Registered account = active(unique("avantpoivre"));
+        jdbc.sql("UPDATE user_credentials SET password_hash = ? WHERE user_id = ?")
+                .param(UnpepperedHashes.of(PASSWORD))
+                .param(account.id())
+                .update();
+        assertThat(login(account.username(), PASSWORD).getResponse().getStatus())
+                .isEqualTo(401);
+
+        assertThat(confirm(client, requestToken(account), NEW_PASSWORD)
+                        .getResponse()
+                        .getStatus())
+                .isEqualTo(204);
+
+        assertThat(login(account.username(), NEW_PASSWORD).getResponse().getStatus())
+                .isEqualTo(204);
+        assertThat(jdbc.sql("SELECT password_hash FROM user_credentials WHERE user_id = ?")
+                        .param(account.id())
+                        .query(String.class)
+                        .single())
+                .startsWith("{argon2-p1}$argon2id$");
     }
 
     @Test

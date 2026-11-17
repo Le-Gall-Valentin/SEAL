@@ -1,3 +1,6 @@
 # Profil test : les données générées (clé de l'Autorité, KEY-10) restent dans target, jamais dans src/data.
 seal:
   data-dir: target/test-data
+  passwords:
+    # ADR 0026 : poivre fixe des tests (les octets 0 à 31), sans valeur secrète.
+    pepper: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=

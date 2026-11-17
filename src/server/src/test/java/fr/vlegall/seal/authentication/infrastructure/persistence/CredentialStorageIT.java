@@ -52,7 +52,7 @@ class CredentialStorageIT {
             "AUTH-13 : Argon2id tourne hors de toute transaction (A06) ; dans une transaction, le hachage est refusé")
     void a06PasswordIsHashedOutsideAnyTransaction() {
         assertThat(initialPassword.prepare("fjord-tuque-raquette", List.of("credential.zero")))
-                .hasValueSatisfying(hash -> assertThat(hash).startsWith("{argon2}$argon2id$"));
+                .hasValueSatisfying(hash -> assertThat(hash).startsWith("{argon2-p1}$argon2id$"));
 
         assertThatThrownBy(() -> transactions.executeWithoutResult(
                         status -> initialPassword.prepare("fjord-tuque-raquette", List.of())))
@@ -81,7 +81,7 @@ class CredentialStorageIT {
     void auth13StoringRequiresATransaction() {
         UserId user = new UserId(UUID.randomUUID());
 
-        assertThatThrownBy(() -> initialPassword.store(user, "{argon2}$argon2id$x"))
+        assertThatThrownBy(() -> initialPassword.store(user, "{argon2-p1}$argon2id$x"))
                 .isInstanceOf(IllegalTransactionStateException.class);
     }
 

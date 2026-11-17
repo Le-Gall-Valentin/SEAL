@@ -130,6 +130,12 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("ADR 0026, point 10 : seul authentication lit le poivre des mots de passe")
+    void onlyAuthenticationReadsThePepper() {
+        ContextRules.onlyAuthenticationReadsThePepper(ROOT).check(CLASSES);
+    }
+
+    @Test
     @DisplayName("ADR 0018, règle 12 : aucune classe n'importe Bouncy Castle")
     void noDirectBouncyCastle() {
         ContextRules.noDirectBouncyCastle(ROOT).check(CLASSES);

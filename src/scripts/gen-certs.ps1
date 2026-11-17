@@ -1,7 +1,8 @@
 ﻿# Prépare SEAL pour un lancement local sous Windows (section 17 du CDC, ADR 0004).
 # NON TESTÉ : l'équipe ne dispose pas d'environnement Windows. Transposition de gen-certs.sh :
 #   1. installe l'autorité locale de mkcert et crée un certificat pour localhost, 127.0.0.1 et ::1 ;
-#   2. crée .env à partir de .env.example s'il n'existe pas, puis remplit les secrets vides.
+#   2. crée .env à partir de .env.example s'il n'existe pas, puis remplit les secrets vides et ajoute ceux qui
+#      manquent à un .env plus ancien, sans jamais toucher une valeur présente (ADR 0026, point 9).
 # Usage, depuis src\ : powershell -ExecutionPolicy Bypass -File scripts\gen-certs.ps1
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
@@ -31,6 +32,8 @@ function New-RandomBase64([int] $bytes) {
 $secrets = [ordered]@{
     # SEC-22 : 32 octets aléatoires en base64.
     'SEAL_DATA_KEY'    = New-RandomBase64 32
+    # AUTH-13, ADR 0026 : poivre des mots de passe, 32 octets aléatoires en base64.
+    'SEAL_PASSWORD_PEPPER' = New-RandomBase64 32
     # Sans + ni / ni =, pour rester sûr dans une URL JDBC ou une ligne de commande.
     'SEAL_DB_PASSWORD' = (New-RandomBase64 32) -replace '[+/=]', ''
 }
@@ -43,6 +46,13 @@ for ($i = 0; $i -lt $lines.Length; $i++) {
             $lines[$i] = "$name=$($secrets[$name])"
             Write-Output "$name généré"
         }
+    }
+}
+# Un .env plus ancien qui n'a pas encore une variable la reçoit à la fin ; une valeur présente n'est jamais touchée.
+foreach ($name in $secrets.Keys) {
+    if (-not ($lines | Where-Object { $_.StartsWith("$name=") })) {
+        $lines += "$name=$($secrets[$name])"
+        Write-Output "$name ajouté"
     }
 }
 # UTF-8 sans BOM et fins de ligne LF, comme le lit docker compose.

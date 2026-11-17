@@ -312,6 +312,21 @@ final class ContextRules {
                         Pattern.quote(root + ".identity.application.port.in.AccountLookupQuery") + "(\\$.*)?");
     }
 
+    // ADR 0026, point 10 : le poivre des mots de passe ne sert qu'au hacheur d'authentication (moindre privilège).
+    static ArchRule onlyAuthenticationReadsThePepper(String root) {
+        String pepper = root + ".common.PasswordPepper";
+        return noClasses()
+                .that()
+                .resideInAPackage(root + "..")
+                .and()
+                .resideOutsideOfPackage(root + ".authentication..")
+                .and()
+                .doNotHaveFullyQualifiedName(pepper)
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName(pepper);
+    }
+
     // Règle 12, complétée par l'ADR 0018
     static ArchRule noDirectBouncyCastle(String root) {
         return noClasses()
