@@ -42,6 +42,9 @@ export default mergeConfig(
         },
         {
           extends: true,
+          // QA-01, QA-02 : les tests dans Chromium lisent les vecteurs par commands.readFile, que server.fs borne. Seul
+          // ce serveur de test les voit : celui de développement et le build gardent la liste d'ADR 0024 (point 6 bis).
+          server: { fs: { allow: ['../protocol/vectors'] } },
           test: {
             // ADR 0012, point 9 : les composants se testent dans un vrai Chromium, sans jsdom ; ADR 0027, point 6 : le
             // trousseau aussi (*.browser.test.ts), avec les vraies CryptoKey non extractables clonées par IndexedDB.

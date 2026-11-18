@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CanonicalEncodingError } from './canonical'
+import { verifyEd25519 } from './ed25519'
 import {
   type CertificateFields,
   encodeCertificate,
@@ -90,13 +91,9 @@ function publicKey(role: string): Uint8Array<ArrayBuffer> {
   return base64url(record(keys[role]), 'publicKey')
 }
 
-async function verifies(
-  key: Uint8Array<ArrayBuffer>,
-  signature: Uint8Array<ArrayBuffer>,
-  data: Uint8Array,
-): Promise<boolean> {
-  const imported = await crypto.subtle.importKey('raw', key, { name: 'Ed25519' }, false, ['verify'])
-  return crypto.subtle.verify({ name: 'Ed25519' }, imported, signature, Uint8Array.from(data))
+/** QA-01 : la vérification du client, avec le refus des points d'ordre faible (ed25519.ts). */
+function verifies(key: Uint8Array, signature: Uint8Array, data: Uint8Array): Promise<boolean> {
+  return verifyEd25519(key, data, signature)
 }
 
 describe('QA-02 : structures signées de l’identité (PROTOCOL.md, section 4)', () => {
