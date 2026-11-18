@@ -36,15 +36,17 @@ export default mergeConfig(
             // Node fournit WebCrypto (Ed25519, X25519, AES-GCM) : le noyau cryptographique s'y teste tel quel.
             // eslint.config.test.ts éprouve les règles de l'ADR 0012 sur le mini-projet eslint-fixtures/.
             include: ['src/**/*.test.ts', 'eslint.config.test.ts'],
+            exclude: ['src/**/*.browser.test.ts'],
             environment: 'node',
           },
         },
         {
           extends: true,
           test: {
-            // ADR 0012, point 9 : les composants se testent dans un vrai Chromium, sans jsdom.
+            // ADR 0012, point 9 : les composants se testent dans un vrai Chromium, sans jsdom ; ADR 0027, point 6 : le
+            // trousseau aussi (*.browser.test.ts), avec les vraies CryptoKey non extractables clonées par IndexedDB.
             name: 'browser',
-            include: ['src/**/*.test.tsx'],
+            include: ['src/**/*.test.tsx', 'src/**/*.browser.test.ts'],
             setupFiles: ['./vitest.setup.browser.ts'],
             browser: {
               enabled: true,
