@@ -12,3 +12,9 @@ export { generateKeyring, type Keyring, type NewKeyring, openVault, type Subkey 
 export { type VaultPayload, VaultOpenError } from './vault'
 export { type KeyStore, openKeyStore, type StoredCertificate } from './keystore'
 export { type AuthorityCheck, checkAuthority, type ServedAuthority } from './authority'
+export {
+  CertificateRejectedError,
+  type CertificateRejection,
+  type ExpectedOwner,
+  storeOwnCertificate,
+} from './certificate'
