@@ -270,3 +270,50 @@ point 15) ; celles d'un ancien certificat ne comptent pas. Le serveur ne vérifi
 ```bash
 python3 -m pip install --require-hashes -r tools/requirements.txt
 ```
+
+## 5. Coffre de clés (KEY-30 à KEY-33, ADR 0027)
+
+Le trousseau est sauvegardé chiffré sur le serveur, qui ne peut pas le lire (CDC, section 6.4). La clé de coffre
+VDK chiffre le trousseau ; la clé de récupération RK, que seul l'utilisateur connaît, chiffre la VDK. RK ne quitte
+jamais le client (KEY-31). Aucune signature : AES-GCM authentifie chaque niveau, et son AAD l'attache au compte.
+
+### 5.1 Clé de récupération (KEY-30)
+
+RK vaut 20 octets de `crypto.getRandomValues`, affichés en base32 de Crockford (alphabet
+`0123456789ABCDEFGHJKMNPQRSTVWXYZ`, 5 bits par caractère, poids fort d'abord) : 32 caractères en 8 groupes de 4. À la
+saisie, la casse, les espaces et les tirets sont ignorés, `O` se lit `0`, `I` et `L` se lisent `1` ; `U` et tout
+autre caractère sont refusés, et la clé DOIT faire exactement 32 caractères utiles.
+
+### 5.2 Trousseau
+
+```
+{ "v": 1, "userId": "<UUID>", "ik": "<PKCS#8 d'IK>",
+  "eks": [{ "ekId": "<16 octets>", "kem": "DHKEM-X25519-HKDF-SHA256", "pkcs8": "<PKCS#8 d'EK>",
+            "createdAt": <ms>, "expiresAt": <ms> }],
+  "createdAt": <ms> }
+```
+
+JSON compact, champs dans cet ordre, octets en base64url, dates en millisecondes Unix (nombres JSON). À l'ouverture,
+un champ inconnu, un `v` autre que 1 ou un `userId` autre que celui du compte DOIVENT être refusés. Les clés
+publiques ne sont pas stockées : elles se relisent dans la clé privée (le `x` de son JWK).
+
+### 5.3 Chiffrement
+
+```
+blob       = AES-256-GCM(VDK, nonceB, trousseau,
+                 AAD = struct("SEAL-vault-v1", uuid(userId), u64(vaultVersion)))
+KEK        = HKDF-SHA256(ikm = RK, salt, info = struct("SEAL-kek-v1", uuid(userId)), longueur 32)
+wrappedVdk = AES-256-GCM(KEK, nonceK, VDK, AAD = struct("SEAL-kek-aad-v1", uuid(userId)))
+serveur   ← { vaultVersion, salt, nonceK, wrappedVdk, nonceB, blob }
+```
+
+VDK : 32 octets aléatoires ; sel de 32 octets ; nonces de 12 ; `wrappedVdk` de 48 (VDK et étiquette GCM). Chaque
+nouvelle version tire un nouveau `nonceB`. Le premier coffre a la version 1, chaque écriture la suivante (ADR 0025,
+point 6). Une étiquette GCM fausse, à l'un ou l'autre niveau, fait échouer l'ouverture, sans trousseau partiel.
+
+### 5.4 Vecteurs (QA-02)
+
+`vectors/vault.json` donne RK et ses groupes, la VDK, les trois structures (`kekInfo`, `kekAad`, `vaultAad`), la KEK,
+le trousseau et ses octets, les clés publiques attendues, la charge envoyée au serveur (`payload`, corps de
+`PUT /api/v1/keys/vault`) et neuf falsifications qu'aucune implémentation NE DOIT ouvrir. IK est la graine du test 2
+de la RFC 8032, EK la clé privée d'Alice de la RFC 7748 (section 6.1) : jamais de vraies clés.

@@ -34,6 +34,11 @@ public final class ProtocolVectors {
         return read("ed25519-rfc8032.json");
     }
 
+    /** vectors/vault.json : clé de récupération et coffre de clés (PROTOCOL.md, section 5 ; ADR 0027). */
+    public static ProtocolVectors vault() {
+        return read("vault.json");
+    }
+
     private static ProtocolVectors read(String file) {
         try {
             return new ProtocolVectors(
@@ -78,6 +83,15 @@ public final class ProtocolVectors {
                                 .toList())
                 .map(point -> Base64.getUrlDecoder().decode(point.asString()))
                 .toList();
+    }
+
+    /** Une section objet du fichier ({@code payload}, {@code authority}…) ; absente, c'est une erreur. */
+    public JsonNode section(String name) {
+        JsonNode node = document.path(name);
+        if (!node.isObject()) {
+            throw new IllegalStateException("vecteurs : aucune section objet " + name);
+        }
+        return node;
     }
 
     /** Clé publique brute d'un signataire des vecteurs ({@code ca}, {@code ik}, {@code other}). */

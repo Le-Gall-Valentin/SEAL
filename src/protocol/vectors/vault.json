@@ -1,0 +1,171 @@
+{
+  "format": "seal-vault-v1",
+  "subject": "Coffre de cl\u00e9s : PROTOCOL.md, section 5 (KEY-30 \u00e0 KEY-33, QA-02, ADR 0027)",
+  "generator": "src/protocol/tools/gen_vectors.py",
+  "recoveryKey": {
+    "bytes": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+    "groups": [
+      "HWX0",
+      "R4EJ",
+      "WHDP",
+      "F6DA",
+      "07Z2",
+      "PF2D",
+      "BSQQ",
+      "10CJ"
+    ]
+  },
+  "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+  "vdk": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+  "kekInfo": "AAAAC1NFQUwta2VrLXYxAZL3of__cACAAAAAAAChHA",
+  "kekAad": "AAAAD1NFQUwta2VrLWFhZC12MQGS96H__3AAgAAAAAAAoRw",
+  "vaultAad": "AAAADVNFQUwtdmF1bHQtdjEBkveh__9wAIAAAAAAAKEcAAAAAAAAAAE",
+  "kek": "2IYoXN_ozZaXxsSenLnsnIJtIIftOpupQ2diVU8z77A",
+  "keyring": {
+    "v": 1,
+    "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+    "ik": "MC4CAQAwBQYDK2VwBCIEIEzNCJso_5banbbDRuwRTg9bijGfNaumJNqM9u1PuKb7",
+    "eks": [
+      {
+        "ekId": "oKGio6SlpqeoqaqrrK2urw",
+        "kem": "DHKEM-X25519-HKDF-SHA256",
+        "pkcs8": "MC4CAQAwBQYDK2VuBCIEIHcHbQpzGKV9PBbBclGyZkXfTC-H68CZKrF3-6UduSwq",
+        "createdAt": 1794009600000,
+        "expiresAt": 1797897600000
+      }
+    ],
+    "createdAt": 1794009600000
+  },
+  "keyringBytes": "eyJ2IjoxLCJ1c2VySWQiOiIwMTkyZjdhMS1mZmZmLTcwMDAtODAwMC0wMDAwMDAwMGExMWMiLCJpayI6Ik1DNENBUUF3QlFZREsyVndCQ0lFSUV6TkNKc29fNWJhbmJiRFJ1d1JUZzliaWpHZk5hdW1KTnFNOXUxUHVLYjciLCJla3MiOlt7ImVrSWQiOiJvS0dpbzZTbHBxZW9xYXFycksydXJ3Iiwia2VtIjoiREhLRU0tWDI1NTE5LUhLREYtU0hBMjU2IiwicGtjczgiOiJNQzRDQVFBd0JRWURLMlZ1QkNJRUlIY0hiUXB6R0tWOVBCYkJjbEd5WmtYZlRDLUg2OENaS3JGMy02VWR1U3dxIiwiY3JlYXRlZEF0IjoxNzk0MDA5NjAwMDAwLCJleHBpcmVzQXQiOjE3OTc4OTc2MDAwMDB9XSwiY3JlYXRlZEF0IjoxNzk0MDA5NjAwMDAwfQ",
+  "publicKeys": {
+    "ik": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+    "ek": "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo"
+  },
+  "payload": {
+    "vaultVersion": 1,
+    "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+    "nonceK": "gIGCg4SFhoeIiYqL",
+    "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+    "nonceB": "kJGSk5SVlpeYmZqb",
+    "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
+  },
+  "falsifications": [
+    {
+      "name": "une autre cl\u00e9 de r\u00e9cup\u00e9ration (un bit)",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZM",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
+      }
+    },
+    {
+      "name": "le coffre ouvert pour un autre compte",
+      "userId": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
+      }
+    },
+    {
+      "name": "une version rejou\u00e9e (vaultVersion chang\u00e9e)",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 2,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
+      }
+    },
+    {
+      "name": "un octet du blob modifi\u00e9",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DBX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
+      }
+    },
+    {
+      "name": "un bit de la VDK envelopp\u00e9e invers\u00e9",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jf7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
+      }
+    },
+    {
+      "name": "un trousseau d'un autre compte, chiffr\u00e9 pour celui-ci",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2guSSRP4uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_aeXvPHQRzpLrpgq38DZRaI"
+      }
+    },
+    {
+      "name": "un trousseau avec un champ inconnu",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabfrH-y4OL2kk8b3-lMAmBD9WQhbaslXVBADVJl3s6i"
+      }
+    },
+    {
+      "name": "un trousseau dont l'ekId fait 15 octets",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeUAv_KgeCdRYWemUTVWIsE2u4lgkjpalc7oGJgHV-YiTj2CHcNSuL3HSoU1o7S2Mm3tiKNNX-bDbSp-p6b9Ed2KKHEyAAcPOpNW_hLNHUKitFwLQ0ws5_C_CkuKAoYiHC8KdLuC4uW6kf01nBi1PjYWcNCF--G0HV-yT-4apZep8WtpgqxrZMUSY6mbc9KUvHIAmG4DXYB9o2Iw8fWirWUreA7WV5YMx2kS2iDILdNVfCz0-fotun2yaa4BVGeuguEvXASUCbRoJWsHqGaar"
+      }
+    },
+    {
+      "name": "un trousseau d'une autre version de format",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvgCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_RgjDts1nPkItTAKykTX1l4"
+      }
+    }
+  ]
+}

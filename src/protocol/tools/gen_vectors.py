@@ -5,11 +5,14 @@
 - vectors/password-policy.json : politique des mots de passe (PROTOCOL.md, section 3 ; AUTH-11, ADR 0024) ;
 - vectors/ed25519-rfc8032.json : vecteurs officiels d'Ed25519 (RFC 8032, section 7.1 ; QA-01) ;
 - vectors/identity.json : certificat, preuve de possession et liaison de sous-clé (PROTOCOL.md, section 4 ;
-  KEY-03 à KEY-05, QA-02, ADR 0025).
+  KEY-03 à KEY-05, QA-02, ADR 0025) ;
+- vectors/vault.json : clé de récupération et coffre de clés (PROTOCOL.md, section 5 ; KEY-30 à KEY-33, QA-02,
+  ADR 0027).
 
 Troisième implémentation, indépendante de Java et de TypeScript : les deux suites de tests relisent ces
 vecteurs, aucune ne se valide elle-même. Bibliothèque standard de Python, plus `cryptography` pour signer en
-Ed25519 (ADR 0025, point 3), installée par : python3 -m pip install --require-hashes -r tools/requirements.txt
+Ed25519 (ADR 0025, point 3) et pour HKDF, AES-GCM et les clés du trousseau (ADR 0027), installée par :
+python3 -m pip install --require-hashes -r tools/requirements.txt
 
 Usage, depuis src/protocol :
     python3 tools/gen_vectors.py           réécrit les fichiers de vectors/
@@ -33,6 +36,7 @@ OUTPUT = PROTOCOL_DIR / "vectors" / "canonical-encoding.json"
 PASSWORD_OUTPUT = PROTOCOL_DIR / "vectors" / "password-policy.json"
 RFC8032_OUTPUT = PROTOCOL_DIR / "vectors" / "ed25519-rfc8032.json"
 IDENTITY_OUTPUT = PROTOCOL_DIR / "vectors" / "identity.json"
+VAULT_OUTPUT = PROTOCOL_DIR / "vectors" / "vault.json"
 BLOCKLIST = PROTOCOL_DIR / "password-blocklist.txt"
 
 U32_MAX = 2**32 - 1
@@ -698,6 +702,177 @@ def build_identity() -> str:
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
 
 
+# ---------------------------------------------------------------------------------------------
+# Coffre de clés (KEY-30 à KEY-33, QA-02, PROTOCOL.md section 5, ADR 0027). AES-GCM est déterministe à nonce fixé :
+# chaque implémentation doit reproduire la KEK, la VDK enveloppée et le blob à l'octet près.
+# ---------------------------------------------------------------------------------------------
+
+CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+RECOVERY_KEY = bytes.fromhex("8f3a0c11d2e45b6799aa01fe2b3c4d5e6f708192")  # KEY-30 : 20 octets, jamais une vraie clé
+VDK = bytes(range(0x40, 0x60))
+VAULT_SALT = bytes(range(0x60, 0x80))
+NONCE_K = bytes(range(0x80, 0x8C))
+NONCE_B = bytes(range(0x90, 0x9C))
+VAULT_VERSION = 1
+# EK du trousseau : clé privée d'Alice, RFC 7748, section 6.1 ; jamais une vraie clé.
+EK_PRIVATE = bytes.fromhex("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a")
+VAULT_EK_ID = bytes(range(0xA0, 0xB0))
+
+
+def vault_crypto():
+    """HKDF, AES-GCM et les clés de `cryptography`, importés à la demande pour que l'erreur dise quoi installer."""
+    try:
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ed25519 as ed, x25519
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    except ImportError as error:
+        raise SystemExit(
+            "gen_vectors.py : la bibliothèque cryptography manque ; lancez "
+            "python3 -m pip install --require-hashes -r tools/requirements.txt"
+        ) from error
+    return hashes, serialization, ed, x25519, AESGCM, HKDF
+
+
+def crockford(data: bytes) -> str:
+    value = int.from_bytes(data, "big")
+    bits = len(data) * 8
+    return "".join(CROCKFORD[(value >> (bits - 5 * (index + 1))) & 31] for index in range(bits // 5))
+
+
+def pkcs8(private_key) -> bytes:
+    _, serialization, _, _, _, _ = vault_crypto()
+    return private_key.private_bytes(
+        serialization.Encoding.DER, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
+
+
+def raw_public(private_key) -> bytes:
+    _, serialization, _, _, _, _ = vault_crypto()
+    return private_key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+
+def vault_aad(user_id: str, version: int) -> bytes:
+    return encode(STRUCT("SEAL-vault-v1", UUID(user_id), U64(version)))
+
+
+def kek_info(user_id: str) -> bytes:
+    return encode(STRUCT("SEAL-kek-v1", UUID(user_id)))
+
+
+def kek_aad(user_id: str) -> bytes:
+    return encode(STRUCT("SEAL-kek-aad-v1", UUID(user_id)))
+
+
+def kek(recovery_key: bytes, salt: bytes, user_id: str) -> bytes:
+    hashes, _, _, _, _, HKDF = vault_crypto()
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=kek_info(user_id)).derive(recovery_key)
+
+
+def keyring_document(user_id: str, extra: dict | None = None) -> dict:
+    """Trousseau de la section 6.4, champs dans l'ordre de PROTOCOL.md 5.2 (ADR 0027, point 3)."""
+    _, _, ed, x25519, _, _ = vault_crypto()
+    created_at = NOT_BEFORE
+    document = {
+        "v": 1,
+        "userId": user_id,
+        "ik": b64url(pkcs8(ed.Ed25519PrivateKey.from_private_bytes(IK_SEED))),
+        "eks": [
+            {
+                "ekId": b64url(VAULT_EK_ID),
+                "kem": KEM,
+                "pkcs8": b64url(pkcs8(x25519.X25519PrivateKey.from_private_bytes(EK_PRIVATE))),
+                "createdAt": created_at,
+                "expiresAt": created_at + SUBKEY_VALIDITY_DAYS * DAY_MS,
+            }
+        ],
+        "createdAt": created_at,
+    }
+    document.update(extra or {})
+    return document
+
+
+def keyring_bytes(document: dict) -> bytes:
+    return json.dumps(document, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+
+
+def seal_vault(user_id: str, version: int, plaintext: bytes, recovery_key: bytes = RECOVERY_KEY) -> dict:
+    _, _, _, _, AESGCM, _ = vault_crypto()
+    return {
+        "vaultVersion": version,
+        "salt": b64url(VAULT_SALT),
+        "nonceK": b64url(NONCE_K),
+        "wrappedVdk": b64url(AESGCM(kek(recovery_key, VAULT_SALT, user_id)).encrypt(NONCE_K, VDK, kek_aad(user_id))),
+        "nonceB": b64url(NONCE_B),
+        "blob": b64url(AESGCM(VDK).encrypt(NONCE_B, plaintext, vault_aad(user_id, version))),
+    }
+
+
+def vault_case(name: str, payload: dict, user_id: str = USER_ID, recovery_key: bytes = RECOVERY_KEY) -> dict:
+    return {"name": name, "userId": user_id, "recoveryKey": b64url(recovery_key), "payload": payload}
+
+
+def build_vault() -> str:
+    _, _, ed, x25519, _, _ = vault_crypto()
+    keyring = keyring_document(USER_ID)
+    plaintext = keyring_bytes(keyring)
+    short_ek_id = keyring_document(USER_ID)
+    short_ek_id["eks"][0]["ekId"] = b64url(VAULT_EK_ID[:15])
+    payload = seal_vault(USER_ID, VAULT_VERSION, plaintext)
+    other_key = RECOVERY_KEY[:-1] + bytes([RECOVERY_KEY[-1] ^ 0x01])
+    blob = bytearray(from_b64url(payload["blob"]))
+    blob[0] ^= 0x01
+    wrapped = bytearray(from_b64url(payload["wrappedVdk"]))
+    wrapped[-1] ^= 0x80
+    display = crockford(RECOVERY_KEY)
+    document = {
+        "format": "seal-vault-v1",
+        "subject": "Coffre de clés : PROTOCOL.md, section 5 (KEY-30 à KEY-33, QA-02, ADR 0027)",
+        "generator": "src/protocol/tools/gen_vectors.py",
+        "recoveryKey": {
+            "bytes": b64url(RECOVERY_KEY),
+            "groups": [display[index : index + 4] for index in range(0, len(display), 4)],
+        },
+        "userId": USER_ID,
+        "vdk": b64url(VDK),
+        "kekInfo": b64url(kek_info(USER_ID)),
+        "kekAad": b64url(kek_aad(USER_ID)),
+        "vaultAad": b64url(vault_aad(USER_ID, VAULT_VERSION)),
+        "kek": b64url(kek(RECOVERY_KEY, VAULT_SALT, USER_ID)),
+        "keyring": keyring,
+        "keyringBytes": b64url(plaintext),
+        "publicKeys": {
+            "ik": b64url(raw_public(ed.Ed25519PrivateKey.from_private_bytes(IK_SEED))),
+            "ek": b64url(raw_public(x25519.X25519PrivateKey.from_private_bytes(EK_PRIVATE))),
+        },
+        "payload": payload,
+        "falsifications": [
+            vault_case("une autre clé de récupération (un bit)", payload, recovery_key=other_key),
+            vault_case("le coffre ouvert pour un autre compte", payload, user_id=VICTIM_ID),
+            vault_case("une version rejouée (vaultVersion changée)", dict(payload, vaultVersion=VAULT_VERSION + 1)),
+            vault_case("un octet du blob modifié", dict(payload, blob=b64url(bytes(blob)))),
+            vault_case("un bit de la VDK enveloppée inversé", dict(payload, wrappedVdk=b64url(bytes(wrapped)))),
+            vault_case(
+                "un trousseau d'un autre compte, chiffré pour celui-ci",
+                seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(keyring_document(VICTIM_ID))),
+            ),
+            vault_case(
+                "un trousseau avec un champ inconnu",
+                seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(keyring_document(USER_ID, {"extra": True}))),
+            ),
+            vault_case(
+                "un trousseau dont l'ekId fait 15 octets",
+                seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(short_ek_id)),
+            ),
+            vault_case(
+                "un trousseau d'une autre version de format",
+                seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(keyring_document(USER_ID, {"v": 2}))),
+            ),
+        ],
+    }
+    return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Vecteurs de référence de SEAL (PROTOCOL.md).")
     parser.add_argument("--check", action="store_true", help="échoue si un fichier n'est pas à jour")
@@ -707,6 +882,7 @@ def main() -> int:
         (PASSWORD_OUTPUT, build_password_policy(), f"{len(PASSWORD_CASES)} cas"),
         (RFC8032_OUTPUT, build_rfc8032(), f"{len(RFC8032_TESTS)} tests"),
         (IDENTITY_OUTPUT, build_identity(), "certificats, preuve, liaison et falsifications"),
+        (VAULT_OUTPUT, build_vault(), "clé de récupération, coffre et falsifications"),
     ]
     if check:
         stale = [path for path, content, _ in outputs if not path.exists() or path.read_text(encoding="ascii") != content]

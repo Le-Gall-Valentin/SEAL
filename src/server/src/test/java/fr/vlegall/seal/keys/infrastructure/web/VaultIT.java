@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import fr.vlegall.seal.common.web.Base64Url;
 import fr.vlegall.seal.keys.domain.model.Vault;
 import fr.vlegall.seal.support.AuthClient;
+import fr.vlegall.seal.support.ProtocolVectors;
 import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
@@ -25,12 +26,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import tools.jackson.databind.JsonNode;
 
 /** KEY-32, KEY-33, QA-05 : coffre opaque, versionné, du seul compte de la session (ADR 0025, point 6). */
 @SealIntegrationTest
 class VaultIT {
 
     private static final String VAULT = "/api/v1/keys/vault";
+    private static final List<String> VAULT_BYTES = List.of("salt", "nonceK", "wrappedVdk", "nonceB", "blob");
 
     @Autowired
     private MockMvc mvc;
@@ -79,6 +82,30 @@ class VaultIT {
                 .andExpect(jsonPath("$.vaultVersion").value(1))
                 .andExpect(jsonPath("$.blob").value(vault(1, 100, 7).get("blob")))
                 .andExpect(jsonPath("$.wrappedVdk").value(vault(1, 100, 7).get("wrappedVdk")));
+    }
+
+    @Test
+    @DisplayName(
+            "KEY-32, QA-02 : la charge de vault.json (PROTOCOL.md 5.4) passe les bornes du serveur et se relit identique")
+    void key32VectorPayloadIsAcceptedAndReadBackUnchanged() throws Exception {
+        // ADR 0027, point 4 : le coffre qu'écrit le client passe les bornes de l'ADR 0025 (point 6).
+        JsonNode payload = ProtocolVectors.vault().section("payload");
+        Map<String, Object> body = new HashMap<>();
+        body.put("vaultVersion", payload.get("vaultVersion").asLong());
+        for (String field : VAULT_BYTES) {
+            body.put(field, payload.get(field).asString());
+        }
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "coffre_vecteur");
+
+        save(account, body).andExpect(status().isNoContent());
+
+        ResultActions read = read(account)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vaultVersion")
+                        .value(payload.get("vaultVersion").asLong()));
+        for (String field : VAULT_BYTES) {
+            read.andExpect(jsonPath("$." + field).value(payload.get(field).asString()));
+        }
     }
 
     @Test

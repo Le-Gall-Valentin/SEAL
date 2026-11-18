@@ -3,6 +3,8 @@
  * sinon. Chaque algorithme est éprouvé de bout en bout, pas seulement détecté : une signature doit se vérifier, et les
  * deux côtés d'un échange X25519 doivent dériver le même secret.
  */
+import { generateX25519 } from './webcrypto'
+
 const PROBE = new TextEncoder().encode('SEAL KEY-01')
 
 export async function checkCryptoSupport(): Promise<boolean> {
@@ -20,8 +22,8 @@ async function ed25519Works(): Promise<boolean> {
 }
 
 async function x25519Works(): Promise<boolean> {
-  const alice = await x25519Pair()
-  const bob = await x25519Pair()
+  const alice = await generateX25519(false, ['deriveBits'])
+  const bob = await generateX25519(false, ['deriveBits'])
   const fromAlice = await crypto.subtle.deriveBits(
     { name: 'X25519', public: bob.publicKey },
     alice.privateKey,
@@ -33,14 +35,6 @@ async function x25519Works(): Promise<boolean> {
     256,
   )
   return equal(new Uint8Array(fromAlice), new Uint8Array(fromBob))
-}
-
-async function x25519Pair(): Promise<CryptoKeyPair> {
-  const pair = await crypto.subtle.generateKey({ name: 'X25519' }, false, ['deriveBits'])
-  if (!('privateKey' in pair)) {
-    throw new TypeError('X25519 : une paire de clés était attendue')
-  }
-  return pair
 }
 
 function equal(left: Uint8Array, right: Uint8Array): boolean {
