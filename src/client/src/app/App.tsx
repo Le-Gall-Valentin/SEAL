@@ -8,7 +8,8 @@ import { logoutApi } from '@/features/logout'
 import { passwordResetApi } from '@/features/password-reset'
 import { registerApi } from '@/features/register'
 import { verifyEmailApi } from '@/features/verify-email'
-import { checkCryptoSupport } from '@/shared/crypto'
+import { authorityApi } from '@/entities/authority'
+import { checkCryptoSupport, openKeyStore } from '@/shared/crypto'
 import { LanguageProvider } from '@/shared/i18n'
 import {
   ApiProviders,
@@ -23,12 +24,13 @@ import { routes } from './router'
 
 const router = createBrowserRouter(routes)
 const queryClient = createQueryClient()
-// KEY-01 : Ed25519 et X25519 sont éprouvés une fois, au démarrage.
-const cryptoSupport = checkCryptoSupport()
+// KEY-01, KEY-40 : Ed25519 et X25519 sont éprouvés une fois, au démarrage, puis le trousseau de l'appareil s'ouvre.
+const cryptoReady = checkCryptoSupport().then((supported) => (supported ? openKeyStore() : null))
 
 /** Racine de composition (ADR 0024, point 7) : seul endroit qui associe chaque port à son adaptateur. */
 const apis: Apis = {
   session: sessionApi,
+  authority: authorityApi,
   passwordBlocklist,
   login: loginApi,
   register: registerApi,
@@ -44,7 +46,7 @@ export function App() {
     // ACC-05 : le français, seule langue tant que la préférence de langue n'est pas livrée (ADR 0017).
     <LanguageProvider language="fr">
       <ErrorBoundary>
-        <CryptoGate support={cryptoSupport}>
+        <CryptoGate ready={cryptoReady}>
           <QueryClientProvider client={queryClient}>
             <ApiProviders apis={apis}>
               <RouterProvider router={router} onError={routerErrorHandler(import.meta.env.PROD)} />

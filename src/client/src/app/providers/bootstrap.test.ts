@@ -6,6 +6,7 @@ function apisWith(reloadCsrf: () => Promise<void>): Apis {
   const never = () => Promise.reject(new Error('non attendu'))
   return {
     session: { me: never, reloadCsrf },
+    authority: { fetchAuthority: never },
     passwordBlocklist: { load: never },
     login: { login: never },
     register: { register: never, usernameAvailability: never },

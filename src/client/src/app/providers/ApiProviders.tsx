@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { AuthorityApiProvider, type IAuthorityApi } from '@/entities/authority'
 import { type IPasswordBlocklist, PasswordBlocklistProvider } from '@/entities/password'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
 import { type ILoginApi, LoginApiProvider } from '@/features/login'
@@ -10,6 +11,7 @@ import { type IVerifyEmailApi, VerifyEmailApiProvider } from '@/features/verify-
 /** Les ports des tranches ; la racine de composition leur donne leurs adaptateurs, les tests des doublures. */
 export interface Apis {
   readonly session: ISessionApi
+  readonly authority: IAuthorityApi
   readonly passwordBlocklist: IPasswordBlocklist
   readonly login: ILoginApi
   readonly register: IRegisterApi
@@ -27,17 +29,19 @@ interface ApiProvidersProps {
 export function ApiProviders({ apis, children }: ApiProvidersProps) {
   return (
     <SessionApiProvider api={apis.session}>
-      <PasswordBlocklistProvider api={apis.passwordBlocklist}>
-        <LoginApiProvider api={apis.login}>
-          <RegisterApiProvider api={apis.register}>
-            <VerifyEmailApiProvider api={apis.verifyEmail}>
-              <PasswordResetApiProvider api={apis.passwordReset}>
-                <LogoutApiProvider api={apis.logout}>{children}</LogoutApiProvider>
-              </PasswordResetApiProvider>
-            </VerifyEmailApiProvider>
-          </RegisterApiProvider>
-        </LoginApiProvider>
-      </PasswordBlocklistProvider>
+      <AuthorityApiProvider api={apis.authority}>
+        <PasswordBlocklistProvider api={apis.passwordBlocklist}>
+          <LoginApiProvider api={apis.login}>
+            <RegisterApiProvider api={apis.register}>
+              <VerifyEmailApiProvider api={apis.verifyEmail}>
+                <PasswordResetApiProvider api={apis.passwordReset}>
+                  <LogoutApiProvider api={apis.logout}>{children}</LogoutApiProvider>
+                </PasswordResetApiProvider>
+              </VerifyEmailApiProvider>
+            </RegisterApiProvider>
+          </LoginApiProvider>
+        </PasswordBlocklistProvider>
+      </AuthorityApiProvider>
     </SessionApiProvider>
   )
 }

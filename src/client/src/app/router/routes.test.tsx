@@ -3,8 +3,10 @@ import { createMemoryRouter, type InitialEntry, type RouteObject } from 'react-r
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
+import { KeyStoreProvider } from '@/entities/authority'
 import type { Account } from '@/entities/session'
 import { ApiProviders, type Apis, createQueryClient } from '../providers'
+import { memoryKeyStore, servingAuthority } from '../testing/authority'
 import { routes, withRootErrorBoundary } from './routes'
 
 const ACTIVE: Account = {
@@ -26,6 +28,7 @@ function fakeApis(account: Account | null): Apis {
   const never = () => Promise.reject(new Error('non attendu'))
   return {
     session: { me: () => Promise.resolve(account), reloadCsrf: () => Promise.resolve() },
+    authority: servingAuthority(),
     passwordBlocklist: { load: () => Promise.resolve([]) },
     login: { login: never },
     register: { register: never, usernameAvailability: never },
@@ -44,7 +47,9 @@ async function renderAt(
   const screen = await render(
     <QueryClientProvider client={createQueryClient()}>
       <ApiProviders apis={fakeApis(account)}>
-        <RouterProvider router={router} />
+        <KeyStoreProvider api={memoryKeyStore()}>
+          <RouterProvider router={router} />
+        </KeyStoreProvider>
       </ApiProviders>
     </QueryClientProvider>,
   )
