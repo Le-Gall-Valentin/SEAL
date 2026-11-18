@@ -10,3 +10,4 @@ export {
 } from './recovery'
 export { generateKeyring, type Keyring, type NewKeyring, openVault, type Subkey } from './keyring'
 export { type VaultPayload, VaultOpenError } from './vault'
+export { type KeyStore, openKeyStore, type StoredCertificate } from './keystore'
