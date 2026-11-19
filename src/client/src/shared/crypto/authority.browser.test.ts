@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { commands } from 'vitest/browser'
 import { checkAuthority, type ServedAuthority } from './authority'
-import { toBase64Url } from './base64url'
+import { fromBase64Url, toBase64Url } from './base64url'
 import { type KeyStore, openKeyStore } from './keystore'
 import { base64url, record, string } from './testing/vectorReader'
 
@@ -105,5 +105,43 @@ describe('KEY-11 : Autorité épinglée au premier usage', () => {
       'invalid',
     )
     await expect(store.loadAuthority()).resolves.toEqual(base64url(AUTHORITY, 'publicKey'))
+  })
+})
+
+describe('KEY-11 : épinglage sous concurrence et base corrompue, repris de la revue de sécurité', () => {
+  it('KEY-11 : deux onglets qui contrôlent en même temps deux clés différentes en gardent une seule', async () => {
+    const other = await servedFor(base64url(record(record(identity['keys'])['other']), 'publicKey'))
+    for (let round = 0; round < 10; round++) {
+      const name = `seal-test-${crypto.randomUUID()}`
+      const left = await freshStore(name)
+      const right = await freshStore(name)
+
+      const outcomes = await Promise.all([
+        checkAuthority(left, SERVED),
+        checkAuthority(right, other),
+      ])
+
+      expect([...outcomes].sort()).toEqual(['changed', 'pinned'])
+      const kept = outcomes[0] === 'pinned' ? SERVED : other
+      await expect(left.loadAuthority()).resolves.toEqual(fromBase64Url(kept.publicKey))
+    }
+  })
+
+  it('KEY-11 : un épinglage corrompu dans la base fait échouer le contrôle, sans réépinglage', async () => {
+    const name = `seal-test-${crypto.randomUUID()}`
+    const store = await freshStore(name)
+    await new Promise((resolve) => {
+      const open = indexedDB.open(name)
+      open.onsuccess = () => {
+        const transaction = open.result.transaction('authority', 'readwrite')
+        transaction.objectStore('authority').put({}, 'ca')
+        transaction.oncomplete = () => {
+          open.result.close()
+          resolve(undefined)
+        }
+      }
+    })
+
+    await expect(checkAuthority(store, SERVED)).rejects.toThrow()
   })
 })

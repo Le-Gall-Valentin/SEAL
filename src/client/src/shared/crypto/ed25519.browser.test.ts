@@ -159,3 +159,58 @@ describe('QA-01 : vérification Ed25519 du client', () => {
     await expect(verifyEd25519(publicKey, message, signature)).resolves.toBe(false)
   })
 })
+
+describe('QA-04 : malléabilité et encodages, repris de la revue de sécurité', () => {
+  const P = 2n ** 255n - 19n
+
+  it('QA-04 : une signature dont S est augmenté de k·L (S ≥ L) est refusée', async () => {
+    for (const test of records(rfc8032['tests'])) {
+      const signature = hex(test, 'signature')
+      const s = littleEndian(signature.subarray(32))
+      for (let k = 1n; s + k * L < 2n ** 256n; k++) {
+        const forged = concat(signature.subarray(0, 32), littleEndian32(s + k * L))
+        await expect(
+          verifyEd25519(hex(test, 'publicKey'), hex(test, 'message'), forged),
+        ).resolves.toBe(false)
+      }
+    }
+  })
+
+  it('QA-04 : le bit de signe de R ou de la clé inversé fait échouer la vérification', async () => {
+    const test = records(rfc8032['tests'])[0] ?? {}
+    const signature = Uint8Array.from(hex(test, 'signature'))
+    const key = Uint8Array.from(hex(test, 'publicKey'))
+    signature[31] = (signature[31] ?? 0) ^ 0x80
+    key[31] = (key[31] ?? 0) ^ 0x80
+
+    await expect(
+      verifyEd25519(hex(test, 'publicKey'), hex(test, 'message'), signature),
+    ).resolves.toBe(false)
+    await expect(verifyEd25519(key, hex(test, 'message'), hex(test, 'signature'))).resolves.toBe(
+      false,
+    )
+  })
+
+  it('ADR 0025, point 14 : les 19 encodages y + p, bit de signe compris, sont non canoniques', () => {
+    for (let y = 0n; y < 19n; y++) {
+      const encoded = littleEndian32(y + P)
+      expect(isWeakOrNonCanonical(encoded)).toBe(true)
+      encoded[31] = (encoded[31] ?? 0) | 0x80
+      expect(isWeakOrNonCanonical(encoded)).toBe(true)
+    }
+  })
+
+  it('QA-01 : une vue décalée dans un tampon plus grand se vérifie sur ses seuls octets', async () => {
+    const test = records(rfc8032['tests'])[1] ?? {}
+    const buffer = new Uint8Array(200)
+    buffer.set(hex(test, 'publicKey'), 7)
+    buffer.set(hex(test, 'signature'), 70)
+
+    await expect(
+      verifyEd25519(buffer.subarray(7, 39), hex(test, 'message'), buffer.subarray(70, 134)),
+    ).resolves.toBe(true)
+    await expect(
+      verifyEd25519(buffer.subarray(7, 40), hex(test, 'message'), buffer.subarray(70, 134)),
+    ).resolves.toBe(false)
+  })
+})

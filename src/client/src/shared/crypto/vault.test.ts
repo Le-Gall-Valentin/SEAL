@@ -8,7 +8,7 @@ import {
   vaultPayload,
   vectorRecoveryKey,
 } from './testing/vaultVectorSuite'
-import { record, string } from './testing/vectorReader'
+import { base64url, record, string } from './testing/vectorReader'
 import { sealVault, VaultOpenError } from './vault'
 
 // QA-02 : vecteurs produits par src/protocol/tools/gen_vectors.py (PROTOCOL.md, section 5 ; ADR 0027).
@@ -127,5 +127,49 @@ describe('KEY-02, KEY-40 : génération du trousseau', () => {
       openVault('0192f7a1-ffff-7000-8000-000000000b0b', vault, other.recoveryKey),
     ).rejects.toBeInstanceOf(VaultOpenError)
     await expect(openVault(userId, vault, other.recoveryKey)).rejects.toBeInstanceOf(VaultOpenError)
+  })
+})
+
+describe('KEY-33, KEY-40 : coffres piégés, repris de la revue de sécurité', () => {
+  const keyringJson = new TextDecoder().decode(base64url(vectors, 'keyringBytes'))
+  const OTHER_ID = '0192f7a1-ffff-7000-8000-000000000b0b'
+
+  /** Scelle un trousseau en clair arbitraire avec la RK et la VDK des vecteurs, comme le ferait un client fautif. */
+  async function sealed(json: string, vaultVersion = 1) {
+    return sealVault({
+      userId,
+      vaultVersion,
+      recoveryKey: vectorRecoveryKey(vectors),
+      vdk: base64url(vectors, 'vdk'),
+      plaintext: new TextEncoder().encode(json),
+    })
+  }
+
+  it('KEY-40 : un JSON piégé est refusé à la relecture, sans pollution de prototype', async () => {
+    const traps = [
+      `{"__proto__":{"polluted":true},${keyringJson.slice(1)}`,
+      `{"constructor":{"prototype":{"polluted":true}},${keyringJson.slice(1)}`,
+      keyringJson.replace(`"userId":"${userId}"`, `"userId":"${userId}","userId":"${OTHER_ID}"`),
+      keyringJson.replace(`"userId":"${userId}"`, `"userId":"${userId.toUpperCase()}"`),
+      keyringJson.replace(/"createdAt":\d+}$/, '"createdAt":1e308}'),
+      keyringJson.replace('"v":1', '"v":"1"'),
+    ]
+    for (const trap of traps) {
+      expect(trap, 'piège construit').not.toBe(keyringJson)
+      await expect(
+        openVault(userId, await sealed(trap), vectorRecoveryKey(vectors)),
+      ).rejects.toMatchObject({
+        reason: 'keyring',
+      })
+    }
+    expect(Object.prototype).not.toHaveProperty('polluted')
+  })
+
+  it('ADR 0027, point 10 : une ancienne version authentique s’ouvre encore (limite écrite, contrôle à la PR 3)', async () => {
+    const first = await sealed(keyringJson, 1)
+    const second = await sealed(keyringJson, 2)
+
+    await expect(openVault(userId, first, vectorRecoveryKey(vectors))).resolves.toBeDefined()
+    await expect(openVault(userId, second, vectorRecoveryKey(vectors))).resolves.toBeDefined()
   })
 })

@@ -55,6 +55,13 @@ describe('KEY-40 : trousseau dans IndexedDB', () => {
       expect(key.extractable).toBe(false)
       await expect(crypto.subtle.exportKey('jwk', key)).rejects.toThrow()
     }
+    // Ni enveloppée par une autre clé : wrapKey exige aussi une clé extractable.
+    const wrapping = await crypto.subtle.generateKey({ name: 'AES-KW', length: 256 }, false, [
+      'wrapKey',
+    ])
+    await expect(
+      crypto.subtle.wrapKey('pkcs8', secrets.identityKey, wrapping, 'AES-KW'),
+    ).rejects.toThrow()
   })
 
   it('ADR 0027, point 12 : un trousseau dont une clé est extractable n’est pas enregistré', async () => {

@@ -1,3 +1,4 @@
+import { inspect } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   generateRecoveryKey,
@@ -118,5 +119,15 @@ describe('KEY-30 : deux groupes à ressaisir, tirés au hasard', () => {
     // 2 donne le premier index ; 4 désigne le cinquième des index restants (0, 1, 3, 4, 5…), soit 5.
     expect(pickRecoveryGroups()).toEqual([2, 5])
     expect(draws).toEqual([])
+  })
+})
+
+describe('KEY-31 : aucune fuite de la clé de récupération, repris de la revue de sécurité', () => {
+  it('KEY-31 : ni inspect, ni structuredClone, ni Reflect.ownKeys ne montrent ses octets', () => {
+    const key = parseRecoveryKey(TEXT)
+
+    expect(inspect(key, { showHidden: true, depth: 5 })).not.toContain('HWX0')
+    expect(Reflect.ownKeys(key)).toEqual([])
+    expect(() => recoveryKeyBytes(structuredClone(key))).toThrow(TypeError)
   })
 })

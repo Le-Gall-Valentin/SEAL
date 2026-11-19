@@ -218,3 +218,48 @@ describe('KEY-06 : le client vérifie le certificat reçu avant de l’enregistr
     await expectRejected(await pinnedStore(), { ...VALID, subjectId: 'pas-un-uuid' }, 'signature')
   })
 })
+
+describe('KEY-06, KEY-11 : certificats forgés, repris de la revue de sécurité (CDC 16.1)', () => {
+  it('KEY-11 : même une Autorité d’ordre faible épinglée n’ouvre pas la porte à un certificat forgé (R neutre, S = 0)', async () => {
+    const neutral = Uint8Array.from({ length: 32 }, (_, index) => (index === 0 ? 1 : 0))
+    const store = await pinnedStore(null)
+    await pinAuthority(store, neutral)
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', neutral))
+    const forged = {
+      ...VALID,
+      issuerKeyId: digest.slice(0, 8),
+      signature: concatBytes(neutral, new Uint8Array(32)),
+    }
+
+    await expectRejected(store, forged, 'signature')
+  })
+
+  it('QA-04 : une signature de l’Autorité dont S est augmenté de L est refusée', async () => {
+    const L = 2n ** 252n + 27742317777372353535851937790883648493n
+    const s = VALID.signature
+      .subarray(32)
+      .reduceRight((value, byte) => (value << 8n) | BigInt(byte), 0n)
+    const bigger = Uint8Array.from({ length: 32 }, (_, index) =>
+      Number(((s + L) >> BigInt(8 * index)) & 0xffn),
+    )
+
+    await expectRejected(
+      await pinnedStore(),
+      { ...VALID, signature: concatBytes(VALID.signature.subarray(0, 32), bigger) },
+      'signature',
+    )
+  })
+
+  it('KEY-06 : un subjectId en majuscules, signé par l’Autorité, n’est pas celui du compte', async () => {
+    const upper = await signedByCa({ ...VALID, subjectId: VALID.subjectId.toUpperCase() })
+
+    await expectRejected(await pinnedStore(), upper, 'subject')
+  })
+})
+
+function concatBytes(left: Uint8Array, right: Uint8Array): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(left.length + right.length)
+  out.set(left)
+  out.set(right, left.length)
+  return out
+}
