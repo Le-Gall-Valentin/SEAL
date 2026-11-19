@@ -37,6 +37,15 @@ public class CertificateRepositoryAdapter implements CertificateRepository {
                 .optional();
     }
 
+    @Override
+    public Optional<IssuedCertificate> findIssued(byte[] serial) {
+        return jdbc.sql("SELECT cert_bytes, signature FROM identity_certificates WHERE serial = :serial")
+                .param("serial", serial)
+                .query((row, number) -> new IssuedCertificate(
+                        SealCertificate.decode(row.getBytes("cert_bytes")), row.getBytes("signature")))
+                .optional();
+    }
+
     /**
      * ADR 0025, point 4 : l'index unique partiel {@code one_active_certificate} (V1) départage deux publications
      * concurrentes ; la perdante n'écrit rien, sans erreur qui ferait échouer la transaction.

@@ -1,8 +1,10 @@
 package fr.vlegall.seal.keys.domain.port.out;
 
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.keys.domain.model.PublishedSubkey;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
 import java.time.Instant;
+import java.util.List;
 
 /** Table {@code subkeys} : un {@code ekId} ne sert qu'une fois (KEY-05), trois sous-clés vivantes au plus par certificat (ADR 0025). */
 public interface SubkeyRepository {
@@ -18,6 +20,12 @@ public interface SubkeyRepository {
      * celles d'un ancien certificat ne comptent pas (ADR 0025, point 15).
      */
     int countLive(UserId user, byte[] certSerial, Instant at);
+
+    /**
+     * KEY-33 : sous-clés du compte liées au certificat {@code certSerial} et non expirées à {@code at}, avec leur
+     * signature, les plus récentes d'abord.
+     */
+    List<PublishedSubkey> findLive(UserId user, byte[] certSerial, Instant at);
 
     /** Enregistre la liaison et sa signature ; faux si l'{@code ekId} existe déjà, sans erreur. */
     boolean save(SubkeyBinding binding, byte[] signature);

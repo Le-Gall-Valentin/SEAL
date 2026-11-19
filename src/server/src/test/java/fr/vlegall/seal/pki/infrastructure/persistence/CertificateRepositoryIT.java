@@ -84,6 +84,26 @@ class CertificateRepositoryIT {
     }
 
     @Test
+    @DisplayName(
+            "KEY-33 : le certificat émis se relit entier par son numéro de série, identifiant et signature compris")
+    void key33IssuedCertificateReadsBackWhole() throws Exception {
+        UserId subject = account("cert_entier");
+        IssuedCertificate issued = issued(subject, 9);
+        certificates.save(issued);
+        byte[] unknown = new byte[16];
+        unknown[0] = (byte) 0xEE;
+
+        assertThat(certificates.findIssued(issued.certificate().serial())).contains(issued);
+        assertThat(certificates
+                        .findIssued(issued.certificate().serial())
+                        .orElseThrow()
+                        .certificate()
+                        .username())
+                .isEqualTo("titulaire");
+        assertThat(certificates.findIssued(unknown)).isEmpty();
+    }
+
+    @Test
     @DisplayName("ADR 0025, point 4 : un second certificat non révoqué n'est pas écrit, sans erreur")
     void adr0025SecondUnrevokedCertificateIsNotWritten() throws Exception {
         UserId subject = account("cert_double");

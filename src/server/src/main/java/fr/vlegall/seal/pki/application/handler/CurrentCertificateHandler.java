@@ -2,8 +2,8 @@ package fr.vlegall.seal.pki.application.handler;
 
 import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.pki.application.port.in.CertificateDetails;
 import fr.vlegall.seal.pki.application.port.in.CurrentCertificateQuery;
-import fr.vlegall.seal.pki.domain.model.CertificateRecord;
 import fr.vlegall.seal.pki.domain.port.out.CertificateRepository;
 import java.time.Clock;
 import java.util.Optional;
@@ -23,23 +23,11 @@ public class CurrentCertificateHandler implements CurrentCertificateQuery {
     /** Relu en base à chaque appel (médiation complète, ADR 0025) : jamais de cache. */
     @Override
     @Transactional(readOnly = true)
-    public Optional<Current> current(UserId subject) {
+    public Optional<CertificateDetails> current(UserId subject) {
         return certificates
                 .findUnrevoked(subject)
                 .filter(certificate -> certificate.isValidAt(clock.instant()))
-                .map(CurrentView::new);
-    }
-
-    private record CurrentView(CertificateRecord certificate) implements Current {
-
-        @Override
-        public byte[] serial() {
-            return certificate.serial();
-        }
-
-        @Override
-        public byte[] ikPublic() {
-            return certificate.ikPublic();
-        }
+                .flatMap(certificate -> certificates.findIssued(certificate.serial()))
+                .map(CertificateDetailsView::new);
     }
 }

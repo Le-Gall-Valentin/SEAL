@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.crypto.Ed25519;
-import fr.vlegall.seal.pki.application.port.in.IssueCertificateUseCase;
+import fr.vlegall.seal.pki.application.port.in.CertificateDetails;
 import fr.vlegall.seal.pki.domain.model.AuthorityKey;
 import fr.vlegall.seal.pki.domain.model.CertificateRecord;
 import fr.vlegall.seal.pki.domain.model.CertificateRecords;
@@ -56,7 +56,7 @@ class IssueCertificateHandlerTest {
     @Test
     @DisplayName("KEY-04 : le certificat émis porte le titulaire, sa clé, l'identifiant de la CA, et la CA le signe")
     void key04IssuedCertificateIsSignedByTheAuthority() {
-        IssueCertificateUseCase.Issued issued =
+        CertificateDetails issued =
                 handler(NOW).issue(SUBJECT, "valentin.dupont", IK).orElseThrow();
 
         assertThat(issued.serial()).isEqualTo(SERIAL);
@@ -115,6 +115,10 @@ class IssueCertificateHandlerTest {
 
         assertThat(current.current(SUBJECT).orElseThrow().serial()).isEqualTo(SERIAL);
         assertThat(current.current(SUBJECT).orElseThrow().ikPublic()).isEqualTo(IK);
+        // KEY-33 : le certificat courant se relit entier, identifiant et signature de la CA compris.
+        assertThat(current.current(SUBJECT).orElseThrow().username()).isEqualTo("valentin.dupont");
+        assertThat(current.current(SUBJECT).orElseThrow().signature())
+                .isEqualTo(certificates.inserted.getFirst().signature());
         CurrentCertificateHandler later = new CurrentCertificateHandler(
                 certificates, Clock.fixed(NOW.plus(SealCertificate.VALIDITY), ZoneOffset.UTC));
         assertThat(later.current(SUBJECT)).isEmpty();
@@ -163,6 +167,13 @@ class IssueCertificateHandlerTest {
                     .filter(certificate -> revoked.stream()
                             .noneMatch(revocation -> Arrays.equals(revocation.serial(), certificate.serial())))
                     .map(CertificateRecords::of)
+                    .findFirst();
+        }
+
+        @Override
+        public Optional<IssuedCertificate> findIssued(byte[] serial) {
+            return inserted.stream()
+                    .filter(issued -> Arrays.equals(issued.certificate().serial(), serial))
                     .findFirst();
         }
 

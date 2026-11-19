@@ -7,10 +7,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.crypto.Canonical;
 import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.support.ProtocolVectors;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -159,5 +161,45 @@ class SealCertificateTest {
                 .contains("0".repeat(32))
                 .contains(SUBJECT.value().toString());
         assertThat(issued).isNotEqualTo(issued.encode());
+    }
+
+    @TestFactory
+    @DisplayName("KEY-33 : un certificat des vecteurs se relit depuis ses octets signés, champ par champ")
+    Stream<DynamicTest> key33CertificatesDecodeFromTheirBytes() {
+        return VECTORS.cases("certificates")
+                .map(vector -> DynamicTest.dynamicTest(vector.get("name").asString(), () -> {
+                    SealCertificate decoded = SealCertificate.decode(bytes(vector, "encoded"));
+                    SealCertificate expected = certificate(vector.get("fields"));
+
+                    assertThat(decoded).isEqualTo(expected);
+                    assertThat(decoded.username()).isEqualTo(expected.username());
+                    assertThat(decoded.subject()).isEqualTo(expected.subject());
+                    assertThat(decoded.usage()).isEqualTo(expected.usage());
+                }));
+    }
+
+    @Test
+    @DisplayName("KEY-33 : des octets tronqués, prolongés, d'une autre structure ou hors du format sont refusés")
+    void key33MalformedBytesAreRefused() {
+        byte[] encoded = bytes(VECTORS.cases("certificates").findFirst().orElseThrow(), "encoded");
+        byte[] proof = bytes(VECTORS.cases("proofs").findFirst().orElseThrow(), "encoded");
+        Instant notBefore = Instant.ofEpochMilli(1_794_009_600_000L);
+        byte[] tooShort = Canonical.struct(
+                SealCertificate.LABEL,
+                Canonical.bytes(new byte[16]),
+                Canonical.bytes(new byte[8]),
+                Canonical.uuid(SUBJECT.value()),
+                Canonical.text("valentin"),
+                Canonical.bytes(new byte[32]),
+                Canonical.u64(notBefore.toEpochMilli()),
+                Canonical.u64(notBefore.plus(Duration.ofDays(30)).toEpochMilli()),
+                Canonical.u8(SealCertificate.USAGE));
+
+        assertThatThrownBy(() -> SealCertificate.decode(Arrays.copyOf(encoded, encoded.length - 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SealCertificate.decode(Arrays.copyOf(encoded, encoded.length + 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SealCertificate.decode(proof)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SealCertificate.decode(tooShort)).isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -13,6 +13,9 @@ public interface CertificateRepository {
     /** Le certificat non révoqué du titulaire, même expiré. */
     Optional<CertificateRecord> findUnrevoked(UserId subject);
 
+    /** KEY-33 : le certificat émis sous ce numéro de série, relu depuis ses octets signés, avec la signature de la CA. */
+    Optional<IssuedCertificate> findIssued(byte[] serial);
+
     /** Faux si le titulaire a déjà un certificat non révoqué : une publication concurrente l'a devancé. */
     boolean save(IssuedCertificate certificate);
 

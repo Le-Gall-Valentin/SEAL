@@ -2,6 +2,7 @@ package fr.vlegall.seal.pki.application.handler;
 
 import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.pki.application.port.in.CertificateDetails;
 import fr.vlegall.seal.pki.application.port.in.IssueCertificateUseCase;
 import fr.vlegall.seal.pki.domain.model.CertificateRecord;
 import fr.vlegall.seal.pki.domain.model.IssuedCertificate;
@@ -33,7 +34,7 @@ public class IssueCertificateHandler implements IssueCertificateUseCase {
 
     @Override
     @Transactional
-    public Optional<Issued> issue(UserId subject, String username, byte[] ikPublic) {
+    public Optional<CertificateDetails> issue(UserId subject, String username, byte[] ikPublic) {
         Instant now = clock.instant();
         Optional<CertificateRecord> unrevoked = certificates.findUnrevoked(subject);
         if (unrevoked.isPresent()) {
@@ -45,54 +46,6 @@ public class IssueCertificateHandler implements IssueCertificateUseCase {
         SealCertificate certificate = SealCertificate.issue(
                 random.next(SealCertificate.SERIAL_BYTES), signer.key().keyId(), subject, username, ikPublic, now);
         IssuedCertificate issued = new IssuedCertificate(certificate, signer.sign(certificate.encode()));
-        return certificates.save(issued) ? Optional.of(new IssuedView(issued)) : Optional.empty();
-    }
-
-    private record IssuedView(IssuedCertificate issued) implements Issued {
-
-        @Override
-        public byte[] serial() {
-            return issued.certificate().serial();
-        }
-
-        @Override
-        public byte[] issuerKeyId() {
-            return issued.certificate().issuerKeyId();
-        }
-
-        @Override
-        public UserId subject() {
-            return issued.certificate().subject();
-        }
-
-        @Override
-        public String username() {
-            return issued.certificate().username();
-        }
-
-        @Override
-        public byte[] ikPublic() {
-            return issued.certificate().ikPublic();
-        }
-
-        @Override
-        public Instant notBefore() {
-            return issued.certificate().notBefore();
-        }
-
-        @Override
-        public Instant notAfter() {
-            return issued.certificate().notAfter();
-        }
-
-        @Override
-        public int usage() {
-            return issued.certificate().usage();
-        }
-
-        @Override
-        public byte[] signature() {
-            return issued.signature();
-        }
+        return certificates.save(issued) ? Optional.of(new CertificateDetailsView(issued)) : Optional.empty();
     }
 }

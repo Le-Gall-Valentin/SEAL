@@ -3,7 +3,7 @@ package fr.vlegall.seal.keys.application.handler;
 import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.keys.application.port.in.PublishSubkeyUseCase;
-import fr.vlegall.seal.keys.domain.model.CurrentCertificate;
+import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
 import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
 import fr.vlegall.seal.keys.domain.model.SubkeyPolicy;
@@ -49,7 +49,7 @@ public class PublishSubkeyHandler implements PublishSubkeyUseCase {
             Instant expiresAt,
             byte[] signature) {
         // Médiation complète : le certificat courant est relu à chaque publication (ADR 0025).
-        Optional<CurrentCertificate> current = certification.current(user);
+        Optional<IdentityCertificate> current = certification.current(user);
         if (current.isEmpty() || !current.get().hasSerial(certSerial)) {
             return new SubkeyPublication.NoCurrentCertificate();
         }

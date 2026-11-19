@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.crypto.Ed25519;
-import fr.vlegall.seal.keys.domain.model.CurrentCertificate;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
+import fr.vlegall.seal.keys.domain.model.PublishedSubkey;
 import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
 import fr.vlegall.seal.keys.domain.model.SubkeyPolicy;
@@ -42,7 +42,13 @@ class PublishSubkeyHandlerTest {
     private final List<byte[]> published = new ArrayList<>();
     private final List<String> rejectedSignatures = new ArrayList<>();
     private Instant now = NOW;
-    private Optional<CurrentCertificate> current = Optional.of(new CurrentCertificate(SERIAL, ik.publicKey()));
+    private Optional<IdentityCertificate> current = Optional.of(certificate(SERIAL, ik.publicKey()));
+
+    /** Certificat courant de doublure : seuls le numéro de série et la clé d'identité comptent ici. */
+    private static IdentityCertificate certificate(byte[] serial, byte[] ikPublic) {
+        return new IdentityCertificate(
+                serial, new byte[8], USER, "titulaire", ikPublic, NOW, NOW.plus(Duration.ofDays(397)), 3, new byte[64]);
+    }
 
     private static byte[] filled(int length, int value) {
         byte[] bytes = new byte[length];
@@ -58,7 +64,7 @@ class PublishSubkeyHandlerTest {
             }
 
             @Override
-            public Optional<CurrentCertificate> current(UserId subject) {
+            public Optional<IdentityCertificate> current(UserId subject) {
                 return current;
             }
         };
@@ -138,7 +144,7 @@ class PublishSubkeyHandlerTest {
     void key05BindingNeedsTheCurrentCertificate() {
         Instant expires = NOW.plus(SubkeyBinding.VALIDITY);
         byte[] signature = sign(USER, NOW, expires, ik);
-        current = Optional.of(new CurrentCertificate(filled(16, 8), ik.publicKey()));
+        current = Optional.of(certificate(filled(16, 8), ik.publicKey()));
 
         assertThat(publish(NOW, expires, signature)).isInstanceOf(SubkeyPublication.NoCurrentCertificate.class);
         current = Optional.empty();
@@ -245,7 +251,7 @@ class PublishSubkeyHandlerTest {
             assertThat(publishFresh(i)).isInstanceOf(SubkeyPublication.Published.class);
         }
         byte[] renewed = filled(16, 8);
-        current = Optional.of(new CurrentCertificate(renewed, ik.publicKey()));
+        current = Optional.of(certificate(renewed, ik.publicKey()));
 
         assertThat(publishFresh(renewed, 4)).isInstanceOf(SubkeyPublication.Published.class);
     }
@@ -255,6 +261,11 @@ class PublishSubkeyHandlerTest {
         final List<byte[]> ekIds = new ArrayList<>();
         final List<SubkeyBinding> bindings = new ArrayList<>();
         final List<String> calls = new ArrayList<>();
+
+        @Override
+        public List<PublishedSubkey> findLive(UserId user, byte[] certSerial, Instant at) {
+            throw new UnsupportedOperationException();
+        }
 
         @Override
         public void lockAccount(UserId user) {

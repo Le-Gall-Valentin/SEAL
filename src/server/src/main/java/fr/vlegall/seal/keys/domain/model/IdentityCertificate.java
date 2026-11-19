@@ -32,6 +32,11 @@ public record IdentityCertificate(
         signature = Objects.requireNonNull(signature, "signature").clone();
     }
 
+    /** Vrai si {@code candidate} est le numéro de série de ce certificat. */
+    public boolean hasSerial(byte[] candidate) {
+        return Arrays.equals(serial, candidate);
+    }
+
     @Override
     public byte[] serial() {
         return serial.clone();

@@ -1,7 +1,6 @@
 package fr.vlegall.seal.keys.domain.port.out;
 
 import fr.vlegall.seal.common.UserId;
-import fr.vlegall.seal.keys.domain.model.CurrentCertificate;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
 import java.util.Optional;
 
@@ -11,6 +10,6 @@ public interface CertificationPort {
     /** Certificat émis pour {@code ikPublic} ; vide si le compte a déjà un certificat valide (ADR 0025, point 4). */
     Optional<IdentityCertificate> certify(UserId subject, String username, byte[] ikPublic);
 
-    /** Certificat non révoqué et non expiré du compte. */
-    Optional<CurrentCertificate> current(UserId subject);
+    /** Certificat non révoqué et non expiré du compte, entier, avec la signature de la CA (KEY-05, KEY-33). */
+    Optional<IdentityCertificate> current(UserId subject);
 }
