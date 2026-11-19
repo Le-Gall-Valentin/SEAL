@@ -32,8 +32,11 @@
   --fp-a: #4f5b14;
   --fp-b: #94a257;
   --fp-c: #d3dbb5;
-  /* Halo du champ actif (Connexion-Ordinateur). */
-  --focus-glow: rgba(102, 116, 28, 0.22);
+  /* Halo du champ actif : 0,24, valeur majoritaire de la maquette (ADR 0029, point 14). */
+  --focus-glow: rgba(102, 116, 28, 0.24);
+  /* Anneau de focus des boutons et ombre des dialogues (Dialogue-Cle-Recuperation). */
+  --focus-ring: #66741c;
+  --shadow-3: 0 24px 64px -16px rgba(27, 31, 20, 0.32), 0 4px 12px rgba(27, 31, 20, 0.08);
   /* ADR 0024 : « Schibsted Grotesk Variable » est le nom de la police variable servie par SEAL. */
   --sans: 'Schibsted Grotesk Variable', 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
   --mono: 'DM Mono', ui-monospace, Menlo, Consolas, monospace;
@@ -71,5 +74,7 @@
     --fp-b: #6f7f34;
     --fp-c: #36421f;
     --focus-glow: rgba(180, 198, 90, 0.28);
+    --focus-ring: #c4d46e;
+    --shadow-3: 0 24px 64px -16px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(233, 237, 223, 0.06);
   }
 }

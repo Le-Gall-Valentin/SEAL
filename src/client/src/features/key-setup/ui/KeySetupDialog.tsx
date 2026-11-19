@@ -17,8 +17,10 @@ const TITLE = 'm-0 text-[20px] leading-[1.2] font-bold tracking-[-0.015em]'
 const BODY = 'flex flex-col gap-4 px-6 pb-[22px]'
 const TEXT = 'm-0 text-[14.5px] leading-[1.45] text-ink-2'
 const FOOTER = 'flex justify-end gap-2 border-t border-line px-6 pt-4 pb-5'
-const PRIMARY =
-  'h-11 rounded-[10px] bg-accent px-4 font-sans text-[14.5px] font-semibold text-on-accent disabled:opacity-55'
+/** Anneau de focus de la maquette (« Terminer ») : 2 px de --focus-ring, à 2 px du bouton. */
+const FOCUS_RING =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
+const PRIMARY = `h-11 rounded-[10px] bg-accent px-4 font-sans text-[14.5px] font-semibold text-on-accent disabled:opacity-55 ${FOCUS_RING}`
 
 /** KEY-02, KEY-30 : Dialogue-Cle-Recuperation, en deux étapes, sur le fond seul (ADR 0029). */
 export function KeySetupDialog({ owner, onDone }: KeySetupDialogProps) {
@@ -79,7 +81,7 @@ function ShowStep({ setup, titleId, textId }: StepProps) {
           <button
             type="button"
             onClick={setup.download}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-surface pr-4 pl-3 font-sans text-[14.5px] font-semibold text-ink inset-ring inset-ring-line-strong"
+            className={`inline-flex h-11 items-center gap-2 rounded-[10px] bg-surface pr-4 pl-3 font-sans text-[14.5px] font-semibold text-ink inset-ring inset-ring-line-strong ${FOCUS_RING}`}
           >
             <svg
               width="18"

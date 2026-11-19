@@ -53,11 +53,12 @@
   --color-fp-b: var(--fp-b);
   --color-fp-c: var(--fp-c);
   --color-focus-glow: var(--focus-glow);
+  --color-focus-ring: var(--focus-ring);
 
   /* Carte de Connexion-Tablette, seule ombre de la maquette des écrans d'authentification. */
   --shadow-card: 0 12px 32px -12px rgba(27, 31, 20, 0.22), 0 2px 6px rgba(27, 31, 20, 0.06);
-  /* Dialogues (Dialogue-Cle-Recuperation, --shadow-3), sans valeur sombre dans la maquette. */
-  --shadow-dialog: 0 24px 64px -16px rgba(27, 31, 20, 0.32), 0 4px 12px rgba(27, 31, 20, 0.08);
+  /* Dialogues (Dialogue-Cle-Recuperation) : --shadow-3 de tokens.css, clair et sombre. */
+  --shadow-dialog: var(--shadow-3);
 
   --font-sans: var(--sans);
   --font-mono: var(--mono);

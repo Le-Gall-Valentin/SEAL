@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { type KeySetup, useKeySetup } from '../model/useKeySetup'
 import { KeySetupDialog } from './KeySetupDialog'
@@ -167,5 +168,23 @@ describe('KEY-30 : Dialogue-Cle-Recuperation, étape 2', () => {
     await expect
       .element(screen.getByRole('dialog', { name: 'Votre clé de récupération' }))
       .toHaveFocus()
+  })
+
+  it('Dialogue-Cle-Recuperation : au clavier, « Terminer » porte l’anneau de focus de la maquette', async () => {
+    const screen = await renderWith(state({ step: 2, typed: ['T7PA', 'K4VE'], confirmed: true }))
+    await expect.element(screen.getByLabelText('Groupe 3')).toHaveFocus()
+
+    await userEvent.tab()
+    await userEvent.tab()
+    await userEvent.tab()
+
+    const finish = screen.getByRole('button', { name: 'Terminer' })
+    await expect.element(finish).toHaveFocus()
+    expect(getComputedStyle(finish.element())).toMatchObject({
+      outlineStyle: 'solid',
+      outlineWidth: '2px',
+      outlineOffset: '2px',
+      outlineColor: 'rgb(102, 116, 28)',
+    })
   })
 })
