@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { commands } from 'vitest/browser'
+import { toBase64Url } from './base64url'
 import {
   CertificateRejectedError,
   type CertificateRejection,
+  type ServedCertificate,
   storeOwnCertificate,
+  verifyOwnCertificate,
 } from './certificate'
 import { encodeCertificate } from './identity'
 import { type KeyStore, openKeyStore, pinAuthority, type StoredCertificate } from './keystore'
@@ -30,6 +33,21 @@ function certificate(vector: unknown): StoredCertificate {
     notAfter: decimal(fields, 'notAfter'),
     usage: number(fields, 'usage'),
     signature: base64url(json, 'signature'),
+  }
+}
+
+/** Le certificat tel que le serveur le sert : octets en base64url, dates en millisecondes (ADR 0029). */
+function served(fields: StoredCertificate): ServedCertificate {
+  return {
+    serial: toBase64Url(fields.serial),
+    issuerKeyId: toBase64Url(fields.issuerKeyId),
+    subjectId: fields.subjectId,
+    username: fields.username,
+    ikPublic: toBase64Url(fields.ikPublic),
+    notBefore: fields.notBefore,
+    notAfter: fields.notAfter,
+    usage: fields.usage,
+    signature: toBase64Url(fields.signature),
   }
 }
 
@@ -96,7 +114,7 @@ async function expectRejected(
   owner = OWNER,
   now = NOW,
 ) {
-  const error: unknown = await storeOwnCertificate(store, received, owner, now).then(
+  const error: unknown = await storeOwnCertificate(store, served(received), owner, now).then(
     () => undefined,
     (thrown: unknown) => thrown,
   )
@@ -116,7 +134,7 @@ describe('KEY-06 : le client vérifie le certificat reçu avant de l’enregistr
       }
       const store = await pinnedStore()
 
-      await storeOwnCertificate(store, received, owner, NOW)
+      await storeOwnCertificate(store, served(received), owner, NOW)
 
       await expect(store.loadCertificate(owner.userId)).resolves.toEqual(received)
     }
@@ -150,13 +168,13 @@ describe('KEY-06 : le client vérifie le certificat reçu avant de l’enregistr
   })
 
   it('ADR 0027, point 9 : une horloge en retard de 5 minutes au plus accepte le certificat tout juste émis', async () => {
-    await storeOwnCertificate(await pinnedStore(), VALID, OWNER, VALID.notBefore - SKEW_MS)
-    await storeOwnCertificate(await pinnedStore(), VALID, OWNER, VALID.notAfter - 1)
+    await storeOwnCertificate(await pinnedStore(), served(VALID), OWNER, VALID.notBefore - SKEW_MS)
+    await storeOwnCertificate(await pinnedStore(), served(VALID), OWNER, VALID.notAfter - 1)
   })
 
   it('KEY-06 : seuls les champs vérifiés sont enregistrés, copiés au début de la vérification', async () => {
     let reads = 0
-    const received = { ...VALID, extra: '<img src=x onerror=alert(1)>' }
+    const received = { ...served(VALID), extra: '<img src=x onerror=alert(1)>' }
     Object.defineProperty(received, 'username', {
       enumerable: true,
       get: () => (++reads === 1 ? VALID.username : 'mallory'),
@@ -166,6 +184,29 @@ describe('KEY-06 : le client vérifie le certificat reçu avant de l’enregistr
     await storeOwnCertificate(store, received, OWNER, NOW)
 
     await expect(store.loadCertificate(OWNER.userId)).resolves.toEqual(VALID)
+  })
+
+  it('ADR 0029 : un base64url non canonique est refusé avant toute vérification', async () => {
+    const store = await pinnedStore()
+    const padded = { ...served(VALID), signature: `${served(VALID).signature}=` }
+
+    const error: unknown = await storeOwnCertificate(store, padded, OWNER, NOW).then(
+      () => undefined,
+      (thrown: unknown) => thrown,
+    )
+
+    expect(error instanceof CertificateRejectedError ? error.reason : error).toBe('encoding')
+    await expect(store.loadCertificate(OWNER.userId)).resolves.toBeUndefined()
+  })
+
+  it('KEY-06, ADR 0029 (point 3) : verifyOwnCertificate vérifie de même, sans rien enregistrer', async () => {
+    const store = await pinnedStore()
+
+    await verifyOwnCertificate(store, served(VALID), OWNER, NOW)
+    await expect(store.loadCertificate(OWNER.userId)).resolves.toBeUndefined()
+    await expect(
+      verifyOwnCertificate(store, served(VALID), { ...OWNER, username: 'mallory' }, NOW),
+    ).rejects.toMatchObject({ reason: 'username' })
   })
 
   it('KEY-04 : une validité autre que 397 jours est refusée, même signée par l’Autorité', async () => {

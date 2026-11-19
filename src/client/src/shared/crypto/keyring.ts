@@ -9,7 +9,7 @@
 import { z } from 'zod'
 import { fromBase64Url, toBase64Url } from './base64url'
 import { KEM, type Kem } from './identity'
-import { generateRecoveryKey, type RecoveryKey } from './recovery'
+import { type RecoveryKey } from './recovery'
 import { openVaultBytes, sealVault, type VaultPayload, VaultOpenError } from './vault'
 import { generateX25519 } from './webcrypto'
 
@@ -82,7 +82,6 @@ export function keyringSecrets(keyring: Keyring): KeyringSecrets {
 
 export interface NewKeyring {
   readonly keyring: Keyring
-  readonly recoveryKey: RecoveryKey
   readonly vault: VaultPayload
 }
 
@@ -144,10 +143,15 @@ export function serializeKeyring(keyring: KeyringExport): Uint8Array<ArrayBuffer
 }
 
 /**
- * KEY-02, KEY-40 : IK, EK et VDK neuves, la clé de récupération et le premier coffre (version 1). Rien n'est publié
- * ni enregistré ici : le parcours de première connexion le fera, coffre d'abord.
+ * KEY-02, KEY-40 : IK, EK et VDK neuves, et le premier coffre (version 1) sous la clé de récupération que
+ * l'utilisateur vient de confirmer (ADR 0029, point 2). Rien n'est publié ni enregistré ici : le parcours de première
+ * connexion le fera, coffre d'abord.
  */
-export async function generateKeyring(userId: string, now: number): Promise<NewKeyring> {
+export async function generateKeyring(
+  userId: string,
+  recoveryKey: RecoveryKey,
+  now: number,
+): Promise<NewKeyring> {
   // KEY-40 : chaque tampon secret est remis à zéro à la sortie, même sur une exception.
   const buffers: Uint8Array[] = []
   const held = <T extends Uint8Array>(buffer: T): T => {
@@ -174,7 +178,6 @@ export async function generateKeyring(userId: string, now: number): Promise<NewK
         createdAt: now,
       }),
     )
-    const recoveryKey = generateRecoveryKey()
     const vault = await sealVault({ userId, vaultVersion: 1, recoveryKey, vdk, plaintext })
     const keyring = createKeyring(
       {
@@ -196,7 +199,7 @@ export async function generateKeyring(userId: string, now: number): Promise<NewK
         vdk: await crypto.subtle.importKey('raw', vdk, 'AES-GCM', false, ['encrypt', 'decrypt']),
       },
     )
-    return { keyring, recoveryKey, vault }
+    return { keyring, vault }
   } finally {
     for (const buffer of buffers) {
       buffer.fill(0)

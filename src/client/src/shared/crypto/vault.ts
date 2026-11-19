@@ -3,6 +3,7 @@
  * tirée de RK par HKDF chiffre la VDK ; chaque AAD attache le niveau au compte, et le blob à sa version. À l'ouverture,
  * la VDK sort d'unwrapKey déjà non extractable (KEY-40) ; toute erreur devient VaultOpenError, sans résultat partiel.
  */
+import { fromBase64Url, toBase64Url } from './base64url'
 import { struct, u64, uuid } from './canonical'
 import { type RecoveryKey, recoveryKeyBytes } from './recovery'
 
@@ -19,6 +20,43 @@ export interface VaultPayload {
   readonly wrappedVdk: Uint8Array<ArrayBuffer>
   readonly nonceB: Uint8Array<ArrayBuffer>
   readonly blob: Uint8Array<ArrayBuffer>
+}
+
+/** Coffre tel que l'API l'échange (GET et PUT /api/v1/keys/vault) : octets en base64url (ADR 0029). */
+export interface VaultWire {
+  readonly vaultVersion: number
+  readonly salt: string
+  readonly nonceK: string
+  readonly wrappedVdk: string
+  readonly nonceB: string
+  readonly blob: string
+}
+
+export function vaultToWire(payload: VaultPayload): VaultWire {
+  return {
+    vaultVersion: payload.vaultVersion,
+    salt: toBase64Url(payload.salt),
+    nonceK: toBase64Url(payload.nonceK),
+    wrappedVdk: toBase64Url(payload.wrappedVdk),
+    nonceB: toBase64Url(payload.nonceB),
+    blob: toBase64Url(payload.blob),
+  }
+}
+
+/** Un base64url non canonique refuse le coffre à l'étage 'format' ; les tailles se contrôlent à l'ouverture. */
+export function vaultFromWire(wire: VaultWire): VaultPayload {
+  try {
+    return {
+      vaultVersion: wire.vaultVersion,
+      salt: fromBase64Url(wire.salt),
+      nonceK: fromBase64Url(wire.nonceK),
+      wrappedVdk: fromBase64Url(wire.wrappedVdk),
+      nonceB: fromBase64Url(wire.nonceB),
+      blob: fromBase64Url(wire.blob),
+    }
+  } catch (error) {
+    throw new VaultOpenError('format', { cause: error })
+  }
 }
 
 export interface VaultNonces {

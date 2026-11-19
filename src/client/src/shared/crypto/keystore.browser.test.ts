@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CertificateFields } from './identity'
 import { createKeyring, generateKeyring, keyringSecrets } from './keyring'
 import { type KeyStore, openKeyStore, pinAuthority, saveCertificate } from './keystore'
+import { generateRecoveryKey } from './recovery'
 
 const USER_ID = '0192f7a1-ffff-7000-8000-00000000a11c'
 const OTHER_ID = '0192f7a1-ffff-7000-8000-000000000b0b'
@@ -31,7 +32,7 @@ afterEach(async () => {
 
 describe('KEY-40 : trousseau dans IndexedDB', () => {
   it('KEY-40 : un trousseau relu de la base signe toujours, et ses clés ne s’exportent pas', async () => {
-    const { keyring } = await generateKeyring(USER_ID, Date.now())
+    const { keyring } = await generateKeyring(USER_ID, generateRecoveryKey(), Date.now())
     const store = await freshStore()
     await store.saveKeyring(keyring)
 
@@ -65,7 +66,7 @@ describe('KEY-40 : trousseau dans IndexedDB', () => {
   })
 
   it('ADR 0027, point 12 : un trousseau dont une clé est extractable n’est pas enregistré', async () => {
-    const { keyring } = await generateKeyring(USER_ID, Date.now())
+    const { keyring } = await generateKeyring(USER_ID, generateRecoveryKey(), Date.now())
     const secrets = keyringSecrets(keyring)
     const extractable = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, [
       'sign',
@@ -79,7 +80,7 @@ describe('KEY-40 : trousseau dans IndexedDB', () => {
   })
 
   it('KEY-40 : le trousseau d’un compte ne se lit pas sous un autre identifiant', async () => {
-    const { keyring } = await generateKeyring(USER_ID, Date.now())
+    const { keyring } = await generateKeyring(USER_ID, generateRecoveryKey(), Date.now())
     const store = await freshStore()
     await store.saveKeyring(keyring)
 
@@ -89,7 +90,7 @@ describe('KEY-40 : trousseau dans IndexedDB', () => {
 
   it('KEY-40 : le trousseau survit à la fermeture de la base, comme à un rechargement de la page', async () => {
     const name = `seal-test-${crypto.randomUUID()}`
-    const { keyring } = await generateKeyring(USER_ID, Date.now())
+    const { keyring } = await generateKeyring(USER_ID, generateRecoveryKey(), Date.now())
     const first = await freshStore(name)
     await first.saveKeyring(keyring)
     first.close()
@@ -103,7 +104,7 @@ describe('KEY-40 : trousseau dans IndexedDB', () => {
 
   it('ADR 0012 (Q6) : l’enregistrement demande que la base ne soit pas évincée', async () => {
     const persist = vi.spyOn(navigator.storage, 'persist').mockResolvedValue(true)
-    const { keyring } = await generateKeyring(USER_ID, Date.now())
+    const { keyring } = await generateKeyring(USER_ID, generateRecoveryKey(), Date.now())
     const store = await freshStore()
 
     await store.saveKeyring(keyring)
@@ -115,7 +116,7 @@ describe('KEY-40 : trousseau dans IndexedDB', () => {
     vi.spyOn(navigator.storage, 'persist').mockRejectedValue(
       new DOMException('refus', 'NotAllowedError'),
     )
-    const { keyring } = await generateKeyring(USER_ID, Date.now())
+    const { keyring } = await generateKeyring(USER_ID, generateRecoveryKey(), Date.now())
     const store = await freshStore()
 
     await store.saveKeyring(keyring)
