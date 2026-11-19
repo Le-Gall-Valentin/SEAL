@@ -54,10 +54,14 @@ final class KeysTestClient {
 
     /** KEY-03 : nouveau défi, qui remplace le précédent. */
     byte[] challenge() throws Exception {
-        JsonNode body = AuthClient.body(mvc.perform(unsafe(post(CHALLENGE), null))
+        return Base64Url.decode(challengeBody().get("challenge").asString());
+    }
+
+    /** Réponse entière de {@code POST /keys/challenge}. */
+    JsonNode challengeBody() throws Exception {
+        return AuthClient.body(mvc.perform(unsafe(post(CHALLENGE), null))
                 .andExpect(status().isOk())
                 .andReturn());
-        return Base64Url.decode(body.get("challenge").asString());
     }
 
     /** Corps de {@code PUT /keys/identity} : preuve signée par {@code key} pour le compte {@code signedFor}. */

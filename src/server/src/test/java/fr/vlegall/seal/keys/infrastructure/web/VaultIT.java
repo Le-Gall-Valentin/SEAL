@@ -135,7 +135,9 @@ class VaultIT {
 
         assertThat(readBack(account)).isEqualTo(next);
         assertThat(next).containsEntry("vaultVersion", 2);
-        save(account, first).andExpect(status().isConflict());
+        save(account, first)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("VAULT_VERSION_CONFLICT"));
     }
 
     @Test

@@ -10,6 +10,7 @@ import fr.vlegall.seal.keys.domain.port.out.ChallengeRepository;
 import fr.vlegall.seal.keys.domain.port.out.RandomBytes;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.springframework.transaction.annotation.Transactional;
 
 @ApplicationService
@@ -29,7 +30,8 @@ public class CreateChallengeHandler implements CreateChallengeUseCase {
     @Transactional
     public IssuedChallenge create(UserId user) {
         byte[] value = random.next(Challenge.BYTES);
-        Instant expiresAt = clock.instant().plus(Challenge.VALIDITY);
+        // Servie à la milliseconde, comme les autres dates de l'API (ISO 8601).
+        Instant expiresAt = clock.instant().truncatedTo(ChronoUnit.MILLIS).plus(Challenge.VALIDITY);
         challenges.renew(user, Digests.sha256(value), expiresAt);
         return new IssuedChallenge(value, expiresAt);
     }

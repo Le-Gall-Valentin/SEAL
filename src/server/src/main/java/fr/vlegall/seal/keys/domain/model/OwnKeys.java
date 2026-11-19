@@ -9,8 +9,18 @@ import java.util.Objects;
  */
 public record OwnKeys(IdentityCertificate certificate, List<PublishedSubkey> subkeys) {
 
+    /**
+     * Chaque sous-clé est liée à ce certificat et à son titulaire : c'est ce qui permet de les servir sans leur
+     * {@code certSerial}, que le client lit dans le certificat (PROTOCOL.md 4.4).
+     */
     public OwnKeys {
         Objects.requireNonNull(certificate, "certificate");
         subkeys = List.copyOf(subkeys);
+        for (PublishedSubkey subkey : subkeys) {
+            SubkeyBinding binding = subkey.binding();
+            if (!certificate.hasSerial(binding.certSerial()) || !binding.user().equals(certificate.subject())) {
+                throw new IllegalArgumentException("sous-clé liée à un autre certificat");
+            }
+        }
     }
 }
