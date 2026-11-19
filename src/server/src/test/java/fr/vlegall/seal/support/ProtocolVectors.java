@@ -101,7 +101,7 @@ public final class ProtocolVectors {
 
     /** Section {@code authority} : clé publique, identifiant et empreinte de la CA. */
     public JsonNode authority() {
-        return document.get("authority");
+        return section("authority");
     }
 
     /** Octets d'un champ base64url sans remplissage. */
