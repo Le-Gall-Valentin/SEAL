@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { encodeCrockford } from './crockford'
 import { KEM } from './identity'
-import { generateKeyring, openVault, serializeKeyring } from './keyring'
+import {
+  generateKeyring,
+  type Keyring,
+  keyringSecrets,
+  openVault,
+  serializeKeyring,
+} from './keyring'
 import { parseRecoveryKey, recoveryKeyBytes } from './recovery'
 import { base64url, number, record, records, string } from './testing/vectorReader'
 import {
@@ -46,11 +52,21 @@ function recoveryKey() {
   return parseRecoveryKey(groups.join('-'))
 }
 
-async function refusesExport(key: CryptoKey): Promise<boolean> {
-  return crypto.subtle.exportKey('pkcs8', key).then(
-    () => false,
-    () => true,
-  )
+/** KEY-40 : aucune clé privée ni la VDK ne s'exporte, sous aucun format. */
+async function expectNothingExports(keyring: Keyring): Promise<void> {
+  const secrets = keyringSecrets(keyring)
+  const subkeyKey = secrets.subkeyKeys[0]
+  if (subkeyKey === undefined || secrets.subkeyKeys.length !== keyring.subkeys.length) {
+    throw new Error('une clé privée par sous-clé attendue')
+  }
+  for (const [format, key] of [
+    ['pkcs8', secrets.identityKey],
+    ['pkcs8', subkeyKey],
+    ['raw', secrets.vdk],
+  ] as const) {
+    expect(key.extractable).toBe(false)
+    await expect(crypto.subtle.exportKey(format, key)).rejects.toThrow()
+  }
 }
 
 describe('KEY-31, QA-02 : coffre de clés, vecteurs de vault.json', () => {
@@ -118,7 +134,7 @@ describe('KEY-31, QA-02 : coffre de clés, vecteurs de vault.json', () => {
     const opened = await openVault(userId, payload(vectors['payload']), recoveryKey())
 
     expect(opened.userId).toBe(userId)
-    expect(opened.identity.publicKey).toEqual(base64url(publicKeys, 'ik'))
+    expect(opened.identityPublicKey).toEqual(base64url(publicKeys, 'ik'))
     expect(opened.subkeys).toHaveLength(1)
     expect(opened.subkeys[0]).toMatchObject({
       ekId: base64url(subkey, 'ekId'),
@@ -133,14 +149,7 @@ describe('KEY-31, QA-02 : coffre de clés, vecteurs de vault.json', () => {
   it('KEY-40 : aucune clé du trousseau ouvert ne s’exporte', async () => {
     const opened = await openVault(userId, payload(vectors['payload']), recoveryKey())
 
-    await expect(refusesExport(opened.identity.privateKey)).resolves.toBe(true)
-    await expect(refusesExport(opened.subkeys[0]?.privateKey ?? opened.vdk)).resolves.toBe(true)
-    await expect(
-      crypto.subtle.exportKey('raw', opened.vdk).then(
-        () => false,
-        () => true,
-      ),
-    ).resolves.toBe(true)
+    await expectNothingExports(opened)
   })
 
   it('PROTOCOL.md 5.3 : un sel, un nonce ou une VDK enveloppée d’une autre taille sont refusés avant tout calcul', async () => {
@@ -203,26 +212,34 @@ describe('KEY-02, KEY-40 : génération du trousseau', () => {
     const message = new TextEncoder().encode('SEAL')
     const signature = await crypto.subtle.sign(
       'Ed25519',
-      generated.keyring.identity.privateKey,
+      keyringSecrets(generated.keyring).identityKey,
       message,
     )
     const publicKey = await crypto.subtle.importKey(
       'raw',
-      opened.identity.publicKey,
+      opened.identityPublicKey,
       'Ed25519',
       false,
       ['verify'],
     )
 
     await expect(crypto.subtle.verify('Ed25519', publicKey, signature, message)).resolves.toBe(true)
-    expect(opened.identity.publicKey).toEqual(generated.keyring.identity.publicKey)
+    expect(opened.identityPublicKey).toEqual(generated.keyring.identityPublicKey)
     expect(opened.subkeys[0]?.publicKey).toEqual(generated.keyring.subkeys[0]?.publicKey)
-    for (const key of [
-      generated.keyring.identity.privateKey,
-      generated.keyring.subkeys[0]?.privateKey ?? generated.keyring.vdk,
-    ]) {
-      await expect(refusesExport(key)).resolves.toBe(true)
-    }
+    await expectNothingExports(generated.keyring)
+    await expectNothingExports(opened)
+  })
+
+  it('ADR 0027, point 12 : le trousseau ne montre que des données publiques, et un faux n’a pas de clés', async () => {
+    const { keyring: created } = await generateKeyring(userId, NOW)
+    const values = [
+      ...Object.values<unknown>({ ...created }),
+      ...created.subkeys.flatMap((subkey) => Object.values<unknown>({ ...subkey })),
+    ]
+
+    expect(values.some((value) => value instanceof CryptoKey)).toBe(false)
+    expect(Object.isFrozen(created)).toBe(true)
+    expect(() => keyringSecrets({ ...created })).toThrow(TypeError)
   })
 
   it('KEY-21, KEY-32 : une sous-clé de 45 jours, un ekId de 16 octets, la version 1 et les tailles du serveur', async () => {

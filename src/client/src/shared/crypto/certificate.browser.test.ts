@@ -6,7 +6,7 @@ import {
   storeOwnCertificate,
 } from './certificate'
 import { encodeCertificate } from './identity'
-import { type KeyStore, openKeyStore, type StoredCertificate } from './keystore'
+import { type KeyStore, openKeyStore, pinAuthority, type StoredCertificate } from './keystore'
 import { base64url, decimal, number, record, records, string } from './testing/vectorReader'
 
 // QA-02 : vecteurs de vectors/identity.json ; chemin relatif à la racine du client, comme le résout readFile.
@@ -76,7 +76,7 @@ async function pinnedStore(pin: Uint8Array | null = CA_PUBLIC): Promise<KeyStore
   const name = `seal-test-${crypto.randomUUID()}`
   const store = await openKeyStore(name)
   opened.push({ store, name })
-  if (pin !== null) await store.pinAuthorityIfAbsent(pin)
+  if (pin !== null) await pinAuthority(store, pin)
   return store
 }
 

@@ -20,7 +20,12 @@ import { LogoutApiProvider } from '@/features/logout'
 import type { KeyStore } from '@/shared/crypto'
 import { ApiError, NetworkError } from '@/shared/lib'
 import { createQueryClient } from '../providers'
-import { memoryKeyStore, servingAuthority, VECTOR_AUTHORITY } from '../testing/authority'
+import {
+  freshKeyStore,
+  OTHER_AUTHORITY,
+  servingAuthority,
+  VECTOR_AUTHORITY,
+} from '../testing/authority'
 import { ActiveRoute, AnonymousRoute, PendingRoute } from './routeGuards'
 
 const ACTIVE: Account = {
@@ -104,15 +109,16 @@ interface AuthorityDoubles {
 async function renderAt(
   path: string,
   me: () => Promise<Account | null>,
-  { authority = servingAuthority(), store = memoryKeyStore() }: AuthorityDoubles = {},
+  { authority = servingAuthority(), store }: AuthorityDoubles = {},
 ) {
   const api: ISessionApi = { me, reloadCsrf: () => Promise.resolve() }
+  const keyStore = store ?? (await freshKeyStore())
   const router = createMemoryRouter(TREE, { initialEntries: [path] })
   const screen = await render(
     <QueryClientProvider client={createQueryClient()}>
       <SessionApiProvider api={api}>
         <AuthorityApiProvider api={authority}>
-          <KeyStoreProvider api={store}>
+          <KeyStoreProvider api={keyStore}>
             <LogoutApiProvider api={{ logout: () => Promise.resolve() }}>
               <RouterProvider router={router} />
             </LogoutApiProvider>
@@ -193,10 +199,8 @@ describe('AUTH-16 : gardes de route selon le compte courant', () => {
 })
 
 describe('KEY-11 : la zone du compte actif attend le contrôle de l’Autorité (ADR 0027, point 5)', () => {
-  const OTHER_KEY = new Uint8Array(32).fill(7)
-
   it('KEY-11 : au premier usage, la clé servie est épinglée et l’accueil s’affiche', async () => {
-    const store = memoryKeyStore()
+    const store = await freshKeyStore()
     const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE), { store })
 
     await expect.element(screen.getByText('Accueil')).toBeVisible()
@@ -205,7 +209,7 @@ describe('KEY-11 : la zone du compte actif attend le contrôle de l’Autorité 
 
   it('KEY-11 : une Autorité changée bloque l’application, sans aucun écran du compte', async () => {
     const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE), {
-      store: memoryKeyStore(OTHER_KEY),
+      store: await freshKeyStore(OTHER_AUTHORITY),
     })
 
     await expect
@@ -216,7 +220,7 @@ describe('KEY-11 : la zone du compte actif attend le contrôle de l’Autorité 
   })
 
   it('ADR 0027, point 5 : une réponse incohérente bloque aussi, et rien n’est épinglé', async () => {
-    const store = memoryKeyStore()
+    const store = await freshKeyStore()
     const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE), {
       store,
       authority: servingAuthority({ ...VECTOR_AUTHORITY, fingerprint: '0'.repeat(64) }),

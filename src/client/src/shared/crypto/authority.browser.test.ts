@@ -69,9 +69,10 @@ describe('KEY-11 : Autorité épinglée au premier usage', () => {
     const store = await freshStore()
     const other = await servedFor(base64url(record(record(identity['keys'])['other']), 'publicKey'))
     await checkAuthority(store, other)
-    const late: KeyStore = { ...store, loadAuthority: () => Promise.resolve(undefined) }
+    // Lecture faite avant l'épinglage de l'autre onglet : le trousseau semble vide, l'écriture trouve la clé posée.
+    store.loadAuthority = () => Promise.resolve(undefined)
 
-    await expect(checkAuthority(late, SERVED)).resolves.toBe('changed')
+    await expect(checkAuthority(store, SERVED)).resolves.toBe('changed')
   })
 
   it('ADR 0027, point 5 : une réponse incohérente est invalide et n’est jamais épinglée', async () => {

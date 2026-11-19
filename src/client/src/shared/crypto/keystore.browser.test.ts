@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CertificateFields } from './identity'
-import { generateKeyring } from './keyring'
-import { type KeyStore, openKeyStore, saveCertificate } from './keystore'
+import { createKeyring, generateKeyring, keyringSecrets } from './keyring'
+import { type KeyStore, openKeyStore, pinAuthority, saveCertificate } from './keystore'
 
 const USER_ID = '0192f7a1-ffff-7000-8000-00000000a11c'
 const OTHER_ID = '0192f7a1-ffff-7000-8000-000000000b0b'
@@ -38,25 +38,37 @@ describe('KEY-40 : trousseau dans IndexedDB', () => {
     const reloaded = await store.loadKeyring(USER_ID)
     if (reloaded === undefined) throw new Error('trousseau attendu')
     const message = new TextEncoder().encode('SEAL')
-    const signature = await crypto.subtle.sign('Ed25519', reloaded.identity.privateKey, message)
+    const secrets = keyringSecrets(reloaded)
+    const signature = await crypto.subtle.sign('Ed25519', secrets.identityKey, message)
     const publicKey = await crypto.subtle.importKey(
       'raw',
-      reloaded.identity.publicKey,
+      reloaded.identityPublicKey,
       'Ed25519',
       false,
       ['verify'],
     )
 
     await expect(crypto.subtle.verify('Ed25519', publicKey, signature, message)).resolves.toBe(true)
-    expect(reloaded.subkeys[0]?.ekId).toEqual(keyring.subkeys[0]?.ekId)
-    for (const key of [
-      reloaded.identity.privateKey,
-      reloaded.subkeys[0]?.privateKey,
-      reloaded.vdk,
-    ]) {
-      expect(key?.extractable).toBe(false)
-      await expect(crypto.subtle.exportKey('jwk', key ?? reloaded.vdk)).rejects.toThrow()
+    expect(reloaded.subkeys).toEqual(keyring.subkeys)
+    expect(secrets.subkeyKeys).toHaveLength(1)
+    for (const key of [secrets.identityKey, ...secrets.subkeyKeys, secrets.vdk]) {
+      expect(key.extractable).toBe(false)
+      await expect(crypto.subtle.exportKey('jwk', key)).rejects.toThrow()
     }
+  })
+
+  it('ADR 0027, point 12 : un trousseau dont une clé est extractable n’est pas enregistré', async () => {
+    const { keyring } = await generateKeyring(USER_ID, Date.now())
+    const secrets = keyringSecrets(keyring)
+    const extractable = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, [
+      'sign',
+      'verify',
+    ])
+    const leaky = createKeyring(keyring, { ...secrets, identityKey: extractable.privateKey })
+    const store = await freshStore()
+
+    await expect(store.saveKeyring(leaky)).rejects.toThrow(TypeError)
+    await expect(store.loadKeyring(USER_ID)).resolves.toBeUndefined()
   })
 
   it('KEY-40 : le trousseau d’un compte ne se lit pas sous un autre identifiant', async () => {
@@ -77,8 +89,8 @@ describe('KEY-40 : trousseau dans IndexedDB', () => {
 
     const second = await freshStore(name)
 
-    expect((await second.loadKeyring(USER_ID))?.identity.publicKey).toEqual(
-      keyring.identity.publicKey,
+    expect((await second.loadKeyring(USER_ID))?.identityPublicKey).toEqual(
+      keyring.identityPublicKey,
     )
   })
 
@@ -113,8 +125,8 @@ describe('KEY-11 : clé de l’Autorité épinglée', () => {
     const store = await freshStore()
 
     await expect(store.loadAuthority()).resolves.toBeUndefined()
-    await expect(store.pinAuthorityIfAbsent(first)).resolves.toEqual(first)
-    await expect(store.pinAuthorityIfAbsent(second)).resolves.toEqual(first)
+    await expect(pinAuthority(store, first)).resolves.toEqual(first)
+    await expect(pinAuthority(store, second)).resolves.toEqual(first)
     await expect(store.loadAuthority()).resolves.toEqual(first)
   })
 
@@ -124,8 +136,8 @@ describe('KEY-11 : clé de l’Autorité épinglée', () => {
     const right = await freshStore(name)
 
     const [fromLeft, fromRight] = await Promise.all([
-      left.pinAuthorityIfAbsent(first),
-      right.pinAuthorityIfAbsent(second),
+      pinAuthority(left, first),
+      pinAuthority(right, second),
     ])
 
     expect(fromLeft).toEqual(fromRight)
@@ -134,7 +146,7 @@ describe('KEY-11 : clé de l’Autorité épinglée', () => {
 
   it('KEY-11 : la clé rendue est une copie : la modifier ne change pas l’épinglage', async () => {
     const store = await freshStore()
-    const pinned = await store.pinAuthorityIfAbsent(first)
+    const pinned = await pinAuthority(store, first)
     pinned.fill(9)
 
     await expect(store.loadAuthority()).resolves.toEqual(first)
@@ -169,7 +181,6 @@ describe('KEY-06 : certificat enregistré', () => {
       saveKeyring: () => Promise.resolve(),
       loadCertificate: () => Promise.resolve(undefined),
       loadAuthority: () => Promise.resolve(undefined),
-      pinAuthorityIfAbsent: (key) => Promise.resolve(Uint8Array.from(key)),
       close: () => undefined,
     }
 

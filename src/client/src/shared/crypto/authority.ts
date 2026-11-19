@@ -5,7 +5,7 @@
  */
 import { fromBase64Url } from './base64url'
 import { isWeakOrNonCanonical } from './ed25519'
-import type { KeyStore } from './keystore'
+import { type KeyStore, pinAuthority } from './keystore'
 
 const PUBLIC_KEY_BYTES = 32
 const KEY_ID_BYTES = 8
@@ -33,7 +33,7 @@ export async function checkAuthority(
     return equal(pinned, publicKey) ? 'unchanged' : 'changed'
   }
   // Un autre onglet a pu épingler entre la lecture et l'écriture : la clé rendue est celle qui reste.
-  const kept = await store.pinAuthorityIfAbsent(publicKey)
+  const kept = await pinAuthority(store, publicKey)
   return equal(kept, publicKey) ? 'pinned' : 'changed'
 }
 

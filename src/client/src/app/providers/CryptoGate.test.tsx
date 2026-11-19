@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { AuthorityApiProvider, useAuthorityCheck } from '@/entities/authority'
 import type { KeyStore } from '@/shared/crypto'
-import { memoryKeyStore, servingAuthority } from '../testing/authority'
+import { freshKeyStore, servingAuthority } from '../testing/authority'
 import { CryptoGate } from './CryptoGate'
 import { ErrorBoundary } from './ErrorBoundary'
 
@@ -58,7 +58,7 @@ describe('KEY-01, KEY-40 : rien ne fonctionne sans les algorithmes ni le trousse
   })
 
   it('KEY-40 : un navigateur qui les propose voit l’application, avec le trousseau de l’appareil', async () => {
-    const screen = await renderGate(() => Promise.resolve(memoryKeyStore()))
+    const screen = await renderGate(() => freshKeyStore())
 
     await expect.element(screen.getByText('Application')).toBeVisible()
     await expect.element(screen.getByText('pinned')).toBeVisible()
@@ -88,7 +88,7 @@ describe('KEY-01, KEY-40 : rien ne fonctionne sans les algorithmes ni le trousse
       attempts += 1
       return attempts === 1
         ? Promise.reject(new DOMException('refus', 'InvalidStateError'))
-        : Promise.resolve(memoryKeyStore())
+        : freshKeyStore()
     })
 
     await screen.getByRole('button', { name: 'Réessayer' }).click()
@@ -104,7 +104,7 @@ describe('KEY-01, KEY-40 : rien ne fonctionne sans les algorithmes ni le trousse
     }
     const screen = await render(
       <OuterBoundary>
-        <CryptoGate start={() => Promise.resolve(memoryKeyStore())}>
+        <CryptoGate start={() => freshKeyStore()}>
           <Broken />
         </CryptoGate>
       </OuterBoundary>,

@@ -8,7 +8,13 @@ export {
   type RecoveryKey,
   RecoveryKeyFormatError,
 } from './recovery'
-export { generateKeyring, type Keyring, type NewKeyring, openVault, type Subkey } from './keyring'
+export {
+  generateKeyring,
+  type Keyring,
+  type NewKeyring,
+  openVault,
+  type SubkeyInfo,
+} from './keyring'
 export { type VaultPayload, VaultOpenError } from './vault'
 export { type KeyStore, openKeyStore, type StoredCertificate } from './keystore'
 export { type AuthorityCheck, checkAuthority, type ServedAuthority } from './authority'

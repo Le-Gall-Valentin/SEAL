@@ -6,7 +6,7 @@ import { render } from 'vitest-browser-react'
 import { KeyStoreProvider } from '@/entities/authority'
 import type { Account } from '@/entities/session'
 import { ApiProviders, type Apis, createQueryClient } from '../providers'
-import { memoryKeyStore, servingAuthority } from '../testing/authority'
+import { freshKeyStore, servingAuthority } from '../testing/authority'
 import { routes, withRootErrorBoundary } from './routes'
 
 const ACTIVE: Account = {
@@ -44,10 +44,11 @@ async function renderAt(
   account: Account | null = ACTIVE,
 ) {
   const router = createMemoryRouter(tree, { initialEntries: [entry] })
+  const store = await freshKeyStore()
   const screen = await render(
     <QueryClientProvider client={createQueryClient()}>
       <ApiProviders apis={fakeApis(account)}>
-        <KeyStoreProvider api={memoryKeyStore()}>
+        <KeyStoreProvider api={store}>
           <RouterProvider router={router} />
         </KeyStoreProvider>
       </ApiProviders>
