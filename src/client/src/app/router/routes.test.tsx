@@ -11,19 +11,10 @@ import { routes, withRootErrorBoundary } from './routes'
 
 // KEY-02, KEY-33 : ce test porte sur le routage ; le trousseau de l'appareil est complet (routeGuards.test.tsx éprouve
 // les autres états des clés).
-vi.mock('@/entities/keyring', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/entities/keyring')>()
-  const { useQuery } = await import('@tanstack/react-query')
-  return {
-    ...actual,
-    useKeyStatus: (owner: { readonly userId: string }) =>
-      useQuery({
-        queryKey: ['keyring', owner.userId],
-        queryFn: () => Promise.resolve('ready' as const),
-        gcTime: 0,
-      }),
-  }
-})
+vi.mock('@/entities/keyring', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/entities/keyring')>()),
+  useKeyStatus: () => ({ status: 'ready', failed: false, waiting: false, reread: () => undefined }),
+}))
 
 const ACTIVE: Account = {
   id: '0192f0c4-7b1a-7cc0-9a51-3f6f8e2d4b10',

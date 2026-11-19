@@ -3,7 +3,7 @@ import { renderHook } from 'vitest-browser-react'
 import { withLock } from './withLock'
 import { useHeldLock } from './useHeldLock'
 
-describe('ADR 0029, point 3 : verrou tenu tant qu’un écran est monté', () => {
+describe('KEY-02, ADR 0029 (point 3) : verrou tenu tant qu’un écran est monté', () => {
   it('ADR 0029 : le second écran attend que le premier libère le verrou', async () => {
     const first = await renderHook(() => useHeldLock('seal-test-held'))
     await expect.poll(() => first.result.current.held).toBe(true)

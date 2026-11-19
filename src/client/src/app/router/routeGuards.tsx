@@ -12,6 +12,8 @@ import { KeySetupDialog } from '@/features/key-setup'
 import { AuthorityChangedPage } from '@/pages/authority-changed'
 import { IdentityChangedPage } from '@/pages/identity-changed'
 import { RestoreKeysPage } from '@/pages/restore-keys'
+import { LogoutButton } from '@/features/logout'
+import { KeysWaitingPage } from '@/pages/keys-waiting'
 import { ErrorPage } from '../layouts'
 
 /**
@@ -63,7 +65,9 @@ function AuthorityGate() {
 /**
  * KEY-02, KEY-33, ADR 0029 (point 3) : après l'Autorité, la zone du compte attend un trousseau complet. Première
  * connexion : le dialogue de la clé, seul sur le fond ; nouvel appareil : la restauration ; certificat d'une autre IK :
- * blocage. Rien du compte ne s'affiche avant « ready » ; un état illisible mène à « Impossible de charger » (A10).
+ * blocage ; verrou tenu par un autre onglet : attente (point 13). Rien du compte ne s'affiche avant « ready ». Un état
+ * illisible mène à « Impossible de charger », avec « Se déconnecter » (point 10) ; une relecture ratée en
+ * arrière-plan garde l'écran affiché et sa saisie (A10).
  */
 function KeyGate() {
   const account = useCurrentAccount().data
@@ -74,22 +78,19 @@ function KeyGate() {
 }
 
 function KeyGateFor({ owner }: { readonly owner: KeyOwner }) {
-  const status = useKeyStatus(owner)
-  const reread = () => {
-    void status.refetch()
+  const keys = useKeyStatus(owner)
+  if (keys.failed) {
+    return <ErrorPage onRetry={keys.reread} extra={<LogoutButton variant="outlined" />} />
   }
-  if (status.isError && status.data !== 'ready') {
-    return <ErrorPage onRetry={reread} />
-  }
-  switch (status.data) {
+  switch (keys.status) {
     case undefined:
-      return null
+      return keys.waiting ? <KeysWaitingPage /> : null
     case 'ready':
       return <Outlet />
     case 'setup':
-      return <KeySetupDialog owner={owner} onDone={reread} />
+      return <KeySetupDialog owner={owner} onDone={keys.reread} />
     case 'restore':
-      return <RestoreKeysPage owner={owner} onRestored={reread} />
+      return <RestoreKeysPage owner={owner} onRestored={keys.reread} />
     case 'foreign':
       return <IdentityChangedPage />
   }

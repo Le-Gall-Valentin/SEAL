@@ -17,7 +17,13 @@ export {
   type KeysContext,
   StaleVaultError,
 } from './model/completeKeys'
-export { KEYS_LOCK, type KeyStatus, keyStatus, useKeyStatus } from './model/keyStatus'
+export {
+  KEYS_LOCK,
+  type KeyStatus,
+  type KeyStatusState,
+  keyStatus,
+  useKeyStatus,
+} from './model/keyStatus'
 export { KeysApiProvider, useKeysApi } from './model/keysApiPort'
 export { KeyStoreProvider, useKeyStore } from './model/keyStorePort'
 export { InvalidVaultError, restoreKeys, WrongRecoveryKeyError } from './model/restoreKeys'

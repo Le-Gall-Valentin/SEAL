@@ -1,4 +1,4 @@
-import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
+import { focusManager, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { createMemoryRouter, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
@@ -24,26 +24,32 @@ import {
 } from '../testing/authority'
 import { ActiveRoute, AnonymousRoute, PendingRoute } from './routeGuards'
 
-// KEY-02, KEY-33 : l'état des clés, choisi par chaque test ; le dialogue et la restauration sont des doublures, testés
-// dans leur tranche.
+// KEY-02, KEY-33 : l'état des clés, choisi par chaque test, avec la même sémantique que useKeyStatus (testé dans sa
+// tranche) ; le dialogue et la restauration sont des doublures, testés dans leur tranche.
 const keys = vi.hoisted(() => ({
   status: (): Promise<KeyStatus> => Promise.resolve('ready'),
+  waiting: false,
   owners: [] as { readonly userId: string; readonly username: string }[],
 }))
 
 vi.mock('@/entities/keyring', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/entities/keyring')>()
-  const { useQuery } = await import('@tanstack/react-query')
+  const { useQuery, useQueryClient } = await import('@tanstack/react-query')
   return {
     ...actual,
     useKeyStatus: (owner: { readonly userId: string; readonly username: string }) => {
       keys.owners.push(owner)
-      return useQuery({
-        queryKey: ['keyring', owner.userId],
-        queryFn: () => keys.status(),
-        gcTime: 0,
-        retry: false,
-      })
+      const client = useQueryClient()
+      const queryKey = ['keyring', owner.userId]
+      const query = useQuery({ queryKey, queryFn: () => keys.status(), gcTime: 0, retry: false })
+      return {
+        status: query.data,
+        failed: query.isError && query.data === undefined,
+        waiting: keys.waiting,
+        reread: () => {
+          void client.resetQueries({ queryKey, exact: true })
+        },
+      }
     },
   }
 })
@@ -56,13 +62,28 @@ vi.mock('@/features/key-setup', () => ({
   ),
 }))
 
-vi.mock('@/pages/restore-keys', () => ({
-  RestoreKeysPage: ({ onRestored }: { readonly onRestored: () => void }) => (
-    <button type="button" onClick={onRestored}>
-      Restauration
-    </button>
-  ),
-}))
+vi.mock('@/pages/restore-keys', async () => {
+  const { useState } = await import('react')
+  return {
+    RestoreKeysPage: ({ onRestored }: { readonly onRestored: () => void }) => {
+      const [typed, setTyped] = useState('')
+      return (
+        <>
+          <input
+            aria-label="clé saisie"
+            value={typed}
+            onChange={(event) => {
+              setTyped(event.target.value)
+            }}
+          />
+          <button type="button" onClick={onRestored}>
+            Restauration
+          </button>
+        </>
+      )
+    },
+  }
+})
 
 const ACTIVE: Account = {
   id: '0192f0c4-7b1a-7cc0-9a51-3f6f8e2d4b10',
@@ -366,7 +387,9 @@ describe('KEY-11 : la zone du compte actif attend le contrôle de l’Autorité 
 describe('KEY-02, KEY-33 : la zone du compte actif attend un trousseau complet (ADR 0029)', () => {
   afterEach(() => {
     keys.status = () => Promise.resolve('ready')
+    keys.waiting = false
     keys.owners.length = 0
+    focusManager.setFocused(undefined)
   })
 
   it('KEY-02 : sans trousseau ni coffre, le dialogue de la clé s’affiche seul, puis l’accueil une fois le parcours fini', async () => {
@@ -413,15 +436,54 @@ describe('KEY-02, KEY-33 : la zone du compte actif attend un trousseau complet (
     await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
   })
 
-  it('A10 : un état des clés en échec affiche « Impossible de charger », et « Réessayer » le relit', async () => {
+  it('A10, ADR 0029 (point 10) : un état des clés en échec affiche « Impossible de charger » et « Se déconnecter », et « Réessayer » le relit', async () => {
     keys.status = () => Promise.reject(new NetworkError())
     const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE))
 
     await expect.element(screen.getByRole('alert')).toBeVisible()
+    await expect.element(screen.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
     await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
     keys.status = () => Promise.resolve('ready')
     await screen.getByRole('button', { name: 'Réessayer' }).click()
     await expect.element(screen.getByText('Accueil')).toBeVisible()
+  })
+
+  it('A10, ADR 0029 (point 10) : une relecture ratée au retour du focus garde la restauration et la clé en cours de saisie', async () => {
+    keys.status = () => Promise.resolve('restore')
+    const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE))
+    await screen.getByLabelText('clé saisie').fill('8WQK 3MZD')
+
+    keys.status = () => Promise.reject(new NetworkError())
+    focusManager.setFocused(false)
+    focusManager.setFocused(true)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    await expect.element(screen.getByLabelText('clé saisie')).toHaveValue('8WQK 3MZD')
+    expect(screen.getByRole('button', { name: 'Réessayer' }).query()).toBeNull()
+  })
+
+  it('ADR 0029, point 10 : une relecture ratée à la fin du dialogue mène à « Impossible de charger », pas à une page blanche', async () => {
+    keys.status = () => Promise.resolve('setup')
+    const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE))
+    await expect.element(screen.getByRole('button', { name: 'Dialogue de la clé' })).toBeVisible()
+
+    keys.status = () => Promise.reject(new NetworkError())
+    await screen.getByRole('button', { name: 'Dialogue de la clé' }).click()
+
+    await expect.element(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible()
+    await expect.element(screen.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
+  })
+
+  it('ADR 0029, point 13 : un onglet qui attend le verrou tenu par un autre le dit, avec « Se déconnecter », sans écran du compte', async () => {
+    keys.status = () => new Promise(() => undefined)
+    keys.waiting = true
+    const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE))
+
+    await expect
+      .element(screen.getByText('Vos clés sont en cours de création dans un autre onglet.'))
+      .toBeVisible()
+    await expect.element(screen.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
+    await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
   })
 
   it('KEY-02 : tant que l’état des clés n’est pas connu, rien du compte ne s’affiche', async () => {

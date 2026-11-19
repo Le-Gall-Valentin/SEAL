@@ -1,4 +1,5 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useClock, withLock } from '@/shared/lib'
 import { completeKeys, ForeignIdentityError, type KeyOwner, type KeysContext } from './completeKeys'
 import { useKeysApi } from './keysApiPort'
@@ -36,15 +37,49 @@ export async function keyStatus(context: KeysContext): Promise<KeyStatus> {
   return (await api.readVault()) === undefined ? 'setup' : 'restore'
 }
 
+export interface KeyStatusState {
+  /** Statut connu ; undefined tant que la première lecture, ou une relecture demandée, n'a pas abouti. */
+  readonly status: KeyStatus | undefined
+  /** La lecture a échoué sans statut connu (A10) ; une relecture en arrière-plan ratée garde le statut. */
+  readonly failed: boolean
+  /** Un autre onglet tient le verrou des clés, et la lecture l'attend (ADR 0029, point 13). */
+  readonly waiting: boolean
+  /** Relecture demandée (fin du dialogue, restauration, « Réessayer ») : repart de zéro (ADR 0029, point 10). */
+  readonly reread: () => void
+}
+
 /** Statut relu à chaque entrée dans la zone du compte, sous le verrou des clés ; rien n'est gardé en cache. */
-export function useKeyStatus(owner: KeyOwner): UseQueryResult<KeyStatus> {
+export function useKeyStatus(owner: KeyOwner): KeyStatusState {
   const api = useKeysApi()
   const store = useKeyStore()
   const clock = useClock()
-  return useQuery({
-    queryKey: ['keyring', owner.userId],
-    queryFn: () => withLock(KEYS_LOCK, () => keyStatus({ api, store, owner, clock })),
+  const client = useQueryClient()
+  const [waiting, setWaiting] = useState(false)
+  const queryKey = ['keyring', owner.userId]
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      try {
+        return await withLock(
+          KEYS_LOCK,
+          () => keyStatus({ api, store, owner, clock }),
+          () => {
+            setWaiting(true)
+          },
+        )
+      } finally {
+        setWaiting(false)
+      }
+    },
     gcTime: 0,
     retry: false,
   })
+  return {
+    status: query.data,
+    failed: query.isError && query.data === undefined,
+    waiting,
+    reread: () => {
+      void client.resetQueries({ queryKey, exact: true })
+    },
+  }
 }
