@@ -88,6 +88,16 @@ async function restore(page: Page, key: string) {
   await page.getByRole('button', { name: 'Restaurer mes clés' }).click()
 }
 
+/**
+ * KEY-33 : la restauration a abouti. « Se déconnecter » ne le prouve pas, Restauration-Appareil l'affiche aussi à la
+ * même adresse : son titre doit disparaître, et l'accueil (logo « seal ») s'afficher.
+ */
+async function expectRestored(page: Page) {
+  await expect(page.getByRole('heading', { name: 'Restaurer vos clés' })).toBeHidden()
+  await expect(page.getByRole('heading', { level: 1, name: 'seal' })).toBeVisible()
+  expect(new URL(page.url()).pathname).toBe('/')
+}
+
 async function login(page: Page, password: string) {
   await page.goto('/connexion')
   await page.getByLabel('Identifiant ou courriel').fill(EMAIL)
@@ -115,7 +125,8 @@ test.describe.serial('AUTH-10 à AUTH-70 : parcours d’authentification du lot 
     await page.getByRole('button', { name: 'Vérifier' }).click()
 
     recoveryKey = await confirmRecoveryKey(page)
-    await expect(page.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(page.getByRole('heading', { level: 1, name: 'seal' })).toBeVisible()
     await page.getByRole('button', { name: 'Se déconnecter' }).click()
     await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible()
   })
@@ -135,8 +146,7 @@ test.describe.serial('AUTH-10 à AUTH-70 : parcours d’authentification du lot 
       'Cette clé de récupération ne correspond pas à votre coffre.',
     )
     await restore(page, recoveryKey)
-    await expect(page.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
-    expect(new URL(page.url()).pathname).toBe('/')
+    await expectRestored(page)
   })
 
   test('AUTH-70 : mot de passe oublié, lien reçu, nouveau mot de passe, connexion avec lui', async ({
@@ -170,6 +180,6 @@ test.describe.serial('AUTH-10 à AUTH-70 : parcours d’authentification du lot 
 
     await login(page, NEW_PASSWORD)
     await restore(page, recoveryKey)
-    await expect(page.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
+    await expectRestored(page)
   })
 })
