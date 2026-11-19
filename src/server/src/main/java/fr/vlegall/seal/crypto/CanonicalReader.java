@@ -4,14 +4,15 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
  * Relecture d'une structure écrite par {@link Canonical} (PROTOCOL.md, section 2), champ par champ et dans l'ordre :
  * le serveur relit ainsi un certificat qu'il a lui-même encodé (KEY-33). Toute valeur hors du format lève
- * {@link CanonicalEncodingException} : longueur au-delà des octets restants, u64 au-delà de 2^63 - 1, UTF-8 invalide,
- * autre étiquette, octet en trop après {@link #end()}.
+ * {@link CanonicalEncodingException} : longueur au-delà des octets restants, u64 au-delà de 2^63 - 1, UTF-8 invalide
+ * ou hors de la forme NFC, autre étiquette, octet en trop après {@link #end()}.
  */
 public final class CanonicalReader {
 
@@ -54,9 +55,11 @@ public final class CanonicalReader {
         return take((int) length);
     }
 
+    /** PROTOCOL.md 2.1, ADR 0006 : UTF-8 strict, en forme NFC, comme l'écrit {@link Canonical#text(String)}. */
     public String text() {
+        String value;
         try {
-            return StandardCharsets.UTF_8
+            value = StandardCharsets.UTF_8
                     .newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
@@ -65,6 +68,10 @@ public final class CanonicalReader {
         } catch (CharacterCodingException e) {
             throw new CanonicalEncodingException("text : UTF-8 invalide");
         }
+        if (!Normalizer.isNormalized(value, Normalizer.Form.NFC)) {
+            throw new CanonicalEncodingException("text : hors de la forme NFC");
+        }
+        return value;
     }
 
     public UUID uuid() {

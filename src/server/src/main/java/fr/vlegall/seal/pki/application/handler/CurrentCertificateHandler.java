@@ -24,10 +24,6 @@ public class CurrentCertificateHandler implements CurrentCertificateQuery {
     @Override
     @Transactional(readOnly = true)
     public Optional<CertificateDetails> current(UserId subject) {
-        return certificates
-                .findUnrevoked(subject)
-                .filter(certificate -> certificate.isValidAt(clock.instant()))
-                .flatMap(certificate -> certificates.findIssued(certificate.serial()))
-                .map(CertificateDetailsView::new);
+        return certificates.findCurrentIssued(subject, clock.instant()).map(CertificateDetailsView::new);
     }
 }

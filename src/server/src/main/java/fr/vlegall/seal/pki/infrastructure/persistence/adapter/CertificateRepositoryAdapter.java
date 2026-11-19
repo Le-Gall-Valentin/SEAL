@@ -38,9 +38,11 @@ public class CertificateRepositoryAdapter implements CertificateRepository {
     }
 
     @Override
-    public Optional<IssuedCertificate> findIssued(byte[] serial) {
-        return jdbc.sql("SELECT cert_bytes, signature FROM identity_certificates WHERE serial = :serial")
-                .param("serial", serial)
+    public Optional<IssuedCertificate> findCurrentIssued(UserId subject, Instant at) {
+        return jdbc.sql("SELECT cert_bytes, signature FROM identity_certificates"
+                        + " WHERE user_id = :user AND revoked_at IS NULL AND not_before <= :at AND not_after > :at")
+                .param("user", subject.value())
+                .param("at", Timestamp.from(at))
                 .query((row, number) -> new IssuedCertificate(
                         SealCertificate.decode(row.getBytes("cert_bytes")), row.getBytes("signature")))
                 .optional();

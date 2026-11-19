@@ -171,10 +171,12 @@ class IssueCertificateHandlerTest {
         }
 
         @Override
-        public Optional<IssuedCertificate> findIssued(byte[] serial) {
-            return inserted.stream()
-                    .filter(issued -> Arrays.equals(issued.certificate().serial(), serial))
-                    .findFirst();
+        public Optional<IssuedCertificate> findCurrentIssued(UserId subject, Instant at) {
+            return findUnrevoked(subject)
+                    .filter(certificate -> certificate.isValidAt(at))
+                    .flatMap(certificate -> inserted.stream()
+                            .filter(issued -> Arrays.equals(issued.certificate().serial(), certificate.serial()))
+                            .findFirst());
         }
 
         @Override

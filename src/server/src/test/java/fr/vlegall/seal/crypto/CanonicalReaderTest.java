@@ -3,6 +3,7 @@ package fr.vlegall.seal.crypto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -77,6 +78,16 @@ class CanonicalReaderTest {
 
         byte[] invalidUtf8 = Canonical.concat(Canonical.text(LABEL), Canonical.bytes(new byte[] {(byte) 0xC3}));
         assertThatThrownBy(() -> CanonicalReader.of(invalidUtf8, LABEL).text())
+                .isInstanceOf(CanonicalEncodingException.class);
+    }
+
+    @Test
+    @DisplayName("MSG-01, ADR 0006 : un texte UTF-8 valide qui n'est pas en NFC est refusé")
+    void msg01NonNfcTextIsRefused() {
+        byte[] decomposed =
+                Canonical.concat(Canonical.text(LABEL), Canonical.bytes("e\u0301".getBytes(StandardCharsets.UTF_8)));
+
+        assertThatThrownBy(() -> CanonicalReader.of(decomposed, LABEL).text())
                 .isInstanceOf(CanonicalEncodingException.class);
     }
 }

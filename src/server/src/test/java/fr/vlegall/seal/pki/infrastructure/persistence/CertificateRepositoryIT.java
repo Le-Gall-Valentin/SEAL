@@ -84,23 +84,38 @@ class CertificateRepositoryIT {
     }
 
     @Test
-    @DisplayName(
-            "KEY-33 : le certificat émis se relit entier par son numéro de série, identifiant et signature compris")
-    void key33IssuedCertificateReadsBackWhole() throws Exception {
+    @DisplayName("KEY-33 : le certificat courant se relit entier, identifiant et signature compris, en une lecture")
+    void key33CurrentCertificateReadsBackWhole() throws Exception {
         UserId subject = account("cert_entier");
         IssuedCertificate issued = issued(subject, 9);
         certificates.save(issued);
-        byte[] unknown = new byte[16];
-        unknown[0] = (byte) 0xEE;
 
-        assertThat(certificates.findIssued(issued.certificate().serial())).contains(issued);
+        assertThat(certificates.findCurrentIssued(subject, NOW)).contains(issued);
         assertThat(certificates
-                        .findIssued(issued.certificate().serial())
+                        .findCurrentIssued(subject, NOW)
                         .orElseThrow()
                         .certificate()
                         .username())
                 .isEqualTo("titulaire");
-        assertThat(certificates.findIssued(unknown)).isEmpty();
+        assertThat(certificates.findCurrentIssued(account("cert_absent"), NOW)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("KEY-33, ADR 0025 : ni un certificat révoqué, ni un certificat hors de sa validité ne sont courants")
+    void key33RevokedOrExpiredCertificateIsNotCurrent() throws Exception {
+        UserId subject = account("cert_courant");
+        IssuedCertificate issued = issued(subject, 10);
+        certificates.save(issued);
+        Instant notAfter = issued.certificate().notAfter();
+
+        assertThat(certificates.findCurrentIssued(subject, NOW.minusMillis(1))).isEmpty();
+        assertThat(certificates.findCurrentIssued(subject, notAfter.minusMillis(1)))
+                .contains(issued);
+        assertThat(certificates.findCurrentIssued(subject, notAfter)).isEmpty();
+
+        certificates.revoke(issued.certificate().serial(), NOW, RevocationReason.SUPERSEDED);
+
+        assertThat(certificates.findCurrentIssued(subject, NOW)).isEmpty();
     }
 
     @Test

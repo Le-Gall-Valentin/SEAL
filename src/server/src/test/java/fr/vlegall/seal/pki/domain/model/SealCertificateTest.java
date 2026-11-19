@@ -10,6 +10,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.crypto.Canonical;
 import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.support.ProtocolVectors;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -201,5 +202,23 @@ class SealCertificateTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> SealCertificate.decode(proof)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> SealCertificate.decode(tooShort)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("KEY-33, ADR 0006 : un identifiant hors de la forme NFC dans les octets signés est refusé")
+    void key33NonNfcUsernameIsRefused() {
+        Instant notBefore = Instant.ofEpochMilli(1_794_009_600_000L);
+        byte[] decomposed = Canonical.struct(
+                SealCertificate.LABEL,
+                Canonical.bytes(new byte[16]),
+                Canonical.bytes(new byte[8]),
+                Canonical.uuid(SUBJECT.value()),
+                Canonical.bytes("vale\u0301ntin".getBytes(StandardCharsets.UTF_8)),
+                Canonical.bytes(new byte[32]),
+                Canonical.u64(notBefore.toEpochMilli()),
+                Canonical.u64(notBefore.plus(SealCertificate.VALIDITY).toEpochMilli()),
+                Canonical.u8(SealCertificate.USAGE));
+
+        assertThatThrownBy(() -> SealCertificate.decode(decomposed)).isInstanceOf(IllegalArgumentException.class);
     }
 }

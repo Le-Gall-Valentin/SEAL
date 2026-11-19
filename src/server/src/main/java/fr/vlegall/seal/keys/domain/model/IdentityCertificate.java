@@ -7,8 +7,9 @@ import java.util.HexFormat;
 import java.util.Objects;
 
 /**
- * Certificat d'identité rendu au client après la preuve de possession (KEY-04) : ses champs (PROTOCOL.md, section 4.2)
- * et la signature de la CA, que le client vérifie avant de l'enregistrer (KEY-06).
+ * Certificat d'identité rendu au client après la preuve de possession (KEY-04), ou relu pour lui par
+ * {@code GET /api/v1/users/{userId}/keys} (KEY-33) : ses champs (PROTOCOL.md, section 4.2) et la signature de la CA,
+ * que le client vérifie avant de l'enregistrer (KEY-06).
  */
 public record IdentityCertificate(
         byte[] serial,

@@ -6,9 +6,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Certificat rendu par {@code PUT /api/v1/keys/identity} : les champs de {@code SealCertificate} (PROTOCOL.md, section
- * 4.2), dates en ISO 8601 à la milliseconde, et la signature de la CA. Le client réencode la structure et la vérifie
- * avec la clé épinglée avant de l'enregistrer (KEY-06).
+ * Certificat rendu par {@code PUT /api/v1/keys/identity} et par {@code GET /api/v1/users/{userId}/keys} : les champs
+ * de {@code SealCertificate} (PROTOCOL.md, section 4.2), dates en ISO 8601 à la milliseconde, et la signature de la CA.
+ * Le client réencode la structure et la vérifie avec la clé épinglée avant de l'enregistrer (KEY-06).
  */
 public record CertificateView(
         String serial,
