@@ -8,6 +8,7 @@ import {
   StaleVaultError,
 } from './completeKeys'
 import { keyStatus } from './keyStatus'
+import { VaultTakenError } from './saveVault'
 import { fakeKeysServer, type FakeKeysServer } from './testing/fakeKeysServer'
 import {
   pinnedStore,
@@ -225,6 +226,21 @@ describe('KEY-02, KEY-05, KEY-06 : achèvement du trousseau (ADR 0029, point 3)'
     expect(server.vault?.vaultVersion).toBe(3)
     const after = (await store.loadKeyring(VECTOR_OWNER.userId))?.subkeys.map((s) => s.ekId)
     expect(after).toEqual(before)
+  })
+
+  it('KEY-32, PROTOCOL.md 5.5 : un coffre écrit par un autre appareil pendant la reprise l’arrête, sans rien publier ni enregistrer', async () => {
+    const { server, store, context } = await scenario(VECTOR_SUBKEY_CREATED_AT + DAY_MS)
+    const save = server.saveVault.bind(server)
+    server.saveVault = (vault) => {
+      server.vault = VECTOR_NEXT_VAULT
+      return save(vault)
+    }
+
+    expect(await failed(completeKeys(context))).toBeInstanceOf(VaultTakenError)
+
+    expect(server.subkeys).toEqual([])
+    expect((await store.loadKeyring(VECTOR_OWNER.userId))?.subkeys).toHaveLength(1)
+    await expect(store.loadCertificate(VECTOR_OWNER.userId)).resolves.toBeUndefined()
   })
 
   it('ADR 0029 : deux onglets qui reprennent ensemble, sous le verrou, ne publient qu’une fois', async () => {
