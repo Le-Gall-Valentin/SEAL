@@ -1,13 +1,17 @@
 import type { ReactNode } from 'react'
 import { Navigate, Outlet } from 'react-router'
 import { useAuthorityCheck } from '@/entities/authority'
+import { type KeyOwner, useKeyStatus } from '@/entities/keyring'
 import {
   destinationFor,
   type SessionState,
   sessionStateOf,
   useCurrentAccount,
 } from '@/entities/session'
+import { KeySetupDialog } from '@/features/key-setup'
 import { AuthorityChangedPage } from '@/pages/authority-changed'
+import { IdentityChangedPage } from '@/pages/identity-changed'
+import { RestoreKeysPage } from '@/pages/restore-keys'
 import { ErrorPage } from '../layouts'
 
 /**
@@ -53,7 +57,42 @@ function AuthorityGate() {
       />
     ) : null
   }
-  return <Outlet />
+  return <KeyGate />
+}
+
+/**
+ * KEY-02, KEY-33, ADR 0029 (point 3) : après l'Autorité, la zone du compte attend un trousseau complet. Première
+ * connexion : le dialogue de la clé, seul sur le fond ; nouvel appareil : la restauration ; certificat d'une autre IK :
+ * blocage. Rien du compte ne s'affiche avant « ready » ; un état illisible mène à « Impossible de charger » (A10).
+ */
+function KeyGate() {
+  const account = useCurrentAccount().data
+  if (account === undefined || account === null) {
+    return null
+  }
+  return <KeyGateFor owner={{ userId: account.id, username: account.username }} />
+}
+
+function KeyGateFor({ owner }: { readonly owner: KeyOwner }) {
+  const status = useKeyStatus(owner)
+  const reread = () => {
+    void status.refetch()
+  }
+  if (status.isError && status.data !== 'ready') {
+    return <ErrorPage onRetry={reread} />
+  }
+  switch (status.data) {
+    case undefined:
+      return null
+    case 'ready':
+      return <Outlet />
+    case 'setup':
+      return <KeySetupDialog owner={owner} onDone={reread} />
+    case 'restore':
+      return <RestoreKeysPage owner={owner} onRestored={reread} />
+    case 'foreign':
+      return <IdentityChangedPage />
+  }
 }
 
 /** Écrans réservés aux anonymes : connexion, inscription, mot de passe oublié. */
@@ -66,7 +105,7 @@ export function PendingRoute() {
   return useSessionGate('pending')
 }
 
-/** Écrans du compte actif, après le contrôle de l'Autorité (KEY-11). */
+/** Écrans du compte actif, après le contrôle de l'Autorité (KEY-11) et un trousseau complet (KEY-02, KEY-33). */
 export function ActiveRoute() {
   return useSessionGate('active', <AuthorityGate />)
 }

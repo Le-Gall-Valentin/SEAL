@@ -2,10 +2,10 @@ import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-q
 import { useState } from 'react'
 import { createMemoryRouter, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { AuthorityApiProvider, type AuthorityView, type IAuthorityApi } from '@/entities/authority'
-import { KeyStoreProvider } from '@/entities/keyring'
+import { type KeyStatus, KeyStoreProvider } from '@/entities/keyring'
 import {
   type Account,
   type ISessionApi,
@@ -23,6 +23,46 @@ import {
   VECTOR_AUTHORITY,
 } from '../testing/authority'
 import { ActiveRoute, AnonymousRoute, PendingRoute } from './routeGuards'
+
+// KEY-02, KEY-33 : l'état des clés, choisi par chaque test ; le dialogue et la restauration sont des doublures, testés
+// dans leur tranche.
+const keys = vi.hoisted(() => ({
+  status: (): Promise<KeyStatus> => Promise.resolve('ready'),
+  owners: [] as { readonly userId: string; readonly username: string }[],
+}))
+
+vi.mock('@/entities/keyring', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/entities/keyring')>()
+  const { useQuery } = await import('@tanstack/react-query')
+  return {
+    ...actual,
+    useKeyStatus: (owner: { readonly userId: string; readonly username: string }) => {
+      keys.owners.push(owner)
+      return useQuery({
+        queryKey: ['keyring', owner.userId],
+        queryFn: () => keys.status(),
+        gcTime: 0,
+        retry: false,
+      })
+    },
+  }
+})
+
+vi.mock('@/features/key-setup', () => ({
+  KeySetupDialog: ({ onDone }: { readonly onDone: () => void }) => (
+    <button type="button" onClick={onDone}>
+      Dialogue de la clé
+    </button>
+  ),
+}))
+
+vi.mock('@/pages/restore-keys', () => ({
+  RestoreKeysPage: ({ onRestored }: { readonly onRestored: () => void }) => (
+    <button type="button" onClick={onRestored}>
+      Restauration
+    </button>
+  ),
+}))
 
 const ACTIVE: Account = {
   id: '0192f0c4-7b1a-7cc0-9a51-3f6f8e2d4b10',
@@ -320,5 +360,87 @@ describe('KEY-11 : la zone du compte actif attend le contrôle de l’Autorité 
         .element(screen.getByRole('heading', { level: 1, name: 'Autorité SEAL modifiée' }))
         .toBeVisible()
     })
+  })
+})
+
+describe('KEY-02, KEY-33 : la zone du compte actif attend un trousseau complet (ADR 0029)', () => {
+  afterEach(() => {
+    keys.status = () => Promise.resolve('ready')
+    keys.owners.length = 0
+  })
+
+  it('KEY-02 : sans trousseau ni coffre, le dialogue de la clé s’affiche seul, puis l’accueil une fois le parcours fini', async () => {
+    let status: KeyStatus = 'setup'
+    keys.status = () => Promise.resolve(status)
+    const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE))
+
+    await expect.element(screen.getByRole('button', { name: 'Dialogue de la clé' })).toBeVisible()
+    await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
+    expect(keys.owners[0]).toEqual({ userId: ACTIVE.id, username: ACTIVE.username })
+    status = 'ready'
+    await screen.getByRole('button', { name: 'Dialogue de la clé' }).click()
+    await expect.element(screen.getByText('Accueil')).toBeVisible()
+  })
+
+  it('KEY-33 : un coffre sans trousseau sur l’appareil mène à la restauration, puis à l’accueil', async () => {
+    let status: KeyStatus = 'restore'
+    keys.status = () => Promise.resolve(status)
+    const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE))
+
+    await expect.element(screen.getByRole('button', { name: 'Restauration' })).toBeVisible()
+    await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
+    status = 'ready'
+    await screen.getByRole('button', { name: 'Restauration' }).click()
+    await expect.element(screen.getByText('Accueil')).toBeVisible()
+  })
+
+  it('16.1 : un certificat d’une autre clé d’identité bloque, avec « Se déconnecter » pour seule issue', async () => {
+    keys.status = () => Promise.resolve('foreign')
+    const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE))
+
+    await expect
+      .element(screen.getByRole('heading', { level: 1, name: 'Identité SEAL modifiée' }))
+      .toBeVisible()
+    await expect
+      .element(
+        screen.getByText(
+          'Le serveur présente pour votre compte une autre clé d’identité que celle de cet appareil. Par sécurité, SEAL est bloqué : prévenez l’administrateur du serveur.',
+        ),
+      )
+      .toBeVisible()
+    expect(screen.getByRole('button').elements()).toHaveLength(1)
+    await expect.element(screen.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
+    await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
+  })
+
+  it('A10 : un état des clés en échec affiche « Impossible de charger », et « Réessayer » le relit', async () => {
+    keys.status = () => Promise.reject(new NetworkError())
+    const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE))
+
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
+    keys.status = () => Promise.resolve('ready')
+    await screen.getByRole('button', { name: 'Réessayer' }).click()
+    await expect.element(screen.getByText('Accueil')).toBeVisible()
+  })
+
+  it('KEY-02 : tant que l’état des clés n’est pas connu, rien du compte ne s’affiche', async () => {
+    keys.status = () => new Promise(() => undefined)
+    const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE))
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
+    await expect.element(screen.getByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('KEY-11 : l’état des clés ne se lit qu’après le contrôle de l’Autorité', async () => {
+    const { screen } = await renderAt('/', () => Promise.resolve(ACTIVE), {
+      store: await freshKeyStore(OTHER_AUTHORITY),
+    })
+
+    await expect
+      .element(screen.getByRole('heading', { level: 1, name: 'Autorité SEAL modifiée' }))
+      .toBeVisible()
+    expect(keys.owners).toEqual([])
   })
 })
