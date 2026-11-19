@@ -51,6 +51,17 @@ describe('KEY-30, KEY-31 : clé de récupération', () => {
     }
   })
 
+  it('ADR 0027, point 15 : une saisie avec ı, ſ ou ß n’est pas lue comme une clé', () => {
+    for (const text of [`${TEXT.slice(0, 31)}ı`, `ſ${TEXT.slice(1)}`, `${TEXT.slice(0, 30)}ß`]) {
+      expect(() => parseRecoveryKey(text), text).toThrow(RecoveryKeyFormatError)
+    }
+  })
+
+  it('KEY-30 : une clé de récupération fait 20 octets, même construite dans le segment', () => {
+    expect(() => RecoveryKey.of(new Uint8Array(19))).toThrow(RangeError)
+    expect(() => RecoveryKey.of(new Uint8Array(21))).toThrow(RangeError)
+  })
+
   it('KEY-31 : la clé ne se sérialise pas en JSON, et ne s’affiche pas en texte', () => {
     const key = parseRecoveryKey(TEXT)
 

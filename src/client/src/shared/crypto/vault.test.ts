@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { encodeCrockford } from './crockford'
 import { KEM } from './identity'
 import {
+  createKeyring,
   generateKeyring,
   type Keyring,
   keyringSecrets,
@@ -240,6 +241,9 @@ describe('KEY-02, KEY-40 : génération du trousseau', () => {
     expect(values.some((value) => value instanceof CryptoKey)).toBe(false)
     expect(Object.isFrozen(created)).toBe(true)
     expect(() => keyringSecrets({ ...created })).toThrow(TypeError)
+    expect(() => createKeyring(created, { ...keyringSecrets(created), subkeyKeys: [] })).toThrow(
+      TypeError,
+    )
   })
 
   it('KEY-21, KEY-32 : une sous-clé de 45 jours, un ekId de 16 octets, la version 1 et les tailles du serveur', async () => {

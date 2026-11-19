@@ -6,6 +6,8 @@
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 const CONFUSABLE: Readonly<Record<string, string>> = { O: '0', I: '1', L: '1' }
 const SEPARATORS = /[\s-]/g
+/** ADR 0027, point 15 : chiffres et lettres ASCII seulement, avant toute mise en majuscules. */
+const ASCII_ALPHANUMERIC = /^[0-9A-Za-z]*$/
 
 export class CrockfordFormatError extends Error {
   override readonly name = 'CrockfordFormatError'
@@ -33,7 +35,12 @@ export function encodeCrockford(bytes: Uint8Array): string {
 }
 
 export function decodeCrockford(input: string): Uint8Array<ArrayBuffer> {
-  const text = input.replace(SEPARATORS, '').toUpperCase()
+  const compact = input.replace(SEPARATORS, '')
+  // toUpperCase() changerait ı en I, ſ en S, ß en SS : tout caractère non ASCII est refusé avant.
+  if (!ASCII_ALPHANUMERIC.test(compact)) {
+    throw new CrockfordFormatError('base32 Crockford : caractère hors de l’alphabet')
+  }
+  const text = compact.toUpperCase()
   if ((text.length * 5) % 8 !== 0) {
     throw new CrockfordFormatError(
       'base32 Crockford : la taille doit tomber sur des octets entiers',

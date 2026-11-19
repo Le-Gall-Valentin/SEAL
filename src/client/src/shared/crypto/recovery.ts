@@ -18,6 +18,9 @@ export class RecoveryKeyFormatError extends Error {
 
 export class RecoveryKey {
   private constructor(bytes: Uint8Array) {
+    if (bytes.length !== BYTES) {
+      throw new RangeError('KEY-30 : une clé de récupération fait 20 octets')
+    }
     SECRETS.set(this, Uint8Array.from(bytes))
   }
 

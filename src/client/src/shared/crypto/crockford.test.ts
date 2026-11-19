@@ -34,8 +34,15 @@ describe('KEY-30 : base32 Crockford', () => {
   })
 
   it('KEY-30 : U et tout caractère hors de l’alphabet sont refusés', () => {
-    for (const text of ['U000', '000!', '000é', '00_0', '00.0']) {
-      expect(() => decodeCrockford(text), text).toThrow(CrockfordFormatError)
+    for (const text of ['U0000000', '0000000!', '0000000é', '000_0000', '00.00000']) {
+      expect(() => decodeCrockford(text), text).toThrow('caractère hors de l’alphabet')
+    }
+  })
+
+  it('ADR 0027, point 15 : un caractère non ASCII est refusé, même s’il devient ASCII en majuscules', () => {
+    // ı devient I, ſ devient S, ß devient SS et ﬀ devient FF sous toUpperCase().
+    for (const text of ['ı0000000', 'ſ0000000', 'ß000000', 'ﬀ000000']) {
+      expect(() => decodeCrockford(text), text).toThrow('caractère hors de l’alphabet')
     }
   })
 
