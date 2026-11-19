@@ -20,7 +20,9 @@ const isoMillis = z
 const KEM = z.literal('DHKEM-X25519-HKDF-SHA256')
 
 /** SEC-01 : réponses strictes ; tailles de PROTOCOL.md 4.2, 4.4 et 5.3, et de l'ADR 0025 (point 6). */
-const CHALLENGE = z.strictObject({ challenge: base64url(32), expiresAt: isoMillis })
+// L'expiration du défi n'est ni signée ni lue : toute précision ISO 8601 en UTC passe (le serveur la sert à la
+// nanoseconde).
+const CHALLENGE = z.strictObject({ challenge: base64url(32), expiresAt: z.iso.datetime() })
 
 const CERTIFICATE = z.strictObject({
   serial: base64url(16),

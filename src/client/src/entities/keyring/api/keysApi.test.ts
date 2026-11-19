@@ -76,6 +76,12 @@ describe('entities/keyring : adaptateur de l’API des clés (KEY-02, KEY-03, KE
     expect(calls).toEqual([{ path: '/api/v1/keys/challenge', options: { method: 'POST' } }])
   })
 
+  it('KEY-03 : l’expiration du défi, qui n’est pas signée, peut porter des nanosecondes', async () => {
+    response = { challenge: B32, expiresAt: '2026-11-19T12:05:00.123456789Z' }
+
+    await expect(keysApi.createChallenge()).resolves.toBe(B32)
+  })
+
   it('KEY-03, KEY-04 : PUT /keys/identity envoie la preuve et rend le certificat, dates en millisecondes', async () => {
     response = CERTIFICATE
     const proof = { ikPublic: B32, challenge: B32, signature: B64 }
