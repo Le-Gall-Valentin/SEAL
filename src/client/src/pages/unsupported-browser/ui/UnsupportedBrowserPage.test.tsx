@@ -19,16 +19,4 @@ describe('KEY-01 : page « Navigateur non pris en charge » (ADR 0027, point 1)'
       .toBeVisible()
     expect(screen.getByRole('button').elements()).toHaveLength(0)
   })
-
-  it('ADR 0016 : la carte est centrée dans la page, avec des marges de 16 px, comme la page de repli', async () => {
-    const screen = await render(<UnsupportedBrowserPage />)
-
-    expect(getComputedStyle(screen.getByRole('main').element())).toMatchObject({
-      display: 'grid',
-      alignItems: 'center',
-      justifyItems: 'center',
-      padding: '16px',
-      minHeight: `${String(window.innerHeight)}px`,
-    })
-  })
 })

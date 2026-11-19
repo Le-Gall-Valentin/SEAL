@@ -8,7 +8,21 @@ import { useLogout } from '../model/useLogout'
  * AUTH-53 : bouton « Se déconnecter » des écrans Paramètres. Un échec s'affiche dessous (ADR 0024, point 10) : sans
  * lui, l'utilisateur se croirait déconnecté alors que sa session reste ouverte.
  */
-export function LogoutButton() {
+/** quiet : texte seul, sur toute la largeur (Paramètres) ; outlined : action d'une carte d'état (ADR 0027, point 13). */
+type LogoutVariant = 'quiet' | 'outlined'
+
+const VARIANTS: Readonly<Record<LogoutVariant, string>> = {
+  quiet:
+    'flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-transparent font-sans text-[14.5px] font-semibold text-ink-2 disabled:opacity-55',
+  outlined:
+    'inline-flex h-11 items-center gap-2 self-start rounded-[10px] bg-surface pr-4 pl-3 font-sans text-[14.5px] font-semibold text-ink inset-ring inset-ring-line-strong disabled:opacity-55',
+}
+
+interface LogoutButtonProps {
+  readonly variant?: LogoutVariant
+}
+
+export function LogoutButton({ variant = 'quiet' }: LogoutButtonProps) {
   const t = useMessages(logoutMessages)
   const logout = useLogout()
   const failure = logout.error === null ? null : failureOf(logout.error)
@@ -17,7 +31,7 @@ export function LogoutButton() {
       <button
         type="button"
         disabled={logout.isPending}
-        className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-transparent font-sans text-[14.5px] font-semibold text-ink-2 disabled:opacity-55"
+        className={VARIANTS[variant]}
         onClick={() => {
           logout.mutate()
         }}

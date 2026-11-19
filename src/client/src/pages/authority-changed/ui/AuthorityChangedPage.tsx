@@ -1,6 +1,6 @@
 import { LogoutButton } from '@/features/logout'
 import { useMessages } from '@/shared/i18n'
-import { StateCard } from '@/shared/ui'
+import { StateCard, StatePage } from '@/shared/ui'
 import { authorityChangedPageMessages } from '../i18n'
 
 /**
@@ -10,8 +10,13 @@ import { authorityChangedPageMessages } from '../i18n'
 export function AuthorityChangedPage() {
   const t = useMessages(authorityChangedPageMessages)
   return (
-    <main className="grid min-h-screen place-items-center p-4">
-      <StateCard heading="h1" title={t('title')} text={t('text')} actions={<LogoutButton />} />
-    </main>
+    <StatePage>
+      <StateCard
+        heading="h1"
+        title={t('title')}
+        text={t('text')}
+        actions={<LogoutButton variant="outlined" />}
+      />
+    </StatePage>
   )
 }

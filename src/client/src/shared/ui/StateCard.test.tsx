@@ -12,6 +12,7 @@ describe('ADR 0027 : carte d’état bloquant, d’après l’état « Erreur de
     await expect.element(screen.getByRole('alert')).toBeVisible()
     await expect.element(screen.getByRole('heading', { level: 1, name: 'Titre' })).toBeVisible()
     expect(screen.getByRole('alert').element().textContent).toBe('TitreTexte')
+    await expect.element(screen.getByRole('region', { name: 'Titre' })).toBeVisible()
     expect(screen.getByRole('button').elements()).toHaveLength(0)
   })
 
@@ -33,7 +34,7 @@ describe('ADR 0027 : carte d’état bloquant, d’après l’état « Erreur de
     const screen = await render(
       <StateCard heading="h1" title="Titre" actions={<button type="button">Action</button>} />,
     )
-    const card = screen.getByRole('alert').element()
+    const card = screen.getByRole('region').element()
     const action = screen.getByRole('button').element()
 
     expect(card.getBoundingClientRect().height).toBe(236)
@@ -51,7 +52,7 @@ describe('ADR 0027 : carte d’état bloquant, d’après l’état « Erreur de
         />
       </div>,
     )
-    const card = screen.getByRole('alert').element()
+    const card = screen.getByRole('region').element()
     const text = screen.getByText(LONG_TEXT).element()
     const action = screen.getByRole('button').element()
 
@@ -60,5 +61,16 @@ describe('ADR 0027 : carte d’état bloquant, d’après l’état « Erreur de
       action.getBoundingClientRect().top - text.getBoundingClientRect().bottom,
     ).toBeGreaterThanOrEqual(16)
     expect(card.getBoundingClientRect().bottom - action.getBoundingClientRect().bottom).toBe(22)
+  })
+
+  it('ADR 0027, point 13 : les actions restent hors de l’alerte, qui n’annonce que le titre et le texte', async () => {
+    const screen = await render(
+      <StateCard heading="h1" title="Titre" text="Texte" actions={<p role="alert">Échec</p>} />,
+    )
+
+    expect(screen.getByRole('alert').elements()).toHaveLength(2)
+    for (const alert of screen.getByRole('alert').elements()) {
+      expect(alert.querySelector('[role="alert"]')).toBeNull()
+    }
   })
 })

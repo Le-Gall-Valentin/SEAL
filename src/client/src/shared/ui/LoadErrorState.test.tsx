@@ -41,7 +41,7 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
   // Valeurs de l'écran Etats de la maquette (bloc <helmet> et styles de l'état « Erreur de chargement »).
   it('ADR 0016 : la carte, l’icône, le titre et le bouton reprennent les dimensions et les jetons de la maquette', async () => {
     const screen = await render(<LoadErrorState heading="h1" onRetry={() => undefined} />)
-    const card = screen.getByRole('alert').element()
+    const card = screen.getByRole('region').element()
     const icon = card.querySelector('[aria-hidden="true"]')
     const title = screen.getByRole('heading').element()
     const button = screen.getByRole('button').element()
@@ -109,7 +109,7 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
         container,
       })
 
-      expect(screen.getByRole('alert').element().getBoundingClientRect().width).toBe(expected)
+      expect(screen.getByRole('region').element().getBoundingClientRect().width).toBe(expected)
       await screen.unmount()
       container.remove()
     }
@@ -119,7 +119,7 @@ describe('ADR 0012 : état « Erreur de chargement » de la maquette (écran Eta
     document.documentElement.style.fontSize = '24px'
     try {
       const screen = await render(<LoadErrorState heading="h1" onRetry={() => undefined} />)
-      const card = screen.getByRole('alert').element()
+      const card = screen.getByRole('region').element()
       const icon = card.querySelector('[aria-hidden="true"]')
       if (icon === null) throw new Error('icône absente')
 

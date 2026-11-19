@@ -51,14 +51,20 @@ describe('KEY-11 : page « Autorité SEAL modifiée » (ADR 0027, point 1)', () 
     })
   })
 
-  it('ADR 0016 : la carte est centrée dans la page, avec des marges de 16 px', async () => {
+  it('ADR 0027, point 13 : « Se déconnecter » prend le style d’action de la carte d’Etats', async () => {
     const screen = await renderPage({ logout: () => Promise.resolve() })
+    const button = screen.getByRole('button', { name: 'Se déconnecter' }).element()
+    const card = screen.getByRole('region', { name: 'Autorité SEAL modifiée' }).element()
 
-    expect(getComputedStyle(screen.getByRole('main').element())).toMatchObject({
-      display: 'grid',
-      alignItems: 'center',
-      justifyItems: 'center',
-      padding: '16px',
+    expect(getComputedStyle(button)).toMatchObject({
+      height: '44px',
+      backgroundColor: 'rgb(255, 255, 255)',
+      color: 'rgb(27, 31, 20)',
+      borderRadius: '10px',
     })
+    expect(button.getBoundingClientRect().width).toBeLessThan(
+      card.getBoundingClientRect().width / 2,
+    )
+    expect(card.getBoundingClientRect().bottom - button.getBoundingClientRect().bottom).toBe(22)
   })
 })
