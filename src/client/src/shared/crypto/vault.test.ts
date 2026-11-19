@@ -167,7 +167,7 @@ describe('KEY-33, KEY-40 : coffres piégés, repris de la revue de sécurité', 
     expect(Object.prototype).not.toHaveProperty('polluted')
   })
 
-  it('ADR 0027, point 10 : une ancienne version authentique s’ouvre encore (limite écrite, contrôle à la PR 3)', async () => {
+  it('ADR 0027, point 10 : une ancienne version authentique s’ouvre encore : restauration et reprise la refusent (PROTOCOL.md 5.3)', async () => {
     const first = await sealed(keyringJson, 1)
     const second = await sealed(keyringJson, 2)
 

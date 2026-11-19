@@ -30,16 +30,19 @@ interface Scenario {
   readonly context: KeysContext
 }
 
-/** Trousseau des vecteurs enregistré sur l'appareil, coffre version 1 sur le serveur, rien de publié. */
-async function scenario(now = FRESH): Promise<Scenario> {
-  const server = fakeKeysServer(VECTOR_CERTIFICATE, () => now)
+/**
+ * Trousseau des vecteurs enregistré sur l'appareil, coffre version 1 sur le serveur, rien de publié. Le serveur et
+ * l'appareil lisent la même horloge : `now`, ou `clock` pour la faire avancer.
+ */
+async function scenario(now = FRESH, clock: () => number = () => now): Promise<Scenario> {
+  const server = fakeKeysServer(VECTOR_CERTIFICATE, clock)
   server.vault = VECTOR_VAULT
   const store = await pinnedStore()
   await store.saveKeyring(await vectorKeyring())
   return {
     server,
     store,
-    context: { api: server, store, owner: VECTOR_OWNER, clock: { now: () => now } },
+    context: { api: server, store, owner: VECTOR_OWNER, clock: { now: clock } },
   }
 }
 
@@ -166,6 +169,62 @@ describe('KEY-02, KEY-05, KEY-06 : achèvement du trousseau (ADR 0029, point 3)'
     replayed.server.subkeys = [elsewhere]
     expect(await failed(completeKeys(replayed.context))).toBeInstanceOf(StaleVaultError)
     await expect(replayed.store.loadCertificate(VECTOR_OWNER.userId)).resolves.toBeUndefined()
+  })
+
+  it('ADR 0029, point 11 : des publications refusées à chaque reprise ne font pas grossir le coffre', async () => {
+    let now = VECTOR_SUBKEY_CREATED_AT + DAY_MS
+    const { server, store, context: clocked } = await scenario(now, () => now)
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      now += 5 * MINUTE_MS
+      server.fail('publishSubkey', 'before')
+      expect(await failed(completeKeys(clocked))).toBeInstanceOf(Error)
+    }
+
+    expect(server.vault?.vaultVersion).toBe(7)
+    expect((await store.loadKeyring(VECTOR_OWNER.userId))?.subkeys).toHaveLength(2)
+    now += 5 * MINUTE_MS
+    await completeKeys(clocked)
+    expect(server.subkeys).toHaveLength(1)
+    expect((await store.loadKeyring(VECTOR_OWNER.userId))?.subkeys).toHaveLength(2)
+  })
+
+  it('ADR 0029, point 11 : un autre appareil, qui garde la sous-clé avant qu’elle soit redatée, reprend sans refus', async () => {
+    let now = VECTOR_SUBKEY_CREATED_AT + DAY_MS
+    const first = await scenario(now, () => now)
+    const clocked = first.context
+    first.server.fail('publishSubkey', 'before')
+    expect(await failed(completeKeys(clocked))).toBeInstanceOf(Error)
+    const restored = await first.store.loadKeyring(VECTOR_OWNER.userId)
+    if (restored === undefined) throw new Error('trousseau attendu')
+    const second = await pinnedStore()
+    await second.saveKeyring(restored)
+
+    now += 5 * MINUTE_MS
+    await completeKeys(clocked)
+    now += MINUTE_MS
+    await completeKeys({ ...clocked, store: second })
+
+    const published = first.server.subkeys.map((subkey) => subkey.ekId)
+    expect(published).toHaveLength(1)
+    expect((await second.loadKeyring(VECTOR_OWNER.userId))?.subkeys).toHaveLength(2)
+    await expect(second.loadCertificate(VECTOR_OWNER.userId)).resolves.toBeDefined()
+  })
+
+  it('ADR 0029, point 11 : une sous-clé publiée que le serveur tait est redatée, sa republication refusée, et rien n’est retiré', async () => {
+    let now = VECTOR_SUBKEY_CREATED_AT + DAY_MS
+    const { server, store, context } = await scenario(now, () => now)
+    await completeKeys(context)
+    const before = (await store.loadKeyring(VECTOR_OWNER.userId))?.subkeys.map((s) => s.ekId)
+    expect(before).toHaveLength(2)
+
+    server.subkeys = []
+    now += 10 * MINUTE_MS
+    expect(await failed(completeKeys(context))).toMatchObject({ code: 'VALIDATION_FAILED' })
+
+    expect(server.vault?.vaultVersion).toBe(3)
+    const after = (await store.loadKeyring(VECTOR_OWNER.userId))?.subkeys.map((s) => s.ekId)
+    expect(after).toEqual(before)
   })
 
   it('ADR 0029 : deux onglets qui reprennent ensemble, sous le verrou, ne publient qu’une fois', async () => {

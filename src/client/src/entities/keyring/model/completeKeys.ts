@@ -4,7 +4,9 @@ import {
   compareOwnKeys,
   type Keyring,
   type KeyStore,
+  neverPublished,
   proveIdentity,
+  redateSubkey,
   reopenVault,
   storeOwnCertificate,
   type SubkeyInfo,
@@ -76,7 +78,7 @@ export async function completeKeys(context: KeysContext): Promise<void> {
   const expected = { ...owner, ikPublic: keyring.identityPublicKey }
   await verifyOwnCertificate(store, served.certificate, expected, clock.now())
   if (comparison.kind === 'match' && !comparison.published) {
-    await publishSubkey(context, keyring, served.certificate.serial)
+    await publishSubkey(context, keyring, served)
   }
   await storeOwnCertificate(store, served.certificate, expected, clock.now())
 }
@@ -119,11 +121,15 @@ async function refreshed(
   return reopened
 }
 
-/** KEY-05, KEY-32 : publie la sous-clé la plus récente, ou une neuve, ajoutée d'abord au coffre (ADR 0025, point 15). */
+/**
+ * KEY-05, KEY-32 : publie la sous-clé la plus récente si elle a moins de 4 minutes. Sinon, elle est d'abord écrite dans
+ * une version suivante du coffre (ADR 0025, point 15) : redatée si elle n'a jamais été publiée, pour que des reprises
+ * qui échouent ne fassent pas grossir le coffre, ou remplacée par une neuve, ajoutée (ADR 0029, point 11).
+ */
 async function publishSubkey(
   { api, store, clock }: KeysContext,
   keyring: Keyring,
-  certSerial: string,
+  served: OwnKeysView,
 ): Promise<void> {
   const now = clock.now()
   let current = keyring
@@ -133,7 +139,12 @@ async function publishSubkey(
     if (wire === undefined) {
       throw new StaleVaultError()
     }
-    const grown = await mapVaultErrors(addSubkey(current, vaultFromWire(wire), now))
+    const vault = vaultFromWire(wire)
+    const grown = await mapVaultErrors(
+      subkey !== undefined && neverPublished(served, now)(subkey)
+        ? redateSubkey(current, vault, subkey.ekId, now)
+        : addSubkey(current, vault, now),
+    )
     await saveVaultOnce(api, vaultToWire(grown.vault))
     await store.saveKeyring(grown.keyring)
     current = grown.keyring
@@ -142,7 +153,7 @@ async function publishSubkey(
   if (subkey === undefined) {
     throw new StaleVaultError()
   }
-  await api.publishSubkey(await bindSubkey(current, certSerial, subkey.ekId))
+  await api.publishSubkey(await bindSubkey(current, served.certificate.serial, subkey.ekId))
 }
 
 async function reopenedFromServer(api: IKeysApi, keyring: Keyring): Promise<Keyring> {

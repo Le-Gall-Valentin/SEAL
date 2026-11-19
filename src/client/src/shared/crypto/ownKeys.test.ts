@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { toBase64Url } from './base64url'
 import { generateKeyring, type Keyring } from './keyring'
-import { compareOwnKeys } from './ownKeys'
+import { compareOwnKeys, neverPublished } from './ownKeys'
 import { generateRecoveryKey } from './recovery'
 
 const USER_ID = '0192f7a1-ffff-7000-8000-00000000a11c'
@@ -13,7 +13,7 @@ async function freshKeyring(): Promise<Keyring> {
 
 function servedFor(keyring: Keyring, subkeyIds: readonly Uint8Array[]) {
   return {
-    certificate: { ikPublic: toBase64Url(keyring.identityPublicKey) },
+    certificate: { ikPublic: toBase64Url(keyring.identityPublicKey), notBefore: NOW },
     subkeys: subkeyIds.map((ekId) => ({ ekId: toBase64Url(ekId) })),
   }
 }
@@ -40,7 +40,7 @@ describe('KEY-33 : clés servies comparées au trousseau de l’appareil (ADR 00
     expect(compareOwnKeys(keyring, servedFor(other, []))).toEqual({ kind: 'foreign' })
     expect(
       compareOwnKeys(keyring, {
-        certificate: { ikPublic: `${toBase64Url(keyring.identityPublicKey)}=` },
+        certificate: { ikPublic: `${toBase64Url(keyring.identityPublicKey)}=`, notBefore: NOW },
         subkeys: [],
       }),
     ).toEqual({ kind: 'foreign' })
@@ -55,9 +55,36 @@ describe('KEY-33 : clés servies comparées au trousseau de l’appareil (ADR 00
     })
     expect(
       compareOwnKeys(keyring, {
-        certificate: { ikPublic: toBase64Url(keyring.identityPublicKey) },
+        certificate: { ikPublic: toBase64Url(keyring.identityPublicKey), notBefore: NOW },
         subkeys: [{ ekId: '*' }],
       }),
     ).toEqual({ kind: 'stale' })
+  })
+})
+
+describe('ADR 0029, point 11 : sous-clé jamais publiée, qu’une neuve remplace dans le coffre', () => {
+  const MINUTE_MS = 60_000
+  const DAY_MS = 86_400_000
+  const ekId = Uint8Array.from({ length: 16 }, (_, index) => index)
+  const later = NOW + 6 * MINUTE_MS
+
+  it('ADR 0029, point 11 : non servie, créée après l’émission du certificat et récente : jamais publiée', async () => {
+    const keyring = await freshKeyring()
+
+    expect(neverPublished(servedFor(keyring, []), later)({ ekId, createdAt: later })).toBe(true)
+  })
+
+  it('ADR 0029, point 11 : servie, créée avant l’émission du certificat (5 minutes de tolérance) ou ancienne : gardée', async () => {
+    const keyring = await freshKeyring()
+    const replaceable = neverPublished(servedFor(keyring, []), later + 31 * DAY_MS)
+
+    expect(neverPublished(servedFor(keyring, [ekId]), later)({ ekId, createdAt: later })).toBe(
+      false,
+    )
+    expect(
+      neverPublished(servedFor(keyring, []), later)({ ekId, createdAt: NOW + 4 * MINUTE_MS }),
+    ).toBe(false)
+    expect(replaceable({ ekId, createdAt: later })).toBe(false)
+    expect(replaceable({ ekId, createdAt: later + 2 * DAY_MS })).toBe(true)
   })
 })

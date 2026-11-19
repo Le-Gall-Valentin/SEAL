@@ -260,6 +260,58 @@ export async function addSubkey(
   payload: VaultPayload,
   now: number,
 ): Promise<NewKeyring> {
+  const ek = await generateX25519(true, ['deriveBits'])
+  // KEY-40 : la clé privée exportée est remise à zéro à la sortie, même sur un refus du coffre relu.
+  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', ek.privateKey))
+  try {
+    return await nextVersion(keyring, payload, (eks) => [
+      ...eks,
+      {
+        ekId: crypto.getRandomValues(new Uint8Array(EK_ID_BYTES)),
+        kem: KEM,
+        pkcs8,
+        createdAt: now,
+        expiresAt: now + SUBKEY_VALIDITY_MS,
+      },
+    ])
+  } finally {
+    pkcs8.fill(0)
+  }
+}
+
+/**
+ * ADR 0029 (point 11), PROTOCOL.md 5.5 : redate une sous-clé jamais publiée (`createdAt` = `now`, 45 jours), en version
+ * suivante rechiffrée par la VDK : une reprise qui échoue réutilise la même sous-clé au lieu d'en ajouter une, et le
+ * coffre ne grossit pas. Aucune clé n'est retirée ; mêmes contrôles qu'addSubkey, et une sous-clé absente du coffre
+ * relu le refuse ('keyring').
+ */
+export async function redateSubkey(
+  keyring: Keyring,
+  payload: VaultPayload,
+  ekId: Uint8Array,
+  now: number,
+): Promise<NewKeyring> {
+  return nextVersion(keyring, payload, (eks) => {
+    if (!eks.some((subkey) => equalBytes(subkey.ekId, ekId))) {
+      throw new VaultOpenError('keyring')
+    }
+    return eks.map((subkey) =>
+      equalBytes(subkey.ekId, ekId)
+        ? { ...subkey, createdAt: now, expiresAt: now + SUBKEY_VALIDITY_MS }
+        : subkey,
+    )
+  })
+}
+
+/**
+ * PROTOCOL.md 5.5 : version suivante du coffre, rechiffrée par la VDK, après `edit` des sous-clés du trousseau relu. Le
+ * coffre relu DOIT contenir toutes les sous-clés de l'appareil.
+ */
+async function nextVersion(
+  keyring: Keyring,
+  payload: VaultPayload,
+  edit: (eks: readonly SubkeyExport[]) => readonly SubkeyExport[],
+): Promise<NewKeyring> {
   const { userId } = keyring
   const { vdk } = keyringSecrets(keyring)
   const current = await decryptBlob(userId, payload, vdk)
@@ -271,35 +323,25 @@ export async function addSubkey(
   }
   try {
     const json = parsedKeyring(userId, current)
-    if (
-      !keepsSubkeys(
-        keyring,
-        json.eks.map((subkey) => ({ ekId: fromBase64Url(subkey.ekId) })),
-      )
-    ) {
+    const eks = json.eks.map((subkey) => ({
+      ekId: fromBase64Url(subkey.ekId),
+      kem: subkey.kem,
+      pkcs8: held(fromBase64Url(subkey.pkcs8)),
+      createdAt: subkey.createdAt,
+      expiresAt: subkey.expiresAt,
+    }))
+    if (!keepsSubkeys(keyring, eks)) {
       throw new VaultOpenError('keyring')
     }
-    const ek = await generateX25519(true, ['deriveBits'])
+    const edited = edit(eks)
+    for (const subkey of edited) {
+      held(subkey.pkcs8)
+    }
     const plaintext = held(
       serializeKeyring({
         userId,
         ik: held(fromBase64Url(json.ik)),
-        eks: [
-          ...json.eks.map((subkey) => ({
-            ekId: fromBase64Url(subkey.ekId),
-            kem: subkey.kem,
-            pkcs8: held(fromBase64Url(subkey.pkcs8)),
-            createdAt: subkey.createdAt,
-            expiresAt: subkey.expiresAt,
-          })),
-          {
-            ekId: crypto.getRandomValues(new Uint8Array(EK_ID_BYTES)),
-            kem: KEM,
-            pkcs8: held(new Uint8Array(await crypto.subtle.exportKey('pkcs8', ek.privateKey))),
-            createdAt: now,
-            expiresAt: now + SUBKEY_VALIDITY_MS,
-          },
-        ],
+        eks: edited,
         createdAt: json.createdAt,
       }),
     )

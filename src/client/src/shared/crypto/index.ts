@@ -15,6 +15,7 @@ export {
   type Keyring,
   type NewKeyring,
   openVault,
+  redateSubkey,
   reopenVault,
   type SubkeyInfo,
 } from './keyring'
@@ -42,4 +43,4 @@ export {
   storeOwnCertificate,
   verifyOwnCertificate,
 } from './certificate'
-export { compareOwnKeys, type KeysComparison, type ServedKeys } from './ownKeys'
+export { compareOwnKeys, type KeysComparison, neverPublished, type ServedKeys } from './ownKeys'

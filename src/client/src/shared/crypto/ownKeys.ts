@@ -6,13 +6,19 @@
  */
 import { fromBase64Url } from './base64url'
 import { equalBytes } from './bytes'
-import type { Keyring } from './keyring'
+import type { Keyring, SubkeyInfo } from './keyring'
 
-/** Ce que la comparaison lit de GET /api/v1/users/{id}/keys : octets en base64url. */
+/** Ce que la comparaison lit de GET /api/v1/users/{id}/keys : octets en base64url, dates en millisecondes. */
 export interface ServedKeys {
-  readonly certificate: { readonly ikPublic: string }
+  readonly certificate: { readonly ikPublic: string; readonly notBefore: number }
   readonly subkeys: readonly { readonly ekId: string }[]
 }
+
+/** ADR 0025, point 7 : écart toléré par le serveur entre l'horloge du client et la sienne. */
+const CLOCK_TOLERANCE_MS = 5 * 60_000
+
+/** ADR 0029, point 11 : 15 jours de marge sur les 45 de validité, contre une horloge très en retard. */
+const REPLACEABLE_AGE_MS = 30 * 86_400_000
 
 export type KeysComparison =
   | { readonly kind: 'foreign' }
@@ -29,6 +35,24 @@ export function compareOwnKeys(keyring: Keyring, served: ServedKeys): KeysCompar
     return ekId !== undefined && keyring.subkeys.some((local) => equalBytes(local.ekId, ekId))
   })
   return known ? { kind: 'match', published: served.subkeys.length > 0 } : { kind: 'stale' }
+}
+
+/**
+ * ADR 0029 (point 11), PROTOCOL.md 5.5 : une sous-clé jamais publiée, qu'une reprise redate au lieu d'en ajouter une.
+ * Elle n'est pas servie, a été créée plus de 5 minutes après l'émission du certificat servi (une sous-clé d'un
+ * certificat précédent n'est plus servie, mais a pu servir) et il y a moins de 30 jours (une sous-clé expirée n'est
+ * plus servie non plus). Une erreur de ce jugement ne retire aucune clé : republier une sous-clé déjà publiée est
+ * refusé par le serveur.
+ */
+export function neverPublished(
+  served: ServedKeys,
+  now: number,
+): (subkey: Pick<SubkeyInfo, 'ekId' | 'createdAt'>) => boolean {
+  const servedIds = served.subkeys.map((subkey) => decoded(subkey.ekId))
+  return (subkey) =>
+    subkey.createdAt >= served.certificate.notBefore + CLOCK_TOLERANCE_MS &&
+    now - subkey.createdAt < REPLACEABLE_AGE_MS &&
+    !servedIds.some((ekId) => ekId !== undefined && equalBytes(ekId, subkey.ekId))
 }
 
 /** Un base64url non canonique ne désigne aucune clé. */

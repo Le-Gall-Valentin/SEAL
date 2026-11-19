@@ -1,7 +1,8 @@
 /**
  * Serveur des clés en mémoire, fidèle aux règles de l'ADR 0025 que le client rencontre : un seul certificat (403
- * ensuite), sous-clé liée au certificat courant et créée à 5 minutes au plus de l'horloge, coffre en versions
- * successives (409 sinon). Une panne se règle avant ou après l'effet, pour imiter une réponse perdue. Réservé aux tests.
+ * ensuite), sous-clé liée au certificat courant, créée à 5 minutes au plus de l'horloge et sous un ekId jamais publié
+ * (400 sinon), coffre en versions successives (409 sinon). `subkeys` est la liste servie : un test la vide pour imiter
+ * un serveur qui tait une sous-clé publiée. Une panne se règle avant ou après l'effet, pour imiter une réponse perdue. Réservé aux tests.
  */
 import { ApiError, NetworkError } from '@/shared/lib'
 import type { CertificateView, IKeysApi, SubkeyView, VaultView } from '../../api/IKeysApi'
@@ -24,6 +25,7 @@ export interface FakeKeysServer extends IKeysApi {
 /** `issued` : le certificat que l'Autorité émet à la publication de l'identité. */
 export function fakeKeysServer(issued: CertificateView, now: () => number): FakeKeysServer {
   const failures = new Map<Method, 'before' | 'after'>()
+  const publishedEkIds = new Set<string>()
   let hidden = false
 
   async function handle<T>(method: Method, effect: () => T): Promise<T> {
@@ -68,6 +70,10 @@ export function fakeKeysServer(issued: CertificateView, now: () => number): Fake
         if (Math.abs(now() - subkey.createdAt) > CLOCK_SKEW_MS) {
           throw new ApiError(400, 'VALIDATION_FAILED', { fields: ['createdAt'] })
         }
+        if (publishedEkIds.has(subkey.ekId)) {
+          throw new ApiError(400, 'VALIDATION_FAILED', { fields: ['ekId'] })
+        }
+        publishedEkIds.add(subkey.ekId)
         server.subkeys.push(subkey)
       }),
     readVault: () => handle('readVault', () => server.vault),

@@ -10,6 +10,7 @@ import {
   type Keyring,
   keyringSecrets,
   openVault,
+  redateSubkey,
   reopenVault,
   serializeKeyring,
 } from '../keyring'
@@ -274,6 +275,41 @@ export function describeVaultVectors(vectors: Json, engine: string): void {
 
       await expect(
         addSubkey(grown, vaultPayload(vectors['payload']), 1_796_601_600_000),
+      ).rejects.toMatchObject({ reason: 'keyring' })
+    })
+
+    it('ADR 0029, point 11 : redateSubkey redate une sous-clé en version suivante, sans en ajouter ni en retirer', async () => {
+      const second = vaultPayload(next['payload'])
+      const grown = await openVault(userId, second, recoveryKey())
+      const [kept, redated] = grown.subkeys
+      if (kept === undefined || redated === undefined) throw new Error('deux sous-clés attendues')
+      const now = 1_796_601_600_000
+
+      const { keyring, vault } = await redateSubkey(grown, second, redated.ekId, now)
+
+      expect(vault.vaultVersion).toBe(3)
+      expect(keyring.subkeys).toHaveLength(2)
+      expect(keyring.subkeys[0]).toEqual(kept)
+      expect(keyring.subkeys[1]).toEqual({
+        ...redated,
+        createdAt: now,
+        expiresAt: now + 45 * DAY_MS,
+      })
+      const reopened = await openVault(userId, vault, recoveryKey())
+      expect(reopened.subkeys).toEqual(keyring.subkeys)
+      await expectNothingExports(keyring)
+    })
+
+    it('ADR 0029, point 11 : redateSubkey refuse une sous-clé absente du coffre, et une version plus ancienne', async () => {
+      const first = await openVault(userId, vaultPayload(vectors['payload']), recoveryKey())
+      const grown = await openVault(userId, vaultPayload(next['payload']), recoveryKey())
+      const unknown = grown.subkeys[1]?.ekId ?? new Uint8Array(16)
+
+      await expect(
+        redateSubkey(first, vaultPayload(vectors['payload']), unknown, 1_796_601_600_000),
+      ).rejects.toMatchObject({ reason: 'keyring' })
+      await expect(
+        redateSubkey(grown, vaultPayload(vectors['payload']), unknown, 1_796_601_600_000),
       ).rejects.toMatchObject({ reason: 'keyring' })
     })
   })
