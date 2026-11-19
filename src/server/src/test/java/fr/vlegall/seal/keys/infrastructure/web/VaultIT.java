@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import fr.vlegall.seal.common.web.Base64Url;
 import fr.vlegall.seal.keys.domain.model.Vault;
 import fr.vlegall.seal.support.AuthClient;
+import fr.vlegall.seal.support.ProtocolVectors;
 import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
@@ -25,6 +26,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /** KEY-32, KEY-33, QA-05 : coffre opaque, versionné, du seul compte de la session (ADR 0025, point 6). */
 @SealIntegrationTest
@@ -79,6 +83,42 @@ class VaultIT {
                 .andExpect(jsonPath("$.vaultVersion").value(1))
                 .andExpect(jsonPath("$.blob").value(vault(1, 100, 7).get("blob")))
                 .andExpect(jsonPath("$.wrappedVdk").value(vault(1, 100, 7).get("wrappedVdk")));
+    }
+
+    /** La charge d'un vecteur, envoyée telle quelle. */
+    private static Map<String, Object> asBody(JsonNode payload) {
+        return JsonMapper.shared().convertValue(payload, new TypeReference<Map<String, Object>>() {});
+    }
+
+    private Map<String, Object> readBack(KeysTestClient account) throws Exception {
+        return asBody(AuthClient.body(read(account).andExpect(status().isOk()).andReturn()));
+    }
+
+    @Test
+    @DisplayName("KEY-32, QA-02 : la charge de vault.json passe telle quelle les bornes du serveur, et le GET la rend"
+            + " entière à l'identique")
+    void key32VectorPayloadIsAcceptedAndReadBackUnchanged() throws Exception {
+        // ADR 0027, point 4 : le coffre qu'écrit le client passe les bornes de l'ADR 0025 (point 6).
+        Map<String, Object> body = asBody(ProtocolVectors.vault().section("payload"));
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "coffre_vecteur");
+
+        save(account, body).andExpect(status().isNoContent());
+
+        assertThat(readBack(account)).isEqualTo(body);
+    }
+
+    @Test
+    @DisplayName("KEY-32 : une version suivante remplace chacun des champs du coffre, relus à l'identique")
+    void key32NextVersionReplacesEveryField() throws Exception {
+        // Champs distincts et non nuls (vault.json) : une colonne permutée à l'UPDATE, nonceK pour nonceB, se verrait.
+        Map<String, Object> next = asBody(ProtocolVectors.vault().section("payload"));
+        next.put("vaultVersion", 2);
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "coffre_suivant");
+        save(account, vault(1, 64, 1)).andExpect(status().isNoContent());
+
+        save(account, next).andExpect(status().isNoContent());
+
+        assertThat(readBack(account)).isEqualTo(next);
     }
 
     @Test

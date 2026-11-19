@@ -70,6 +70,12 @@ Au premier démarrage, SEAL génère la clé de son Autorité de certification d
 est à sauvegarder : `docker compose down -v` l'efface aussi, et une nouvelle Autorité rend invalides tous les
 certificats déjà émis.
 
+Chaque navigateur épingle la clé de l'Autorité au premier usage (KEY-11). Après une nouvelle Autorité
+(`docker compose down -v`, ou volume `app-data` perdu), un navigateur déjà venu se bloque donc sur « Autorité SEAL
+modifiée » : c'est voulu, une autre clé pouvant être celle d'un attaquant. Pour repartir en local, effacez les données
+du site `https://localhost:8443` dans ce navigateur (dans Chrome : outils de développement, onglet Application,
+« Clear site data »).
+
 Le fichier `.env` est à sauvegarder lui aussi : il porte le poivre des mots de passe (`SEAL_PASSWORD_PEPPER`,
 ADR 0026), gardé hors de la base. Sans lui, aucun mot de passe enregistré ne se vérifie plus, et chaque compte
 devrait passer par « mot de passe oublié ».

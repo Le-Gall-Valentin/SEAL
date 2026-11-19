@@ -1,0 +1,1 @@
+export { authorityChangedPageMessages } from './messages'

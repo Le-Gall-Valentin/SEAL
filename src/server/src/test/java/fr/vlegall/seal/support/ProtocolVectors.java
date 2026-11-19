@@ -34,6 +34,21 @@ public final class ProtocolVectors {
         return read("ed25519-rfc8032.json");
     }
 
+    /** vectors/hkdf-rfc5869.json : RFC 5869, annexe A, cas 1 à 3, en hexadécimal (QA-01, ADR 0027). */
+    public static ProtocolVectors hkdfRfc5869() {
+        return read("hkdf-rfc5869.json");
+    }
+
+    /** vectors/x25519-rfc7748.json : RFC 7748, section 6.1, en hexadécimal (QA-01, ADR 0027). */
+    public static ProtocolVectors x25519Rfc7748() {
+        return read("x25519-rfc7748.json");
+    }
+
+    /** vectors/vault.json : clé de récupération et coffre de clés (PROTOCOL.md, section 5 ; ADR 0027). */
+    public static ProtocolVectors vault() {
+        return read("vault.json");
+    }
+
     private static ProtocolVectors read(String file) {
         try {
             return new ProtocolVectors(
@@ -80,6 +95,24 @@ public final class ProtocolVectors {
                 .toList();
     }
 
+    /** Un champ du fichier, de premier niveau ; absent, c'est une erreur. */
+    public JsonNode value(String name) {
+        JsonNode node = document.path(name);
+        if (node.isMissingNode() || node.isNull()) {
+            throw new IllegalStateException("vecteurs : aucun champ " + name);
+        }
+        return node;
+    }
+
+    /** Une section objet du fichier ({@code payload}, {@code authority}…) ; absente, c'est une erreur. */
+    public JsonNode section(String name) {
+        JsonNode node = document.path(name);
+        if (!node.isObject()) {
+            throw new IllegalStateException("vecteurs : aucune section objet " + name);
+        }
+        return node;
+    }
+
     /** Clé publique brute d'un signataire des vecteurs ({@code ca}, {@code ik}, {@code other}). */
     public byte[] publicKey(String role) {
         return bytes(document.get("keys").get(role), "publicKey");
@@ -87,7 +120,7 @@ public final class ProtocolVectors {
 
     /** Section {@code authority} : clé publique, identifiant et empreinte de la CA. */
     public JsonNode authority() {
-        return document.get("authority");
+        return section("authority");
     }
 
     /** Octets d'un champ base64url sans remplissage. */

@@ -6,5 +6,5 @@
   },
   // Tests exécutés sous Node (projet « node » de Vitest).
   "include": ["src/**/*.test.ts"],
-  "exclude": []
+  "exclude": ["src/**/*.browser.test.ts"]
 }

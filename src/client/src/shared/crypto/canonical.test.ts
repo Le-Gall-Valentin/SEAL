@@ -12,6 +12,7 @@ import {
   u8,
   uuid,
 } from './canonical'
+import { isRecord } from './testing/vectorReader'
 
 // MSG-02 : vecteurs produits par src/protocol/tools/gen_vectors.py, relus aussi par les tests Java.
 const VECTORS = new URL('../../../../protocol/vectors/canonical-encoding.json', import.meta.url)
@@ -27,10 +28,6 @@ interface Vector {
   name: string
   input: Descriptor
   expected?: string
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
 }
 
 function children(value: unknown): Descriptor[] {

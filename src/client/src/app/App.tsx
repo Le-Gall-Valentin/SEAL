@@ -8,12 +8,15 @@ import { logoutApi } from '@/features/logout'
 import { passwordResetApi } from '@/features/password-reset'
 import { registerApi } from '@/features/register'
 import { verifyEmailApi } from '@/features/verify-email'
+import { authorityApi } from '@/entities/authority'
 import { LanguageProvider } from '@/shared/i18n'
 import {
   ApiProviders,
   type Apis,
   bootstrap,
+  createCryptoStartup,
   createQueryClient,
+  CryptoGate,
   ErrorBoundary,
   routerErrorHandler,
 } from './providers'
@@ -25,6 +28,7 @@ const queryClient = createQueryClient()
 /** Racine de composition (ADR 0024, point 7) : seul endroit qui associe chaque port à son adaptateur. */
 const apis: Apis = {
   session: sessionApi,
+  authority: authorityApi,
   passwordBlocklist,
   login: loginApi,
   register: registerApi,
@@ -33,18 +37,26 @@ const apis: Apis = {
   logout: logoutApi,
 }
 
-bootstrap(apis)
+// KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un
+// navigateur refusé n'envoie aucune requête (ADR 0027, point 8).
+const startCrypto = createCryptoStartup({
+  onSupported: () => {
+    bootstrap(apis)
+  },
+})
 
 export function App() {
   return (
     // ACC-05 : le français, seule langue tant que la préférence de langue n'est pas livrée (ADR 0017).
     <LanguageProvider language="fr">
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <ApiProviders apis={apis}>
-            <RouterProvider router={router} onError={routerErrorHandler(import.meta.env.PROD)} />
-          </ApiProviders>
-        </QueryClientProvider>
+        <CryptoGate start={startCrypto}>
+          <QueryClientProvider client={queryClient}>
+            <ApiProviders apis={apis}>
+              <RouterProvider router={router} onError={routerErrorHandler(import.meta.env.PROD)} />
+            </ApiProviders>
+          </QueryClientProvider>
+        </CryptoGate>
       </ErrorBoundary>
     </LanguageProvider>
   )

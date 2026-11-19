@@ -97,7 +97,7 @@ et ses `fields`, eux-mêmes des descripteurs. Les caractères hors ASCII sont é
 
 Les vecteurs sont produits par `tools/gen_vectors.py`, une troisième implémentation en Python,
 indépendante de Java et de TypeScript : bibliothèque standard seule, plus `cryptography` pour les signatures
-de la section 4. Pour les régénérer, depuis `src/protocol` :
+de la section 4 et le coffre de la section 5. Pour les régénérer, depuis `src/protocol` :
 
 ```bash
 python3 tools/gen_vectors.py           # réécrit les fichiers de vectors/
@@ -265,8 +265,69 @@ point 15) ; celles d'un ancien certificat ne comptent pas. Le serveur ne vérifi
   des chaînes décimales, comme en 2.5 ; les octets, du base64url. Les clés sont les graines publiques de la
   RFC 8032 (CA : test 1, IK : test 2, autre clé : test 3).
 
-`gen_vectors.py` les signe avec la bibliothèque `cryptography`, épinglée avec ses empreintes :
+`gen_vectors.py` les signe, et chiffre le coffre de la section 5, avec la bibliothèque `cryptography`, épinglée avec
+ses empreintes :
 
 ```bash
 python3 -m pip install --require-hashes -r tools/requirements.txt
 ```
+
+## 5. Coffre de clés (KEY-30 à KEY-33, ADR 0027)
+
+Le trousseau est sauvegardé chiffré sur le serveur, qui ne peut pas le lire (CDC, section 6.4). La clé de coffre
+VDK chiffre le trousseau ; la clé de récupération RK, que seul l'utilisateur connaît, chiffre la VDK. RK ne quitte
+jamais le client (KEY-31). Aucune signature : AES-GCM authentifie chaque niveau, et son AAD l'attache au compte.
+
+### 5.1 Clé de récupération (KEY-30)
+
+RK vaut 20 octets de `crypto.getRandomValues`, affichés en base32 de Crockford (alphabet
+`0123456789ABCDEFGHJKMNPQRSTVWXYZ`, 5 bits par caractère, poids fort d'abord) : 32 caractères en 8 groupes de 4. À la
+saisie, la casse, les espaces et les tirets sont ignorés, `O` se lit `0`, `I` et `L` se lisent `1` ; `U` et tout
+autre caractère sont refusés, et la clé DOIT faire exactement 32 caractères utiles.
+
+### 5.2 Trousseau
+
+```
+{ "v": 1, "userId": "<UUID>", "ik": "<PKCS#8 d'IK>",
+  "eks": [{ "ekId": "<16 octets>", "kem": "DHKEM-X25519-HKDF-SHA256", "pkcs8": "<PKCS#8 d'EK>",
+            "createdAt": <ms>, "expiresAt": <ms> }],
+  "createdAt": <ms> }
+```
+
+JSON compact, champs dans cet ordre, octets en base64url, dates en millisecondes Unix (nombres JSON). À l'ouverture,
+DOIVENT être refusés : un champ inconnu ou manquant ; un `v` autre que 1 ; un `userId` autre que celui du compte ;
+une liste `eks` vide ; un `ekId` d'une autre taille que 16 octets ; un `kem` autre que `DHKEM-X25519-HKDF-SHA256` ;
+un base64url invalide ou non canonique ; une clé privée que WebCrypto refuse. Les clés publiques ne sont pas
+stockées : elles se relisent dans la clé privée (le `x` de son JWK).
+
+### 5.3 Chiffrement
+
+```
+blob       = AES-256-GCM(VDK, nonceB, trousseau,
+                 AAD = struct("SEAL-vault-v1", uuid(userId), u64(vaultVersion)))
+KEK        = HKDF-SHA256(ikm = RK, salt, info = struct("SEAL-kek-v1", uuid(userId)), longueur 32)
+wrappedVdk = AES-256-GCM(KEK, nonceK, VDK, AAD = struct("SEAL-kek-aad-v1", uuid(userId)))
+serveur   ← { vaultVersion, salt, nonceK, wrappedVdk, nonceB, blob }
+```
+
+VDK : 32 octets aléatoires ; sel de 32 octets ; nonces de 12 ; `wrappedVdk` de 48 (VDK et étiquette GCM). Chaque
+nouvelle version tire un nouveau `nonceB`. Le premier coffre a la version 1, chaque écriture la suivante (ADR 0025,
+point 6). Une étiquette GCM fausse, à l'un ou l'autre niveau, fait échouer l'ouverture, sans trousseau partiel.
+
+**Limite : le rejeu d'une ancienne version.** L'AAD lie le blob à la version que porte la charge, pas à une version
+attendue : une version réétiquetée est refusée, mais un serveur malveillant peut resservir une ancienne version
+authentique, qui s'ouvre avec moins de sous-clés. La restauration (KEY-33) DEVRA vérifier que le trousseau restauré
+contient toutes les sous-clés non expirées publiées pour le certificat courant (ADR 0027, point 10).
+
+### 5.4 Vecteurs (QA-02)
+
+`vectors/vault.json` donne RK et ses groupes, la VDK, les trois structures (`kekInfo`, `kekAad`, `vaultAad`), la KEK,
+le trousseau et ses octets, les clés publiques attendues, la charge envoyée au serveur (`payload`, corps de
+`PUT /api/v1/keys/vault`) et onze falsifications (`forgeries`) qu'aucune implémentation NE DOIT ouvrir. Chacune nomme
+l'étage qui DOIT la refuser (`rejectedBy`) : `key` (la VDK ne se désenveloppe pas), `blob` (le trousseau ne se
+déchiffre pas) ou `keyring` (il se déchiffre, et sa relecture stricte le refuse) ; le générateur le vérifie. IK est la graine du test 2
+de la RFC 8032, EK la clé privée d'Alice de la RFC 7748 (section 6.1) : jamais de vraies clés.
+
+`vectors/hkdf-rfc5869.json` (RFC 5869, annexe A, cas 1 à 3) et `vectors/x25519-rfc7748.json` (RFC 7748, section 6.1)
+sont les vecteurs officiels des deux primitives du coffre et des sous-clés (QA-01). `gen_vectors.py` les recopie des
+RFC et les recalcule avec `cryptography` avant de les écrire ; WebCrypto (Node et Chromium) et la JCA les rejouent.

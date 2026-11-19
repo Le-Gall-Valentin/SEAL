@@ -797,6 +797,23 @@ describe('Audit de la branche : contournements de l’outillage fermés', () => 
     )
   })
 
+  it('ADR 0027, point 13 : seuls les tests et les dossiers testing/ importent un dossier testing/', async () => {
+    const fromTesting = "import { reader } from './testing/vectorReader'\nexport const v = reader\n"
+    await expectForbidden(FEATURE_MODEL, fromTesting, 'no-restricted-imports')
+    await expectForbidden(SHARED_CRYPTO, fromTesting, 'no-restricted-imports')
+    await expectForbidden(
+      'src/app/App.tsx',
+      "import { freshKeyStore } from '@/app/testing/authority'\nexport const v = freshKeyStore\n",
+      'no-restricted-imports',
+    )
+    await expectPermitted('src/features/sign-in/model/useSignIn.test.ts', fromTesting)
+    await expectPermitted('src/shared/crypto/keys.test.ts', fromTesting)
+    await expectPermitted(
+      'src/shared/crypto/testing/suite.ts',
+      "import { reader } from './vectorReader'\nexport const v = reader\n",
+    )
+  })
+
   it('QA-10 : une directive eslint-disable en ligne ne lève aucune règle', async () => {
     const rules = await ruleIds(
       FEATURE_MODEL,

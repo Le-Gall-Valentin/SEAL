@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CanonicalEncodingError } from './canonical'
+import { verifyEd25519 } from './ed25519'
 import {
   type CertificateFields,
   encodeCertificate,
@@ -11,58 +12,25 @@ import {
   type ProofOfPossessionFields,
   type SubkeyBindingFields,
 } from './identity'
+import {
+  base64url,
+  decimal,
+  hex,
+  type Json,
+  number,
+  record,
+  records,
+  string,
+} from './testing/vectorReader'
 
 // QA-01, QA-02 : vecteurs produits par src/protocol/tools/gen_vectors.py, relus aussi par les tests Java.
 const IDENTITY = new URL('../../../../protocol/vectors/identity.json', import.meta.url)
 const RFC8032 = new URL('../../../../protocol/vectors/ed25519-rfc8032.json', import.meta.url)
 
-type Json = Record<string, unknown>
-
-function isRecord(value: unknown): value is Json {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function record(value: unknown): Json {
-  if (!isRecord(value)) throw new Error('objet attendu')
-  return value
-}
-
-function records(value: unknown): Json[] {
-  if (!Array.isArray(value)) throw new Error('liste attendue')
-  return value.map(record)
-}
-
-function string(json: Json, field: string): string {
-  const value = json[field]
-  if (typeof value !== 'string') throw new Error(`${field} : chaîne attendue`)
-  return value
-}
-
-function number(json: Json, field: string): number {
-  const value = json[field]
-  if (typeof value !== 'number') throw new Error(`${field} : nombre attendu`)
-  return value
-}
-
-/** ADR 0006, PROTOCOL.md 2.5 : un u64 est une chaîne décimale, que JSON.parse ne peut arrondir. */
-function decimal(json: Json, field: string): number {
-  const value = string(json, field)
-  if (!/^(0|[1-9][0-9]*)$/.test(value)) throw new Error(`${field} : u64 décimal attendu`)
-  return Number(value)
-}
-
 function kem(json: Json, field: string): Kem {
   const value = string(json, field)
   if (value !== KEM) throw new Error(`${field} : ${KEM} attendu`)
   return value
-}
-
-function b64url(json: Json, field: string): Uint8Array<ArrayBuffer> {
-  return Uint8Array.from(Buffer.from(string(json, field), 'base64url'))
-}
-
-function hex(json: Json, field: string): Uint8Array<ArrayBuffer> {
-  return Uint8Array.from(Buffer.from(string(json, field), 'hex'))
 }
 
 const identity = record(JSON.parse(readFileSync(IDENTITY, 'utf8')))
@@ -71,11 +39,11 @@ const keys = record(identity['keys'])
 
 function certificateFields(fields: Json): CertificateFields {
   return {
-    serial: b64url(fields, 'serial'),
-    issuerKeyId: b64url(fields, 'issuerKeyId'),
+    serial: base64url(fields, 'serial'),
+    issuerKeyId: base64url(fields, 'issuerKeyId'),
     subjectId: string(fields, 'subjectId'),
     username: string(fields, 'username'),
-    ikPublic: b64url(fields, 'ikPublic'),
+    ikPublic: base64url(fields, 'ikPublic'),
     notBefore: decimal(fields, 'notBefore'),
     notAfter: decimal(fields, 'notAfter'),
     usage: number(fields, 'usage'),
@@ -85,18 +53,18 @@ function certificateFields(fields: Json): CertificateFields {
 function proofFields(fields: Json): ProofOfPossessionFields {
   return {
     userId: string(fields, 'userId'),
-    ikPublic: b64url(fields, 'ikPublic'),
-    challenge: b64url(fields, 'challenge'),
+    ikPublic: base64url(fields, 'ikPublic'),
+    challenge: base64url(fields, 'challenge'),
   }
 }
 
 function bindingFields(fields: Json): SubkeyBindingFields {
   return {
     userId: string(fields, 'userId'),
-    certSerial: b64url(fields, 'certSerial'),
-    ekId: b64url(fields, 'ekId'),
+    certSerial: base64url(fields, 'certSerial'),
+    ekId: base64url(fields, 'ekId'),
     kem: kem(fields, 'kem'),
-    ekPublic: b64url(fields, 'ekPublic'),
+    ekPublic: base64url(fields, 'ekPublic'),
     createdAt: decimal(fields, 'createdAt'),
     expiresAt: decimal(fields, 'expiresAt'),
   }
@@ -120,16 +88,12 @@ const REQUIREMENTS: Record<string, string> = Object.fromEntries(
 )
 
 function publicKey(role: string): Uint8Array<ArrayBuffer> {
-  return b64url(record(keys[role]), 'publicKey')
+  return base64url(record(keys[role]), 'publicKey')
 }
 
-async function verifies(
-  key: Uint8Array<ArrayBuffer>,
-  signature: Uint8Array<ArrayBuffer>,
-  data: Uint8Array,
-): Promise<boolean> {
-  const imported = await crypto.subtle.importKey('raw', key, { name: 'Ed25519' }, false, ['verify'])
-  return crypto.subtle.verify({ name: 'Ed25519' }, imported, signature, Uint8Array.from(data))
+/** QA-01 : la vérification du client, avec le refus des points d'ordre faible (ed25519.ts). */
+function verifies(key: Uint8Array, signature: Uint8Array, data: Uint8Array): Promise<boolean> {
+  return verifyEd25519(key, data, signature)
 }
 
 describe('QA-02 : structures signées de l’identité (PROTOCOL.md, section 4)', () => {
@@ -152,9 +116,9 @@ describe('QA-02 : structures signées de l’identité (PROTOCOL.md, section 4)'
         const encoded = ENCODERS[structure]?.(record(vector['fields']))
         if (encoded === undefined) throw new Error(`structure inconnue : ${structure}`)
 
-        expect(encoded).toEqual(b64url(vector, 'encoded'))
+        expect(encoded).toEqual(base64url(vector, 'encoded'))
         await expect(
-          verifies(publicKey(string(vector, 'signer')), b64url(vector, 'signature'), encoded),
+          verifies(publicKey(string(vector, 'signer')), base64url(vector, 'signature'), encoded),
         ).resolves.toBe(true)
       })
     }
@@ -168,7 +132,7 @@ describe('QA-02 : structures signées de l’identité (PROTOCOL.md, section 4)'
       const encoded = encoder(record(forgery['fields']))
 
       await expect(
-        verifies(publicKey(string(forgery, 'verifier')), b64url(forgery, 'signature'), encoded),
+        verifies(publicKey(string(forgery, 'verifier')), base64url(forgery, 'signature'), encoded),
       ).resolves.toBe(false)
     })
   }
