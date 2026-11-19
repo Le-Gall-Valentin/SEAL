@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { type KeyRestore, useKeyRestore } from '../model/useKeyRestore'
 import { KeyRestoreForm } from './KeyRestoreForm'
@@ -55,6 +56,22 @@ describe('KEY-33 : Restauration-Appareil, formulaire', () => {
 
     expect(restore.enter).toHaveBeenLastCalledWith(0, '8wqk')
     await expect.element(screen.getByLabelText('Groupe 2 sur 8')).toHaveFocus()
+  })
+
+  it('KEY-33 : Retour arrière dans une case vide revient à la précédente, sans rien effacer ; ailleurs, il efface', async () => {
+    const restore = state({ groups: ['8WQK', '', '', '', '', '', '', ''] })
+    const screen = await renderWith(restore)
+    const second = screen.getByLabelText('Groupe 2 sur 8')
+
+    await second.click()
+    await userEvent.keyboard('{Backspace}')
+
+    await expect.element(screen.getByLabelText('Groupe 1 sur 8')).toHaveFocus()
+    expect(restore.enter).not.toHaveBeenCalled()
+    await screen.getByLabelText('Groupe 1 sur 8').click()
+    await userEvent.keyboard('{End}{Backspace}')
+    expect(restore.enter).toHaveBeenLastCalledWith(0, '8WQ')
+    await expect.element(screen.getByLabelText('Groupe 1 sur 8')).toHaveFocus()
   })
 
   it('KEY-33 : clé complète, l’envoi lance la restauration ; en cours, le bouton est inactif', async () => {

@@ -25,9 +25,9 @@ const KEY = '8WQK3MZDT7PAR2HX5NCFY9GBK4VEJ6TS'
 const api = {} as IKeysApi
 const store = {} as KeyStore
 
-async function renderRestore(onRestored: () => void = () => undefined) {
+async function renderRestore(onRestored: () => void = () => undefined, client = new QueryClient()) {
   const wrapper = ({ children }: { readonly children: ReactNode }) => (
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <KeysApiProvider api={api}>
         <KeyStoreProvider api={store}>{children}</KeyStoreProvider>
       </KeysApiProvider>
@@ -103,5 +103,34 @@ describe('KEY-33 : Restauration-Appareil, modèle', () => {
     }
     result.current.enter(3, 'R2HX')
     await expect.poll(() => result.current.failure).toBeNull()
+  })
+
+  it('KEY-31, KEY-40 : la clé de récupération ne reste pas dans le cache des mutations, ni pendant ni après', async () => {
+    let resolveRestore: () => void = () => undefined
+    vi.mocked(restoreKeys).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRestore = resolve
+        }),
+    )
+    const client = new QueryClient()
+    const { result, unmount } = await renderRestore(() => undefined, client)
+    result.current.enter(0, KEY)
+    await expect.poll(() => result.current.canSubmit).toBe(true)
+    const variables = () =>
+      client
+        .getMutationCache()
+        .getAll()
+        .map((mutation) => mutation.state.variables)
+
+    result.current.submit()
+    await expect.poll(() => vi.mocked(restoreKeys).mock.calls.length).toBe(1)
+    expect(variables()).toEqual([undefined])
+    resolveRestore()
+    await expect.poll(() => result.current.pending).toBe(false)
+    expect(variables()).toEqual([undefined])
+
+    await unmount()
+    await expect.poll(() => client.getMutationCache().getAll()).toHaveLength(0)
   })
 })

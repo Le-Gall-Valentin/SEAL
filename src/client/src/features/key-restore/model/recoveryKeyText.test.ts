@@ -43,4 +43,10 @@ describe('KEY-33 : saisie de la clé de récupération en 8 cases (Restauration-
     expect(recoveryKeyOf([...KEY.slice(0, 7), 'J6Tı'])).toBeNull()
     expect(enterGroups(EMPTY_GROUPS, 0, 'ı').groups[0]).toBe('ı')
   })
+
+  it('KEY-33 : un caractère tapé dans une case pleine n’écrase pas la suivante ; seul un collage se répartit', () => {
+    expect(enterGroups(KEY, 2, 'T7ZPA')).toEqual({ groups: KEY, focus: 2 })
+    expect(enterGroups(KEY, 7, 'J6TSX')).toEqual({ groups: KEY, focus: 7 })
+    expect(enterGroups(KEY, 2, 'T7PAR2HX').groups).toEqual(KEY)
+  })
 })

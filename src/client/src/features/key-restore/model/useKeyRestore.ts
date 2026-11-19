@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   InvalidVaultError,
   KEYS_LOCK,
@@ -32,7 +32,8 @@ export interface KeyRestore {
 
 /**
  * KEY-33 : Restauration-Appareil. La clé saisie ne quitte pas l'appareil : restoreKeys ouvre le coffre ici, sous le
- * verrou des clés, puis la zone du compte complète la publication (onRestored).
+ * verrou des clés, puis la zone du compte complète la publication (onRestored). KEY-31, KEY-40 : la clé n'entre pas
+ * dans le cache des mutations (ni en variables, ni gardée après le démontage) ; elle ne vit que dans l'écran.
  */
 export function useKeyRestore(owner: KeyOwner, onRestored: () => void): KeyRestore {
   const api = useKeysApi()
@@ -40,10 +41,20 @@ export function useKeyRestore(owner: KeyOwner, onRestored: () => void): KeyResto
   const clock = useClock()
   const [groups, setGroups] = useState(EMPTY_GROUPS)
   const recoveryKey = useMemo(() => recoveryKeyOf(groups), [groups])
+  const submitted = useRef<RecoveryKey | null>(null)
   const restore = useMutation({
-    mutationFn: (key: RecoveryKey) =>
-      withLock(KEYS_LOCK, () => restoreKeys({ api, store, owner, clock }, key)),
+    mutationFn: () => {
+      const key = submitted.current
+      if (key === null) {
+        return Promise.reject(new TypeError('KEY-33 : aucune clé envoyée'))
+      }
+      return withLock(KEYS_LOCK, () => restoreKeys({ api, store, owner, clock }, key))
+    },
     onSuccess: onRestored,
+    onSettled: () => {
+      submitted.current = null
+    },
+    gcTime: 0,
   })
 
   return {
@@ -57,7 +68,8 @@ export function useKeyRestore(owner: KeyOwner, onRestored: () => void): KeyResto
     canSubmit: recoveryKey !== null && !restore.isPending,
     submit: () => {
       if (recoveryKey !== null && !restore.isPending) {
-        restore.mutate(recoveryKey)
+        submitted.current = recoveryKey
+        restore.mutate()
       }
     },
     pending: restore.isPending,
