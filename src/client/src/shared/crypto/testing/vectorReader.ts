@@ -3,10 +3,11 @@
  * attendue plutôt que de supposer ce que rend JSON.parse. Sans API de Node, il sert aussi aux tests dans Chromium ;
  * chaque test lit lui-même son fichier.
  */
+import { fromBase64Url } from '../base64url'
+
 export type Json = Record<string, unknown>
 
 const DECIMAL = /^(0|[1-9][0-9]*)$/
-const BASE64URL = /^[A-Za-z0-9_-]*$/
 const HEX = /^(?:[0-9a-fA-F]{2})*$/
 
 export function isRecord(value: unknown): value is Json {
@@ -44,17 +45,14 @@ export function decimal(json: Json, field: string): number {
   return parsed
 }
 
-/** PROTOCOL.md 1 : octets en base64url sans remplissage. */
+/** PROTOCOL.md 1 : octets en base64url sans remplissage, décodés par le décodeur strict du segment. */
 export function base64url(json: Json, field: string): Uint8Array<ArrayBuffer> {
   const value = string(json, field)
-  if (!BASE64URL.test(value) || value.length % 4 === 1) {
-    throw new Error(`${field} : base64url sans remplissage attendu`)
+  try {
+    return fromBase64Url(value)
+  } catch (error) {
+    throw new Error(`${field} : base64url sans remplissage attendu`, { cause: error })
   }
-  const base64 = value
-    .replaceAll('-', '+')
-    .replaceAll('_', '/')
-    .padEnd(Math.ceil(value.length / 4) * 4, '=')
-  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
 }
 
 export function hex(json: Json, field: string): Uint8Array<ArrayBuffer> {

@@ -20,4 +20,11 @@ describe('PROTOCOL.md 1 : octets en base64url sans remplissage', () => {
       expect(() => fromBase64Url(text), text).toThrow(Base64UrlError)
     }
   })
+
+  it('PROTOCOL.md 1 : un encodage aux bits de fin non nuls est refusé : chaque valeur n’a qu’un encodage', () => {
+    expect(fromBase64Url('AA')).toEqual(Uint8Array.of(0))
+    for (const text of ['AB', 'AP', 'AAB', 'AP9']) {
+      expect(() => fromBase64Url(text), text).toThrow(Base64UrlError)
+    }
+  })
 })

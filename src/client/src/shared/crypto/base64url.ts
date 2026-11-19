@@ -1,6 +1,6 @@
 /**
  * Octets en base64url sans remplissage (PROTOCOL.md, section 1), interne à shared/crypto. Le décodage est strict : ni
- * remplissage, ni alphabet standard, ni longueur impossible.
+ * remplissage, ni alphabet standard, ni longueur impossible, ni bits de fin non nuls (chaque valeur a un seul encodage).
  */
 const ALPHABET = /^[A-Za-z0-9_-]*$/
 
@@ -24,5 +24,9 @@ export function fromBase64Url(text: string): Uint8Array<ArrayBuffer> {
     .replaceAll('-', '+')
     .replaceAll('_', '/')
     .padEnd(Math.ceil(text.length / 4) * 4, '=')
-  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+  if (toBase64Url(bytes) !== text) {
+    throw new Base64UrlError('base64url non canonique : bits de fin non nuls')
+  }
+  return bytes
 }

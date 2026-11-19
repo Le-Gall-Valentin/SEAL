@@ -58,6 +58,9 @@ describe('QA-02 : lecteur commun des vecteurs du protocole', () => {
     expect(() => base64url(json, 'short')).toThrow('short : base64url sans remplissage attendu')
     expect(() => base64url(json, 'padded')).toThrow('padded : base64url sans remplissage attendu')
     expect(() => base64url(json, 'std')).toThrow('std : base64url sans remplissage attendu')
+    expect(() => base64url(record({ loose: 'AB' }), 'loose')).toThrow(
+      'loose : base64url sans remplissage attendu',
+    )
   })
 
   it('QA-01 : octets en hexadécimal, de longueur paire', () => {
