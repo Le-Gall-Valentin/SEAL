@@ -15,6 +15,7 @@ const keys = record(identity['keys'])
 const CA_PUBLIC = base64url(record(keys['ca']), 'publicKey')
 const CA_SEED = base64url(record(keys['ca']), 'seed')
 const DAY_MS = 86_400_000
+const SKEW_MS = 5 * 60_000
 
 function certificate(vector: unknown): StoredCertificate {
   const json = record(vector)
@@ -142,10 +143,29 @@ describe('KEY-06 : le client vérifie le certificat reçu avant de l’enregistr
     })
   })
 
-  it('KEY-06 : un certificat expiré, ou pas encore valable, est refusé', async () => {
+  it('KEY-06 : un certificat expiré, ou valable dans plus de 5 minutes, est refusé', async () => {
     const store = await pinnedStore()
     await expectRejected(store, VALID, 'validity', OWNER, VALID.notAfter)
-    await expectRejected(store, VALID, 'validity', OWNER, VALID.notBefore - 1)
+    await expectRejected(store, VALID, 'validity', OWNER, VALID.notBefore - SKEW_MS - 1)
+  })
+
+  it('ADR 0027, point 9 : une horloge en retard de 5 minutes au plus accepte le certificat tout juste émis', async () => {
+    await storeOwnCertificate(await pinnedStore(), VALID, OWNER, VALID.notBefore - SKEW_MS)
+    await storeOwnCertificate(await pinnedStore(), VALID, OWNER, VALID.notAfter - 1)
+  })
+
+  it('KEY-06 : seuls les champs vérifiés sont enregistrés, copiés au début de la vérification', async () => {
+    let reads = 0
+    const received = { ...VALID, extra: '<img src=x onerror=alert(1)>' }
+    Object.defineProperty(received, 'username', {
+      enumerable: true,
+      get: () => (++reads === 1 ? VALID.username : 'mallory'),
+    })
+    const store = await pinnedStore()
+
+    await storeOwnCertificate(store, received, OWNER, NOW)
+
+    await expect(store.loadCertificate(OWNER.userId)).resolves.toEqual(VALID)
   })
 
   it('KEY-04 : une validité autre que 397 jours est refusée, même signée par l’Autorité', async () => {

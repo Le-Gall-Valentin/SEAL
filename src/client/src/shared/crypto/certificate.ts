@@ -1,6 +1,7 @@
 /**
  * KEY-06 : le client vérifie le certificat reçu avant de l'enregistrer : signé par l'Autorité épinglée (KEY-11), pour
- * son compte, son identifiant et sa clé d'identité, avec l'usage et la validité de KEY-04. C'est la seule voie qui
+ * son compte, son identifiant et sa clé d'identité, avec l'usage et la validité de KEY-04 (5 minutes de retard
+ * d'horloge tolérées, ADR 0027, point 9). C'est la seule voie qui
  * écrit un certificat dans le trousseau : aucune n'enregistre un certificat non vérifié (échec fermé).
  */
 import { verifyEd25519 } from './ed25519'
@@ -13,6 +14,8 @@ const KEY_ID_BYTES = 8
 const VALIDITY_MS = 397 * 86_400_000
 /** Bit 0 : signature et non-répudiation ; bit 1 : certification de sous-clés. */
 const USAGE = 0b11
+/** ADR 0027, point 9 : retard d'horloge toléré, comme pour le createdAt d'une sous-clé (ADR 0025, point 7). */
+const CLOCK_SKEW_MS = 5 * 60_000
 
 /** Titulaire attendu : la session et le trousseau de l'appareil, jamais la réponse elle-même. */
 export interface ExpectedOwner {
@@ -48,40 +51,59 @@ export async function storeOwnCertificate(
   expected: ExpectedOwner,
   now: number,
 ): Promise<void> {
+  const certificate = copyOf(received)
   const authority = await store.loadAuthority()
   if (authority === undefined) {
     throw new CertificateRejectedError('authority')
   }
-  if (received.serial.length !== SERIAL_BYTES) {
+  if (certificate.serial.length !== SERIAL_BYTES) {
     throw new CertificateRejectedError('serial')
   }
   const authorityDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', authority))
-  if (!equal(received.issuerKeyId, authorityDigest.subarray(0, KEY_ID_BYTES))) {
+  if (!equal(certificate.issuerKeyId, authorityDigest.subarray(0, KEY_ID_BYTES))) {
     throw new CertificateRejectedError('issuer')
   }
-  if (!(await signedBy(authority, received))) {
+  if (!(await signedBy(authority, certificate))) {
     throw new CertificateRejectedError('signature')
   }
-  if (received.subjectId !== expected.userId) {
+  if (certificate.subjectId !== expected.userId) {
     throw new CertificateRejectedError('subject')
   }
-  if (received.username !== expected.username) {
+  if (certificate.username !== expected.username) {
     throw new CertificateRejectedError('username')
   }
-  if (!equal(received.ikPublic, expected.ikPublic)) {
+  if (!equal(certificate.ikPublic, expected.ikPublic)) {
     throw new CertificateRejectedError('key')
   }
-  if (received.usage !== USAGE) {
+  if (certificate.usage !== USAGE) {
     throw new CertificateRejectedError('usage')
   }
   if (
-    received.notAfter - received.notBefore !== VALIDITY_MS ||
-    now < received.notBefore ||
-    now >= received.notAfter
+    certificate.notAfter - certificate.notBefore !== VALIDITY_MS ||
+    now < certificate.notBefore - CLOCK_SKEW_MS ||
+    now >= certificate.notAfter
   ) {
     throw new CertificateRejectedError('validity')
   }
-  await saveCertificate(store, expected.userId, received)
+  await saveCertificate(store, expected.userId, certificate)
+}
+
+/**
+ * Les neuf champs du certificat, copiés une fois : la vérification et l'enregistrement portent sur les mêmes valeurs,
+ * et rien d'autre n'est enregistré.
+ */
+function copyOf(received: StoredCertificate): StoredCertificate {
+  return {
+    serial: Uint8Array.from(received.serial),
+    issuerKeyId: Uint8Array.from(received.issuerKeyId),
+    subjectId: received.subjectId,
+    username: received.username,
+    ikPublic: Uint8Array.from(received.ikPublic),
+    notBefore: received.notBefore,
+    notAfter: received.notAfter,
+    usage: received.usage,
+    signature: Uint8Array.from(received.signature),
+  }
 }
 
 /** Des champs impossibles à encoder ne peuvent pas avoir été signés : ils valent une signature fausse. */
