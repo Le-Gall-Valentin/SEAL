@@ -10,10 +10,12 @@ export {
   RecoveryKeyFormatError,
 } from './recovery'
 export {
+  addSubkey,
   generateKeyring,
   type Keyring,
   type NewKeyring,
   openVault,
+  reopenVault,
   type SubkeyInfo,
 } from './keyring'
 export {

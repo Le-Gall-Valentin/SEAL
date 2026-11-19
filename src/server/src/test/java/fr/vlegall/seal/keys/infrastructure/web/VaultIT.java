@@ -122,6 +122,23 @@ class VaultIT {
     }
 
     @Test
+    @DisplayName("KEY-32, QA-02 : la version 2 de vault.json suit la version 1 et se relit à l'identique"
+            + " (PROTOCOL.md 5.5)")
+    void key32VectorNextVersionFollowsTheFirst() throws Exception {
+        Map<String, Object> first = asBody(ProtocolVectors.vault().section("payload"));
+        Map<String, Object> next =
+                asBody(ProtocolVectors.vault().section("nextVersion").get("payload"));
+        KeysTestClient account = KeysTestClient.account(mvc, mail, "coffre_version_2");
+        save(account, first).andExpect(status().isNoContent());
+
+        save(account, next).andExpect(status().isNoContent());
+
+        assertThat(readBack(account)).isEqualTo(next);
+        assertThat(next).containsEntry("vaultVersion", 2);
+        save(account, first).andExpect(status().isConflict());
+    }
+
+    @Test
     @DisplayName("KEY-32 : seule la version qui suit l'enregistrée passe ; un rejeu ou un saut donne 409")
     void key32OnlyTheNextVersionIsAccepted() throws Exception {
         KeysTestClient account = KeysTestClient.account(mvc, mail, "coffre_version");

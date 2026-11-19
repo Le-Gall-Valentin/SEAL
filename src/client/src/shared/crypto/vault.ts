@@ -127,18 +127,13 @@ export async function sealVault(input: SealInput): Promise<VaultPayload> {
     input.vdk,
   )
   const vdk = await crypto.subtle.importKey('raw', input.vdk, 'AES-GCM', false, ['encrypt'])
-  const blob = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: nonceB, additionalData: vaultAad(input.userId, input.vaultVersion) },
-    vdk,
-    input.plaintext,
-  )
   return {
     vaultVersion: input.vaultVersion,
     salt,
     nonceK,
     wrappedVdk: new Uint8Array(wrappedVdk),
     nonceB,
-    blob: new Uint8Array(blob),
+    blob: await encryptBlob(input.userId, input.vaultVersion, vdk, input.plaintext, nonceB),
   }
 }
 
@@ -147,16 +142,7 @@ export async function openVaultBytes(
   payload: VaultPayload,
   recoveryKey: RecoveryKey,
 ): Promise<OpenedVault> {
-  if (
-    payload.salt.length !== SALT_BYTES ||
-    payload.nonceK.length !== NONCE_BYTES ||
-    payload.nonceB.length !== NONCE_BYTES ||
-    payload.wrappedVdk.length !== WRAPPED_VDK_BYTES ||
-    !Number.isSafeInteger(payload.vaultVersion) ||
-    payload.vaultVersion < 1
-  ) {
-    throw new VaultOpenError('format')
-  }
+  checkFormat(payload)
   let vdk: CryptoKey
   try {
     const kek = await deriveKek(recoveryKey, payload.salt, userId, ['unwrapKey'])
@@ -172,6 +158,35 @@ export async function openVaultBytes(
   } catch (error) {
     throw new VaultOpenError('key', { cause: error })
   }
+  return { vdk, plaintext: await decryptBlob(userId, payload, vdk) }
+}
+
+/** PROTOCOL.md 5.3 : le trousseau chiffré par la VDK, sous l'AAD de sa version. */
+export async function encryptBlob(
+  userId: string,
+  vaultVersion: number,
+  vdk: CryptoKey,
+  plaintext: Uint8Array<ArrayBuffer>,
+  nonceB: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const blob = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: nonceB, additionalData: vaultAad(userId, vaultVersion) },
+    vdk,
+    plaintext,
+  )
+  return new Uint8Array(blob)
+}
+
+/**
+ * KEY-32, KEY-33 : le trousseau en clair, déchiffré par la VDK ; tailles et version d'abord ('format'), puis
+ * l'étiquette GCM, qui lie le blob au compte et à sa version ('blob').
+ */
+export async function decryptBlob(
+  userId: string,
+  payload: VaultPayload,
+  vdk: CryptoKey,
+): Promise<Uint8Array<ArrayBuffer>> {
+  checkFormat(payload)
   try {
     const plaintext = await crypto.subtle.decrypt(
       {
@@ -182,9 +197,49 @@ export async function openVaultBytes(
       vdk,
       payload.blob,
     )
-    return { vdk, plaintext: new Uint8Array(plaintext) }
+    return new Uint8Array(plaintext)
   } catch (error) {
     throw new VaultOpenError('blob', { cause: error })
+  }
+}
+
+/**
+ * KEY-32, PROTOCOL.md 5.5 : version suivante du coffre, rechiffrée par la même VDK sous un nonceB neuf ; sel, nonceK
+ * et VDK enveloppée ne changent pas, et la clé de récupération n'est pas nécessaire.
+ */
+export async function sealNextVersion(
+  userId: string,
+  payload: VaultPayload,
+  vdk: CryptoKey,
+  plaintext: Uint8Array<ArrayBuffer>,
+): Promise<VaultPayload> {
+  checkFormat(payload)
+  const vaultVersion = payload.vaultVersion + 1
+  if (!Number.isSafeInteger(vaultVersion)) {
+    throw new VaultOpenError('format')
+  }
+  const nonceB = crypto.getRandomValues(new Uint8Array(NONCE_BYTES))
+  return {
+    vaultVersion,
+    salt: Uint8Array.from(payload.salt),
+    nonceK: Uint8Array.from(payload.nonceK),
+    wrappedVdk: Uint8Array.from(payload.wrappedVdk),
+    nonceB,
+    blob: await encryptBlob(userId, vaultVersion, vdk, plaintext, nonceB),
+  }
+}
+
+/** PROTOCOL.md 5.3 : une taille fausse ou une version impossible sont refusées avant tout calcul. */
+function checkFormat(payload: VaultPayload): void {
+  if (
+    payload.salt.length !== SALT_BYTES ||
+    payload.nonceK.length !== NONCE_BYTES ||
+    payload.nonceB.length !== NONCE_BYTES ||
+    payload.wrappedVdk.length !== WRAPPED_VDK_BYTES ||
+    !Number.isSafeInteger(payload.vaultVersion) ||
+    payload.vaultVersion < 1
+  ) {
+    throw new VaultOpenError('format')
   }
 }
 

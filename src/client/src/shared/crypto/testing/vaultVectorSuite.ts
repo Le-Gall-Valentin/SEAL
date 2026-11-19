@@ -5,9 +5,17 @@
 import { describe, expect, it } from 'vitest'
 import { encodeCrockford } from '../crockford'
 import { KEM } from '../identity'
-import { type Keyring, keyringSecrets, openVault, serializeKeyring } from '../keyring'
+import {
+  addSubkey,
+  type Keyring,
+  keyringSecrets,
+  openVault,
+  reopenVault,
+  serializeKeyring,
+} from '../keyring'
 import { parseRecoveryKey, type RecoveryKey, recoveryKeyBytes } from '../recovery'
 import {
+  encryptBlob,
   kekAad,
   kekInfo,
   kekParameters,
@@ -186,5 +194,87 @@ export function describeVaultVectors(vectors: Json, engine: string): void {
         )
       })
     }
+  })
+
+  const next = record(vectors['nextVersion'])
+  const DAY_MS = 86_400_000
+
+  describe(`KEY-32, QA-02 : version suivante du coffre, vecteurs de vault.json (${engine})`, () => {
+    it('QA-02 : l’AAD de la version 2 et le blob rechiffré par la VDK sont identiques à l’octet près', async () => {
+      const payload = vaultPayload(next['payload'])
+      const vdk = await crypto.subtle.importKey(
+        'raw',
+        base64url(vectors, 'vdk'),
+        'AES-GCM',
+        false,
+        ['encrypt'],
+      )
+
+      expect(vaultAad(userId, 2)).toEqual(base64url(next, 'vaultAad'))
+      await expect(
+        encryptBlob(userId, 2, vdk, base64url(next, 'keyringBytes'), payload.nonceB),
+      ).resolves.toEqual(payload.blob)
+    })
+
+    it('KEY-33 : la version 2 s’ouvre par RK, avec ses deux sous-clés', async () => {
+      const opened = await openVault(userId, vaultPayload(next['payload']), recoveryKey())
+
+      expect(opened.subkeys.map((info) => info.publicKey)).toEqual([
+        base64url(publicKeys, 'ek'),
+        base64url(next, 'ekPublic'),
+      ])
+    })
+
+    it('KEY-32 : reopenVault relit la version 2 par la seule VDK du trousseau, et refuse une version réétiquetée', async () => {
+      const first = await openVault(userId, vaultPayload(vectors['payload']), recoveryKey())
+
+      const reopened = await reopenVault(first, vaultPayload(next['payload']))
+
+      expect(reopened.subkeys).toHaveLength(2)
+      expect(reopened.identityPublicKey).toEqual(first.identityPublicKey)
+      await expectNothingExports(reopened)
+      await expect(
+        reopenVault(first, { ...vaultPayload(vectors['payload']), vaultVersion: 2 }),
+      ).rejects.toMatchObject({ reason: 'blob' })
+    })
+
+    it('KEY-32 : addSubkey écrit la version suivante : sous-clé de 45 jours, sel, nonceK et VDK enveloppée inchangés', async () => {
+      const first = vaultPayload(vectors['payload'])
+      const opened = await openVault(userId, first, recoveryKey())
+      const now = 1_796_601_600_000
+
+      const { keyring: grown, vault } = await addSubkey(opened, first, now)
+
+      expect(vault.vaultVersion).toBe(2)
+      expect([vault.salt, vault.nonceK, vault.wrappedVdk]).toEqual([
+        first.salt,
+        first.nonceK,
+        first.wrappedVdk,
+      ])
+      expect(vault.nonceB).not.toEqual(first.nonceB)
+      expect(grown.subkeys).toHaveLength(2)
+      expect(grown.subkeys[1]).toMatchObject({ createdAt: now, expiresAt: now + 45 * DAY_MS })
+      const reopened = await openVault(userId, vault, recoveryKey())
+      expect(reopened.subkeys.map((info) => info.publicKey)).toEqual(
+        grown.subkeys.map((info) => info.publicKey),
+      )
+      await expectNothingExports(grown)
+    })
+
+    it('KEY-33, PROTOCOL.md 5.5 : reopenVault refuse une version plus ancienne, qui perdrait une sous-clé du trousseau', async () => {
+      const grown = await openVault(userId, vaultPayload(next['payload']), recoveryKey())
+
+      await expect(reopenVault(grown, vaultPayload(vectors['payload']))).rejects.toMatchObject({
+        reason: 'keyring',
+      })
+    })
+
+    it('KEY-32 : addSubkey refuse d’écrire sur une version plus ancienne, qui perdrait une sous-clé du trousseau', async () => {
+      const grown = await openVault(userId, vaultPayload(next['payload']), recoveryKey())
+
+      await expect(
+        addSubkey(grown, vaultPayload(vectors['payload']), 1_796_601_600_000),
+      ).rejects.toMatchObject({ reason: 'keyring' })
+    })
   })
 }

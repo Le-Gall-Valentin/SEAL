@@ -331,3 +331,19 @@ de la RFC 8032, EK la clé privée d'Alice de la RFC 7748 (section 6.1) : jamais
 `vectors/hkdf-rfc5869.json` (RFC 5869, annexe A, cas 1 à 3) et `vectors/x25519-rfc7748.json` (RFC 7748, section 6.1)
 sont les vecteurs officiels des deux primitives du coffre et des sous-clés (QA-01). `gen_vectors.py` les recopie des
 RFC et les recalcule avec `cryptography` avant de les écrire ; WebCrypto (Node et Chromium) et la JCA les rejouent.
+
+### 5.5 Version suivante (KEY-32, ADR 0029)
+
+Une nouvelle sous-clé (rotation, ou reprise d'une publication interrompue) s'écrit dans une nouvelle version du coffre,
+sans la clé de récupération : le client déchiffre le blob avec la VDK de son trousseau, ajoute la sous-clé au trousseau
+et le rechiffre avec la même VDK, sous l'AAD de la version suivante (`vaultVersion + 1`) et avec un `nonceB` neuf.
+`salt`, `nonceK` et `wrappedVdk` ne changent pas ; seule la régénération de RK (KEY-35) les renouvelle. Le trousseau
+relu DOIT contenir toutes les sous-clés du trousseau de l'appareil : une version plus ancienne, resservie, en perdrait. Le serveur
+n'accepte que la version qui suit l'enregistrée (409 `VAULT_VERSION_CONFLICT` sinon).
+
+Un client qui reçoit 409 relit le coffre : identique à celui qu'il envoyait, il a été écrit par une requête dont la
+réponse s'est perdue ; différent, un autre appareil a écrit entre-temps, et le client repart de la version relue.
+
+`vectors/vault.json` donne la version 2 dans `nextVersion` : l'AAD (`vaultAad`), les octets du trousseau à deux
+sous-clés (`keyringBytes`), la clé publique de la seconde (`ekPublic`, celle de Bob dans la RFC 7748) et la charge
+(`payload`), qui s'ouvre aussi par RK.
