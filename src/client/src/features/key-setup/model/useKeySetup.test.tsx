@@ -1,13 +1,15 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import {
+  ForeignIdentityError,
   type IKeysApi,
   KEYS_LOCK,
   KeysApiProvider,
   KeyStoreProvider,
   setupKeys,
+  StaleVaultError,
 } from '@/entities/keyring'
 import { generateKeyring, generateRecoveryKey, type KeyStore, openKeyStore } from '@/shared/crypto'
 import { NetworkError, withLock } from '@/shared/lib'
@@ -52,6 +54,20 @@ afterEach(() => {
   vi.mocked(setupKeys).mockReset()
 })
 
+/** Les deux groupes tirés, ressaisis justes : « Terminer » devient possible. */
+async function confirm(result: { readonly current: ReturnType<typeof useKeySetup> }) {
+  await expect.poll(() => result.current.ready).toBe(true)
+  const [first, second] = result.current.picked
+  result.current.type(0, result.current.groups[first] ?? '')
+  result.current.type(1, result.current.groups[second] ?? '')
+  await expect.poll(() => result.current.confirmed).toBe(true)
+}
+
+/** Vrai si un autre onglet obtiendrait le verrou des clés tout de suite. */
+async function lockIsFree(): Promise<boolean> {
+  return navigator.locks.request(KEYS_LOCK, { ifAvailable: true }, (lock) => lock !== null)
+}
+
 describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
   it('KEY-02, KEY-30 : rien n’est envoyé avant « Terminer », et seuls les deux groupes tirés confirment la clé', async () => {
     const { result } = await renderSetup(await freshStore(), () => undefined)
@@ -81,7 +97,7 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
     await expect.poll(() => result.current.confirmed).toBe(true)
 
     result.current.finish()
-    await expect.poll(() => result.current.failed).toBe(true)
+    await expect.poll(() => result.current.failure).toBe('network')
     result.current.finish()
     await expect.poll(() => onDone.mock.calls.length).toBe(1)
 
@@ -124,5 +140,83 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
 
     await expect.poll(() => onDone.mock.calls.length).toBe(1)
     expect(result.current.ready).toBe(false)
+  })
+
+  it('ADR 0029, point 3 : un retour du focus pendant « Terminer » ne rend ni le verrou ni la main avant la fin', async () => {
+    const onDone = vi.fn()
+    let finishSetup: () => void = () => undefined
+    vi.mocked(setupKeys).mockImplementationOnce(async ({ store }, pending) => {
+      await store.saveKeyring(pending.keyring)
+      await new Promise<void>((resolve) => {
+        finishSetup = resolve
+      })
+      return 'done'
+    })
+    const { result } = await renderSetup(await freshStore(), onDone)
+    await confirm(result)
+
+    result.current.finish()
+    await expect.poll(() => result.current.saving).toBe(true)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    focusManager.setFocused(false)
+    focusManager.setFocused(true)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(onDone).not.toHaveBeenCalled()
+    expect(await lockIsFree()).toBe(false)
+    finishSetup()
+    await expect.poll(() => onDone.mock.calls.length).toBe(1)
+    focusManager.setFocused(undefined)
+  })
+
+  it('ADR 0029, point 2 : deux « Terminer » avant le rendu suivant ne lancent qu’une sauvegarde', async () => {
+    vi.mocked(setupKeys).mockResolvedValue('done')
+    const { result } = await renderSetup(await freshStore(), () => undefined)
+    await confirm(result)
+
+    result.current.finish()
+    result.current.finish()
+
+    await expect.poll(() => vi.mocked(setupKeys).mock.calls.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(setupKeys).toHaveBeenCalledOnce()
+  })
+
+  it('ADR 0029, point 5 : un certificat d’une autre identité ou un coffre rejoué rendent la main à la zone du compte', async () => {
+    for (const error of [new ForeignIdentityError(), new StaleVaultError()]) {
+      const onDone = vi.fn()
+      vi.mocked(setupKeys).mockRejectedValueOnce(error)
+      const { result, unmount } = await renderSetup(await freshStore(), onDone)
+      await confirm(result)
+
+      result.current.finish()
+
+      await expect.poll(() => onDone.mock.calls.length).toBe(1)
+      expect(await lockIsFree()).toBe(true)
+      await unmount()
+    }
+  })
+
+  it('ADR 0029, point 12 : une erreur réseau garde son texte, toute autre erreur est inattendue', async () => {
+    vi.mocked(setupKeys).mockRejectedValueOnce(new Error('IndexedDB indisponible'))
+    const { result } = await renderSetup(await freshStore(), () => undefined)
+    await confirm(result)
+
+    result.current.finish()
+
+    await expect.poll(() => result.current.failure).toBe('unexpected')
+  })
+
+  it('ADR 0029, point 3 : un trousseau illisible sur l’appareil rend le verrou et la main, sans page blanche', async () => {
+    const store = await freshStore()
+    const onDone = vi.fn()
+
+    await renderSetup(
+      { ...store, loadKeyring: () => Promise.reject(new Error('IndexedDB indisponible')) },
+      onDone,
+    )
+
+    await expect.poll(() => onDone.mock.calls.length).toBe(1)
+    expect(await lockIsFree()).toBe(true)
   })
 })

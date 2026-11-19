@@ -23,7 +23,7 @@ function state(overrides: Partial<KeySetup> = {}): KeySetup {
     download: vi.fn(),
     finish: vi.fn(),
     saving: false,
-    failed: false,
+    failure: null,
     ...overrides,
   }
 }
@@ -50,6 +50,8 @@ describe('KEY-30 : Dialogue-Cle-Recuperation, étape 1', () => {
       name: 'Clé de récupération, 8 groupes de 4 caractères',
     })
     await expect.element(list).toHaveTextContent('18WQK23MZD3T7PA4R2HX55NCF6Y9GB7K4VE8J6TS')
+    // KEY-31 : la traduction automatique du navigateur n'envoie pas la clé à un service tiers.
+    await expect.element(list).toHaveAttribute('translate', 'no')
     await expect
       .element(screen.getByRole('note'))
       .toHaveTextContent(
@@ -90,6 +92,11 @@ describe('KEY-30 : Dialogue-Cle-Recuperation, étape 2', () => {
 
     await screen.getByLabelText('Groupe 3').fill('t7pa')
     expect(setup.type).toHaveBeenLastCalledWith(0, 't7pa')
+    // Comme « T7PA » dans la maquette : majuscules d'affichage, la saisie reste telle quelle.
+    expect(getComputedStyle(screen.getByLabelText('Groupe 3').element()).textTransform).toBe(
+      'uppercase',
+    )
+    await expect.element(screen.getByLabelText('Groupe 3')).toHaveAttribute('translate', 'no')
     await screen.getByRole('button', { name: 'Revoir la clé' }).click()
     expect(setup.showKey).toHaveBeenCalledOnce()
   })
@@ -108,7 +115,7 @@ describe('KEY-30 : Dialogue-Cle-Recuperation, étape 2', () => {
       .not.toHaveAttribute('aria-invalid', 'true')
   })
 
-  it('KEY-30 : clé confirmée : le statut, le texte de la maquette, et « Terminer » lance la sauvegarde', async () => {
+  it('KEY-30, ADR 0029 (point 9) : clé confirmée : le statut, le texte au futur, et « Terminer » lance la sauvegarde', async () => {
     const setup = state({ step: 2, typed: ['T7PA', 'K4VE'], confirmed: true })
     const screen = await renderWith(setup)
 
@@ -116,26 +123,49 @@ describe('KEY-30 : Dialogue-Cle-Recuperation, étape 2', () => {
     await expect
       .element(
         screen.getByText(
-          'Votre trousseau est sauvegardé chiffré sur le serveur, qui ne peut pas le lire. Vous pourrez régénérer cette clé dans Paramètres › Sécurité ; l’ancienne cessera alors de fonctionner.',
+          'Votre trousseau sera sauvegardé chiffré sur le serveur, qui ne pourra pas le lire.',
+          { exact: true },
         ),
       )
       .toBeVisible()
+    expect(screen.getByText(/Paramètres/).query()).toBeNull()
     await screen.getByRole('button', { name: 'Terminer' }).click()
     expect(setup.finish).toHaveBeenCalledOnce()
   })
 
-  it('ADR 0029, point 5 : un échec de la sauvegarde s’annonce, « Terminer » reste disponible ; en cours, il est inactif', async () => {
-    const failed = await renderWith(state({ step: 2, confirmed: true, failed: true }))
+  it('ADR 0029, points 5 et 9 : un échec réseau s’annonce, sans le texte de sauvegarde, et « Terminer » reste disponible ; en cours, il est inactif', async () => {
+    const failed = await renderWith(state({ step: 2, confirmed: true, failure: 'network' }))
 
     await expect
       .element(failed.getByRole('alert'))
       .toHaveTextContent(
         'Vos clés n’ont pas pu être sauvegardées. Vérifiez votre réseau puis réessayez.',
       )
+    expect(failed.getByText(/sera sauvegardé/).query()).toBeNull()
     await expect.element(failed.getByRole('button', { name: 'Terminer' })).toBeEnabled()
     await failed.unmount()
 
+    const unexpected = await renderWith(state({ step: 2, confirmed: true, failure: 'unexpected' }))
+    await expect
+      .element(unexpected.getByRole('alert'))
+      .toHaveTextContent('Une erreur inattendue est survenue. Réessayez.')
+    await unexpected.unmount()
+
     const saving = await renderWith(state({ step: 2, confirmed: true, saving: true }))
     await expect.element(saving.getByRole('button', { name: 'Terminer' })).toBeDisabled()
+  })
+
+  it('Accessibilité : « Revoir la clé » rend le focus à la fenêtre, qui annonce l’étape 1', async () => {
+    const setup = state({ step: 2 })
+    const screen = await renderWith(setup)
+    await expect.element(screen.getByLabelText('Groupe 3')).toHaveFocus()
+
+    await screen.getByRole('button', { name: 'Revoir la clé' }).click()
+    vi.mocked(useKeySetup).mockReturnValue({ ...setup, step: 1 })
+    await screen.rerender(<KeySetupDialog owner={OWNER} onDone={() => undefined} />)
+
+    await expect
+      .element(screen.getByRole('dialog', { name: 'Votre clé de récupération' }))
+      .toHaveFocus()
   })
 })

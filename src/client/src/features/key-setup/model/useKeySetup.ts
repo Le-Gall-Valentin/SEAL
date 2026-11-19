@@ -16,7 +16,7 @@ import {
   type NewKeyring,
   pickRecoveryGroups,
 } from '@/shared/crypto'
-import { downloadText, useClock, useHeldLock } from '@/shared/lib'
+import { downloadText, failureOf, useClock, useHeldLock } from '@/shared/lib'
 import { keySetupMessages } from '../i18n'
 import { recoveryKeyFile } from './recoveryKeyFile'
 
@@ -40,7 +40,8 @@ export interface KeySetup {
   readonly download: () => void
   readonly finish: () => void
   readonly saving: boolean
-  readonly failed: boolean
+  /** ADR 0029, point 12 : échec de la sauvegarde, réseau ou inattendu ; null sinon. */
+  readonly failure: 'network' | 'unexpected' | null
 }
 
 const GROUP_LENGTH = 4
@@ -63,13 +64,20 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
   const [typed, setTyped] = useState<readonly [string, string]>(['', ''])
   const pending = useRef<NewKeyring | null>(null)
 
-  // Un autre onglet a pu créer le trousseau pendant que ce dialogue attendait le verrou.
+  // Un autre onglet a pu créer le trousseau pendant que ce dialogue attendait le verrou. Lu une seule fois, à
+  // l'obtention du verrou : une relecture (retour du focus, reconnexion) trouverait celui que « Terminer » enregistre.
   const existing = useQuery({
     queryKey: ['keyring', 'setup', owner.userId],
     queryFn: async () => (await store.loadKeyring(owner.userId)) !== undefined,
     enabled: lock.held,
     gcTime: 0,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
   })
+  // Une sauvegarde à la fois, même pour deux « Terminer » avant le rendu suivant.
+  const running = useRef(false)
 
   // Le dialogue ne se quitte qu'une fois, quel que soit le nombre de rendus qui suivent.
   const left = useRef(false)
@@ -82,11 +90,13 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
     }
   }, [release, onDone])
 
+  // Trousseau créé ailleurs avant toute sauvegarde : le dialogue se ferme sans montrer de clé. Appareil illisible : la
+  // zone du compte reprend la main et affiche l'erreur, au lieu d'une page blanche qui garderait le verrou.
   useEffect(() => {
-    if (existing.data === true) {
+    if ((existing.data === true && !running.current) || existing.isError) {
       leave()
     }
-  }, [existing.data, leave])
+  }, [existing.data, existing.isError, leave])
 
   const setup = useMutation({
     mutationFn: async () => {
@@ -99,6 +109,9 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
       if (error instanceof ForeignIdentityError || error instanceof StaleVaultError) {
         leave()
       }
+    },
+    onSettled: () => {
+      running.current = false
     },
   })
 
@@ -132,11 +145,19 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
       downloadText(file.name, file.text)
     },
     finish: () => {
-      if (confirmed && !setup.isPending) {
+      if (confirmed && !running.current) {
+        running.current = true
         setup.mutate()
       }
     },
     saving: setup.isPending,
-    failed: setup.isError,
+    failure: failureFrom(setup.error),
   }
+}
+
+function failureFrom(error: Error | null): KeySetup['failure'] {
+  if (error === null) {
+    return null
+  }
+  return failureOf(error).kind === 'network' ? 'network' : 'unexpected'
 }

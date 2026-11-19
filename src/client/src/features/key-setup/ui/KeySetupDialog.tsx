@@ -1,7 +1,7 @@
 import { type Ref, useEffect, useId, useRef } from 'react'
 import type { KeyOwner } from '@/entities/keyring'
 import { useMessages } from '@/shared/i18n'
-import { Alert, Dialog, FieldError, FieldLabel, SecondaryButton } from '@/shared/ui'
+import { Alert, Dialog, FailureAlert, FieldError, FieldLabel, SecondaryButton } from '@/shared/ui'
 import { keySetupMessages } from '../i18n'
 import { type KeySetup, type Slot, useKeySetup } from '../model/useKeySetup'
 
@@ -29,7 +29,7 @@ export function KeySetupDialog({ owner, onDone }: KeySetupDialogProps) {
     return null
   }
   return (
-    <Dialog labelledBy={titleId} describedBy={textId}>
+    <Dialog labelledBy={titleId} describedBy={textId} stepKey={setup.step}>
       {setup.step === 1 ? (
         <ShowStep setup={setup} titleId={titleId} textId={textId} />
       ) : (
@@ -61,6 +61,8 @@ function ShowStep({ setup, titleId, textId }: StepProps) {
         </p>
         <ol
           aria-label={t('groupsLabel')}
+          // KEY-31 : la traduction automatique du navigateur enverrait la clé à un service tiers.
+          translate="no"
           className="m-0 grid list-none grid-cols-4 gap-x-2.5 gap-y-3 rounded-[14px] bg-sunken px-[18px] py-4 inset-ring inset-ring-line"
         >
           {setup.groups.map((code, index) => (
@@ -189,10 +191,11 @@ function VerifyStep({ setup, titleId, textId }: StepProps) {
             </div>
           )}
         </div>
-        {setup.confirmed && (
+        {setup.confirmed && setup.failure === null && (
           <p className="m-0 text-[13.5px] leading-[1.45] text-ink-3">{t('savedText')}</p>
         )}
-        {setup.failed && <Alert variant="error">{t('saveFailed')}</Alert>}
+        {setup.failure === 'network' && <Alert variant="error">{t('saveFailed')}</Alert>}
+        {setup.failure === 'unexpected' && <FailureAlert failure={{ kind: 'unexpected' }} />}
       </div>
       <footer className={FOOTER}>
         <SecondaryButton onClick={setup.showKey}>{t('review')}</SecondaryButton>
@@ -217,7 +220,10 @@ interface GroupInputProps {
   readonly inputRef?: Ref<HTMLInputElement> | undefined
 }
 
-/** Case d'un groupe ressaisi : 4 caractères, police monospace, centrés, comme Dialogue-Cle-Recuperation. */
+/**
+ * Case d'un groupe ressaisi : 4 caractères, police monospace, centrés, en majuscules d'affichage comme
+ * Dialogue-Cle-Recuperation ; la saisie reste telle quelle (ADR 0027, point 15).
+ */
 function GroupInput({ label, value, onChange, error, inputRef }: GroupInputProps) {
   const id = useId()
   const errorId = `${id}-erreur`
@@ -236,9 +242,10 @@ function GroupInput({ label, value, onChange, error, inputRef }: GroupInputProps
         autoComplete="off"
         spellCheck={false}
         autoCapitalize="characters"
+        translate="no"
         aria-invalid={invalid}
         aria-describedby={invalid ? errorId : undefined}
-        className="h-12 w-full min-w-0 rounded-[10px] bg-surface text-center font-mono text-[18px] font-medium tracking-[0.1em] text-ink inset-ring inset-ring-line-strong outline-none focus:ring-3 focus:inset-ring-[1.5px] focus:ring-focus-glow focus:inset-ring-accent aria-invalid:inset-ring-danger"
+        className="h-12 w-full min-w-0 rounded-[10px] bg-surface text-center font-mono text-[18px] font-medium tracking-[0.1em] text-ink uppercase inset-ring inset-ring-line-strong outline-none focus:ring-3 focus:inset-ring-[1.5px] focus:ring-focus-glow focus:inset-ring-accent aria-invalid:inset-ring-danger"
       />
       <FieldError id={errorId} error={error} />
     </div>
