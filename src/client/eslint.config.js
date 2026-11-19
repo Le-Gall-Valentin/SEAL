@@ -378,7 +378,14 @@ function restrictedGlobals(allowed, { inTests }) {
 
 // Règles d'une zone : les puits, plus les capacités des autres segments. Un bloc par zone, car ESLint remplace les
 // options d'une règle d'un bloc à l'autre au lieu de les fusionner.
-function restrictionsExcept(allowed) {
+// ADR 0027, point 13 : les doublures et lecteurs des dossiers testing/ ne servent qu'aux tests.
+const TESTING_FOLDER = {
+  regex: String.raw`(^|/)testing/`,
+  message:
+    "Un dossier testing/ ne s'importe que depuis un test ou un autre dossier testing/ (ADR 0027).",
+}
+
+function restrictionsExcept(allowed, { inTests } = { inTests: false }) {
   const denied = deniedTo(allowed)
   return {
     'no-restricted-globals': restrictedGlobals(allowed, { inTests: false }),
@@ -400,6 +407,7 @@ function restrictionsExcept(allowed) {
         patterns: [
           { regex: '(^|/)node_modules/', message: NODE_MODULES },
           { regex: String.raw`(?<!^\./styles/global)\.css$`, message: CSS_FILE },
+          ...(inTests ? [] : [TESTING_FOLDER]),
           // Un test exporterait console (permise dans les tests) et embarquerait Vitest dans l'application.
           {
             regex: String.raw`\.test(\.tsx?)?$`,
@@ -530,6 +538,20 @@ export default defineConfig(
   ...Object.entries(CAPABILITIES).map(([name, { folder }]) => ({
     files: [`${folder}/**/*.{ts,tsx}`],
     rules: restrictionsExcept(name),
+  })),
+  // Les tests et les dossiers testing/ importent les dossiers testing/ ; le reste des restrictions d'import tient.
+  {
+    files: ['src/**/*.test.{ts,tsx}', 'src/**/testing/**/*.{ts,tsx}'],
+    ignores: Object.values(CAPABILITIES).map(({ folder }) => `${folder}/**`),
+    rules: {
+      'no-restricted-imports': restrictionsExcept(null, { inTests: true })['no-restricted-imports'],
+    },
+  },
+  ...Object.entries(CAPABILITIES).map(([name, { folder }]) => ({
+    files: [`${folder}/**/*.test.{ts,tsx}`, `${folder}/**/testing/**/*.{ts,tsx}`],
+    rules: {
+      'no-restricted-imports': restrictionsExcept(name, { inTests: true })['no-restricted-imports'],
+    },
   })),
   {
     files: ['src/**/*.test.{ts,tsx}'],

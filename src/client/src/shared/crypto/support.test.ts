@@ -12,6 +12,9 @@ function algorithmName(algorithm: unknown): unknown {
     : algorithm
 }
 
+// generateKey est surchargée (paire ou clé seule, selon l'algorithme) : une doublure ne peut en reprendre toutes les
+// signatures. L'assertion « as typeof generateKey » ne sert qu'à brancher la doublure ; elle délègue le reste au vrai
+// generateKey, et seul l'algorithme visé est refusé.
 function refuseAlgorithm(name: string) {
   const generateKey = crypto.subtle.generateKey.bind(crypto.subtle)
   vi.spyOn(crypto.subtle, 'generateKey').mockImplementation(((
