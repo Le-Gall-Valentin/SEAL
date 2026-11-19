@@ -30,6 +30,7 @@ import struct as binary
 import sys
 import unicodedata
 from pathlib import Path
+from types import SimpleNamespace
 
 PROTOCOL_DIR = Path(__file__).resolve().parent.parent
 OUTPUT = PROTOCOL_DIR / "vectors" / "canonical-encoding.json"
@@ -427,17 +428,21 @@ def build_password_policy() -> str:
 # ---------------------------------------------------------------------------------------------
 
 
-def ed25519():
-    """Module Ed25519 de `cryptography`, importé à la demande pour que l'erreur dise quoi installer."""
+def crypto_lib() -> SimpleNamespace:
+    """Modules de `cryptography`, importés à la demande pour que l'erreur dise quoi installer."""
     try:
-        from cryptography.hazmat.primitives.asymmetric import ed25519 as module
-        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
     except ImportError as error:
         raise SystemExit(
             "gen_vectors.py : la bibliothèque cryptography manque ; lancez "
             "python3 -m pip install --require-hashes -r tools/requirements.txt"
         ) from error
-    return module, serialization
+    return SimpleNamespace(
+        hashes=hashes, serialization=serialization, ed25519=ed25519, x25519=x25519, AESGCM=AESGCM, HKDF=HKDF
+    )
 
 
 def sha256(data: bytes) -> bytes:
@@ -445,20 +450,21 @@ def sha256(data: bytes) -> bytes:
 
 
 def public_key(seed: bytes) -> bytes:
-    module, serialization = ed25519()
-    key = module.Ed25519PrivateKey.from_private_bytes(seed).public_key()
-    return key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    return raw_public(crypto_lib().ed25519.Ed25519PrivateKey.from_private_bytes(seed))
+
+
+def raw_public(private_key) -> bytes:
+    serialization = crypto_lib().serialization
+    return private_key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
 
 
 def sign(seed: bytes, message: bytes) -> bytes:
-    module, _ = ed25519()
-    return module.Ed25519PrivateKey.from_private_bytes(seed).sign(message)
+    return crypto_lib().ed25519.Ed25519PrivateKey.from_private_bytes(seed).sign(message)
 
 
 def verifies(public: bytes, message: bytes, signature: bytes) -> bool:
-    module, _ = ed25519()
     try:
-        module.Ed25519PublicKey.from_public_bytes(public).verify(signature, message)
+        crypto_lib().ed25519.Ed25519PublicKey.from_public_bytes(public).verify(signature, message)
         return True
     except Exception:  # InvalidSignature : la seule réponse attendue d'une signature fausse
         return False
@@ -719,37 +725,17 @@ EK_PRIVATE = bytes.fromhex("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177
 VAULT_EK_ID = bytes(range(0xA0, 0xB0))
 
 
-def vault_crypto():
-    """HKDF, AES-GCM et les clés de `cryptography`, importés à la demande pour que l'erreur dise quoi installer."""
-    try:
-        from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import ed25519 as ed, x25519
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-    except ImportError as error:
-        raise SystemExit(
-            "gen_vectors.py : la bibliothèque cryptography manque ; lancez "
-            "python3 -m pip install --require-hashes -r tools/requirements.txt"
-        ) from error
-    return hashes, serialization, ed, x25519, AESGCM, HKDF
+def pkcs8(private_key) -> bytes:
+    serialization = crypto_lib().serialization
+    return private_key.private_bytes(
+        serialization.Encoding.DER, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
 
 
 def crockford(data: bytes) -> str:
     value = int.from_bytes(data, "big")
     bits = len(data) * 8
     return "".join(CROCKFORD[(value >> (bits - 5 * (index + 1))) & 31] for index in range(bits // 5))
-
-
-def pkcs8(private_key) -> bytes:
-    _, serialization, _, _, _, _ = vault_crypto()
-    return private_key.private_bytes(
-        serialization.Encoding.DER, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
-    )
-
-
-def raw_public(private_key) -> bytes:
-    _, serialization, _, _, _, _ = vault_crypto()
-    return private_key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
 
 
 def vault_aad(user_id: str, version: int) -> bytes:
@@ -765,27 +751,27 @@ def kek_aad(user_id: str) -> bytes:
 
 
 def kek(recovery_key: bytes, salt: bytes, user_id: str) -> bytes:
-    hashes, _, _, _, _, HKDF = vault_crypto()
-    return HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=kek_info(user_id)).derive(recovery_key)
+    lib = crypto_lib()
+    return lib.HKDF(algorithm=lib.hashes.SHA256(), length=32, salt=salt, info=kek_info(user_id)).derive(recovery_key)
 
 
-def keyring_document(user_id: str, extra: dict | None = None) -> dict:
+def keyring_document(user_id: str, extra: dict | None = None, subkey_extra: dict | None = None) -> dict:
     """Trousseau de la section 6.4, champs dans l'ordre de PROTOCOL.md 5.2 (ADR 0027, point 3)."""
-    _, _, ed, x25519, _, _ = vault_crypto()
+    lib = crypto_lib()
     created_at = NOT_BEFORE
+    subkey = {
+        "ekId": b64url(VAULT_EK_ID),
+        "kem": KEM,
+        "pkcs8": b64url(pkcs8(lib.x25519.X25519PrivateKey.from_private_bytes(EK_PRIVATE))),
+        "createdAt": created_at,
+        "expiresAt": created_at + SUBKEY_VALIDITY_DAYS * DAY_MS,
+    }
+    subkey.update(subkey_extra or {})
     document = {
         "v": 1,
         "userId": user_id,
-        "ik": b64url(pkcs8(ed.Ed25519PrivateKey.from_private_bytes(IK_SEED))),
-        "eks": [
-            {
-                "ekId": b64url(VAULT_EK_ID),
-                "kem": KEM,
-                "pkcs8": b64url(pkcs8(x25519.X25519PrivateKey.from_private_bytes(EK_PRIVATE))),
-                "createdAt": created_at,
-                "expiresAt": created_at + SUBKEY_VALIDITY_DAYS * DAY_MS,
-            }
-        ],
+        "ik": b64url(pkcs8(lib.ed25519.Ed25519PrivateKey.from_private_bytes(IK_SEED))),
+        "eks": [subkey],
         "createdAt": created_at,
     }
     document.update(extra or {})
@@ -797,27 +783,56 @@ def keyring_bytes(document: dict) -> bytes:
 
 
 def seal_vault(user_id: str, version: int, plaintext: bytes, recovery_key: bytes = RECOVERY_KEY) -> dict:
-    _, _, _, _, AESGCM, _ = vault_crypto()
+    aesgcm = crypto_lib().AESGCM
     return {
         "vaultVersion": version,
         "salt": b64url(VAULT_SALT),
         "nonceK": b64url(NONCE_K),
-        "wrappedVdk": b64url(AESGCM(kek(recovery_key, VAULT_SALT, user_id)).encrypt(NONCE_K, VDK, kek_aad(user_id))),
+        "wrappedVdk": b64url(aesgcm(kek(recovery_key, VAULT_SALT, user_id)).encrypt(NONCE_K, VDK, kek_aad(user_id))),
         "nonceB": b64url(NONCE_B),
-        "blob": b64url(AESGCM(VDK).encrypt(NONCE_B, plaintext, vault_aad(user_id, version))),
+        "blob": b64url(aesgcm(VDK).encrypt(NONCE_B, plaintext, vault_aad(user_id, version))),
     }
 
 
-def vault_case(name: str, payload: dict, user_id: str = USER_ID, recovery_key: bytes = RECOVERY_KEY) -> dict:
-    return {"name": name, "userId": user_id, "recoveryKey": b64url(recovery_key), "payload": payload}
+def rejecting_layer(user_id: str, recovery_key: bytes, payload: dict) -> str:
+    """Étage qui refuse la charge, selon `cryptography` elle-même : key (la VDK ne se désenveloppe pas), blob (le
+    trousseau ne se déchiffre pas) ou keyring (il se déchiffre ; c'est sa relecture stricte qui le refuse)."""
+    aesgcm = crypto_lib().AESGCM
+    try:
+        vdk = aesgcm(kek(recovery_key, from_b64url(payload["salt"]), user_id)).decrypt(
+            from_b64url(payload["nonceK"]), from_b64url(payload["wrappedVdk"]), kek_aad(user_id)
+        )
+    except Exception:  # InvalidTag : la seule réponse attendue d'une enveloppe fausse
+        return "key"
+    try:
+        aesgcm(vdk).decrypt(
+            from_b64url(payload["nonceB"]), from_b64url(payload["blob"]), vault_aad(user_id, payload["vaultVersion"])
+        )
+    except Exception:
+        return "blob"
+    return "keyring"
+
+
+def vault_forgery(
+    name: str, payload: dict, rejected_by: str, user_id: str = USER_ID, recovery_key: bytes = RECOVERY_KEY
+) -> dict:
+    """Une falsification et l'étage qui DOIT la refuser, contrôlé ici même (PROTOCOL.md 5.4)."""
+    actual = rejecting_layer(user_id, recovery_key, payload)
+    if actual != rejected_by:
+        raise SystemExit(f"gen_vectors.py : « {name} » est refusée par {actual}, pas par {rejected_by}")
+    return {
+        "name": name,
+        "userId": user_id,
+        "recoveryKey": b64url(recovery_key),
+        "payload": payload,
+        "rejectedBy": rejected_by,
+    }
 
 
 def build_vault() -> str:
-    _, _, ed, x25519, _, _ = vault_crypto()
+    lib = crypto_lib()
     keyring = keyring_document(USER_ID)
     plaintext = keyring_bytes(keyring)
-    short_ek_id = keyring_document(USER_ID)
-    short_ek_id["eks"][0]["ekId"] = b64url(VAULT_EK_ID[:15])
     payload = seal_vault(USER_ID, VAULT_VERSION, plaintext)
     other_key = RECOVERY_KEY[:-1] + bytes([RECOVERY_KEY[-1] ^ 0x01])
     blob = bytearray(from_b64url(payload["blob"]))
@@ -825,6 +840,12 @@ def build_vault() -> str:
     wrapped = bytearray(from_b64url(payload["wrappedVdk"]))
     wrapped[-1] ^= 0x80
     display = crockford(RECOVERY_KEY)
+
+    def sealed(document: dict) -> dict:
+        return seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(document))
+
+    if rejecting_layer(USER_ID, RECOVERY_KEY, payload) != "keyring":
+        raise SystemExit("gen_vectors.py : le coffre de référence ne s'ouvre pas")
     document = {
         "format": "seal-vault-v1",
         "subject": "Coffre de clés : PROTOCOL.md, section 5 (KEY-30 à KEY-33, QA-02, ADR 0027)",
@@ -842,32 +863,36 @@ def build_vault() -> str:
         "keyring": keyring,
         "keyringBytes": b64url(plaintext),
         "publicKeys": {
-            "ik": b64url(raw_public(ed.Ed25519PrivateKey.from_private_bytes(IK_SEED))),
-            "ek": b64url(raw_public(x25519.X25519PrivateKey.from_private_bytes(EK_PRIVATE))),
+            "ik": b64url(public_key(IK_SEED)),
+            "ek": b64url(raw_public(lib.x25519.X25519PrivateKey.from_private_bytes(EK_PRIVATE))),
         },
         "payload": payload,
-        "falsifications": [
-            vault_case("une autre clé de récupération (un bit)", payload, recovery_key=other_key),
-            vault_case("le coffre ouvert pour un autre compte", payload, user_id=VICTIM_ID),
-            vault_case("une version rejouée (vaultVersion changée)", dict(payload, vaultVersion=VAULT_VERSION + 1)),
-            vault_case("un octet du blob modifié", dict(payload, blob=b64url(bytes(blob)))),
-            vault_case("un bit de la VDK enveloppée inversé", dict(payload, wrappedVdk=b64url(bytes(wrapped)))),
-            vault_case(
-                "un trousseau d'un autre compte, chiffré pour celui-ci",
-                seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(keyring_document(VICTIM_ID))),
+        "forgeries": [
+            vault_forgery("une autre clé de récupération (un bit)", payload, "key", recovery_key=other_key),
+            vault_forgery("le coffre ouvert pour un autre compte", payload, "key", user_id=VICTIM_ID),
+            vault_forgery(
+                "une version réétiquetée (vaultVersion changée sans rechiffrer)",
+                dict(payload, vaultVersion=VAULT_VERSION + 1),
+                "blob",
             ),
-            vault_case(
-                "un trousseau avec un champ inconnu",
-                seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(keyring_document(USER_ID, {"extra": True}))),
+            vault_forgery("un octet du blob modifié", dict(payload, blob=b64url(bytes(blob))), "blob"),
+            vault_forgery("un bit de la VDK enveloppée inversé", dict(payload, wrappedVdk=b64url(bytes(wrapped))), "key"),
+            vault_forgery(
+                "un trousseau d'un autre compte, chiffré pour celui-ci", sealed(keyring_document(VICTIM_ID)), "keyring"
             ),
-            vault_case(
+            vault_forgery("un trousseau avec un champ inconnu", sealed(keyring_document(USER_ID, {"extra": True})), "keyring"),
+            vault_forgery("un trousseau d'une autre version de format", sealed(keyring_document(USER_ID, {"v": 2})), "keyring"),
+            vault_forgery(
                 "un trousseau dont l'ekId fait 15 octets",
-                seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(short_ek_id)),
+                sealed(keyring_document(USER_ID, subkey_extra={"ekId": b64url(VAULT_EK_ID[:15])})),
+                "keyring",
             ),
-            vault_case(
-                "un trousseau d'une autre version de format",
-                seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(keyring_document(USER_ID, {"v": 2}))),
+            vault_forgery(
+                "un trousseau dont la sous-clé a un autre KEM",
+                sealed(keyring_document(USER_ID, subkey_extra={"kem": "X-WING"})),
+                "keyring",
             ),
+            vault_forgery("un trousseau sans sous-clé", sealed(keyring_document(USER_ID, {"eks": []})), "keyring"),
         ],
     }
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"

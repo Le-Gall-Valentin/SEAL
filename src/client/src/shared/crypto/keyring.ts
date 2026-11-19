@@ -219,14 +219,14 @@ export async function openVault(
       JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(plaintext)),
     )
     if (json.userId !== userId) {
-      throw new VaultOpenError('trousseau d’un autre compte')
+      throw new VaultOpenError('keyring')
     }
     const identity = await importPrivate(fromBase64Url(json.ik), 'Ed25519', ['sign'])
     const subkeys = await Promise.all(
       json.eks.map(async (subkey) => {
         const ekId = fromBase64Url(subkey.ekId)
         if (ekId.length !== EK_ID_BYTES) {
-          throw new VaultOpenError('ekId mal formé')
+          throw new VaultOpenError('keyring')
         }
         const key = await importPrivate(fromBase64Url(subkey.pkcs8), 'X25519', ['deriveBits'])
         const info: SubkeyInfo = {
@@ -253,9 +253,7 @@ export async function openVault(
       },
     )
   } catch (error) {
-    throw error instanceof VaultOpenError
-      ? error
-      : new VaultOpenError('trousseau illisible', { cause: error })
+    throw error instanceof VaultOpenError ? error : new VaultOpenError('keyring', { cause: error })
   } finally {
     plaintext.fill(0)
   }
@@ -271,7 +269,7 @@ async function importPrivate(
     const passing = await crypto.subtle.importKey('pkcs8', pkcs8, algorithm, true, usages)
     const { x } = await crypto.subtle.exportKey('jwk', passing)
     if (x === undefined) {
-      throw new VaultOpenError('clé publique absente du JWK')
+      throw new VaultOpenError('keyring')
     }
     return {
       privateKey: await crypto.subtle.importKey('pkcs8', pkcs8, algorithm, false, usages),

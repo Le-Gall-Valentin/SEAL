@@ -43,8 +43,21 @@ export interface OpenedVault {
   readonly plaintext: Uint8Array<ArrayBuffer>
 }
 
+/**
+ * Étage qui refuse un coffre (PROTOCOL.md 5.4) : format (tailles ou version), key (la VDK ne se désenveloppe pas),
+ * blob (le trousseau ne se déchiffre pas) ou keyring (sa relecture stricte le refuse).
+ */
+export type VaultRejection = 'format' | 'key' | 'blob' | 'keyring'
+
+/** Ne porte que son étage : jamais un octet de RK, de la VDK ni du trousseau. */
 export class VaultOpenError extends Error {
   override readonly name = 'VaultOpenError'
+  readonly reason: VaultRejection
+
+  constructor(reason: VaultRejection, options?: ErrorOptions) {
+    super(`coffre refusé : ${reason}`, options)
+    this.reason = reason
+  }
 }
 
 export function vaultAad(userId: string, vaultVersion: number): Uint8Array<ArrayBuffer> {
@@ -100,13 +113,16 @@ export async function openVaultBytes(
     payload.salt.length !== SALT_BYTES ||
     payload.nonceK.length !== NONCE_BYTES ||
     payload.nonceB.length !== NONCE_BYTES ||
-    payload.wrappedVdk.length !== WRAPPED_VDK_BYTES
+    payload.wrappedVdk.length !== WRAPPED_VDK_BYTES ||
+    !Number.isSafeInteger(payload.vaultVersion) ||
+    payload.vaultVersion < 1
   ) {
-    throw new VaultOpenError('coffre mal formé')
+    throw new VaultOpenError('format')
   }
+  let vdk: CryptoKey
   try {
     const kek = await deriveKek(recoveryKey, payload.salt, userId, ['unwrapKey'])
-    const vdk = await crypto.subtle.unwrapKey(
+    vdk = await crypto.subtle.unwrapKey(
       'raw',
       payload.wrappedVdk,
       kek,
@@ -115,6 +131,10 @@ export async function openVaultBytes(
       false,
       ['encrypt', 'decrypt'],
     )
+  } catch (error) {
+    throw new VaultOpenError('key', { cause: error })
+  }
+  try {
     const plaintext = await crypto.subtle.decrypt(
       {
         name: 'AES-GCM',
@@ -126,7 +146,7 @@ export async function openVaultBytes(
     )
     return { vdk, plaintext: new Uint8Array(plaintext) }
   } catch (error) {
-    throw new VaultOpenError('coffre illisible avec cette clé de récupération', { cause: error })
+    throw new VaultOpenError('blob', { cause: error })
   }
 }
 

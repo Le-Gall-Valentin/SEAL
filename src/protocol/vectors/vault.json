@@ -49,7 +49,7 @@
     "nonceB": "kJGSk5SVlpeYmZqb",
     "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
   },
-  "falsifications": [
+  "forgeries": [
     {
       "name": "une autre cl\u00e9 de r\u00e9cup\u00e9ration (un bit)",
       "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
@@ -61,7 +61,8 @@
         "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
         "nonceB": "kJGSk5SVlpeYmZqb",
         "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
-      }
+      },
+      "rejectedBy": "key"
     },
     {
       "name": "le coffre ouvert pour un autre compte",
@@ -74,10 +75,11 @@
         "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
         "nonceB": "kJGSk5SVlpeYmZqb",
         "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
-      }
+      },
+      "rejectedBy": "key"
     },
     {
-      "name": "une version rejou\u00e9e (vaultVersion chang\u00e9e)",
+      "name": "une version r\u00e9\u00e9tiquet\u00e9e (vaultVersion chang\u00e9e sans rechiffrer)",
       "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
       "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
       "payload": {
@@ -87,7 +89,8 @@
         "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
         "nonceB": "kJGSk5SVlpeYmZqb",
         "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
-      }
+      },
+      "rejectedBy": "blob"
     },
     {
       "name": "un octet du blob modifi\u00e9",
@@ -100,7 +103,8 @@
         "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
         "nonceB": "kJGSk5SVlpeYmZqb",
         "blob": "DBX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
-      }
+      },
+      "rejectedBy": "blob"
     },
     {
       "name": "un bit de la VDK envelopp\u00e9e invers\u00e9",
@@ -113,7 +117,8 @@
         "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jf7",
         "nonceB": "kJGSk5SVlpeYmZqb",
         "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_WXbkgxd0cUONRWCZ0yXiuI"
-      }
+      },
+      "rejectedBy": "key"
     },
     {
       "name": "un trousseau d'un autre compte, chiffr\u00e9 pour celui-ci",
@@ -126,7 +131,8 @@
         "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
         "nonceB": "kJGSk5SVlpeYmZqb",
         "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2guSSRP4uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_aeXvPHQRzpLrpgq38DZRaI"
-      }
+      },
+      "rejectedBy": "keyring"
     },
     {
       "name": "un trousseau avec un champ inconnu",
@@ -139,20 +145,8 @@
         "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
         "nonceB": "kJGSk5SVlpeYmZqb",
         "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabfrH-y4OL2kk8b3-lMAmBD9WQhbaslXVBADVJl3s6i"
-      }
-    },
-    {
-      "name": "un trousseau dont l'ekId fait 15 octets",
-      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
-      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
-      "payload": {
-        "vaultVersion": 1,
-        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
-        "nonceK": "gIGCg4SFhoeIiYqL",
-        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
-        "nonceB": "kJGSk5SVlpeYmZqb",
-        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeUAv_KgeCdRYWemUTVWIsE2u4lgkjpalc7oGJgHV-YiTj2CHcNSuL3HSoU1o7S2Mm3tiKNNX-bDbSp-p6b9Ed2KKHEyAAcPOpNW_hLNHUKitFwLQ0ws5_C_CkuKAoYiHC8KdLuC4uW6kf01nBi1PjYWcNCF--G0HV-yT-4apZep8WtpgqxrZMUSY6mbc9KUvHIAmG4DXYB9o2Iw8fWirWUreA7WV5YMx2kS2iDILdNVfCz0-fotun2yaa4BVGeuguEvXASUCbRoJWsHqGaar"
-      }
+      },
+      "rejectedBy": "keyring"
     },
     {
       "name": "un trousseau d'une autre version de format",
@@ -165,7 +159,50 @@
         "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
         "nonceB": "kJGSk5SVlpeYmZqb",
         "blob": "DRX4HOvgCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-QliO2Fixj18ggorUFbYLTxSw6_Lni3edcIjnPGmJ8E9omkz1mw5wKPVU36vOWOm0rqtyfGSKEWaAANrcj-KOlcFBK5qtFiz0xhYr_iLOt5uLuvjyacq1I6HTvBb2X3plJHgSjcrMMjJv_H0jR4_d6IuhZuN4U9xprRrZMViKozzJ5acjHaQheM7EbRdo2YIzcm-tWUreTtjEmsxh3FenjCIvZLYRGDA2fYJqlmqTbYBVGabf_RgjDts1nPkItTAKykTX1l4"
-      }
+      },
+      "rejectedBy": "keyring"
+    },
+    {
+      "name": "un trousseau dont l'ekId fait 15 octets",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeUAv_KgeCdRYWemUTVWIsE2u4lgkjpalc7oGJgHV-YiTj2CHcNSuL3HSoU1o7S2Mm3tiKNNX-bDbSp-p6b9Ed2KKHEyAAcPOpNW_hLNHUKitFwLQ0ws5_C_CkuKAoYiHC8KdLuC4uW6kf01nBi1PjYWcNCF--G0HV-yT-4apZep8WtpgqxrZMUSY6mbc9KUvHIAmG4DXYB9o2Iw8fWirWUreA7WV5YMx2kS2iDILdNVfCz0-fotun2yaa4BVGeuguEvXASUCbRoJWsHqGaar"
+      },
+      "rejectedBy": "keyring"
+    },
+    {
+      "name": "un trousseau dont la sous-cl\u00e9 a un autre KEM",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKlkjUQO3X-EOe9biaiCMebHs3_YJGfvI7g-4UPeRB0_O9ZD5MPWZf-Xj2S1Fvb9UE3x9COS8ZiMXDQ-47l-BPqJeaUFUahsSE_4i3xnXN7Cux3-ZnlRuappa1FXGWgOGixOfnmuMa3_8IhKom1PxzRmXxk8S3jgri5tZzmMvuKCafw63q0KCQhQDZXn9bXZ3A6rTl2D-zMssH5I78_IphyoRveOF-Ctimared6X_EvZJbENFQ6gcFuLxnvS0DfSdGN99B6iRXy3WZ6faa_MmpUeyqIBbw70NmulJY"
+      },
+      "rejectedBy": "keyring"
+    },
+    {
+      "name": "un trousseau sans sous-cl\u00e9",
+      "userId": "0192f7a1-ffff-7000-8000-00000000a11c",
+      "recoveryKey": "jzoMEdLkW2eZqgH-KzxNXm9wgZI",
+      "payload": {
+        "vaultVersion": 1,
+        "salt": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+        "nonceK": "gIGCg4SFhoeIiYqL",
+        "wrappedVdk": "Zb4DXVJWAM_ZRn6bJC7z8ZMD9_pbNIZkUo_5aOkcUOWK29WR0OyATVk1KC2z1jd7",
+        "nonceB": "kJGSk5SVlpeYmZqb",
+        "blob": "DRX4HOvjCIfUlvecuyrUl8fn5or2t0sCdMUTJJAoQ1U2wZ-5gtAwHJPlgosPQJF2grXBRf8uMm4h1FJwRw1FUv-MmYpfi1QtSryB72ZDv29byyKX5SHXKrNkWS5kaXaOxOkaSeSf_1wk76ELfImLsAPtEgvCUGtSym3BAK14EjYGVnUwzXKDnHIYAHS9XqC2ZBXpXcD_S4m-NcfY7c-iuf5AaS2rcu57uiNwKgRzgjbLrw"
+      },
+      "rejectedBy": "keyring"
     }
   ]
 }

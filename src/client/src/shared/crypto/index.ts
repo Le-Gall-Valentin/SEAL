@@ -15,7 +15,7 @@ export {
   openVault,
   type SubkeyInfo,
 } from './keyring'
-export { type VaultPayload, VaultOpenError } from './vault'
+export { type VaultPayload, VaultOpenError, type VaultRejection } from './vault'
 export { type KeyStore, openKeyStore, type StoredCertificate } from './keystore'
 export { type AuthorityCheck, checkAuthority, type ServedAuthority } from './authority'
 export {
