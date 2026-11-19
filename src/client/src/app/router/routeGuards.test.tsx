@@ -2,9 +2,14 @@ import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-q
 import { useState } from 'react'
 import { createMemoryRouter, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { AuthorityApiProvider, type IAuthorityApi, KeyStoreProvider } from '@/entities/authority'
+import {
+  AuthorityApiProvider,
+  type AuthorityView,
+  type IAuthorityApi,
+  KeyStoreProvider,
+} from '@/entities/authority'
 import {
   type Account,
   type ISessionApi,
@@ -79,6 +84,8 @@ const TREE: RouteObject[] = [
     element: <PendingRoute />,
     children: [{ path: '/verification-courriel', element: <p>Écran de vérification</p> }],
   },
+  // Hors de toute garde, comme /reinitialisation : on peut sortir de la zone du compte actif et y revenir.
+  { path: '/libre', element: <p>Libre</p> },
   {
     element: <ActiveRoute />,
     children: [
@@ -266,5 +273,52 @@ describe('KEY-11 : la zone du compte actif attend le contrôle de l’Autorité 
     await expect.element(pending.screen.getByText('Écran de vérification')).toBeVisible()
 
     expect(calls).toBe(0)
+  })
+
+  describe('ADR 0027, point 7 : un contrôle frais à chaque entrée dans la zone', () => {
+    /** Entre dans la zone, en sort par /libre, puis y revient ; le second contrôle répond selon `second`. */
+    async function reenter(second: () => Promise<AuthorityView>) {
+      let calls = 0
+      const authority: IAuthorityApi = {
+        fetchAuthority: () => {
+          calls += 1
+          return calls === 1 ? Promise.resolve(VECTOR_AUTHORITY) : second()
+        },
+      }
+      const { router, screen } = await renderAt('/', () => Promise.resolve(ACTIVE), { authority })
+      await expect.element(screen.getByText('Accueil')).toBeVisible()
+      await router.navigate('/libre')
+      await expect.element(screen.getByText('Libre')).toBeVisible()
+      await router.navigate('/')
+      return { screen, calls: () => calls }
+    }
+
+    it('ADR 0027 : au retour, rien ne s’affiche avant la réponse du nouveau contrôle', async () => {
+      const { screen, calls } = await reenter(() => new Promise(() => undefined))
+
+      await vi.waitFor(() => {
+        expect(calls()).toBe(2)
+      })
+      await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
+    })
+
+    it('ADR 0027 : au retour, un contrôle en échec mène à « Impossible de charger »', async () => {
+      const { screen } = await reenter(() => Promise.reject(new NetworkError()))
+
+      await expect
+        .element(screen.getByRole('heading', { name: 'Impossible de charger' }))
+        .toBeVisible()
+      await expect.element(screen.getByText('Accueil')).not.toBeInTheDocument()
+    })
+
+    it('KEY-11 : au retour, une Autorité changée bloque l’application', async () => {
+      const { screen } = await reenter(() =>
+        Promise.resolve({ ...VECTOR_AUTHORITY, fingerprint: '0'.repeat(64) }),
+      )
+
+      await expect
+        .element(screen.getByRole('heading', { level: 1, name: 'Autorité SEAL modifiée' }))
+        .toBeVisible()
+    })
   })
 })
