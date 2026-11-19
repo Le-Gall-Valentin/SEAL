@@ -27,6 +27,8 @@
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-overlay: var(--overlay);
   --color-sunken: var(--sunken);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
@@ -54,6 +56,8 @@
 
   /* Carte de Connexion-Tablette, seule ombre de la maquette des écrans d'authentification. */
   --shadow-card: 0 12px 32px -12px rgba(27, 31, 20, 0.22), 0 2px 6px rgba(27, 31, 20, 0.06);
+  /* Dialogues (Dialogue-Cle-Recuperation, --shadow-3), sans valeur sombre dans la maquette. */
+  --shadow-dialog: 0 24px 64px -16px rgba(27, 31, 20, 0.32), 0 4px 12px rgba(27, 31, 20, 0.08);
 
   --font-sans: var(--sans);
   --font-mono: var(--mono);

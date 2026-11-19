@@ -21,3 +21,4 @@ export { KEYS_LOCK, type KeyStatus, keyStatus, useKeyStatus } from './model/keyS
 export { KeysApiProvider, useKeysApi } from './model/keysApiPort'
 export { KeyStoreProvider, useKeyStore } from './model/keyStorePort'
 export { saveVaultOnce, VaultTakenError } from './model/saveVault'
+export { setupKeys } from './model/setupKeys'

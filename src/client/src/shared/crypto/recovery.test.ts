@@ -131,3 +131,27 @@ describe('KEY-31 : aucune fuite de la clé de récupération, repris de la revue
     expect(() => recoveryKeyBytes(structuredClone(key))).toThrow(TypeError)
   })
 })
+
+describe('KEY-30 : ressaisie d’un groupe (Dialogue-Cle-Recuperation, étape 2)', () => {
+  const key = parseRecoveryKey('8WQK-3MZD-T7PA-R2HX-5NCF-Y9GB-K4VE-J6TS')
+
+  it('KEY-30 : le groupe noté se reconnaît en minuscules, avec espaces, tirets, O pour 0 et I ou L pour 1', () => {
+    expect(key.matchesGroup(2, 'T7PA')).toBe(true)
+    expect(key.matchesGroup(6, ' k4-ve ')).toBe(true)
+    expect(
+      parseRecoveryKey('0000-1111-0000-1111-0000-1111-0000-1111').matchesGroup(1, 'ilIL'),
+    ).toBe(true)
+    expect(
+      parseRecoveryKey('0000-1111-0000-1111-0000-1111-0000-1111').matchesGroup(0, 'oOoO'),
+    ).toBe(true)
+  })
+
+  it('KEY-30 : un autre groupe, un caractère hors de l’alphabet ou non ASCII, ou un index hors de 0 à 7 ne correspondent pas', () => {
+    expect(key.matchesGroup(2, 'K4VE')).toBe(false)
+    expect(key.matchesGroup(2, 'T7P')).toBe(false)
+    expect(key.matchesGroup(2, 'T7PAU')).toBe(false)
+    expect(key.matchesGroup(2, 'T7PÅ')).toBe(false)
+    expect(key.matchesGroup(8, 'T7PA')).toBe(false)
+    expect(key.matchesGroup(-1, '8WQK')).toBe(false)
+  })
+})

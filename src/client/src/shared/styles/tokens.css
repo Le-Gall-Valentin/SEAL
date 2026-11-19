@@ -7,6 +7,8 @@
   color-scheme: light;
   --bg: #f7f8f3;
   --surface: #ffffff;
+  --raised: #ffffff;
+  --overlay: rgba(14, 18, 11, 0.38);
   --sunken: #f1f3ea;
   --line: #e3e6da;
   --line-strong: #cdd2c0;
@@ -43,6 +45,8 @@
     color-scheme: dark;
     --bg: #0e120b;
     --surface: #151a10;
+    --raised: #1b2115;
+    --overlay: rgba(0, 0, 0, 0.55);
     --sunken: #11150d;
     --line: #262d1d;
     --line-strong: #364029;

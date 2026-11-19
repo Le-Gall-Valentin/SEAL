@@ -3,7 +3,7 @@
  * de 4. Ses octets restent dans ce module : l'objet ne se sérialise pas, ne s'affiche pas en texte et n'a aucune
  * propriété énumérable. Seuls ses groupes sortent, pour l'affichage unique et la ressaisie.
  */
-import { decodeCrockford, encodeCrockford } from './crockford'
+import { decodeCrockford, encodeCrockford, normalizeCrockford } from './crockford'
 
 const BYTES = 20
 const GROUPS = 8
@@ -35,6 +35,19 @@ export class RecoveryKey {
     return Array.from({ length: GROUPS }, (_, index) =>
       text.slice(index * GROUP_LENGTH, (index + 1) * GROUP_LENGTH),
     )
+  }
+
+  /** KEY-30 : vrai si `typed`, lu comme une clé ressaisie (casse, séparateurs, O, I, L), est le groupe `index`. */
+  matchesGroup(index: number, typed: string): boolean {
+    const expected = this.groups()[index]
+    if (expected === undefined) {
+      return false
+    }
+    try {
+      return normalizeCrockford(typed) === expected
+    } catch {
+      return false
+    }
   }
 
   /** KEY-31 : la clé ne part jamais dans un corps JSON. */
