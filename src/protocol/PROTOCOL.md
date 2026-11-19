@@ -327,3 +327,7 @@ le trousseau et ses octets, les clés publiques attendues, la charge envoyée au
 l'étage qui DOIT la refuser (`rejectedBy`) : `key` (la VDK ne se désenveloppe pas), `blob` (le trousseau ne se
 déchiffre pas) ou `keyring` (il se déchiffre, et sa relecture stricte le refuse) ; le générateur le vérifie. IK est la graine du test 2
 de la RFC 8032, EK la clé privée d'Alice de la RFC 7748 (section 6.1) : jamais de vraies clés.
+
+`vectors/hkdf-rfc5869.json` (RFC 5869, annexe A, cas 1 à 3) et `vectors/x25519-rfc7748.json` (RFC 7748, section 6.1)
+sont les vecteurs officiels des deux primitives du coffre et des sous-clés (QA-01). `gen_vectors.py` les recopie des
+RFC et les recalcule avec `cryptography` avant de les écrire ; WebCrypto (Node et Chromium) et la JCA les rejouent.

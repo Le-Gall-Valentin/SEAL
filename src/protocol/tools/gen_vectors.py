@@ -7,7 +7,9 @@
 - vectors/identity.json : certificat, preuve de possession et liaison de sous-clé (PROTOCOL.md, section 4 ;
   KEY-03 à KEY-05, QA-02, ADR 0025) ;
 - vectors/vault.json : clé de récupération et coffre de clés (PROTOCOL.md, section 5 ; KEY-30 à KEY-33, QA-02,
-  ADR 0027).
+  ADR 0027) ;
+- vectors/hkdf-rfc5869.json et vectors/x25519-rfc7748.json : vecteurs officiels de HKDF-SHA256 (RFC 5869, annexe A,
+  cas 1 à 3) et de X25519 (RFC 7748, section 6.1) (QA-01, ADR 0027).
 
 Troisième implémentation, indépendante de Java et de TypeScript : les deux suites de tests relisent ces
 vecteurs, aucune ne se valide elle-même. Bibliothèque standard de Python, plus `cryptography` pour signer en
@@ -38,6 +40,8 @@ PASSWORD_OUTPUT = PROTOCOL_DIR / "vectors" / "password-policy.json"
 RFC8032_OUTPUT = PROTOCOL_DIR / "vectors" / "ed25519-rfc8032.json"
 IDENTITY_OUTPUT = PROTOCOL_DIR / "vectors" / "identity.json"
 VAULT_OUTPUT = PROTOCOL_DIR / "vectors" / "vault.json"
+HKDF_OUTPUT = PROTOCOL_DIR / "vectors" / "hkdf-rfc5869.json"
+X25519_OUTPUT = PROTOCOL_DIR / "vectors" / "x25519-rfc7748.json"
 BLOCKLIST = PROTOCOL_DIR / "password-blocklist.txt"
 
 U32_MAX = 2**32 - 1
@@ -898,6 +902,91 @@ def build_vault() -> str:
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
 
 
+# ---------------------------------------------------------------------------------------------
+# Vecteurs officiels de HKDF-SHA256 et de X25519 (QA-01, ADR 0027, point 11), recopiés des RFC puis recalculés par
+# `cryptography` : une valeur mal recopiée fait échouer la génération.
+# ---------------------------------------------------------------------------------------------
+
+# RFC 5869, annexe A, cas 1 à 3 (SHA-256) : nom, IKM, sel, info, longueur L, OKM.
+HKDF_TESTS = [
+    (
+        "RFC 5869, A.1 : cas de base",
+        "0b" * 22,
+        "000102030405060708090a0b0c",
+        "f0f1f2f3f4f5f6f7f8f9",
+        42,
+        "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865",
+    ),
+    (
+        "RFC 5869, A.2 : entrées et sortie plus longues",
+        bytes(range(0x00, 0x50)).hex(),
+        bytes(range(0x60, 0xB0)).hex(),
+        bytes(range(0xB0, 0x100)).hex(),
+        82,
+        "b11e398dc80327a1c8e7f78c596a49344f012eda2d4efad8a050cc4c19afa97c"
+        "59045a99cac7827271cb41c65e590e09da3275600c2f09b8367793a9aca3db71"
+        "cc30c58179ec3e87c14c01d5c1f3434f1d87",
+    ),
+    (
+        "RFC 5869, A.3 : sel et info vides",
+        "0b" * 22,
+        "",
+        "",
+        42,
+        "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8",
+    ),
+]
+
+# RFC 7748, section 6.1 : clés privées et publiques d'Alice et de Bob, et leur secret partagé K.
+X25519_ALICE_PRIVATE = "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a"
+X25519_ALICE_PUBLIC = "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a"
+X25519_BOB_PRIVATE = "5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb"
+X25519_BOB_PUBLIC = "de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f"
+X25519_SHARED = "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742"
+
+
+def build_hkdf() -> str:
+    lib = crypto_lib()
+    tests = []
+    for name, ikm, salt, info, length, okm in HKDF_TESTS:
+        # Un sel vide vaut un sel de 32 octets nuls (RFC 5869, 2.2) ; cryptography le veut explicite (None).
+        derived = lib.HKDF(
+            algorithm=lib.hashes.SHA256(), length=length, salt=bytes.fromhex(salt) or None, info=bytes.fromhex(info)
+        ).derive(bytes.fromhex(ikm))
+        if derived.hex() != okm:
+            raise AssertionError(f"cryptography ne reproduit pas la RFC 5869, {name}")
+        tests.append({"name": name, "ikm": ikm, "salt": salt, "info": info, "length": length, "okm": okm})
+    document = {
+        "format": "seal-hkdf-rfc5869-v1",
+        "subject": "Vecteurs officiels de HKDF-SHA256 : RFC 5869, annexe A, cas 1 à 3 (QA-01), en hexadécimal",
+        "generator": "src/protocol/tools/gen_vectors.py",
+        "tests": tests,
+    }
+    return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
+
+
+def build_x25519() -> str:
+    x25519 = crypto_lib().x25519
+    alice = x25519.X25519PrivateKey.from_private_bytes(bytes.fromhex(X25519_ALICE_PRIVATE))
+    bob = x25519.X25519PrivateKey.from_private_bytes(bytes.fromhex(X25519_BOB_PRIVATE))
+    if (
+        raw_public(alice).hex() != X25519_ALICE_PUBLIC
+        or raw_public(bob).hex() != X25519_BOB_PUBLIC
+        or alice.exchange(bob.public_key()).hex() != X25519_SHARED
+        or bob.exchange(alice.public_key()).hex() != X25519_SHARED
+    ):
+        raise AssertionError("cryptography ne reproduit pas la RFC 7748, section 6.1")
+    document = {
+        "format": "seal-x25519-rfc7748-v1",
+        "subject": "Vecteurs officiels de X25519 : RFC 7748, section 6.1 (QA-01), en hexadécimal",
+        "generator": "src/protocol/tools/gen_vectors.py",
+        "alice": {"privateKey": X25519_ALICE_PRIVATE, "publicKey": X25519_ALICE_PUBLIC},
+        "bob": {"privateKey": X25519_BOB_PRIVATE, "publicKey": X25519_BOB_PUBLIC},
+        "sharedSecret": X25519_SHARED,
+    }
+    return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Vecteurs de référence de SEAL (PROTOCOL.md).")
     parser.add_argument("--check", action="store_true", help="échoue si un fichier n'est pas à jour")
@@ -908,6 +997,8 @@ def main() -> int:
         (RFC8032_OUTPUT, build_rfc8032(), f"{len(RFC8032_TESTS)} tests"),
         (IDENTITY_OUTPUT, build_identity(), "certificats, preuve, liaison et falsifications"),
         (VAULT_OUTPUT, build_vault(), "clé de récupération, coffre et falsifications"),
+        (HKDF_OUTPUT, build_hkdf(), f"{len(HKDF_TESTS)} cas"),
+        (X25519_OUTPUT, build_x25519(), "Alice, Bob et leur secret partagé"),
     ]
     if check:
         stale = [path for path, content, _ in outputs if not path.exists() or path.read_text(encoding="ascii") != content]
