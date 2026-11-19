@@ -1,5 +1,5 @@
 import { type ReactNode, Suspense, use, useState } from 'react'
-import { KeyStoreProvider } from '@/entities/authority'
+import { KeyStoreProvider } from '@/entities/keyring'
 import { UnsupportedBrowserPage } from '@/pages/unsupported-browser'
 import type { KeyStore } from '@/shared/crypto'
 import { ErrorPage } from '../layouts'

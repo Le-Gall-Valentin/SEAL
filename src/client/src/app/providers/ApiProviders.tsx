@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { AuthorityApiProvider, type IAuthorityApi } from '@/entities/authority'
+import { type IKeysApi, KeysApiProvider } from '@/entities/keyring'
 import { type IPasswordBlocklist, PasswordBlocklistProvider } from '@/entities/password'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
 import { type ILoginApi, LoginApiProvider } from '@/features/login'
@@ -12,6 +13,7 @@ import { type IVerifyEmailApi, VerifyEmailApiProvider } from '@/features/verify-
 export interface Apis {
   readonly session: ISessionApi
   readonly authority: IAuthorityApi
+  readonly keys: IKeysApi
   readonly passwordBlocklist: IPasswordBlocklist
   readonly login: ILoginApi
   readonly register: IRegisterApi
@@ -30,17 +32,19 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
   return (
     <SessionApiProvider api={apis.session}>
       <AuthorityApiProvider api={apis.authority}>
-        <PasswordBlocklistProvider api={apis.passwordBlocklist}>
-          <LoginApiProvider api={apis.login}>
-            <RegisterApiProvider api={apis.register}>
-              <VerifyEmailApiProvider api={apis.verifyEmail}>
-                <PasswordResetApiProvider api={apis.passwordReset}>
-                  <LogoutApiProvider api={apis.logout}>{children}</LogoutApiProvider>
-                </PasswordResetApiProvider>
-              </VerifyEmailApiProvider>
-            </RegisterApiProvider>
-          </LoginApiProvider>
-        </PasswordBlocklistProvider>
+        <KeysApiProvider api={apis.keys}>
+          <PasswordBlocklistProvider api={apis.passwordBlocklist}>
+            <LoginApiProvider api={apis.login}>
+              <RegisterApiProvider api={apis.register}>
+                <VerifyEmailApiProvider api={apis.verifyEmail}>
+                  <PasswordResetApiProvider api={apis.passwordReset}>
+                    <LogoutApiProvider api={apis.logout}>{children}</LogoutApiProvider>
+                  </PasswordResetApiProvider>
+                </VerifyEmailApiProvider>
+              </RegisterApiProvider>
+            </LoginApiProvider>
+          </PasswordBlocklistProvider>
+        </KeysApiProvider>
       </AuthorityApiProvider>
     </SessionApiProvider>
   )

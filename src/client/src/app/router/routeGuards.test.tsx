@@ -4,12 +4,8 @@ import { createMemoryRouter, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
-import {
-  AuthorityApiProvider,
-  type AuthorityView,
-  type IAuthorityApi,
-  KeyStoreProvider,
-} from '@/entities/authority'
+import { AuthorityApiProvider, type AuthorityView, type IAuthorityApi } from '@/entities/authority'
+import { KeyStoreProvider } from '@/entities/keyring'
 import {
   type Account,
   type ISessionApi,

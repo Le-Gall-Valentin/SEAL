@@ -2,5 +2,4 @@
 export type { AuthorityView, IAuthorityApi } from './api/IAuthorityApi'
 export { authorityApi } from './api/authorityApi'
 export { AuthorityApiProvider } from './model/authorityApiPort'
-export { KeyStoreProvider } from './model/keyStorePort'
 export { useAuthorityCheck } from './model/useAuthorityCheck'

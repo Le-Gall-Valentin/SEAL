@@ -3,7 +3,7 @@ import { createMemoryRouter, type InitialEntry, type RouteObject } from 'react-r
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { KeyStoreProvider } from '@/entities/authority'
+import { KeyStoreProvider } from '@/entities/keyring'
 import type { Account } from '@/entities/session'
 import { ApiProviders, type Apis, createQueryClient } from '../providers'
 import { freshKeyStore, servingAuthority } from '../testing/authority'
@@ -29,6 +29,14 @@ function fakeApis(account: Account | null): Apis {
   return {
     session: { me: () => Promise.resolve(account), reloadCsrf: () => Promise.resolve() },
     authority: servingAuthority(),
+    keys: {
+      createChallenge: never,
+      publishIdentity: never,
+      publishSubkey: never,
+      readVault: never,
+      saveVault: never,
+      readOwnKeys: never,
+    },
     passwordBlocklist: { load: () => Promise.resolve([]) },
     login: { login: never },
     register: { register: never, usernameAvailability: never },
