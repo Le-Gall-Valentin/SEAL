@@ -20,5 +20,6 @@ export {
 export { KEYS_LOCK, type KeyStatus, keyStatus, useKeyStatus } from './model/keyStatus'
 export { KeysApiProvider, useKeysApi } from './model/keysApiPort'
 export { KeyStoreProvider, useKeyStore } from './model/keyStorePort'
+export { InvalidVaultError, restoreKeys, WrongRecoveryKeyError } from './model/restoreKeys'
 export { saveVaultOnce, VaultTakenError } from './model/saveVault'
 export { setupKeys } from './model/setupKeys'
