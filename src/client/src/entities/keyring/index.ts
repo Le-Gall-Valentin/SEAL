@@ -10,5 +10,14 @@ export type {
   VaultView,
 } from './api/IKeysApi'
 export { keysApi } from './api/keysApi'
-export { KeysApiProvider } from './model/keysApiPort'
-export { KeyStoreProvider } from './model/keyStorePort'
+export {
+  completeKeys,
+  ForeignIdentityError,
+  type KeyOwner,
+  type KeysContext,
+  StaleVaultError,
+} from './model/completeKeys'
+export { KEYS_LOCK, type KeyStatus, keyStatus, useKeyStatus } from './model/keyStatus'
+export { KeysApiProvider, useKeysApi } from './model/keysApiPort'
+export { KeyStoreProvider, useKeyStore } from './model/keyStorePort'
+export { saveVaultOnce, VaultTakenError } from './model/saveVault'

@@ -42,3 +42,4 @@ export {
   storeOwnCertificate,
   verifyOwnCertificate,
 } from './certificate'
+export { compareOwnKeys, type KeysComparison, type ServedKeys } from './ownKeys'
