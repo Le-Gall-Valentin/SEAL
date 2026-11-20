@@ -61,7 +61,7 @@ class CreateOAuthAccountHandlerTest {
     @Test
     @DisplayName("ACC-03 : un nom affiché refusé donne VALIDATION_FAILED sur displayName")
     void acc03InvalidDisplayName() {
-        assertThatThrownBy(() -> handler.create("nom", "Vale‮ntin", "n@exemple.ca", true))
+        assertThatThrownBy(() -> handler.create("nom", "Vale\u202Entin", "n@exemple.ca", true))
                 .isInstanceOfSatisfying(
                         SealException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThat(identity.accounts).isEmpty();

@@ -17,7 +17,7 @@ class ExternalIdentityTest {
     @Test
     @DisplayName("AUTH-31 : fournisseur, sujet, courriel en NFC, vérification et nom proposé")
     void auth31KeepsTheProviderData() {
-        ExternalIdentity identity = google("1234567890", "valéntin@exemple.ca", "Valentin Dupont");
+        ExternalIdentity identity = google("1234567890", "vale\u0301ntin@exemple.ca", "Valentin Dupont");
 
         assertThat(identity.provider()).isEqualTo(OAuthProvider.GOOGLE);
         assertThat(identity.subject()).isEqualTo("1234567890");
@@ -55,13 +55,48 @@ class ExternalIdentityTest {
     @DisplayName(
             "ACC-03 : le nom proposé perd ses caractères de contrôle et de direction, et 50 points de code au plus")
     void acc03SuggestedNameIsCleaned() {
-        assertThat(google("1", "v@exemple.ca", "Vale‮ntin\u0000 ").displayName())
+        assertThat(google("1", "v@exemple.ca", "Vale\u202Entin\u0000 ").displayName())
                 .isEqualTo("Valentin");
         assertThat(google("1", "v@exemple.ca", "🦭".repeat(60)).displayName()).isEqualTo("🦭".repeat(50));
-        assertThat(google("1", "v@exemple.ca", "é").displayName()).isEqualTo("é");
+        assertThat(google("1", "v@exemple.ca", "e\u0301").displayName()).isEqualTo("é");
         assertThat(ExternalIdentity.of(OAuthProvider.GITHUB, "1", "v@exemple.ca", false, null)
                         .displayName())
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("ACC-03 : le nom proposé suit la règle du nom affiché : ZWJ des émojis gardé, nom invisible abandonné")
+    void acc03SuggestedNameFollowsTheDisplayNameRule() {
+        String family = "👨\u200D👩\u200D👧";
+        assertThat(google("1", "v@exemple.ca", family).displayName()).isEqualTo(family);
+        assertThat(google("1", "v@exemple.ca", "\u3164").displayName()).isEmpty();
+        assertThat(google("1", "v@exemple.ca", "\u200F\u202E").displayName()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AUTH-30 : aucun nom du fournisseur ne refuse l'identité ; le nom proposé est stable (idempotent)")
+    void auth30SuggestedNameNeverBlocksAndIsIdempotent() {
+        String[] names = {
+            "Jose\u200D\u0301",
+            "Re\u0000\u0301",
+            "a\u202E\u0301b",
+            "\u0301",
+            "x".repeat(49) + "e\u0301\u0302",
+            " \u200B ",
+            "Valentin Dupont",
+            "👨\u200D👩",
+            "\uD800",
+            "각"
+        };
+        for (String name : names) {
+            String suggested = google("1", "v@exemple.ca", name).displayName();
+            assertThat(google("1", "v@exemple.ca", suggested).displayName())
+                    .as(name)
+                    .isEqualTo(suggested);
+            assertThat(new ExternalIdentity(OAuthProvider.GOOGLE, "1", "v@exemple.ca", true, suggested))
+                    .as(name)
+                    .isNotNull();
+        }
     }
 
     @Test

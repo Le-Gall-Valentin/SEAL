@@ -249,7 +249,7 @@ class OAuthRegistrationIT {
     void acc03DisplayNameRules() throws Exception {
         Cookie session = pendingGoogle(googleSubject(), unique("d") + "@gmail.com");
 
-        for (String name : new String[] {"", "   ", "Vale‮ntin", "x".repeat(51)}) {
+        for (String name : new String[] {"", "   ", "Vale\u202Entin", "x".repeat(51)}) {
             mvc.perform(client.unsafe(post("/api/v1/auth/oauth/complete"), session, choice(unique("d"), name)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
