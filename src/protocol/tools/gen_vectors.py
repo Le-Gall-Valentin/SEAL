@@ -52,9 +52,19 @@ U32_MAX = 2**32 - 1
 U64_MAX = 2**63 - 1  # ADR 0006 : le long de Java est signé
 UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
+# Version d'Unicode du générateur, référence de SEAL (ADR 0006, point 2) : NFC, NFKC et minuscules en dépendent. Elle
+# est écrite dans password-policy.json, si bien qu'une régénération sous une autre version fait échouer --check (la CI
+# épingle Python).
+UNICODE_VERSION = unicodedata.unidata_version
+
 
 class Rejected(Exception):
     """Valeur hors du domaine de l'encodage : elle doit être rejetée par toute implémentation."""
+
+
+class UnassignedCharacter(Exception):
+    """Caractère non attribué dans la version d'Unicode du générateur : une version plus récente pourrait le composer,
+    si bien que son verdict NFC dépend du moteur (ADR 0006, point 2). Le générateur s'arrête plutôt que de l'écrire."""
 
 
 def b64url(data: bytes) -> str:
@@ -91,10 +101,19 @@ def raw_bytes(value: bytes) -> bytes:
     return u32(len(value)) + value
 
 
+def known_characters(value: str) -> str:
+    """`value`, si chacun de ses caractères est attribué dans UNICODE_VERSION : son verdict NFC est alors le même dans
+    toute version postérieure, par la politique de stabilité de la normalisation (ADR 0006, point 2)."""
+    for character in value:
+        if unicodedata.category(character) == "Cn":
+            raise UnassignedCharacter(f"U+{ord(character):04X} non attribué en Unicode {UNICODE_VERSION}")
+    return value
+
+
 def text(value: str) -> bytes:
     try:
         # encode() échoue sur un demi-caractère isolé : c'est le refus voulu (ADR 0006).
-        encoded = unicodedata.normalize("NFC", value).encode("utf-8")
+        encoded = unicodedata.normalize("NFC", known_characters(value)).encode("utf-8")
     except UnicodeEncodeError as error:
         raise Rejected("demi-caractère Unicode isolé") from error
     return raw_bytes(encoded)
@@ -394,10 +413,6 @@ PASSWORD_CASES: list[tuple[str, str, str, str]] = [
     ("longueur : 128 phoques U+1F9AD, 256 unités UTF-16", "\U0001f9ad" * 128, "valentin", "valentin@exemple.ca"),
     ("longueur : 129 phoques U+1F9AD", "\U0001f9ad" * 129, "valentin", "valentin@exemple.ca"),
 ]
-
-# Version d'Unicode du générateur : NFKC et minuscules en dépendent. Elle est écrite dans le fichier, si bien qu'une
-# régénération sous une autre version fait échouer --check (la CI épingle Python).
-UNICODE_VERSION = unicodedata.unidata_version
 
 
 def build_password_policy() -> str:
@@ -1416,7 +1431,8 @@ class Reader:
         return self.take(self.u32())
 
     def text(self) -> str:
-        value = self.bytes().decode("utf-8")  # strict ; un BOM reste U+FEFF, comme en Java et en TypeScript
+        # strict ; un BOM reste U+FEFF, comme en Java et en TypeScript
+        value = known_characters(self.bytes().decode("utf-8"))
         if unicodedata.normalize("NFC", value) != value:
             raise Rejected("texte hors de la forme NFC")
         return value
@@ -1891,10 +1907,29 @@ def build_envelope() -> str:
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
 
 
+# U+FDD0 est un non-caractère : non attribué dans toutes les versions d'Unicode, c'est une sonde stable.
+UNASSIGNED_PROBE = "seal\ufdd0"
+
+
+def check_unicode_guard() -> None:
+    """ADR 0006, point 2 : un caractère non attribué arrête le générateur, à l'écriture comme à la relecture."""
+    attempts = {
+        "écriture": lambda: text(UNASSIGNED_PROBE),
+        "relecture": lambda: Reader(raw_bytes(UNASSIGNED_PROBE.encode("utf-8"))).text(),
+    }
+    for step, attempt in attempts.items():
+        try:
+            attempt()
+        except UnassignedCharacter:
+            continue
+        raise AssertionError(f"{step} : un caractère non attribué doit arrêter le générateur (ADR 0006, point 2)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Vecteurs de référence de SEAL (PROTOCOL.md).")
     parser.add_argument("--check", action="store_true", help="échoue si un fichier n'est pas à jour")
     check = parser.parse_args().check
+    check_unicode_guard()
     outputs = [
         (OUTPUT, build(), f"{len(VALID)} cas valides, {len(INVALID)} cas à rejeter"),
         (PASSWORD_OUTPUT, build_password_policy(), f"{len(PASSWORD_CASES)} cas"),

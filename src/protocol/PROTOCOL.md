@@ -38,6 +38,14 @@ Le JSON n'est jamais signé ni haché directement.
 `‖` désigne la concaténation. Un élément de liste PEUT être composé de plusieurs primitives
 concaténées, comme une encapsulation `uuid(recipientId) ‖ bytes(ekId) ‖ bytes(enc) ‖ bytes(wrappedCek)`.
 
+**Version d'Unicode (ADR 0006, point 2).** NFC dépend de la version d'Unicode du moteur.
+- La référence est Unicode 15.0, celle du générateur des vecteurs, et toute implémentation testée est au moins
+  à cette version.
+- Un texte fait de caractères attribués dans une version garde le même verdict NFC dans toutes les versions
+  suivantes. Le générateur s'arrête donc sur tout caractère non attribué dans la sienne.
+- Limite admise : un texte qui contient un caractère inconnu du moteur de l'émetteur peut être jugé hors NFC par
+  un lecteur plus récent. Le message est alors refusé (`integrity_failed`), jamais affiché.
+
 ### 2.2 Règles (MSG-01)
 
 1. Les champs sont encodés exactement dans l'ordre documenté par chaque structure.
