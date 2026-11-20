@@ -18,6 +18,17 @@ import {
 } from '../messageFormat'
 import { base64url, decimal, type Json, number, record, records, string } from './vectorReader'
 
+/** Un UUID de version 4 : jamais un messageId (PROTOCOL.md 6.2). */
+const UUID_V4 = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b'
+
+/** Le même UUIDv7, daté d'une milliseconde plus tôt. */
+function otherInstant(messageId: string): string {
+  const hex = messageId.replaceAll('-', '')
+  const earlier = (Number.parseInt(hex.slice(0, 12), 16) - 1).toString(16).padStart(12, '0')
+  const value = `${earlier}${hex.slice(12)}`
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`
+}
+
 /** RFC 8410 : en-tête PKCS#8 d'une clé privée X25519 brute de 32 octets. */
 const X25519_PKCS8_PREFIX = Uint8Array.of(
   0x30,
@@ -189,6 +200,24 @@ export function describeEnvelopeVectors(vectors: Json, engine: string): void {
       }
     })
 
+    it('PROTOCOL.md 6.2 : un messageId qui n’est pas un UUIDv7 daté de sentAt, un senderSeq nul, un groupSeq non nul en direct ou l’émetteur absent des destinataires sont refusés', () => {
+      const bobId = fields.recipientIds.find((id) => id !== fields.senderId) ?? ''
+      for (const [name, forged] of [
+        ['UUIDv4', payload({ messageId: uuid(UUID_V4) })],
+        [
+          'UUIDv7 daté d’un autre instant',
+          payload({ messageId: uuid(otherInstant(fields.messageId)) }),
+        ],
+        ['senderSeq nul', payload({ senderSeq: u64(0) })],
+        ['groupSeq non nul en direct', payload({ groupSeq: u64(1) })],
+        ['émetteur absent', payload({ recipientIds: list(uuid, [bobId]) })],
+      ] as const) {
+        expect(() => decodeSignedPayload(forged), name).toThrow(MessageFormatError)
+      }
+      const group = decodeSignedPayload(payload({ conversationType: u8(2), groupSeq: u64(7) }))
+      expect(group.groupSeq).toBe(7)
+    })
+
     it('ADR 0030, point 6 : 4 000 points de code se relisent, émojis compris', () => {
       const body = '🦭'.repeat(4000)
 
@@ -202,6 +231,14 @@ export function describeEnvelopeVectors(vectors: Json, engine: string): void {
         ['destinataire en double', { ...fields, recipientIds: [first, first] }],
         ['sel de 15 octets', { ...fields, salt: new Uint8Array(15) }],
         ['corps de 4 001 points de code', { ...fields, body: 'a'.repeat(4001) }],
+        ['UUIDv4', { ...fields, messageId: UUID_V4 }],
+        ['senderSeq nul', { ...fields, senderSeq: 0 }],
+        ['groupSeq non nul en direct', { ...fields, groupSeq: 1 }],
+        ['sentAt fractionnaire', { ...fields, sentAt: fields.sentAt + 0.5 }],
+        [
+          'émetteur absent',
+          { ...fields, recipientIds: fields.recipientIds.filter((id) => id !== fields.senderId) },
+        ],
       ] as const) {
         expect(() => encodeSignedPayload(forged), name).toThrow(MessageFormatError)
       }

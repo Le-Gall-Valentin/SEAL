@@ -216,6 +216,35 @@ function checkPayload(fields: SignedPayloadFields): void {
     }
     previous = id
   }
+  checkInvariants(fields)
+}
+
+/**
+ * PROTOCOL.md 6.2 (ADR 0030, point 4) : `messageId` est un UUIDv7 daté de `sentAt`, `senderSeq` commence à 1,
+ * `groupSeq` vaut 0 en conversation directe, et l'émetteur figure parmi les destinataires.
+ */
+function checkInvariants(fields: SignedPayloadFields): void {
+  if (fields.senderSeq < 1) {
+    throw new MessageFormatError('SignedPayload : senderSeq commence à 1')
+  }
+  if (fields.conversationType === 1 && fields.groupSeq !== 0) {
+    throw new MessageFormatError('SignedPayload : groupSeq vaut 0 en conversation directe')
+  }
+  if (!fields.recipientIds.includes(fields.senderId)) {
+    throw new MessageFormatError('SignedPayload : l’émetteur figure parmi les destinataires')
+  }
+  if (!Number.isSafeInteger(fields.sentAt)) {
+    throw new MessageFormatError('SignedPayload : sentAt est un entier')
+  }
+  const id = encoded(() => encodeUuid(fields.messageId))
+  const view = new DataView(id.buffer)
+  if (
+    view.getUint8(6) >> 4 !== 7 ||
+    view.getUint8(8) >> 6 !== 0b10 ||
+    view.getBigUint64(0) >> 16n !== BigInt(fields.sentAt)
+  ) {
+    throw new MessageFormatError('SignedPayload : messageId est un UUIDv7 daté de sentAt')
+  }
 }
 
 /**

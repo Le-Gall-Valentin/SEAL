@@ -1307,14 +1307,16 @@ MESSAGE_RECIPIENTS = {
 
 
 def seal_message(header: dict, signed_payload: bytes, signature: bytes, recipients: list[str], label: str,
-                 padding: bytes = b"", cek: bytes | None = None, nonce: bytes | None = None) -> dict:
+                 padding: bytes = b"", cek: bytes | None = None, nonce: bytes | None = None,
+                 plaintext: bytes | None = None) -> dict:
     """
     CDC 7.5, étapes 5 à 7 : Plaintext chiffré par la CEK sous l'AAD, CEK encapsulée pour chaque destinataire. Sauf
     mention contraire, la CEK et le nonce dérivent de `label` : aucun couple ne chiffre deux textes (CDC 7.1).
     """
     cek = cek if cek is not None else sha256(("SEAL vecteurs, CEK : " + label).encode("utf-8"))
     nonce = nonce if nonce is not None else sha256(("SEAL vecteurs, nonce : " + label).encode("utf-8"))[:12]
-    plaintext = raw_bytes(signed_payload) + raw_bytes(signature) + raw_bytes(padding)
+    if plaintext is None:
+        plaintext = raw_bytes(signed_payload) + raw_bytes(signature) + raw_bytes(padding)
     aad = message_aad(header)
     ciphertext = crypto_lib().AESGCM(cek).encrypt(nonce, plaintext, aad)
     wraps = []
@@ -1462,6 +1464,17 @@ def decode_signed_payload(data: bytes) -> dict:
         or any(uuid(a) >= uuid(b) for a, b in zip(recipients, recipients[1:]))
     ):
         raise Rejected("SignedPayload hors du format")
+    # PROTOCOL.md 6.2 : UUIDv7 daté de sentAt, senderSeq dès 1, groupSeq nul en direct, émetteur destinataire.
+    message_id = uuid(f["messageId"])
+    if (
+        message_id[6] >> 4 != 7
+        or message_id[8] >> 6 != 0b10
+        or int.from_bytes(message_id[:6], "big") != f["sentAt"]
+        or f["senderSeq"] < 1
+        or (f["conversationType"] == 1 and f["groupSeq"] != 0)
+        or f["senderId"] not in recipients
+    ):
+        raise Rejected("invariants de PROTOCOL.md 6.2")
     return f
 
 
@@ -1618,6 +1631,14 @@ def build_envelope() -> str:
             "envelope"
         ]
 
+    def signed_variant(label: str, **changes) -> dict:
+        """Un SignedPayload modifié, signé par l'émetteur, chiffré pour Bob ; l'en-tête reprend son messageId."""
+        variant = signed_payload_fields(**changes)
+        payload = encode(signed_payload_struct(variant))
+        return seal_message(dict(header, messageId=variant["messageId"]), payload, sign(IK_SEED, payload), [VICTIM_ID],
+                            label)["envelope"]
+
+    crowd = sorted([USER_ID, VICTIM_ID] + [f"0192f7a1-ffff-7000-8000-{index:012x}" for index in range(49)], key=uuid)
     unsorted = signed_payload_fields(recipientIds=list(reversed(fields["recipientIds"])))
     unsorted_payload = encode(signed_payload_struct(unsorted))
     absent_payload = encode(signed_payload_struct(signed_payload_fields(recipientIds=[USER_ID])))
@@ -1684,6 +1705,25 @@ def build_envelope() -> str:
                         dict(envelope, wraps=envelope["wraps"] + [envelope["wraps"][bob_wrap]]), "integrity_failed"),
         message_forgery("un chiffré de 24 577 octets, pourtant signé (MSG-21)",
                         padded_to(MAX_CIPHERTEXT_BYTES + 1, "24 577 octets"), "integrity_failed"),
+        message_forgery("un messageId UUIDv4, pourtant signé",
+                        signed_variant("UUIDv4", messageId="6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b"), "integrity_failed"),
+        message_forgery("un messageId UUIDv7 daté d'une autre milliseconde que sentAt, pourtant signé",
+                        signed_variant("autre instant", messageId=uuid_v7(SENT_AT - 1, bytes(range(0xD0, 0xDA)))),
+                        "integrity_failed"),
+        message_forgery("un senderSeq nul, pourtant signé", signed_variant("senderSeq nul", senderSeq=0),
+                        "integrity_failed"),
+        message_forgery("un groupSeq non nul en conversation directe, pourtant signé",
+                        signed_variant("groupSeq en direct", groupSeq=1), "integrity_failed"),
+        message_forgery("l'émetteur absent des destinataires signés",
+                        signed_variant("émetteur absent", recipientIds=[VICTIM_ID]), "integrity_failed"),
+        message_forgery("51 destinataires signés", signed_variant("51 destinataires", recipientIds=crowd),
+                        "integrity_failed"),
+        message_forgery(
+            "un Plaintext sans son champ de padding, pourtant chiffré",
+            seal_message(header, signed_payload, signature, [VICTIM_ID], "sans padding",
+                         plaintext=raw_bytes(signed_payload) + raw_bytes(signature))["envelope"],
+            "integrity_failed",
+        ),
         message_forgery(
             "une liste de destinataires non triée, pourtant signée",
             seal_message(header, unsorted_payload, sign(IK_SEED, unsorted_payload), [VICTIM_ID], "non triée")["envelope"],

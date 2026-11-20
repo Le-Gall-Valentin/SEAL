@@ -211,6 +211,16 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       ).rejects.toBeInstanceOf(HpkeSealError)
     })
 
+    it('PROTOCOL.md 6.2 : un senderSeq nul ou un groupSeq non nul en direct ne scellent rien', async () => {
+      const keyring = await parties.senderKeyring()
+
+      for (const changes of [{ senderSeq: 0 }, { groupSeq: 1 }]) {
+        await expect(sealMessage(keyring, await draft(changes))).rejects.toBeInstanceOf(
+          MessageFormatError,
+        )
+      }
+    })
+
     it('RFC 9562 : un sentAt hors des 48 bits d’un UUIDv7, ou un aléa de 9 octets, ne scellent rien', async () => {
       const keyring = await parties.senderKeyring()
 

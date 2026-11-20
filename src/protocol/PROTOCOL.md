@@ -426,9 +426,11 @@ info_r     = struct("SEAL-wrap-v1", text(suite), uuid(messageId),
 - `messageId` est un UUIDv7 dont l'horodatage est `sentAt` ; CEK de 32 octets, nonce de 12 et sel de 16, tirés par
   `crypto.getRandomValues` à chaque message.
 - `recipientIds` compte de 1 à 50 identifiants, triés par ordre des octets et distincts ; l'émetteur y figure.
+- `senderSeq` commence à 1 ; `groupSeq` vaut 0 en conversation directe. Le scellement refuse ce que la relecture
+  refuserait, ces règles comprises (ADR 0030, point 4).
 - Le corps se compte en points de code après NFC : un émoji compte pour un (ADR 0030, point 6).
-- `padding` est vide au scellement en P0 ; à la lecture, toute longueur est acceptée et ignorée : il est chiffré mais
-  non signé, et n'a aucun sens (ADR 0030, point 7).
+- `padding` est vide au scellement en P0 ; à la lecture, toute longueur est acceptée et ignorée, dans la limite de
+  MSG-21 (chiffré de 24 576 octets au plus) : il est chiffré mais non signé, et n'a aucun sens (ADR 0030, point 7).
 - La CEK et `Plaintext` sont remis à zéro dès qu'ils ont servi ; la CEK n'existe qu'en mémoire.
 
 ### 6.3 Sous-clé d'un destinataire (KEY-20)
@@ -462,7 +464,7 @@ Les vérifications s'exécutent dans cet ordre et échouent fermé : le contenu 
 | 1 | Enveloppe lisible : objet strict (aucun champ inconnu), UUID en minuscules, base64url canonique, tailles, `v` = 1, suite connue ; MSG-21 : chiffré de 24 576 octets au plus, 50 encapsulations au plus, une par destinataire | `integrity_failed` |
 | 3 | L'encapsulation pour soi, dont l'`ekId` est dans le trousseau, ouverte par HPKE | `undecryptable` |
 | 4 | `Plaintext` déchiffré par AES-256-GCM sous l'AAD | `integrity_failed` |
-| 5 | `SignedPayload` relu strictement ; version, suite, identifiants et numéro de série égaux à l'enveloppe | `integrity_failed` |
+| 5 | `SignedPayload` relu strictement, invariants de 6.2 compris (`messageId` UUIDv7 daté de `sentAt`, `senderSeq` ≥ 1, `groupSeq` = 0 en direct, émetteur parmi les destinataires) ; version, suite, identifiants et numéro de série égaux à l'enveloppe | `integrity_failed` |
 | 6 | Certificat de l'émetteur : Autorité, sujet, numéro de série, validité à `serverReceivedAt` | `signature_invalid` |
 | 7 | Signature Ed25519 de `SignedPayload` par l'IK du certificat | `signature_invalid` |
 | 8 | Le lecteur figure dans `recipientIds` | `recipients_mismatch` |
@@ -488,7 +490,9 @@ les deux sens (ADR 0030, point 2). Il ouvre ensuite chaque enveloppe selon 6.5 e
 statut diffère de celui qu'il annonce. `accepted` donne des enveloppes qui s'ouvrent : padding de 7 octets, chiffré de
 24 576 octets exactement. `forgeries` donne des enveloppes que Bob NE DOIT PAS accepter, chacune avec le statut
 attendu (`rejectedBy`) : champ inconnu dans l'enveloppe ou dans une encapsulation ; `messageId` en majuscules ; deux
-encapsulations pour Bob ; chiffré de 24 577 octets, pourtant signé ; octet du chiffré, du
+encapsulations pour Bob ; chiffré de 24 577 octets, pourtant signé ; `messageId` UUIDv4, ou UUIDv7 d'une autre
+milliseconde que `sentAt` ; `senderSeq` nul ; `groupSeq` non nul en direct ; émetteur absent des destinataires ;
+51 destinataires ; `Plaintext` sans son champ de padding ; octet du chiffré, du
 nonce, de `enc` ou de `wrappedCek` ; en-tête déplacé dans une autre conversation ; message signé rechiffré par Bob
 dans une autre conversation (transfert subreptice), sous un autre `messageId`, sous un autre émetteur annoncé ou sous
 un autre numéro de certificat ; signature d'une autre IK ; signature altérée ; Bob absent des

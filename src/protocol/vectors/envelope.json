@@ -622,6 +622,167 @@
       "rejectedBy": "integrity_failed"
     },
     {
+      "name": "un messageId UUIDv4, pourtant sign\u00e9",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "I0EuD5Ti0otQjADk",
+        "ciphertext": "iWHJ-t5e9ZOgA34rY83zxVerBcHWMGPvSeUpnX4Vshr9ZyVyWlEjkesgzh9EbFtWR66-k3MOnxw32FP87y0AKkmpUpF8MtQhbVM4nSfmeyINeX5zH19CLS5fEjt0GtOXncJDkZ1nRCh_X3aWCNn4gT6m0a8VccZkXHIRxCn5rUbbBQTmRmS5nJ4CgRWALpfFm-sar7str0F22RNie2XQ7w6SZukX5PL5Ym5iGSDL6vw9goOLSGtqcjcziIlpRNm9jsuyiA4A65OFAUZpF3SoGfjkYMuvURCKr5ZEgTfZgMopv8GgA6Gq4zzYOOzBhMcgDyZhh_dOyNPOpCrQbxaHeu5wxzo-6toZYPuQoI4gyMgVPWKi0KvWzK_0ckwgX_Vg7CWu1Igyn5I6sJCyOYVY73EAAw5CzuUd6hGLsvhc2RiPS5_6nKTXTqhnRPDDdda_D0I2U6bG5Vaor2RrDZ4",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "Lh8PkMEJy5cOQZ6g42KLxEA2F5H3c5DCQTs6b7OWhBs",
+            "wrappedCek": "Z1909oDbf2ioCUK3Sm5Ec1rXb-_m512WQsU6QSdTa7yo9BUmOzZdch0o4l-AJ0XY"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
+      "name": "un messageId UUIDv7 dat\u00e9 d'une autre milliseconde que sentAt, pourtant sign\u00e9",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa5f-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "w2QXsI6KnJMwUerP",
+        "ciphertext": "Y5_s_8iEdMLtcfOv70Jo6_q5f8qx9eO9XY2cQYfVW9GWcgtqI-Ge1-RjELxNVfZds7QJMWAb4IrId2kTN50zDuwTJNZQiwlkSrhLaOysTTP1tdMW8_l4w6VZhd0uci3mPCP1_IqqtqIbKO-MKywmhUdK3P_IL9dUZpGAFPHQ8yfw-5yTfoN6vsOVa0VduELjx5xfw4eh_0i5ZfjOwgYHoNy1-MPruULbsVr3zSIjfnr1oUetNP1cAJefgAempf8UhmUzTFikZ-VvlUNoQKACJw9aITiq8gM_WomtkzbhxTHEGGwgsoCtWULhZBx9_WVdUeRBAeOJTRTWiH6yaGLGJLgsP9_FuwDGv6Y_9gdW99JrHA53JLkdvh9VNPFk7hKlffMdV3_q3ly2aNOAaaplZvy2QbM4PB2f5TD7Okg8xirK3U_y9lE7siETR-Ru-tLjJXRnCv_vqNDKiQwc5EU",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "iOQdLJEmULHx4b2QayHN6S113bS4m59TaWutA1wX9HQ",
+            "wrappedCek": "aeQgwemh_fciUthczfntN7PcqEYklU8n6K0ZQMFiNw1pJy_bH7rA-NgJgK7JJLk1"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
+      "name": "un senderSeq nul, pourtant sign\u00e9",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "CzBe0aoAhfORWXIg",
+        "ciphertext": "Zga3mK_dPqNc2uZhoZhfRnMkrTIiVHi2j27YnYSgbouOGx7UFvANmhNsGF51uAlklulXRbl1RSZz0A28K6kC8al-MHXILF6He7uV6Yf22zdYtAkwVOhLS-MFFF-SJvktrfgjvXEmcDxN0xz289FlnzWry75JnSIuTepILhl9-XOviDFz8U9TJFj5iD4jRlesV_SIXg_K6V-_RAmYqgohXxcBlOUhodILybAb3i2Cpz0KwBNvqHW3SP7W9LDunSva_4PtIJmimZj9wLVL1JQRAsyiiGoWrr6zjYiZ-cT47vbD7inB6ps0JVGV7vkXo9txROu1KFZSifHkMPsHIRRUmOJ8s3-uja_eWovW3Jqk6mPcRaJ0pa_4W0-LXkq6negybPVQHxIvGwgqrf4NY67rxyNENKyTbCalFplkCinHYqu18YOGdO1M4lT-BPj4_b62KVBZQk1IySYeM1mizQc",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "aj23nyqDyiGnkmyXah8zNegBaHHSb0K47f7-u8Ezv0E",
+            "wrappedCek": "92R9nI66Cs2n6SK17faBWK-7f29Opg0v9uxaD3bqp__sZdpDEMPgkp7FzAcS9qV7"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
+      "name": "un groupSeq non nul en conversation directe, pourtant sign\u00e9",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "_wvzqW2V7pVR3IZM",
+        "ciphertext": "F5-g-_cHUJQG1EV56_KQ8d7FtQ_pcnHXTNVzaSGZ2yIZLlxGh6eZEntUIijMospPcEfpJx-Q6xnC2btvx7PPFikNOM9DjExyY5TE677cOMyqdH98gF6P-zKHYQzIdn_cT5Zdc47HvhCaHXZc3Ao18MbYGdKmyutWtZYKbN8hf9YeFZ9pJj2Hr93D1nD2siVaYIWD1qLpEx1CB8XCHBgaYrmtVAbvuhoCkwsskQC8LGn2rRkgv9ZCXR4iwiZxw0ewor9CkjaX2nIMAKkrUE64c1oY1Dh-1aTppomsrzrHmS_0RVYtZWamhYcXZpM67cMpEQxRjoxNLyqRprfEPL0s0HffYBi1GhThEZGsNrQUE-6UJ_uLUKK_e6odqxGH7nbfqG_bRn_XYjiHQKd_PTI-HS_ZV6ROS1W7MnjvJS1q3TWID0qBjTVyQidyj6-NvdCLKV_FKGOmwbaH8jHUaqo",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "fymyEuZJ1LVzu_YVvmbgTqRziT9sEVBfpJ-5Qf8ycAY",
+            "wrappedCek": "37ylvzj_V4i7A-C4hDSwmyFcdHxi-YyaI2c8WkZGXswJ_d12498gyWWO_BBu6nJD"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
+      "name": "l'\u00e9metteur absent des destinataires sign\u00e9s",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "XIWBZw4oDnvTeW0-",
+        "ciphertext": "tHS8r1QTpUpAovAN2m4IoiuZ5OAW9K31OnOZUuAJiXd07DRRQJYU32uIgzJ3qmSzSBwSo9T4dz9lWDJwDxmUzkCxE-kVXwZDSjLGsWe7RIGTCga44uMhFtVsP7CeQEJ5VI8In7djBTTdR9htUxj6jzis4Kvw2LxXxVNtseFxQl6fPcxSw3kYmF1tVAGOvEnB2YSbILINGINmEHwxeRn4Qn7aj-ZqKfI4Gzz9fxnbI1UYVlsxqDGGU80EWX1fNzuuK_n-QnIBhQtk_nvkvmys5Q6OJSOKIoaSFEpOgR9RZ7EcxOYDtIbON2MYqDCufSKnfA8aHIzdwyrkwwGNlt5AmGFau_0D1anaxKpWcLau860_sRIS7b58UMY5SMzZhqOn2BF1V-JHPDrZ6U87_msUyDU2rsoQof6jnK8cphdfbE6HStw7xOZQo3gNzr4C1Q",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "bqwXabaggLDU9RSILm8VlIByZCngrNnyy29_8pmDWgE",
+            "wrappedCek": "lDwh3v2K9yE9_jKEP3yJ7DOI5ngNoRiSoJXc1S9gj6xHl3HKp5gXBQ1N27g0ousv"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
+      "name": "51 destinataires sign\u00e9s",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "ywzsRVjAemjm_UHX",
+        "ciphertext": "1pJL4bnj4LELiYPpMaQeHc_nL3AxHXPf4t2KlDc1Tq85haBYSmW-5HfJY9iS6OFTnM2FPiKt0MuW7ZdC4pp0fu4W6EmTkVintXqNi-lMYx9IbwZ4WkHeC-re4YpJqZe9eMY4CyAe3bDxJYYGGNOeB7KdeACjL3-znwtZVaQJT26MW50Oq-sPikq0zJdjuC08VDlHKy-to3fK8cMRdFab84cmRcqwRiH5qoiWJH7IrTwRvxi9A95ayvqDIOXn5tdPynGfz1tihwWRWJAPWxUyca77RIGOkqdn5cIu1jo6c_N_ykeQNyQNBlHuuOAROqolqDUM1xb67P7xkmfChqa2aYNPMFQRie-JfbUsY9S4Rwgz3UawNKqAfU55qIwI9NCR_5R2kDj0Bmdr8u3eDo0G04cN4jJ8Jvyi5lpzziNc2bNWxD8KHJugCWU5GeIUNrdxRAUZckd2taIuadf-CuMmEF5x1H881UlfO3PVI7npIbET4PSncGMIbC_qSs2ywGWUrAQFaEbo1XqSk3xE5yTWWHESA_4fkg79UU9nsvLULwQm716KlKRKyQ_kvgLBT0BC4lprOhLWzM8hJ3g8hMyVc3mg1AU8Cf-Cestt_G2gg91BLkD7mQ4skJMcfLnWgpqsnUZlZk8rHsZ_o5qWq-OwbxEAEq03bRBrPssFM9JSXfrwMBrOXeLYO4m4ad3XNv8Ii-s0EfFjRKnS_4TDKpq81sQOqcaO7I5N5zfhxoC8019H56r-DYilcr33VLOar0ktjzNt0evEMKF-uMNL8LZeS5QM_dSfUnphjl0Ts13BTk_-tj-Wx0_oO9Lt81KtRpKbflzJwxRSShZ_O0ELV4W-aCJW3OjOE6AaSTi4gVcRU2JosSyAmRj8VOjwshYS69QGs2FfInn8M4XSZcMiGX-CwnX4MOwtLh85SOFiOAlHE_SDduxWXZJ0Kghqnd9UK_wOrl7DE6sOaZe4N1fQ5jifCf18eHOCslmAme44uAWutZDgLr78lpcSHRc9hKlwQ3-kAXvi-OAABl4SlDIZWy3iK1v9aH94KbvOyJgTPww5K3DBPobQlQao5uC16Kgbn994pjJj2aeFGaaz0XcApzqxSYmLFT51eCtjH1bcSHuIY3qP0ODHbZDa4zd-FfycUXhBVmvPDKhxchE213dtnOsE6Uy_uz7mF0iOLcdmJw0-Gsavl-gHpheQTI4EbuXF2WxNtGbMrUR-gATN9qENWFS4vLQm2sGK1MSkjietJAIO6DlQAzafxU2SWBynubPdPfpd2o6nDSt4eBFItJICMrKnB_Kn9h9ykZ2PT465kYQjOB_1IDGmkgvpUMD88YvPbxFMHWas4a1wztfh0HT4VpjFO7VIqSkY6wrYczAV6NrDRKZRGNK7XWcMEYpQ8L4YQqQo29tS5tFPCka3pPdrxsizlJA3fL3x4JQhOxR3IcsaClHqSzsu8OwmjeB35sdqLYRzKlD1DVKU6h3NpauqrNM3GhL5iFZAkxd2GdyYRz9o",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "HeXE-SAfkA30ua-apANhup3rE2sPH9T1QO2QJ0SMwlY",
+            "wrappedCek": "bysiTpajrGsKacOlRdEIl2A0WtGrGpVTPtP8egQ2dGK7TP392qgBMyIaZ_oaxB1R"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
+      "name": "un Plaintext sans son champ de padding, pourtant chiffr\u00e9",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "Msih2CfcMcKqO6ej",
+        "ciphertext": "A8oVm8_OPM-zfmhpz9vdhu-ISXOQRGvilvKVDMvvJPkA3hcmv9nf79thl8fpLc8eYEWxU_TqNyhMkwZIRN6Y48acU3ldgu6qPV3LYX62GMgmkirnklL8Dlpd7ExcJSa58uNqg6cXi-CuZu0AD2EoSeEiw4WIg02y-u2MukrwbVcp3JBKcbWCTZMZQL_Sy1ChGIaOMYltqxrIlw6BAqMhUpPL8NeZc2grHAVnSgUkpoH5xIYnS2TO7wMBt3x5oM5AEGDY-ZuwbL1JL9EWaWNGBBtNGDab745ommG03jaeDIJi8GosW_uZTb503U2DLpM1JaiY9wK7ccdVNlrmm2RKIOEfnd6y9rVOFBOZzSATp9-hDE35_p59IJIKS7FGC8WYlBaA6FG5T0usEjfsqxHqbf1AfoaMgEyNfy-XQFSR4_U5GSVh4W5j5NG5l26pYgfWZO8tsrq4rb8OZg",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "v6uAVe48C9W_G6DeVO1t6HZFQmAZrD1q5AHtEfL8viw",
+            "wrappedCek": "fITFHxPUhqmjR70Q9PIJMgkV2z5Wgf8kcpmtdF0dLTx9qRbSQ4rNW9sYjhUQs85e"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
       "name": "une liste de destinataires non tri\u00e9e, pourtant sign\u00e9e",
       "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
       "envelope": {
