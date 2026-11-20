@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
+import fr.vlegall.seal.identity.domain.model.IdentityException;
 import fr.vlegall.seal.identity.domain.model.Username;
 import fr.vlegall.seal.identity.domain.port.out.EmailCodeRepository;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
@@ -119,5 +120,37 @@ class IdentityPersistenceIT {
         assertThat(users.findActiveByEmail(
                         EmailAddress.parse("persistance.cinq@exemple.ca").orElseThrow()))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+            "AUTH-32 : createActive traduit l'identifiant pris en USERNAME_TAKEN, le courriel actif en OAUTH_EMAIL_IN_USE")
+    void auth32CreateActiveTranslatesUniqueIndexes() {
+        insertActive("persistance.oauth");
+        fr.vlegall.seal.identity.domain.model.DisplayName name =
+                fr.vlegall.seal.identity.domain.model.DisplayName.parse("Nom").orElseThrow();
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> users.createActive(
+                        Username.parse("persistance.oauth"),
+                        name,
+                        EmailAddress.parse("libre.oauth@exemple.ca").orElseThrow(),
+                        Instant.now())))
+                .isInstanceOf(IdentityException.UsernameTaken.class);
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> users.createActive(
+                        Username.parse("persistance.oauth2"),
+                        name,
+                        EmailAddress.parse("persistance.oauth@exemple.ca").orElseThrow(),
+                        Instant.now())))
+                .isInstanceOf(IdentityException.EmailInUse.class);
+        UserId created = transactions.execute(status -> users.createActive(
+                Username.parse("persistance.oauth3"),
+                name,
+                EmailAddress.parse("persistance.oauth3@exemple.ca").orElseThrow(),
+                Instant.now()));
+        assertThat(jdbc.sql("SELECT status FROM users WHERE id = ? AND email_verified_at IS NOT NULL")
+                        .param(created.value())
+                        .query(String.class)
+                        .single())
+                .isEqualTo("ACTIVE");
     }
 }

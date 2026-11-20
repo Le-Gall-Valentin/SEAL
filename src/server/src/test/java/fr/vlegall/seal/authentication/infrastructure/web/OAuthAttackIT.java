@@ -144,7 +144,8 @@ class OAuthAttackIT {
                 .andReturn());
 
         List<String> causes = jdbc.sql("SELECT details->>'cause' FROM security_events WHERE type = 'LOGIN_FAILED' "
-                        + "AND details->>'method' = 'oauth' ORDER BY created_at DESC LIMIT 2")
+                        + "AND details->>'method' = 'oauth' AND ip = CAST(? AS inet)")
+                .param(client.ip())
                 .query(String.class)
                 .list();
         assertThat(causes).containsExactlyInAnyOrder("access_denied", "oauth_error");

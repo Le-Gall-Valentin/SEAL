@@ -282,7 +282,7 @@ class OAuthRegistrationIT {
     }
 
     @Test
-    @DisplayName("A06 : deux complete simultanés de la même attente ne créent qu'un compte")
+    @DisplayName("AUTH-32, A06 : deux complete simultanés de la même attente ne créent qu'un compte")
     void a06ConcurrentCompletesCreateOneAccount() throws Exception {
         String subject = googleSubject();
         Cookie session = pendingGoogle(subject, unique("r") + "@gmail.com");
@@ -302,6 +302,17 @@ class OAuthRegistrationIT {
         assertThat(statuses).containsOnlyOnce(204);
         assertThat(statuses).anyMatch(status -> status == 404 || status == 409);
         assertThat(identities.findUser(OAuthProvider.GOOGLE, subject)).isPresent();
+        UserId user = identities.findUser(OAuthProvider.GOOGLE, subject).orElseThrow();
+        String email = jdbc.sql("SELECT email FROM users WHERE id = ?")
+                .param(user.value())
+                .query(String.class)
+                .single();
+        assertThat(jdbc.sql("SELECT count(*) FROM users WHERE email = CAST(? AS citext)")
+                        .param(email)
+                        .query(Long.class)
+                        .single())
+                .as("un seul compte pour ce courriel")
+                .isOne();
     }
 
     @Test
@@ -312,7 +323,8 @@ class OAuthRegistrationIT {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
         mvc.perform(client.unsafe(post("/api/v1/auth/oauth/complete"), null, choice(unique("q"), "Nom")))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         AuthClient other = new AuthClient(mvc, mail);
         Cookie full = other.verify(other.register(unique("q") + "@exemple.ca", unique("q")));
@@ -320,7 +332,8 @@ class OAuthRegistrationIT {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         mvc.perform(other.unsafe(post("/api/v1/auth/oauth/complete"), full, choice(unique("q"), "Nom")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
 
         Cookie session = pendingGoogle(googleSubject(), unique("q") + "@gmail.com");
         mvc.perform(client.from(post("/api/v1/auth/oauth/complete"))
@@ -335,6 +348,9 @@ class OAuthRegistrationIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         mvc.perform(client.unsafe(post("/api/v1/auth/oauth/complete"), session, choice("u".repeat(65), "Nom")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        mvc.perform(client.unsafe(post("/api/v1/auth/oauth/complete"), session, choice(unique("q"), "n".repeat(201))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
@@ -405,5 +421,36 @@ class OAuthRegistrationIT {
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> createOAuthAccount.create(unique("t"), "Nom", unique("t") + "@exemple.ca", true))
                 .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+    }
+
+    @Test
+    @DisplayName("AUTH-31, AUTH-32 : identité liée entre deux attentes, la seconde est refusée et n'en laisse rien")
+    void auth31SecondPendingOfALinkedIdentityLeavesNothing() throws Exception {
+        long id = GITHUB_IDS.incrementAndGet();
+        String firstName = unique("pa");
+        String secondName = unique("pb");
+        Cookie first = AuthClient.sessionOf(oauth.signIn(
+                "github",
+                new GitHubAccount(id, "octo", null, List.of(new GitHubEmail(firstName + "@exemple.ca", true, false)))));
+        Cookie second = AuthClient.sessionOf(oauth.signIn(
+                "github",
+                new GitHubAccount(
+                        id, "octo", null, List.of(new GitHubEmail(secondName + "@exemple.ca", true, false)))));
+        assertThat(complete(first, choice(firstName, "Premier")).getResponse().getStatus())
+                .isEqualTo(204);
+
+        mvc.perform(client.unsafe(post("/api/v1/auth/oauth/complete"), second, choice(secondName, "Second")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("OAUTH_ALREADY_LINKED"));
+
+        assertThat(jdbc.sql("SELECT count(*) FROM users WHERE username = ?")
+                        .param(secondName)
+                        .query(Long.class)
+                        .single())
+                .as("le second compte est annulé avec la liaison")
+                .isZero();
+        assertThat(mail.sentTo(secondName + "@exemple.ca"))
+                .as("aucun code pour un compte annulé")
+                .isEmpty();
     }
 }

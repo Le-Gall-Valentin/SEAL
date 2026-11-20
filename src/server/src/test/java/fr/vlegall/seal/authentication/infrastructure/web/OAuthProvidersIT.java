@@ -70,7 +70,7 @@ class OAuthProvidersIT {
     }
 
     @Test
-    @DisplayName("A02 : OAuth n'ajoute aucune page de connexion générée par Spring")
+    @DisplayName("OPS-03, A02 : OAuth n'ajoute aucune page de connexion générée par Spring")
     void a02NoGeneratedLoginPage() throws Exception {
         MvcResult result = mvc.perform(client.from(get("/login").accept(MediaType.TEXT_HTML)))
                 .andExpect(status().isUnauthorized())
@@ -86,5 +86,16 @@ class OAuthProvidersIT {
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().doesNotExist("Location"))
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    @DisplayName("AUTH-35, QA-05 : une session complète lit aussi les fournisseurs (paramètres, liaison au P1)")
+    void auth35FullSessionReadsProviders() throws Exception {
+        String name = "pr" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        jakarta.servlet.http.Cookie session = client.verify(client.register(name + "@exemple.ca", name));
+
+        mvc.perform(client.from(get("/api/v1/auth/providers")).cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.providers").isArray());
     }
 }

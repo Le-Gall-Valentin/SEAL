@@ -281,4 +281,24 @@ class OAuthLoginIT {
                         .list())
                 .noneMatch(details -> details.contains("journal@exemple.ca"));
     }
+
+    @Test
+    @DisplayName("ACC-07 : un compte lié mais supprimé n'ouvre aucune session : REQUEST_REJECTED")
+    void acc07DeletedLinkedAccountIsRejected() throws Exception {
+        Registered account = active(unique("d"));
+        String subject = googleSubject();
+        link(account, OAuthProvider.GOOGLE, subject);
+        jdbc.sql("UPDATE users SET status = 'DELETED', email = NULL, deleted_at = now() WHERE id = ?")
+                .param(account.id())
+                .update();
+
+        MvcResult result = oauth.signIn("google", GoogleAccount.verified(subject, "supprime@gmail.com"));
+
+        assertThat(location(result)).isEqualTo("/connexion?erreur=REQUEST_REJECTED");
+        assertThat(jdbc.sql("SELECT details->>'cause' FROM security_events WHERE user_id = ? AND type = 'LOGIN_FAILED'")
+                        .param(account.id())
+                        .query(String.class)
+                        .list())
+                .containsExactly("account_unusable");
+    }
 }
