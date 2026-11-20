@@ -151,6 +151,14 @@ export async function verifyCertificate(
  * valeurs, et rien d'autre n'est enregistré. Un base64url non canonique est refusé ('encoding').
  */
 function decoded(served: ServedCertificate): StoredCertificate {
+  // Une réponse hostile peut servir une date en chaîne (décimale ou hexadécimale) : elle n'est jamais convertie.
+  if (
+    !Number.isSafeInteger(served.notBefore) ||
+    !Number.isSafeInteger(served.notAfter) ||
+    !Number.isInteger(served.usage)
+  ) {
+    throw new CertificateRejectedError('encoding')
+  }
   try {
     return {
       serial: fromBase64Url(served.serial),

@@ -1569,10 +1569,19 @@ def verifies_strictly(public: bytes, message: bytes, signature: bytes) -> bool:
 
 
 def served_u64(value: object) -> int:
-    """Un u64 des vecteurs : une chaîne décimale (PROTOCOL.md 2.5), rien d'autre."""
-    if not isinstance(value, str) or not DECIMAL_U64.fullmatch(value) or int(value) > U64_MAX:
-        raise Rejected("u64 hors d'une chaîne décimale")
-    return int(value)
+    """
+    Une date du certificat servi : une chaîne décimale dans les vecteurs (PROTOCOL.md 2.5), un nombre entier de JSON
+    dans l'API, comme le lit le client ; rien d'autre, ni chaîne hexadécimale, ni booléen, ni fraction.
+    """
+    if isinstance(value, str) and DECIMAL_U64.fullmatch(value):
+        number = int(value)
+    elif isinstance(value, (int, float)) and not isinstance(value, bool) and float(value).is_integer():
+        number = int(value)
+    else:
+        raise Rejected("u64 hors d'une chaîne décimale ou d'un nombre entier")
+    if not 0 <= number <= 2**53 - 1:
+        raise Rejected("u64 au-delà d'un entier sûr")
+    return number
 
 
 def verified_certificate(served: dict, subject_id: str, at: int) -> dict:
@@ -1584,8 +1593,10 @@ def verified_certificate(served: dict, subject_id: str, at: int) -> dict:
         strict_b64url(f["ikPublic"], 32)
         signature = strict_b64url(served["signature"], 64)
         not_before, not_after = served_u64(f["notBefore"]), served_u64(f["notAfter"])
-        if not is_integer(f["usage"]):
+        # Sémantique de JSON, comme pour la version : 3 et 3.0 sont le même nombre.
+        if isinstance(f["usage"], bool) or not isinstance(f["usage"], (int, float)) or not float(f["usage"]).is_integer():
             raise Rejected("usage")
+        f = dict(f, usage=int(f["usage"]), notBefore=not_before, notAfter=not_after)
         valid = (
             verifies_strictly(public_key(CA_SEED), encode(certificate_struct(f)), signature)
             and issuer_key_id == sha256(public_key(CA_SEED))[:8]
