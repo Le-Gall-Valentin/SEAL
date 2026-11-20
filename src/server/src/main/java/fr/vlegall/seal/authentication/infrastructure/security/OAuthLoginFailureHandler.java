@@ -5,7 +5,7 @@ import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.regex.Pattern;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -27,10 +27,32 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
     static final String REJECTED = "/connexion?erreur=REQUEST_REJECTED";
 
     /**
-     * Un code d'erreur OAuth (RFC 6749, section 5.2) : le paramètre {@code error} d'un retour vient du navigateur, donc
-     * de n'importe qui. Tout autre texte est journalisé sous un nom fixe (SEC-21, A05).
+     * Codes d'erreur journalisables tels quels : ceux de la RFC 6749 (sections 4.1.2.1 et 5.2) et ceux de Spring
+     * Security. Le paramètre {@code error} d'un retour vient du navigateur, donc de n'importe qui : tout autre texte,
+     * comme une cause propre à SEAL ({@code email_in_use}), est journalisé {@code oauth_error} (SEC-21, A09).
      */
-    private static final Pattern ERROR_CODE = Pattern.compile("[a-z_]{1,64}");
+    private static final Set<String> KNOWN_ERRORS = Set.of(
+            "invalid_request",
+            "unauthorized_client",
+            "access_denied",
+            "unsupported_response_type",
+            "invalid_scope",
+            "server_error",
+            "temporarily_unavailable",
+            "invalid_client",
+            "invalid_grant",
+            "unsupported_grant_type",
+            "authorization_request_not_found",
+            "client_registration_not_found",
+            "invalid_state_parameter",
+            "invalid_redirect_uri_parameter",
+            "invalid_token_response",
+            "invalid_user_info_response",
+            "invalid_user_info",
+            "invalid_id_token",
+            "invalid_nonce",
+            "missing_user_info_uri",
+            "missing_user_name_attribute");
 
     private final RequestMatcher callback =
             PathPatternRequestMatcher.withDefaults().matcher("/login/oauth2/code/{registrationId}");
@@ -44,11 +66,15 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
     public void onAuthenticationFailure(
             HttpServletRequest request, HttpServletResponse response, AuthenticationException exception)
             throws IOException {
-        login.rejected(provider(request), cause(exception));
+        login.rejected(provider(request), cause(request, exception));
         response.sendRedirect(REJECTED);
     }
 
+    /** Le fournisseur du départ s'il est connu, sinon celui de l'adresse de retour. */
     private @Nullable OAuthProvider provider(HttpServletRequest request) {
+        if (request.getAttribute(OAuthAuthorizationRequests.STARTED_WITH) instanceof String startedWith) {
+            return OAuthProvider.fromRegistrationId(startedWith).orElse(null);
+        }
         RequestMatcher.MatchResult match = callback.matcher(request);
         String registrationId = match.getVariables().get("registrationId");
         return match.isMatch() && registrationId != null
@@ -56,12 +82,13 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
                 : null;
     }
 
-    private static String cause(AuthenticationException exception) {
-        if (exception instanceof OAuth2AuthenticationException oauth) {
-            String code = oauth.getError().getErrorCode();
-            if (code != null && ERROR_CODE.matcher(code).matches()) {
-                return code;
-            }
+    private static String cause(HttpServletRequest request, AuthenticationException exception) {
+        if (request.getAttribute(OAuthAuthorizationRequests.REJECTION) instanceof String rejection) {
+            return rejection;
+        }
+        if (exception instanceof OAuth2AuthenticationException oauth
+                && KNOWN_ERRORS.contains(oauth.getError().getErrorCode())) {
+            return oauth.getError().getErrorCode();
         }
         return "oauth_error";
     }

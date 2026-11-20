@@ -36,12 +36,16 @@ class OAuthLoginConfiguration {
             OAuthClientRegistrations registrations,
             OAuthLoginUseCase login,
             SessionEstablisher sessions,
-            PendingOAuthSession pending) {
+            PendingOAuthSession pending,
+            OAuthAuthorizationRequests requests) {
         return configurer -> configurer
                 .clientRegistrationRepository(registrations)
                 .authorizedClientRepository(new DiscardingAuthorizedClientRepository())
-                .authorizationEndpoint(endpoint ->
-                        endpoint.authorizationRequestResolver(new AnonymousAuthorizationRequestResolver(registrations)))
+                // ADR 0032, point 7 : même dépôt pour le départ et le retour (Spring le partage entre les deux
+                // filtres).
+                .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(
+                                new AnonymousAuthorizationRequestResolver(registrations))
+                        .authorizationRequestRepository(requests))
                 .tokenEndpoint(token -> token.accessTokenResponseClient(ProviderHttp.tokenClient()))
                 .userInfoEndpoint(userInfo ->
                         userInfo.userService(new GitHubUserService()).oidcUserService(new GoogleUserService()))

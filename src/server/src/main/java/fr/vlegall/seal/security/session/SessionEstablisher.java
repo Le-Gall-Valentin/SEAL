@@ -41,13 +41,19 @@ public final class SessionEstablisher {
     private final CsrfTokenRepository csrfTokens;
     private final Clock clock;
     private final CredentialVersions versions;
+    private final List<SessionOpeningCleanup> cleanups;
 
-    public SessionEstablisher(CsrfTokenRepository csrfTokens, Clock clock, CredentialVersions versions) {
+    public SessionEstablisher(
+            CsrfTokenRepository csrfTokens,
+            Clock clock,
+            CredentialVersions versions,
+            List<SessionOpeningCleanup> cleanups) {
         this.renewal = new CompositeSessionAuthenticationStrategy(
                 List.of(new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrfTokens)));
         this.csrfTokens = csrfTokens;
         this.clock = clock;
         this.versions = versions;
+        this.cleanups = List.copyOf(cleanups);
     }
 
     /**
@@ -170,6 +176,8 @@ public final class SessionEstablisher {
             HttpServletResponse response) {
         Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(principal, null, authorities);
         renewal.onAuthentication(authentication, request, response);
+        // ADR 0032, point 7 : la session ouverte ne garde ni départ OAuth ni inscription en attente.
+        cleanups.forEach(cleanup -> cleanup.clean(request));
         SecurityContext context = holder.createEmptyContext();
         context.setAuthentication(authentication);
         holder.setContext(context);
