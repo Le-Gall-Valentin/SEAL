@@ -117,7 +117,7 @@ describe('MSG-01 : relecture de l’encodage canonique (PROTOCOL.md, section 2),
     )
   })
 
-  it('PROTOCOL.md 6.2 : le lecteur lit le tampon de l’appelant sans le recopier, et rend des copies', () => {
+  it('MSG-01, PROTOCOL.md 6.2 : le lecteur lit le tampon de l’appelant sans le recopier, et rend des copies', () => {
     const encoded = concat(bytes(Uint8Array.of(7, 8)), bytes(Uint8Array.of(9)))
     expect(CanonicalReader.unlabelled(encoded.subarray(6)).bytes()).toEqual(Uint8Array.of(9))
     const reader = CanonicalReader.unlabelled(encoded)

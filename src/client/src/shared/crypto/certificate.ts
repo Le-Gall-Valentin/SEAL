@@ -9,9 +9,8 @@ import { encodeCertificate } from './identity'
 import { type KeyStore, saveCertificate, type StoredCertificate } from './keystore'
 import { fromBase64Url } from './base64url'
 import { equalBytes } from './bytes'
-import { CLOCK_SKEW_MS, SERIAL_BYTES } from './protocol'
+import { CLOCK_SKEW_MS, KEY_ID_BYTES, SERIAL_BYTES } from './protocol'
 
-const KEY_ID_BYTES = 8
 /** KEY-04 : notAfter = notBefore + 397 jours. */
 const VALIDITY_MS = 397 * 86_400_000
 /** Bit 0 : signature et non-répudiation ; bit 1 : certification de sous-clés. */

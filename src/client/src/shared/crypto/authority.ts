@@ -7,9 +7,7 @@ import { fromBase64Url } from './base64url'
 import { isWeakOrNonCanonical } from './ed25519'
 import { type KeyStore, pinAuthority } from './keystore'
 import { equalBytes } from './bytes'
-
-const PUBLIC_KEY_BYTES = 32
-const KEY_ID_BYTES = 8
+import { ED25519_PUBLIC_KEY_BYTES, KEY_ID_BYTES } from './protocol'
 
 /** Réponse de GET /api/v1/pki/ca, telle que servie : octets en base64url, empreinte en hexadécimal majuscule. */
 export interface ServedAuthority {
@@ -47,7 +45,7 @@ async function coherentKey(served: ServedAuthority): Promise<Uint8Array<ArrayBuf
   } catch {
     return undefined
   }
-  if (publicKey.length !== PUBLIC_KEY_BYTES || isWeakOrNonCanonical(publicKey)) {
+  if (publicKey.length !== ED25519_PUBLIC_KEY_BYTES || isWeakOrNonCanonical(publicKey)) {
     return undefined
   }
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', publicKey))

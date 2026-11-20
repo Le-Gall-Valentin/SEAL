@@ -5,11 +5,10 @@
  */
 import { fromBase64Url, toBase64Url } from './base64url'
 import { struct, u64, uuid } from './canonical'
+import { AES_GCM_NONCE_BYTES, VDK_BYTES } from './protocol'
 import { type RecoveryKey, recoveryKeyBytes } from './recovery'
 
 const SALT_BYTES = 32
-const NONCE_BYTES = 12
-const VDK_BYTES = 32
 const WRAPPED_VDK_BYTES = VDK_BYTES + 16
 
 /** Corps de PUT /api/v1/keys/vault, octets décodés (ADR 0025, point 6). */
@@ -218,7 +217,7 @@ export async function sealNextVersion(
   if (!Number.isSafeInteger(vaultVersion)) {
     throw new VaultOpenError('format')
   }
-  const nonceB = crypto.getRandomValues(new Uint8Array(NONCE_BYTES))
+  const nonceB = crypto.getRandomValues(new Uint8Array(AES_GCM_NONCE_BYTES))
   return {
     vaultVersion,
     salt: Uint8Array.from(payload.salt),
@@ -233,8 +232,8 @@ export async function sealNextVersion(
 function checkFormat(payload: VaultPayload): void {
   if (
     payload.salt.length !== SALT_BYTES ||
-    payload.nonceK.length !== NONCE_BYTES ||
-    payload.nonceB.length !== NONCE_BYTES ||
+    payload.nonceK.length !== AES_GCM_NONCE_BYTES ||
+    payload.nonceB.length !== AES_GCM_NONCE_BYTES ||
     payload.wrappedVdk.length !== WRAPPED_VDK_BYTES ||
     !Number.isSafeInteger(payload.vaultVersion) ||
     payload.vaultVersion < 1
@@ -267,7 +266,7 @@ async function deriveKek(
 function freshNonces(): VaultNonces {
   return {
     salt: crypto.getRandomValues(new Uint8Array(SALT_BYTES)),
-    nonceK: crypto.getRandomValues(new Uint8Array(NONCE_BYTES)),
-    nonceB: crypto.getRandomValues(new Uint8Array(NONCE_BYTES)),
+    nonceK: crypto.getRandomValues(new Uint8Array(AES_GCM_NONCE_BYTES)),
+    nonceB: crypto.getRandomValues(new Uint8Array(AES_GCM_NONCE_BYTES)),
   }
 }

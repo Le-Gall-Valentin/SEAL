@@ -4,19 +4,8 @@
  * publique relue dans le JWK d'une clé privée (ADR 0027, point 3) et échange X25519. Réservé aux tests.
  */
 import { describe, expect, it } from 'vitest'
+import { x25519Pkcs8 } from './pkcs8'
 import { hex, type Json, number, record, records, string } from './vectorReader'
-
-/** En-tête PKCS#8 d'une clé privée X25519 (RFC 8410), suivi des 32 octets de la clé. */
-const X25519_PKCS8_PREFIX = Uint8Array.from([
-  0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x04, 0x22, 0x04, 0x20,
-])
-
-function x25519Pkcs8(privateKey: Uint8Array): Uint8Array<ArrayBuffer> {
-  const pkcs8 = new Uint8Array(X25519_PKCS8_PREFIX.length + privateKey.length)
-  pkcs8.set(X25519_PKCS8_PREFIX)
-  pkcs8.set(privateKey, X25519_PKCS8_PREFIX.length)
-  return pkcs8
-}
 
 function fromBase64UrlText(text: string): Uint8Array {
   return Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), (char) =>

@@ -193,7 +193,7 @@ describe('KEY-06 : le client vérifie le certificat reçu avant de l’enregistr
     await expect(store.loadCertificate(OWNER.userId)).resolves.toEqual(VALID)
   })
 
-  it('ADR 0029 : une date ou un usage qui ne sont pas des entiers sont refusés avant toute vérification', async () => {
+  it('KEY-06, ADR 0029 : une date ou un usage qui ne sont pas des entiers sont refusés avant toute vérification', async () => {
     const store = await pinnedStore()
     // Ce que pourrait servir un serveur hostile : la signature porte sur la même valeur, une fois convertie.
     const hostile = (value: unknown) => value as number

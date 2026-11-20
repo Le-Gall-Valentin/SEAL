@@ -22,7 +22,6 @@ type MessageSuite = typeof MESSAGE_SUITE
 /** CDC 7.3 : `text/plain` en v1. */
 export const CONTENT_TYPE = 'text/plain'
 export const SALT_BYTES = 16
-export const NONCE_BYTES = 12
 /** MSG-21 : 50 encapsulations au plus, une par membre. */
 export const MAX_RECIPIENTS = 50
 /** CDC 7.3 : 4 000 caractères au plus après NFC, comptés en points de code (ADR 0030, point 6). */

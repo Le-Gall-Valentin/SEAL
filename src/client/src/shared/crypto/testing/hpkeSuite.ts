@@ -77,7 +77,7 @@ export function describeHpke(engine: string): void {
       }
     })
 
-    it('RFC 9180, 7.1.4 : une clé publique d’ordre faible n’est jamais scellée, ni un enc d’ordre faible ouvert', async () => {
+    it('KEY-22, RFC 9180 (7.1.4) : une clé publique d’ordre faible n’est jamais scellée, ni un enc d’ordre faible ouvert', async () => {
       const { key } = await recipient()
       const cek = crypto.getRandomValues(new Uint8Array(32))
 
@@ -92,7 +92,7 @@ export function describeHpke(engine: string): void {
       }
     })
 
-    it('PROTOCOL.md 6.2 : HPKE ne garde aucune copie de la CEK, celle de l’appelant reste à lui', async () => {
+    it('CDC 7.5, étape 8 : HPKE ne garde aucune copie de la CEK, celle de l’appelant reste à lui', async () => {
       const { key } = await recipient()
       const cek = crypto.getRandomValues(new Uint8Array(32))
       const encrypted = watchEncrypt()

@@ -17,7 +17,17 @@ import {
   MessageFormatError,
   type SignedPayloadFields,
 } from '../messageFormat'
-import { base64url, decimal, type Json, number, record, records, string } from './vectorReader'
+import { x25519Pkcs8 } from './pkcs8'
+import {
+  base64url,
+  decimal,
+  type Json,
+  number,
+  record,
+  records,
+  string,
+  strings,
+} from './vectorReader'
 
 /** Un UUID de version 4 : jamais un messageId (PROTOCOL.md 6.2). */
 const UUID_V4 = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b'
@@ -39,31 +49,9 @@ function withBits(messageId: string, version: number, variant: number): string {
   return uuidText(value)
 }
 
-/** RFC 8410 : en-tête PKCS#8 d'une clé privée X25519 brute de 32 octets. */
-const X25519_PKCS8_PREFIX = Uint8Array.of(
-  0x30,
-  0x2e,
-  0x02,
-  0x01,
-  0x00,
-  0x30,
-  0x05,
-  0x06,
-  0x03,
-  0x2b,
-  0x65,
-  0x6e,
-  0x04,
-  0x22,
-  0x04,
-  0x20,
-)
-
 /** Clé privée X25519 d'un vecteur (RFC 7748), importée non extractable. */
 export async function vectorX25519Private(raw: Uint8Array): Promise<CryptoKey> {
-  return crypto.subtle.importKey('pkcs8', concat(X25519_PKCS8_PREFIX, raw), 'X25519', false, [
-    'deriveBits',
-  ])
+  return crypto.subtle.importKey('pkcs8', x25519Pkcs8(raw), 'X25519', false, ['deriveBits'])
 }
 
 /** Un certificat d'un vecteur, tel que le sert le serveur : dates en millisecondes (u64 en chaîne décimale). */
@@ -116,7 +104,7 @@ export function vectorFields(json: Json): SignedPayloadFields {
     senderSeq: decimal(json, 'senderSeq'),
     groupSeq: decimal(json, 'groupSeq'),
     salt: base64url(json, 'salt'),
-    recipientIds: (json['recipientIds'] as unknown[]).map(String),
+    recipientIds: strings(json, 'recipientIds'),
     contentType: string(json, 'contentType'),
     body: string(json, 'body'),
   }
@@ -153,7 +141,7 @@ export function describeEnvelopeVectors(vectors: Json, engine: string): void {
       ).toEqual(base64url(message, 'plaintext'))
     })
 
-    it('ADR 0030, point 2 : @hpke/core ouvre les encapsulations du générateur, et les reproduit avec sa clé éphémère', async () => {
+    it('QA-02, ADR 0030 (point 2) : @hpke/core ouvre les encapsulations du générateur, et les reproduit avec sa clé éphémère', async () => {
       const aad = base64url(message, 'aad')
       const cek = base64url(message, 'cek')
       for (const wrap of wraps) {
@@ -225,7 +213,7 @@ export function describeEnvelopeVectors(vectors: Json, engine: string): void {
       }
     })
 
-    it('PROTOCOL.md 6.2 : un messageId qui n’est pas un UUIDv7 daté de sentAt, un senderSeq nul, un groupSeq non nul en direct ou l’émetteur absent des destinataires sont refusés', () => {
+    it('MSG-01, PROTOCOL.md 6.2 : un messageId qui n’est pas un UUIDv7 daté de sentAt, un senderSeq nul, un groupSeq non nul en direct ou l’émetteur absent des destinataires sont refusés', () => {
       const bobId = fields.recipientIds.find((id) => id !== fields.senderId) ?? ''
       for (const [name, forged] of [
         ['UUIDv4', payload({ messageId: uuid(UUID_V4) })],
@@ -251,7 +239,7 @@ export function describeEnvelopeVectors(vectors: Json, engine: string): void {
       expect(group.groupSeq).toBe(7)
     })
 
-    it('ADR 0030, point 6 : 4 000 points de code se relisent, émojis compris', () => {
+    it('CDC 7.3, ADR 0030 (point 6) : 4 000 points de code se relisent, émojis compris', () => {
       const body = '🦭'.repeat(4000)
 
       expect(decodeSignedPayload(payload({ body: text(body) })).body).toBe(body)

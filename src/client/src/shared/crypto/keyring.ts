@@ -10,7 +10,7 @@ import { z } from 'zod'
 import { fromBase64Url, toBase64Url } from './base64url'
 import { equalBytes } from './bytes'
 import { KEM, type Kem } from './identity'
-import { EK_ID_BYTES, SUBKEY_VALIDITY_MS } from './protocol'
+import { EK_ID_BYTES, SUBKEY_VALIDITY_MS, VDK_BYTES } from './protocol'
 import { type RecoveryKey } from './recovery'
 import {
   decryptBlob,
@@ -23,7 +23,6 @@ import {
 import { generateX25519 } from './webcrypto'
 
 const FORMAT_VERSION = 1
-const VDK_BYTES = 32
 
 /** Sous-clé de chiffrement, côté public (KEY-05). */
 export interface SubkeyInfo {

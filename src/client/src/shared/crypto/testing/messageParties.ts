@@ -5,37 +5,23 @@
  * Leurs sous-clés passent par chooseSubkey, comme au lot 4 (ADR 0030, point 8). Réservé aux tests.
  */
 import { fromBase64Url, toBase64Url } from '../base64url'
-import { concat } from '../canonical'
 import type { ServedCertificate } from '../certificate'
 import { encodeCertificate, KEM } from '../identity'
 import { createKeyring, type Keyring, openVault } from '../keyring'
 import type { KeyStore } from '../keystore'
 import { SUBKEY_VALIDITY_MS } from '../protocol'
 import { bindSubkey } from '../publication'
-import { type ChosenSubkey, chooseSubkey, type ServedUserKeys } from '../recipientKeys'
+import {
+  type ChosenSubkey,
+  chooseSubkey,
+  type ServedSubkey,
+  type ServedUserKeys,
+} from '../recipientKeys'
 import { vectorCertificate, vectorX25519Private } from './envelopeVectorSuite'
+import { ed25519Pkcs8 } from './pkcs8'
 import { vaultPayload, vectorRecoveryKey } from './vaultVectorSuite'
 import { base64url, decimal, type Json, record, records, string } from './vectorReader'
 
-/** RFC 8410 : en-tête PKCS#8 d'une graine Ed25519 brute de 32 octets. */
-const ED25519_PKCS8_PREFIX = Uint8Array.of(
-  0x30,
-  0x2e,
-  0x02,
-  0x01,
-  0x00,
-  0x30,
-  0x05,
-  0x06,
-  0x03,
-  0x2b,
-  0x65,
-  0x70,
-  0x04,
-  0x22,
-  0x04,
-  0x20,
-)
 /** Numéro de série du certificat de Bob, distinct de celui de l'émetteur. */
 const BOB_SERIAL = toBase64Url(Uint8Array.from({ length: 16 }, (_, index) => 0x70 + index))
 
@@ -61,6 +47,26 @@ export interface MessageParties {
   ): Promise<{ readonly own: ChosenSubkey; readonly bob: ChosenSubkey }>
   /** Le certificat donné, signé comme par l'Autorité des vecteurs. */
   signedByCa(served: ServedCertificate): Promise<ServedCertificate>
+}
+
+/**
+ * La sous-clé `ekId` du trousseau, telle que la sert GET /users/{id}/keys : sa liaison au certificat `certSerial`, sans
+ * ce numéro de série, porté par le certificat (PROTOCOL.md 4.4).
+ */
+export async function servedSubkey(
+  keyring: Keyring,
+  certSerial: string,
+  ekId: Uint8Array,
+): Promise<ServedSubkey> {
+  const binding = await bindSubkey(keyring, certSerial, ekId)
+  return {
+    ekId: binding.ekId,
+    kem: binding.kem,
+    ekPublic: binding.ekPublic,
+    createdAt: binding.createdAt,
+    expiresAt: binding.expiresAt,
+    signature: binding.signature,
+  }
 }
 
 /** Un trousseau qui ne connaît que l'Autorité épinglée : chooseSubkey n'en lit rien d'autre. */
@@ -89,7 +95,7 @@ export async function messageParties(
   const ca = record(record(identity['keys'])['ca'])
   const caKey = await crypto.subtle.importKey(
     'pkcs8',
-    concat(ED25519_PKCS8_PREFIX, base64url(ca, 'seed')),
+    ed25519Pkcs8(base64url(ca, 'seed')),
     'Ed25519',
     false,
     ['sign'],
@@ -166,18 +172,7 @@ export async function messageParties(
   ): Promise<ServedUserKeys> {
     const certificate = keyring.userId === bobId ? bobCertificate : senderCertificate
     const subkeys = await Promise.all(
-      ekIds.map(async (ekId) => {
-        // La liaison servie ne porte pas son numéro de série : c'est celui du certificat (PROTOCOL.md 4.4).
-        const binding = await bindSubkey(keyring, certificate.serial, ekId)
-        return {
-          ekId: binding.ekId,
-          kem: binding.kem,
-          ekPublic: binding.ekPublic,
-          createdAt: binding.createdAt,
-          expiresAt: binding.expiresAt,
-          signature: binding.signature,
-        }
-      }),
+      ekIds.map((ekId) => servedSubkey(keyring, certificate.serial, ekId)),
     )
     return { certificate, subkeys }
   }

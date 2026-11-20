@@ -17,11 +17,10 @@ import {
   MAX_RECIPIENTS,
   MESSAGE_SUITE,
   MessageFormatError,
-  NONCE_BYTES,
   SALT_BYTES,
   type WrapWire,
 } from './messageFormat'
-import { CEK_BYTES } from './protocol'
+import { AES_GCM_NONCE_BYTES, CEK_BYTES } from './protocol'
 import {
   type ChosenSubkey,
   SubkeyUnavailableError,
@@ -76,7 +75,7 @@ export async function sealMessage(keyring: Keyring, draft: MessageDraft): Promis
     messageIdRandom: crypto.getRandomValues(new Uint8Array(UUID_RANDOM_BYTES)),
     salt: crypto.getRandomValues(new Uint8Array(SALT_BYTES)),
     cek: crypto.getRandomValues(new Uint8Array(CEK_BYTES)),
-    nonce: crypto.getRandomValues(new Uint8Array(NONCE_BYTES)),
+    nonce: crypto.getRandomValues(new Uint8Array(AES_GCM_NONCE_BYTES)),
     ephemeral: () => undefined,
   })
 }

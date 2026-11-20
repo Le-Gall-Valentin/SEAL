@@ -129,7 +129,7 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       expect(randomness.cek.every((byte) => byte === 0)).toBe(true)
     })
 
-    it('PROTOCOL.md 6.2 : SignedPayload, Plaintext et chaque copie de la CEK sont remis à zéro après le scellement', async () => {
+    it('CDC 7.5, étape 8 : SignedPayload, Plaintext et chaque copie de la CEK sont remis à zéro après le scellement', async () => {
       const keyring = await parties.senderKeyring()
       const vector = await draft()
       const [encrypted, signed] = [watchEncrypt(), watchSigned()]
@@ -163,7 +163,7 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       expect(readOne.payload.recipientIds).toEqual([parties.bobId, parties.senderId])
     })
 
-    it('ADR 0030, point 6 : 4 000 points de code, émojis compris, passent ; 4 001 sont refusés ; le corps est mis en NFC', async () => {
+    it('CDC 7.3, ADR 0030 (point 6) : 4 000 points de code, émojis compris, passent ; 4 001 sont refusés ; le corps est mis en NFC', async () => {
       const keyring = await parties.senderKeyring()
 
       const sealed = await sealMessage(keyring, await draft({ body: `${'🦭'.repeat(3999)}é` }))
@@ -173,7 +173,7 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       ).rejects.toBeInstanceOf(MessageTooLongError)
     })
 
-    it('ADR 0030, point 4 : l’enveloppe porte ses identifiants en minuscules, quelle que soit leur casse donnée', async () => {
+    it('CDC 7.3, ADR 0030 (point 4) : l’enveloppe porte ses identifiants en minuscules, quelle que soit leur casse donnée', async () => {
       const sender = await parties.senderKeyring()
       const shouting = createKeyring(
         { ...sender, userId: sender.userId.toUpperCase() },
@@ -206,7 +206,7 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       }
     })
 
-    it('ADR 0030, point 8 : une sous-clé construite à la main, sans chooseSubkey, n’est pas scellée', async () => {
+    it('KEY-20, ADR 0030 (point 8) : une sous-clé construite à la main, sans chooseSubkey, n’est pas scellée', async () => {
       const { own, bob } = await parties.chosen(store)
       const forged: ChosenSubkey = {
         recipientId: bob.recipientId,
@@ -221,7 +221,7 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       ).rejects.toBeInstanceOf(TypeError)
     })
 
-    it('ADR 0030, point 8 : modifier une sous-clé choisie ne change rien, le scellement suit la copie vérifiée', async () => {
+    it('KEY-20, ADR 0030 (point 8) : modifier une sous-clé choisie ne change rien, le scellement suit la copie vérifiée', async () => {
       const { own, bob } = await parties.chosen(store)
       bob.ekPublic.fill(0)
 
@@ -233,7 +233,7 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       expect((await readAsBob(sealed)).payload.body).toBe(string(fields, 'body'))
     })
 
-    it('RFC 9180, 7.1.4 : une sous-clé d’ordre faible, pourtant bien liée, n’est pas scellée', async () => {
+    it('KEY-22, RFC 9180 (7.1.4) : une sous-clé d’ordre faible, pourtant bien liée, n’est pas scellée', async () => {
       const weak = await parties.bobKeyring(new Uint8Array(32))
       const bob = await chooseSubkey(
         store,
@@ -248,7 +248,7 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       ).rejects.toBeInstanceOf(HpkeSealError)
     })
 
-    it('PROTOCOL.md 6.2 : un senderSeq nul ou un groupSeq non nul en direct ne scellent rien', async () => {
+    it('MSG-01, PROTOCOL.md 6.2 : un senderSeq nul ou un groupSeq non nul en direct ne scellent rien', async () => {
       const keyring = await parties.senderKeyring()
 
       for (const changes of [{ senderSeq: 0 }, { groupSeq: 1 }]) {
@@ -305,7 +305,7 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       }
     })
 
-    it('RFC 9562 : un sentAt hors des 48 bits d’un UUIDv7, ou un aléa de 9 octets, ne scellent rien', async () => {
+    it('CDC 7.5, RFC 9562 : un sentAt hors des 48 bits d’un UUIDv7, ou un aléa de 9 octets, ne scellent rien', async () => {
       const keyring = await parties.senderKeyring()
 
       await expect(sealMessage(keyring, await draft({ sentAt: 2 ** 48 }))).rejects.toBeInstanceOf(

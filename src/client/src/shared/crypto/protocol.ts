@@ -17,3 +17,18 @@ export const SERIAL_BYTES = 16
 
 /** CDC 7.3 : CEK AES-256 d'un message. */
 export const CEK_BYTES = 32
+
+/** KEY-04, PROTOCOL.md 4.2 : identifiant de la clé de l'Autorité, les 8 premiers octets de son empreinte. */
+export const KEY_ID_BYTES = 8
+
+/** RFC 8032 : clé publique Ed25519 encodée (et R d'une signature). */
+export const ED25519_PUBLIC_KEY_BYTES = 32
+
+/** RFC 7748 : clé publique X25519, et `enc` de DHKEM(X25519) (RFC 9180). */
+export const X25519_PUBLIC_KEY_BYTES = 32
+
+/** NIST SP 800-38D : nonce AES-GCM de 96 bits, pour le coffre comme pour les messages. */
+export const AES_GCM_NONCE_BYTES = 12
+
+/** ADR 0027 : clé de coffre (VDK), AES-256. */
+export const VDK_BYTES = 32

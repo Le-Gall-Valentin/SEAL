@@ -4,7 +4,6 @@ import { fromBase64Url, toBase64Url } from './base64url'
 import type { ServedCertificate } from './certificate'
 import { createKeyring, type Keyring, keyringSecrets, openVault } from './keyring'
 import { type KeyStore, openKeyStore, pinAuthority } from './keystore'
-import { bindSubkey } from './publication'
 import {
   chooseSubkey,
   type ServedSubkey,
@@ -12,6 +11,7 @@ import {
   SubkeyUnavailableError,
   type SubkeyUnavailableReason,
 } from './recipientKeys'
+import { servedSubkey } from './testing/messageParties'
 import { vaultPayload, vectorRecoveryKey } from './testing/vaultVectorSuite'
 import { base64url, decimal, number, record, records, string } from './testing/vectorReader'
 
@@ -74,15 +74,7 @@ async function served(
 ): Promise<ServedSubkey> {
   const subkey = ring.subkeys[index]
   if (subkey === undefined) throw new Error('sous-clé du vecteur attendue')
-  const binding = await bindSubkey(ring, serial, subkey.ekId)
-  return {
-    ekId: binding.ekId,
-    kem: binding.kem,
-    ekPublic: binding.ekPublic,
-    createdAt: binding.createdAt,
-    expiresAt: binding.expiresAt,
-    signature: binding.signature,
-  }
+  return servedSubkey(ring, serial, subkey.ekId)
 }
 
 async function servedKeys(subkeys: readonly ServedSubkey[]): Promise<ServedUserKeys> {
@@ -154,7 +146,7 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
     ).toBe('none')
   })
 
-  it('ADR 0025, point 7 : le certificat du destinataire tolère 5 minutes de retard d’horloge, pas une de plus', async () => {
+  it('KEY-20, ADR 0025 (point 7) : le certificat du destinataire tolère 5 minutes de retard d’horloge, pas une de plus', async () => {
     const ring = await keyring()
     const store = await pinnedStore()
     const keys = await servedKeys([await served(ring, 0)])
@@ -177,7 +169,7 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
     ).toBe('certificate')
   })
 
-  it('ADR 0030, point 5 : une seule liaison invalide refuse toutes les clés du destinataire', async () => {
+  it('KEY-20, ADR 0030 (point 5) : une seule liaison invalide refuse toutes les clés du destinataire', async () => {
     const ring = await keyring()
     const [older, newer] = [await served(ring, 0), await served(ring, 1)]
     const store = await pinnedStore()
@@ -232,7 +224,7 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
     }
   })
 
-  it('ADR 0025, point 7 : une sous-clé datée de plus de 5 minutes dans le futur est une liaison invalide', async () => {
+  it('KEY-20, ADR 0025 (point 7) : une sous-clé datée de plus de 5 minutes dans le futur est une liaison invalide', async () => {
     const ring = await keyring()
     const [older, newer] = [await served(ring, 0), await served(ring, 1)]
     const store = await pinnedStore()
@@ -288,7 +280,7 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
     ).toBe('certificate')
   })
 
-  it('ADR 0030, point 5 : une réponse mal formée du serveur donne « clé indisponible », jamais une autre erreur', async () => {
+  it('KEY-20, ADR 0030 (point 5) : une réponse mal formée du serveur donne « clé indisponible », jamais une autre erreur', async () => {
     const ring = await keyring()
     const older = await served(ring, 0)
     const store = await pinnedStore()

@@ -179,14 +179,14 @@ describe('encodeur canonique, cas propres à TypeScript', () => {
     expect(list(struct, ['a', 'b'])).toEqual(concat(u32(2), struct('a'), struct('b')))
   })
 
-  it('ADR 0006 : uuidText rend la forme 8-4-4-4-12 en minuscules de 16 octets, et refuse une autre longueur', () => {
+  it('MSG-01, ADR 0006 : uuidText rend la forme 8-4-4-4-12 en minuscules de 16 octets, et refuse une autre longueur', () => {
     const value = uuid('0192F7A1-FFFF-7000-8000-00000000A11C')
 
     expect(uuidText(value)).toBe('0192f7a1-ffff-7000-8000-00000000a11c')
     expect(() => uuidText(value.subarray(1))).toThrow(CanonicalEncodingError)
   })
 
-  it('PROTOCOL.md 6.2 : text ne garde aucune copie UTF-8 du texte encodé', () => {
+  it('MSG-01, PROTOCOL.md 6.2 : text ne garde aucune copie UTF-8 du texte encodé', () => {
     const seen: Uint8Array[] = []
     const plain = new TextEncoder()
     const encode = plain.encode.bind(plain)

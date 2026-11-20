@@ -176,7 +176,7 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
       expect('message' in result ? result.message.recipientIds : undefined).toEqual([senderId])
     })
 
-    it('PROTOCOL.md 6.2 : à l’ouverture, la CEK, Plaintext et SignedPayload sont remis à zéro, refus compris', async () => {
+    it('CDC 7.7, PROTOCOL.md 6.2 : à l’ouverture, la CEK, Plaintext et SignedPayload sont remis à zéro, refus compris', async () => {
       const bob = await parties.bobKeyring()
       const store = await pinnedStore()
       const forged = records(envelope['forgeries']).find(
@@ -205,7 +205,7 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
       }
     })
 
-    it('PROTOCOL.md 6.2 : sur un refus, les champs relus de SignedPayload (sel, numéro de série) sont remis à zéro', async () => {
+    it('CDC 7.7, PROTOCOL.md 6.2 : sur un refus, les champs relus de SignedPayload (sel, numéro de série) sont remis à zéro', async () => {
       const bob = await parties.bobKeyring()
       for (const [name, rejectedBy] of [
         [

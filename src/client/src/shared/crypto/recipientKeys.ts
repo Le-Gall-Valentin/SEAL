@@ -10,9 +10,7 @@ import { CertificateRejectedError, type ServedCertificate, verifyCertificate } f
 import { verifyEd25519 } from './ed25519'
 import { encodeSubkeyBinding, KEM } from './identity'
 import type { KeyStore } from './keystore'
-import { CLOCK_SKEW_MS, EK_ID_BYTES, SUBKEY_VALIDITY_MS } from './protocol'
-
-const EK_PUBLIC_BYTES = 32
+import { CLOCK_SKEW_MS, EK_ID_BYTES, SUBKEY_VALIDITY_MS, X25519_PUBLIC_KEY_BYTES } from './protocol'
 
 /** Sous-clé telle que la sert GET /api/v1/users/{id}/keys : sans `certSerial`, porté par le certificat (4.4). */
 export interface ServedSubkey {
@@ -186,7 +184,7 @@ async function verifiedSubkey(
     if (
       served.kem !== KEM ||
       ekId.length !== EK_ID_BYTES ||
-      ekPublic.length !== EK_PUBLIC_BYTES ||
+      ekPublic.length !== X25519_PUBLIC_KEY_BYTES ||
       !Number.isSafeInteger(served.createdAt) ||
       !Number.isSafeInteger(served.expiresAt) ||
       served.createdAt < 0 ||

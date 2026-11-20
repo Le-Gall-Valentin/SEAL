@@ -18,12 +18,10 @@ import {
   MAX_RECIPIENTS,
   MESSAGE_SUITE,
   MessageFormatError,
-  NONCE_BYTES,
   type SignedPayloadFields,
 } from './messageFormat'
-import { EK_ID_BYTES, SERIAL_BYTES } from './protocol'
+import { AES_GCM_NONCE_BYTES, EK_ID_BYTES, SERIAL_BYTES, X25519_PUBLIC_KEY_BYTES } from './protocol'
 
-const ENC_BYTES = 32
 const WRAPPED_CEK_BYTES = 48
 /** Étiquette AES-GCM de 128 bits : un chiffré en compte au moins 16 octets. */
 const TAG_BYTES = 16
@@ -203,12 +201,12 @@ function decodeEnvelope(envelope: unknown): DecodedEnvelope {
     return {
       header,
       aad: encodeMessageAad(header),
-      nonce: sized(parsed.nonce, NONCE_BYTES),
+      nonce: sized(parsed.nonce, AES_GCM_NONCE_BYTES),
       ciphertext,
       wraps: parsed.wraps.map((wrap) => ({
         recipientId: wrap.recipientId,
         ekId: sized(wrap.ekId, EK_ID_BYTES),
-        enc: sized(wrap.enc, ENC_BYTES),
+        enc: sized(wrap.enc, X25519_PUBLIC_KEY_BYTES),
         wrappedCek: sized(wrap.wrappedCek, WRAPPED_CEK_BYTES),
       })),
     }
