@@ -5,6 +5,7 @@
  * ment.
  */
 import { fromBase64Url } from './base64url'
+import { uuid } from './canonical'
 import { CertificateRejectedError, type ServedCertificate, verifyCertificate } from './certificate'
 import { verifyEd25519 } from './ed25519'
 import { encodeSubkeyBinding, KEM } from './identity'
@@ -65,24 +66,22 @@ export async function chooseSubkey(
   recipientId: string,
   now: number,
 ): Promise<ChosenSubkey> {
+  const recipient = lowercaseUuid(recipientId)
   let certificate
   try {
-    certificate = await verifyCertificate(
-      store,
-      served.certificate,
-      recipientId,
-      now,
-      CLOCK_SKEW_MS,
-    )
+    certificate = await verifyCertificate(store, served.certificate, recipient, now, CLOCK_SKEW_MS)
   } catch (error) {
     if (error instanceof CertificateRejectedError) {
       throw new SubkeyUnavailableError('certificate', { cause: error })
     }
     throw error
   }
+  if (!isList(served.subkeys)) {
+    throw new SubkeyUnavailableError('binding')
+  }
   const subkeys = await Promise.all(
     served.subkeys.map((subkey) =>
-      verifiedSubkey(subkey, recipientId, certificate.serial, certificate.ikPublic, now),
+      verifiedSubkey(subkey, recipient, certificate.serial, certificate.ikPublic, now),
     ),
   )
   const newest = subkeys.reduce<VerifiedSubkey | undefined>((latest, subkey) => {
@@ -97,12 +96,29 @@ export async function chooseSubkey(
     throw new SubkeyUnavailableError('none')
   }
   return {
-    recipientId,
+    recipientId: recipient,
     certSerial: Uint8Array.from(certificate.serial),
     ikPublic: Uint8Array.from(certificate.ikPublic),
     ekId: newest.ekId,
     ekPublic: newest.ekPublic,
   }
+}
+
+/** Une réponse hostile peut servir autre chose qu'une liste ; ce test ne change pas le type supposé. */
+function isList(value: unknown): boolean {
+  return Array.isArray(value)
+}
+
+/** Un identifiant à la forme UUID, comparé en minuscules ; une autre forme est une erreur de l'appelant. */
+function lowercaseUuid(value: string): string {
+  try {
+    uuid(value)
+  } catch (error) {
+    throw new TypeError('KEY-20 : identifiant de destinataire hors de la forme UUID', {
+      cause: error,
+    })
+  }
+  return value.toLowerCase()
 }
 
 /**
@@ -120,32 +136,35 @@ async function verifiedSubkey(
   let ekId: Uint8Array<ArrayBuffer>
   let ekPublic: Uint8Array<ArrayBuffer>
   let signature: Uint8Array<ArrayBuffer>
+  let binding: Uint8Array<ArrayBuffer>
   try {
     ekId = fromBase64Url(served.ekId)
     ekPublic = fromBase64Url(served.ekPublic)
     signature = fromBase64Url(served.signature)
+    if (
+      served.kem !== KEM ||
+      ekId.length !== EK_ID_BYTES ||
+      ekPublic.length !== EK_PUBLIC_BYTES ||
+      !Number.isSafeInteger(served.createdAt) ||
+      served.createdAt < 0 ||
+      served.createdAt > now + CLOCK_SKEW_MS ||
+      served.expiresAt - served.createdAt !== SUBKEY_VALIDITY_MS
+    ) {
+      return undefined
+    }
+    binding = encodeSubkeyBinding({
+      userId,
+      certSerial,
+      ekId,
+      kem: KEM,
+      ekPublic,
+      createdAt: served.createdAt,
+      expiresAt: served.expiresAt,
+    })
   } catch {
+    // Réponse hors des types attendus (champ nul, valeur impossible à encoder) : une liaison invalide, rien d'autre.
     return undefined
   }
-  if (
-    served.kem !== KEM ||
-    ekId.length !== EK_ID_BYTES ||
-    ekPublic.length !== EK_PUBLIC_BYTES ||
-    !Number.isSafeInteger(served.createdAt) ||
-    served.createdAt > now + CLOCK_SKEW_MS ||
-    served.expiresAt - served.createdAt !== SUBKEY_VALIDITY_MS
-  ) {
-    return undefined
-  }
-  const binding = encodeSubkeyBinding({
-    userId,
-    certSerial,
-    ekId,
-    kem: KEM,
-    ekPublic,
-    createdAt: served.createdAt,
-    expiresAt: served.expiresAt,
-  })
   if (!(await verifyEd25519(ikPublic, binding, signature))) {
     return undefined
   }

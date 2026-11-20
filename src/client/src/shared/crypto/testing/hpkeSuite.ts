@@ -4,9 +4,10 @@
  */
 import { Aes256Gcm, CipherSuite, DhkemX25519HkdfSha256, HkdfSha256 } from '@hpke/core'
 import { describe, expect, it } from 'vitest'
-import { HpkeOpenError, openCek, sealCek } from '../hpke'
+import { HpkeOpenError, HpkeSealError, openCek, sealCek } from '../hpke'
 import { generateKeyring, type Keyring, keyringSecrets } from '../keyring'
 import { generateRecoveryKey } from '../recovery'
+import { fromHex, SMALL_ORDER_X25519 } from './bytesForTests'
 
 const USER_ID = '0192f7a1-ffff-7000-8000-00000000a11c'
 const NOW = 1_794_009_600_000
@@ -77,6 +78,21 @@ export function describeHpke(engine: string): void {
         await expect(
           openCek(key, enc, flipped(wrappedCek, index), INFO, AAD),
           `wrappedCek ${String(index)}`,
+        ).rejects.toBeInstanceOf(HpkeOpenError)
+      }
+    })
+
+    it('RFC 9180, 7.1.4 : une clé publique d’ordre faible n’est jamais scellée, ni un enc d’ordre faible ouvert', async () => {
+      const { key } = await recipient()
+      const cek = crypto.getRandomValues(new Uint8Array(32))
+
+      for (const [name, point] of SMALL_ORDER_X25519) {
+        await expect(sealCek(fromHex(point), INFO, AAD, cek), name).rejects.toBeInstanceOf(
+          HpkeSealError,
+        )
+        await expect(
+          openCek(key, fromHex(point), new Uint8Array(48), INFO, AAD),
+          name,
         ).rejects.toBeInstanceOf(HpkeOpenError)
       }
     })

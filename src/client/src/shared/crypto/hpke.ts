@@ -21,6 +21,15 @@ export class HpkeOpenError extends Error {
   }
 }
 
+/** RFC 9180 (7.1.4) : la clé publique du destinataire est hors de la courbe ou d'ordre faible ; rien n'est scellé. */
+export class HpkeSealError extends Error {
+  override readonly name = 'HpkeSealError'
+
+  constructor(options?: ErrorOptions) {
+    super('clé publique du destinataire inutilisable', options)
+  }
+}
+
 export interface SealedCek {
   /** Clé publique éphémère de l'émetteur, 32 octets. */
   readonly enc: Uint8Array<ArrayBuffer>
@@ -34,8 +43,8 @@ export interface CekRecipient {
 }
 
 /**
- * Scelle la CEK pour la clé publique X25519 du destinataire. `ephemeral` fixe la clé éphémère : réservé aux vecteurs
- * (interne à shared/crypto, jamais exporté de l'index).
+ * Scelle la CEK pour la clé publique X25519 du destinataire ; une clé inutilisable lève HpkeSealError. `ephemeral`
+ * fixe la clé éphémère : réservé aux vecteurs (interne à shared/crypto, jamais exporté de l'index).
  */
 export async function sealCek(
   recipientPublicKey: Uint8Array,
@@ -47,16 +56,22 @@ export async function sealCek(
   if (cek.length !== CEK_BYTES) {
     throw new RangeError('la CEK fait 32 octets')
   }
-  const { ct, enc } = await SUITE.seal(
-    {
-      recipientPublicKey: await importPublic(recipientPublicKey),
-      info,
-      ...(ephemeral === undefined ? {} : { ekm: ephemeral }),
-    },
-    cek,
-    aad,
-  )
-  return { enc: new Uint8Array(enc), wrappedCek: new Uint8Array(ct) }
+  let sealed
+  try {
+    sealed = await SUITE.seal(
+      {
+        recipientPublicKey: await importPublic(recipientPublicKey),
+        info,
+        ...(ephemeral === undefined ? {} : { ekm: ephemeral }),
+      },
+      cek,
+      aad,
+    )
+  } catch (error) {
+    // WebCrypto refuse un secret DH nul : une clé d'ordre faible ne donne jamais une CEK lisible par tous.
+    throw new HpkeSealError({ cause: error })
+  }
+  return { enc: new Uint8Array(sealed.enc), wrappedCek: new Uint8Array(sealed.ct) }
 }
 
 /** Ouvre la CEK avec la paire du destinataire ; tout échec lève HpkeOpenError. */

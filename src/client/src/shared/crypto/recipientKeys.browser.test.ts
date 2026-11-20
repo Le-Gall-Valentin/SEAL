@@ -245,6 +245,39 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
     ).toBe('certificate')
   })
 
+  it('ADR 0030, point 5 : une réponse mal formée du serveur donne « clé indisponible », jamais une autre erreur', async () => {
+    const ring = await keyring()
+    const older = await served(ring, 0)
+    const store = await pinnedStore()
+    const now = NOT_BEFORE + DAY_MS
+    // Ce que pourrait servir un serveur hostile, hors des types que suppose le code.
+    const hostile = (value: unknown) => value as readonly ServedSubkey[]
+
+    for (const [name, subkeys] of [
+      ['sous-clés absentes', hostile(null)],
+      ['sous-clé nulle', hostile([null])],
+      ['createdAt négatif', [{ ...older, createdAt: -1000, expiresAt: -1000 + 45 * DAY_MS }]],
+    ] as const) {
+      expect(
+        await refusal(chooseSubkey(store, await servedKeys(subkeys), RECIPIENT, now)),
+        name,
+      ).toBe('binding')
+    }
+  })
+
+  it('KEY-20 : l’identifiant du destinataire est comparé en minuscules ; une autre forme est une erreur de l’appelant', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+    const keys = await servedKeys([await served(ring, 0)])
+
+    const chosen = await chooseSubkey(store, keys, RECIPIENT.toUpperCase(), NOT_BEFORE + DAY_MS)
+
+    expect(chosen.recipientId).toBe(RECIPIENT)
+    await expect(
+      chooseSubkey(store, keys, 'destinataire', NOT_BEFORE + DAY_MS),
+    ).rejects.toBeInstanceOf(TypeError)
+  })
+
   it('A10 : une panne du trousseau de l’appareil remonte telle quelle, sans passer pour une clé indisponible', async () => {
     const ring = await keyring()
     const store = await pinnedStore()
