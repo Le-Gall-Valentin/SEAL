@@ -44,3 +44,11 @@ export {
   verifyOwnCertificate,
 } from './certificate'
 export { compareOwnKeys, type KeysComparison, neverPublished, type ServedKeys } from './ownKeys'
+export {
+  type ChosenSubkey,
+  chooseSubkey,
+  type ServedSubkey,
+  type ServedUserKeys,
+  SubkeyUnavailableError,
+  type SubkeyUnavailableReason,
+} from './recipientKeys'

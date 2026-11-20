@@ -90,6 +90,29 @@ async function verified(
   expected: ExpectedOwner,
   now: number,
 ): Promise<StoredCertificate> {
+  const certificate = await verifyCertificate(store, served, expected.userId, now, CLOCK_SKEW_MS)
+  if (certificate.username !== expected.username) {
+    throw new CertificateRejectedError('username')
+  }
+  if (!equalBytes(certificate.ikPublic, expected.ikPublic)) {
+    throw new CertificateRejectedError('key')
+  }
+  return certificate
+}
+
+/**
+ * KEY-06, KEY-20, CDC 7.7 (étape 6) : certificat d'un compte, sans titulaire attendu au-delà de son identifiant. Signé
+ * par l'Autorité épinglée (KEY-11), pour `subjectId`, avec l'usage et la validité de KEY-04 à l'instant `at`, avec
+ * `toleranceMs` de retard d'horloge avant `notBefore`. Rend ses champs vérifiés ; tout écart lève
+ * CertificateRejectedError.
+ */
+export async function verifyCertificate(
+  store: KeyStore,
+  served: ServedCertificate,
+  subjectId: string,
+  at: number,
+  toleranceMs: number,
+): Promise<StoredCertificate> {
   const certificate = decoded(served)
   const authority = await store.loadAuthority()
   if (authority === undefined) {
@@ -105,22 +128,16 @@ async function verified(
   if (!(await signedBy(authority, certificate))) {
     throw new CertificateRejectedError('signature')
   }
-  if (certificate.subjectId !== expected.userId) {
+  if (certificate.subjectId !== subjectId) {
     throw new CertificateRejectedError('subject')
-  }
-  if (certificate.username !== expected.username) {
-    throw new CertificateRejectedError('username')
-  }
-  if (!equalBytes(certificate.ikPublic, expected.ikPublic)) {
-    throw new CertificateRejectedError('key')
   }
   if (certificate.usage !== USAGE) {
     throw new CertificateRejectedError('usage')
   }
   if (
     certificate.notAfter - certificate.notBefore !== VALIDITY_MS ||
-    now < certificate.notBefore - CLOCK_SKEW_MS ||
-    now >= certificate.notAfter
+    at < certificate.notBefore - toleranceMs ||
+    at >= certificate.notAfter
   ) {
     throw new CertificateRejectedError('validity')
   }
