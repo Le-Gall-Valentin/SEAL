@@ -1,4 +1,5 @@
-# ADR 0025, point 3 : bibliothèque qui signe les vecteurs (gen_vectors.py), et ses dépendances.
+# ADR 0025, point 3 et ADR 0030, point 2 : bibliothèque qui signe les vecteurs (gen_vectors.py) et vérifie son
+# HPKE (cryptography.hpke, section 6 de PROTOCOL.md), et ses dépendances.
 # Versions publiées depuis plus de deux semaines (A03) ; chaque fichier de PyPI épinglé par son empreinte.
 # Installation : python3 -m pip install --require-hashes -r tools/requirements.txt
 cryptography==50.0.2 \

@@ -4,8 +4,8 @@ Ce document est la référence publique du protocole de SEAL : conformément au 
 sa sécurité ne repose que sur les clés. Il précise, à l'octet près, les sections 6 à 9 du cahier des
 charges ; client (TypeScript) et serveur (Java) DOIVENT produire exactement les encodages décrits ici.
 
-Les mots DOIT, NE DOIT PAS et PEUT ont le sens de la RFC 2119. Les sections sur les messages, les
-groupes et la non-répudiation s'ajouteront avec leurs lots ; toute modification d'un format met à
+Les mots DOIT, NE DOIT PAS et PEUT ont le sens de la RFC 2119. Les sections sur les groupes et la
+non-répudiation s'ajouteront avec leurs lots ; toute modification d'un format met à
 jour, dans le même commit, ce document, les vecteurs de `vectors/` et les tests Java et TypeScript.
 
 ## 1. Conventions
@@ -37,6 +37,14 @@ Le JSON n'est jamais signé ni haché directement.
 
 `‖` désigne la concaténation. Un élément de liste PEUT être composé de plusieurs primitives
 concaténées, comme une encapsulation `uuid(recipientId) ‖ bytes(ekId) ‖ bytes(enc) ‖ bytes(wrappedCek)`.
+
+**Version d'Unicode (ADR 0006, point 2).** NFC dépend de la version d'Unicode du moteur.
+- La référence est Unicode 15.0, celle du générateur des vecteurs, et toute implémentation testée est au moins
+  à cette version.
+- Un texte fait de caractères attribués dans une version garde le même verdict NFC dans toutes les versions
+  suivantes. Le générateur s'arrête donc sur tout caractère non attribué dans la sienne.
+- Limite admise : un texte qui contient un caractère inconnu du moteur de l'émetteur peut être jugé hors NFC par
+  un lecteur plus récent. Le message est alors refusé (`integrity_failed`), jamais affiché.
 
 ### 2.2 Règles (MSG-01)
 
@@ -96,8 +104,9 @@ une chaîne décimale (`JSON.parse` perd la précision au-delà de 2⁵³), `byt
 et ses `fields`, eux-mêmes des descripteurs. Les caractères hors ASCII sont échappés en `\uXXXX`.
 
 Les vecteurs sont produits par `tools/gen_vectors.py`, une troisième implémentation en Python,
-indépendante de Java et de TypeScript : bibliothèque standard seule, plus `cryptography` pour les signatures
-de la section 4 et le coffre de la section 5. Pour les régénérer, depuis `src/protocol` :
+indépendante de Java et de TypeScript : bibliothèque standard seule, plus `cryptography` 50.0.2 pour
+les signatures de la section 4, le coffre de la section 5 et l'HPKE de la section 6. Pour les régénérer,
+depuis `src/protocol` :
 
 ```bash
 python3 tools/gen_vectors.py           # réécrit les fichiers de vectors/
@@ -370,3 +379,139 @@ repart du coffre relu.
 `vectors/vault.json` donne la version 2 dans `nextVersion` : l'AAD (`vaultAad`), les octets du trousseau à deux
 sous-clés (`keyringBytes`), la clé publique de la seconde (`ekPublic`, celle de Bob dans la RFC 7748) et la charge
 (`payload`), qui s'ouvre aussi par RK.
+
+## 6. Messages (CDC 7 ; KEY-20, QA-02 à QA-04, ADR 0030)
+
+Chaque message est signé par son auteur, chiffré avec une clé de contenu (CEK) à usage unique, et cette CEK est
+encapsulée par HPKE pour chaque destinataire, émetteur compris. Le serveur ne voit que l'enveloppe.
+
+### 6.1 Suite et enveloppe
+
+Suite `SEAL1-X25519-A256GCM-ED25519` : signature Ed25519 ; encapsulation HPKE (RFC 9180) en mode base,
+DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-256-GCM ; chiffrement du message en AES-256-GCM. L'enveloppe :
+
+```json
+{
+  "v": 1,
+  "suite": "SEAL1-X25519-A256GCM-ED25519",
+  "messageId": "UUIDv7 généré par le client",
+  "conversationId": "UUID",
+  "senderId": "UUID",
+  "senderCertSerial": "base64url, 16 octets",
+  "nonce": "base64url, 12 octets",
+  "ciphertext": "base64url",
+  "wraps": [
+    { "recipientId": "UUID", "ekId": "base64url, 16 octets",
+      "enc": "base64url, 32 octets", "wrappedCek": "base64url, 48 octets" }
+  ]
+}
+```
+
+### 6.2 Structures
+
+```
+SignedPayload = struct("SEAL-msg-v1",
+    u8(v), text(suite), uuid(messageId), uuid(conversationId),
+    u8(conversationType),             // 1 : direct, 2 : groupe
+    uuid(senderId), bytes(senderCertSerial),
+    u64(sentAt),                      // horloge de l'émetteur, ms
+    u64(senderSeq),                   // compteur de l'émetteur dans cette conversation, dès 1
+    u64(groupSeq),                    // dernière opération de groupe connue, 0 en direct
+    bytes(salt),                      // 16 octets aléatoires
+    list(uuid, recipientIds),         // triés par ordre des octets
+    text(contentType),                // "text/plain" en v1
+    text(body))                       // 4 000 points de code au plus après NFC
+signature  = Ed25519.sign(IK de l'émetteur, SignedPayload)
+Plaintext  = bytes(SignedPayload) || bytes(signature) || bytes(padding)
+AAD        = struct("SEAL-aad-v1", u8(v), text(suite), uuid(messageId),
+                 uuid(conversationId), uuid(senderId), bytes(senderCertSerial))
+ciphertext = AES-256-GCM(CEK, nonce, Plaintext, AAD)
+info_r     = struct("SEAL-wrap-v1", text(suite), uuid(messageId),
+                 uuid(conversationId), uuid(recipientId), bytes(ekId))
+(enc, wrappedCek) = HPKE.SealBase(pkR = EK_r, info = info_r, aad = AAD, pt = CEK)
+```
+
+- `messageId` est un UUIDv7 dont l'horodatage est `sentAt` ; CEK de 32 octets, nonce de 12 et sel de 16, tirés par
+  `crypto.getRandomValues` à chaque message.
+- `recipientIds` compte de 1 à 50 identifiants, triés par ordre des octets et distincts ; l'émetteur y figure.
+- `senderSeq` commence à 1 ; `groupSeq` vaut 0 en conversation directe. Le scellement refuse ce que la relecture
+  refuserait, ces règles comprises (ADR 0030, point 4).
+- Le corps se compte en points de code après NFC : un émoji compte pour un (ADR 0030, point 6).
+- `padding` est vide au scellement en P0 ; à la lecture, toute longueur est acceptée et ignorée, dans la limite de
+  MSG-21 (chiffré de 24 576 octets au plus) : il est chiffré mais non signé, et n'a aucun sens (ADR 0030, point 7).
+- La CEK, `Plaintext` et `SignedPayload` sont remis à zéro dès qu'ils ont servi, refus compris : chaque copie que SEAL
+  maîtrise, tampons de l'encodage canonique compris, et la CEK confiée à `@hpke` en `ArrayBuffer` exact, que la
+  bibliothèque ne recopie pas. La CEK n'existe
+  qu'en mémoire. Restent hors de portée : les chaînes JavaScript (le corps décodé), les copies internes de WebCrypto
+  et le contenu rendu au lecteur (ADR 0030, point 9).
+
+### 6.3 Sous-clé d'un destinataire (KEY-20)
+
+L'émetteur relit `GET /api/v1/users/{userId}/keys` et vérifie :
+
+1. le certificat : signature de l'Autorité épinglée, sujet égal au destinataire, usage, validité à cet instant avec
+   5 minutes de tolérance d'horloge ;
+2. chaque liaison de sous-clé, par l'IK du certificat, sur `SubkeyBinding` avec le numéro de série de ce
+   certificat (4.4) : `kem` attendu, 45 jours exacts, `createdAt` au plus 5 minutes après cet instant (le serveur
+   refuse une sous-clé datée dans le futur, ADR 0025, point 7).
+
+Il prend, parmi les sous-clés non expirées, celle dont `createdAt` est le plus récent. Un certificat ou une seule
+liaison invalides refusent toutes les clés du destinataire, et l'envoi est annulé (« clé indisponible ») : une
+signature fausse n'est jamais normale (ADR 0030, point 5). Le scellement n'accepte que les sous-clés ainsi choisies,
+et les refuse à leur tour si la sous-clé ou son certificat ont expiré à `sentAt` (ADR 0030, point 8).
+
+### 6.4 Scellement (CDC 7.5, étapes 3 à 7)
+
+1. `SignedPayload` : `messageId` en UUIDv7, `sentAt`, `senderSeq`, `groupSeq`, un sel neuf, les destinataires triés.
+2. Signature par l'IK de l'émetteur.
+3. CEK et nonce neufs ; `Plaintext` chiffré en AES-256-GCM sous l'AAD.
+4. CEK encapsulée pour chaque destinataire, émetteur compris, par la sous-clé choisie en 6.3.
+5. CEK, `Plaintext` et `SignedPayload` remis à zéro, avec leurs copies intermédiaires (6.2).
+
+### 6.5 Ouverture (CDC 7.7)
+
+Les vérifications s'exécutent dans cet ordre et échouent fermé : le contenu n'est rendu qu'aux statuts `verified` et
+`recipients_mismatch`, ce dernier affiché sous l'avertissement ambre de la section 7.7 du CDC (ADR 0030, point 4).
+
+| Étape | Vérification | Échec |
+| --- | --- | --- |
+| 1 | Enveloppe lisible : objet strict (aucun champ inconnu), UUID en minuscules, base64url canonique, tailles, `v` = 1, suite connue ; MSG-21 : chiffré de 24 576 octets au plus, 50 encapsulations au plus, une par destinataire | `integrity_failed` |
+| 3 | L'encapsulation pour soi, dont l'`ekId` est dans le trousseau, ouverte par HPKE | `undecryptable` |
+| 4 | `Plaintext` déchiffré par AES-256-GCM sous l'AAD | `integrity_failed` |
+| 5 | `SignedPayload` relu strictement, invariants de 6.2 compris (`messageId` UUIDv7 daté de `sentAt`, `senderSeq` ≥ 1, `groupSeq` = 0 en direct, émetteur parmi les destinataires) ; version, suite, identifiants et numéro de série égaux à l'enveloppe | `integrity_failed` |
+| 6 | Certificat de l'émetteur : Autorité, sujet, numéro de série, usage, validité à `serverReceivedAt` (un instant qui n'est pas un entier positif sûr est refusé, jamais ignoré) | `signature_invalid` |
+| 7 | Signature Ed25519 de `SignedPayload` par l'IK du certificat | `signature_invalid` |
+| 8 | Le lecteur figure dans `recipientIds` | `recipients_mismatch` |
+
+L'AAD et `info_r` portent l'en-tête : un en-tête modifié par le serveur fait échouer HPKE dès l'étape 3
+(`undecryptable`). Le client du lot 4 complète ces étapes avec l'état de la conversation : message déjà traité
+(étape 2), membres attendus à `groupSeq` (étape 8), séquence et horloge (étapes 9 et 10), registre des contacts
+(KEY-50) et révocation.
+
+### 6.6 Vecteurs (QA-02, QA-04)
+
+`vectors/envelope.json` donne un message d'un compte à lui-même et à Bob : les champs de `SignedPayload` (u64 en
+chaîne décimale), ses octets et sa signature, la CEK, le nonce, `Plaintext`, l'AAD, le chiffré, chaque `info_r`,
+`enc` et `wrappedCek`, l'enveloppe et son `serverReceivedAt` (`receivedAt`, chaîne décimale). L'émetteur est celui
+de `identity.json` et de `vault.json` (IK : graine du test 2 de la RFC 8032 ; EK : clé privée d'Alice de la RFC
+7748) ; l'EK de Bob dérive de « SEAL vecteurs, EK de Bob » (DeriveKeyPair), sans clé commune avec `vault.json`. Les
+clés éphémères dérivent de `ikmE` (DeriveKeyPair, RFC 9180, 7.1.3), pour que chaque implémentation reproduise les
+encapsulations à l'octet près. Hors du message principal, chaque enveloppe chiffre sous une CEK et un nonce propres.
+
+L'API HPKE de `cryptography` ne prend pas d'AAD : `gen_vectors.py` compose le mode base de la RFC 9180 avec ses
+primitives, se vérifie contre le vecteur A.1.1 de la RFC 9180, puis contre `cryptography.hpke` avec une AAD vide, dans
+les deux sens (ADR 0030, point 2). Il ouvre ensuite chaque enveloppe selon 6.5 et refuse de publier un vecteur dont le
+statut diffère de celui qu'il annonce ; ses vérifications de signature refusent, comme celles du client, une clé ou
+un R d'ordre faible (section 4). Une falsification peut porter le certificat que sert le serveur pour elle
+(`senderCertificate`). `accepted` donne des enveloppes qui s'ouvrent : padding de 7 octets, chiffré de
+24 576 octets exactement. `forgeries` donne des enveloppes que Bob NE DOIT PAS accepter, chacune avec le statut
+attendu (`rejectedBy`) : champ inconnu dans l'enveloppe ou dans une encapsulation ; `messageId` en majuscules ; deux
+encapsulations pour Bob ; 51 encapsulations pour 51 destinataires distincts ; chiffré de 24 577 octets, pourtant
+signé ; `messageId` UUIDv4, de version 8 ou de variante 11 datés de `sentAt`, ou UUIDv7 d'une autre milliseconde ;
+`senderSeq` nul ; `groupSeq` non nul en direct ; émetteur absent des destinataires ; 51 destinataires ; `Plaintext`
+sans son champ de padding, ou avec un octet après lui ; IK d'ordre faible certifiée, avec une signature universelle ;
+numéro de série non canonique dans le certificat servi ; octet du chiffré, du
+nonce, de `enc` ou de `wrappedCek` ; en-tête déplacé dans une autre conversation ; message signé rechiffré par Bob
+dans une autre conversation (transfert subreptice), sous un autre `messageId`, sous un autre émetteur annoncé ou sous
+un autre numéro de certificat ; signature d'une autre IK ; signature altérée ; Bob absent des
+destinataires signés ; destinataires non triés, pourtant signés.

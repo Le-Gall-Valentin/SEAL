@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { fromBase64Url, toBase64Url } from './base64url'
 import { equalBytes } from './bytes'
 import { KEM, type Kem } from './identity'
+import { EK_ID_BYTES, SUBKEY_VALIDITY_MS, VDK_BYTES } from './protocol'
 import { type RecoveryKey } from './recovery'
 import {
   decryptBlob,
@@ -22,10 +23,6 @@ import {
 import { generateX25519 } from './webcrypto'
 
 const FORMAT_VERSION = 1
-const EK_ID_BYTES = 16
-const VDK_BYTES = 32
-/** KEY-21 : une sous-clé vaut 45 jours. */
-const SUBKEY_VALIDITY_MS = 45 * 86_400_000
 
 /** Sous-clé de chiffrement, côté public (KEY-05). */
 export interface SubkeyInfo {
@@ -86,6 +83,16 @@ export function keyringSecrets(keyring: Keyring): KeyringSecrets {
     throw new TypeError('trousseau inconnu : créé hors de shared/crypto')
   }
   return secrets
+}
+
+/** Signature Ed25519 par l'IK du trousseau (KEY-03, KEY-05, CDC 7.5) ; interne à shared/crypto. */
+export async function signWithIdentity(
+  keyring: Keyring,
+  data: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array(
+    await crypto.subtle.sign('Ed25519', keyringSecrets(keyring).identityKey, data),
+  )
 }
 
 export interface NewKeyring {

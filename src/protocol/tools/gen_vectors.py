@@ -9,11 +9,14 @@
 - vectors/vault.json : clé de récupération et coffre de clés (PROTOCOL.md, section 5 ; KEY-30 à KEY-33, QA-02,
   ADR 0027) ;
 - vectors/hkdf-rfc5869.json et vectors/x25519-rfc7748.json : vecteurs officiels de HKDF-SHA256 (RFC 5869, annexe A,
-  cas 1 à 3) et de X25519 (RFC 7748, section 6.1) (QA-01, ADR 0027).
+  cas 1 à 3) et de X25519 (RFC 7748, section 6.1) (QA-01, ADR 0027) ;
+- vectors/envelope.json : enveloppe d'un message, encapsulations HPKE et falsifications (PROTOCOL.md, section 6 ;
+  CDC 7, QA-02 à QA-04, ADR 0030).
 
 Troisième implémentation, indépendante de Java et de TypeScript : les deux suites de tests relisent ces
 vecteurs, aucune ne se valide elle-même. Bibliothèque standard de Python, plus `cryptography` pour signer en
-Ed25519 (ADR 0025, point 3) et pour HKDF, AES-GCM et les clés du trousseau (ADR 0027), installée par :
+Ed25519 (ADR 0025, point 3), pour HKDF, AES-GCM et les clés du trousseau (ADR 0027), et pour vérifier l'HPKE de
+la section 6 contre cryptography.hpke (50.0.2, ADR 0030, point 2), installée par :
 python3 -m pip install --require-hashes -r tools/requirements.txt
 
 Usage, depuis src/protocol :
@@ -42,15 +45,26 @@ IDENTITY_OUTPUT = PROTOCOL_DIR / "vectors" / "identity.json"
 VAULT_OUTPUT = PROTOCOL_DIR / "vectors" / "vault.json"
 HKDF_OUTPUT = PROTOCOL_DIR / "vectors" / "hkdf-rfc5869.json"
 X25519_OUTPUT = PROTOCOL_DIR / "vectors" / "x25519-rfc7748.json"
+ENVELOPE_OUTPUT = PROTOCOL_DIR / "vectors" / "envelope.json"
 BLOCKLIST = PROTOCOL_DIR / "password-blocklist.txt"
 
 U32_MAX = 2**32 - 1
 U64_MAX = 2**63 - 1  # ADR 0006 : le long de Java est signé
 UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
+# Version d'Unicode du générateur, référence de SEAL (ADR 0006, point 2) : NFC, NFKC et minuscules en dépendent. Elle
+# est écrite dans password-policy.json, si bien qu'une régénération sous une autre version fait échouer --check (la CI
+# épingle Python).
+UNICODE_VERSION = unicodedata.unidata_version
+
 
 class Rejected(Exception):
     """Valeur hors du domaine de l'encodage : elle doit être rejetée par toute implémentation."""
+
+
+class UnassignedCharacter(Exception):
+    """Caractère non attribué dans la version d'Unicode du générateur : une version plus récente pourrait le composer,
+    si bien que son verdict NFC dépend du moteur (ADR 0006, point 2). Le générateur s'arrête plutôt que de l'écrire."""
 
 
 def b64url(data: bytes) -> str:
@@ -87,10 +101,19 @@ def raw_bytes(value: bytes) -> bytes:
     return u32(len(value)) + value
 
 
+def known_characters(value: str) -> str:
+    """`value`, si chacun de ses caractères est attribué dans UNICODE_VERSION : son verdict NFC est alors le même dans
+    toute version postérieure, par la politique de stabilité de la normalisation (ADR 0006, point 2)."""
+    for character in value:
+        if unicodedata.category(character) == "Cn":
+            raise UnassignedCharacter(f"U+{ord(character):04X} non attribué en Unicode {UNICODE_VERSION}")
+    return value
+
+
 def text(value: str) -> bytes:
     try:
         # encode() échoue sur un demi-caractère isolé : c'est le refus voulu (ADR 0006).
-        encoded = unicodedata.normalize("NFC", value).encode("utf-8")
+        encoded = unicodedata.normalize("NFC", known_characters(value)).encode("utf-8")
     except UnicodeEncodeError as error:
         raise Rejected("demi-caractère Unicode isolé") from error
     return raw_bytes(encoded)
@@ -391,10 +414,6 @@ PASSWORD_CASES: list[tuple[str, str, str, str]] = [
     ("longueur : 129 phoques U+1F9AD", "\U0001f9ad" * 129, "valentin", "valentin@exemple.ca"),
 ]
 
-# Version d'Unicode du générateur : NFKC et minuscules en dépendent. Elle est écrite dans le fichier, si bien qu'une
-# régénération sous une autre version fait échouer --check (la CI épingle Python).
-UNICODE_VERSION = unicodedata.unidata_version
-
 
 def build_password_policy() -> str:
     blocklist = load_blocklist()
@@ -438,14 +457,22 @@ def crypto_lib() -> SimpleNamespace:
         from cryptography.hazmat.primitives import hashes, serialization
         from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+        from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF, HKDFExpand
     except ImportError as error:
         raise SystemExit(
             "gen_vectors.py : la bibliothèque cryptography manque ; lancez "
             "python3 -m pip install --require-hashes -r tools/requirements.txt"
         ) from error
     return SimpleNamespace(
-        hashes=hashes, serialization=serialization, ed25519=ed25519, x25519=x25519, AESGCM=AESGCM, HKDF=HKDF
+        hashes=hashes,
+        serialization=serialization,
+        ed25519=ed25519,
+        x25519=x25519,
+        AESGCM=AESGCM,
+        HKDF=HKDF,
+        HKDFExpand=HKDFExpand,
+        InvalidTag=InvalidTag,
     )
 
 
@@ -1031,10 +1058,878 @@ def build_x25519() -> str:
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
 
 
+# ---------------------------------------------------------------------------------------------
+# Messages (PROTOCOL.md, section 6 ; CDC 7 ; QA-02 à QA-04, ADR 0030). Le CDC encapsule la CEK avec aad = AAD, et
+# l'API HPKE de `cryptography` ne prend pas d'AAD : le mode base de la RFC 9180 est composé ici avec ses primitives
+# (X25519, HKDF, AES-GCM), comme le coffre (ADR 0030, point 2). Il est vérifié contre le vecteur A.1.1 de la
+# RFC 9180, puis contre cryptography.hpke avec une AAD vide ; @hpke/core ouvre ensuite ses encapsulations.
+# ---------------------------------------------------------------------------------------------
+
+HPKE_KEM_ID = 0x0020  # DHKEM(X25519, HKDF-SHA256)
+HPKE_KDF_ID = 0x0001  # HKDF-SHA256
+HPKE_AES_128_GCM = 0x0001
+HPKE_AES_256_GCM = 0x0002
+HPKE_KEM_SUITE = b"KEM" + HPKE_KEM_ID.to_bytes(2, "big")
+
+# RFC 9180, annexe A.1.1 : DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM, mode base, première encryption.
+RFC9180_A11 = {
+    "info": "4f6465206f6e2061204772656369616e2055726e",
+    "ikmE": "7268600d403fce431561aef583ee1613527cff655c1343f29812e66706df3234",
+    "pkEm": "37fda3567bdbd628e88668c3c8d7e97d1d1253b6d4ea6d44c150f741f1bf4431",
+    "skEm": "52c4a758a802cd8b936eceea314432798d5baf2d7e9235dc084ab1b9cfa2f736",
+    "ikmR": "6db9df30aa07dd42ee5e8181afdb977e538f5e1fec8a06223f33f7013e525037",
+    "pkRm": "3948cfe0ad1ddb695d780e59077195da6c56506b027329794ab02bca80815c4d",
+    "skRm": "4612c550263fc8ad58375df3f557aac531d26850903e55a9f23f21d8534e8ac8",
+    "shared_secret": "fe0e18c9f024ce43799ae393c7e8fe8fce9d218875e8227b0187c04e7d2ea1fc",
+    "key_schedule_context": "00725611c9d98c07c03f60095cd32d400d8347d45ed67097bbad50fc56da742d07cb6cffde367bb0565ba28bb02c90744a20f5ef37f30523526106f637abb05449",
+    "secret": "12fff91991e93b48de37e7daddb52981084bd8aa64289c3788471d9a9712f397",
+    "key": "4531685d41d65f03dc48f6b8302c05b0",
+    "base_nonce": "56d890e5accaaf011cff4b7d",
+    "pt": "4265617574792069732074727574682c20747275746820626561757479",
+    "aad": "436f756e742d30",
+    "ct": "f938558b5d72f1a23810b4be2ab4f84331acc02fc97babc53a52ae8218a355a96d8770ac83d07bea87e13c512a",
+}
+
+
+def hpke_suite_id(aead_id: int) -> bytes:
+    return b"HPKE" + HPKE_KEM_ID.to_bytes(2, "big") + HPKE_KDF_ID.to_bytes(2, "big") + aead_id.to_bytes(2, "big")
+
+
+def hkdf_extract(salt: bytes, ikm: bytes) -> bytes:
+    """RFC 5869 : un sel vide vaut 32 octets nuls, que HMAC complète de même."""
+    return crypto_lib().HKDF.extract(crypto_lib().hashes.SHA256(), salt, ikm)
+
+
+def hkdf_expand(prk: bytes, info: bytes, length: int) -> bytes:
+    return crypto_lib().HKDFExpand(crypto_lib().hashes.SHA256(), length, info).derive(prk)
+
+
+def labeled_extract(suite_id: bytes, salt: bytes, label: bytes, ikm: bytes) -> bytes:
+    return hkdf_extract(salt, b"HPKE-v1" + suite_id + label + ikm)
+
+
+def labeled_expand(suite_id: bytes, prk: bytes, label: bytes, info: bytes, length: int) -> bytes:
+    return hkdf_expand(prk, length.to_bytes(2, "big") + b"HPKE-v1" + suite_id + label + info, length)
+
+
+def x25519_public(private: bytes) -> bytes:
+    return raw_public(crypto_lib().x25519.X25519PrivateKey.from_private_bytes(private))
+
+
+def x25519_dh(private: bytes, public: bytes) -> bytes:
+    x25519 = crypto_lib().x25519
+    return x25519.X25519PrivateKey.from_private_bytes(private).exchange(x25519.X25519PublicKey.from_public_bytes(public))
+
+
+def hpke_derive_key_pair(ikm: bytes) -> tuple[bytes, bytes]:
+    """RFC 9180, 7.1.3 : DeriveKeyPair pour X25519."""
+    dkp_prk = labeled_extract(HPKE_KEM_SUITE, b"", b"dkp_prk", ikm)
+    private = labeled_expand(HPKE_KEM_SUITE, dkp_prk, b"sk", b"", 32)
+    return private, x25519_public(private)
+
+
+def hpke_shared_secret(dh: bytes, enc: bytes, recipient_public: bytes) -> bytes:
+    eae_prk = labeled_extract(HPKE_KEM_SUITE, b"", b"eae_prk", dh)
+    return labeled_expand(HPKE_KEM_SUITE, eae_prk, b"shared_secret", enc + recipient_public, 32)
+
+
+def hpke_key_schedule(aead_id: int, shared_secret: bytes, info: bytes) -> SimpleNamespace:
+    """RFC 9180, 5.1 : KeyScheduleS en mode base (psk et psk_id vides)."""
+    suite = hpke_suite_id(aead_id)
+    context = bytes([0]) + labeled_extract(suite, b"", b"psk_id_hash", b"") + labeled_extract(suite, b"", b"info_hash", info)
+    secret = labeled_extract(suite, shared_secret, b"secret", b"")
+    key_length = 16 if aead_id == HPKE_AES_128_GCM else 32
+    return SimpleNamespace(
+        context=context,
+        secret=secret,
+        key=labeled_expand(suite, secret, b"key", context, key_length),
+        base_nonce=labeled_expand(suite, secret, b"base_nonce", context, 12),
+    )
+
+
+def hpke_seal(recipient_public: bytes, info: bytes, aad: bytes, plaintext: bytes, ikm_e: bytes,
+              aead_id: int = HPKE_AES_256_GCM) -> SimpleNamespace:
+    """SealBase : la clé éphémère dérive de ikm_e (DeriveKeyPair), pour des vecteurs stables."""
+    private_e, enc = hpke_derive_key_pair(ikm_e)
+    shared = hpke_shared_secret(x25519_dh(private_e, recipient_public), enc, recipient_public)
+    schedule = hpke_key_schedule(aead_id, shared, info)
+    ciphertext = crypto_lib().AESGCM(schedule.key).encrypt(schedule.base_nonce, plaintext, aad)
+    return SimpleNamespace(enc=enc, ciphertext=ciphertext, shared=shared, schedule=schedule)
+
+
+def hpke_open(recipient_private: bytes, enc: bytes, info: bytes, aad: bytes, ciphertext: bytes,
+              aead_id: int = HPKE_AES_256_GCM) -> bytes:
+    shared = hpke_shared_secret(x25519_dh(recipient_private, enc), enc, x25519_public(recipient_private))
+    schedule = hpke_key_schedule(aead_id, shared, info)
+    return crypto_lib().AESGCM(schedule.key).decrypt(schedule.base_nonce, ciphertext, aad)
+
+
+def check_hpke() -> None:
+    """L'HPKE composé ici reproduit la RFC 9180 (A.1.1), puis s'entend avec cryptography.hpke (AAD vide)."""
+    v = {name: bytes.fromhex(value) for name, value in RFC9180_A11.items()}
+    if hpke_derive_key_pair(v["ikmE"]) != (v["skEm"], v["pkEm"]) or hpke_derive_key_pair(v["ikmR"]) != (
+        v["skRm"], v["pkRm"]
+    ):
+        raise SystemExit("gen_vectors.py : DeriveKeyPair ne reproduit pas la RFC 9180, A.1.1")
+    sealed = hpke_seal(v["pkRm"], v["info"], v["aad"], v["pt"], v["ikmE"], HPKE_AES_128_GCM)
+    reproduced = (
+        sealed.enc == v["pkEm"]
+        and sealed.shared == v["shared_secret"]
+        and sealed.schedule.context == v["key_schedule_context"]
+        and sealed.schedule.secret == v["secret"]
+        and sealed.schedule.key == v["key"]
+        and sealed.schedule.base_nonce == v["base_nonce"]
+        and sealed.ciphertext == v["ct"]
+        and hpke_open(v["skRm"], sealed.enc, v["info"], v["aad"], sealed.ciphertext, HPKE_AES_128_GCM) == v["pt"]
+    )
+    if not reproduced:
+        raise SystemExit("gen_vectors.py : l'HPKE composé ne reproduit pas la RFC 9180, A.1.1")
+    try:
+        from cryptography.hazmat.primitives import hpke
+    except ImportError as error:
+        raise SystemExit(
+            "gen_vectors.py : cryptography.hpke manque (cryptography 50.0.2) ; lancez "
+            "python3 -m pip install --require-hashes -r tools/requirements.txt"
+        ) from error
+    x25519 = crypto_lib().x25519
+    suite = hpke.Suite(hpke.KEM.X25519, hpke.KDF.HKDF_SHA256, hpke.AEAD.AES_256_GCM)
+    recipient = x25519.X25519PrivateKey.from_private_bytes(v["skRm"])
+    theirs = suite.encrypt(v["pt"], recipient.public_key(), info=v["info"])
+    ours = hpke_seal(v["pkRm"], v["info"], b"", v["pt"], v["ikmE"])
+    from cryptography.exceptions import InvalidTag
+
+    try:
+        agree = (
+            hpke_open(v["skRm"], theirs[:32], v["info"], b"", theirs[32:]) == v["pt"]
+            and suite.decrypt(ours.enc + ours.ciphertext, recipient, info=v["info"]) == v["pt"]
+        )
+    except InvalidTag:
+        agree = False
+    if not agree:
+        raise SystemExit("gen_vectors.py : l'HPKE composé ne s'entend pas avec cryptography.hpke")
+
+
+MESSAGE_SUITE = SUITE
+U64_FIELDS = ("sentAt", "senderSeq", "groupSeq")
+MESSAGE_VERSION = 1
+MESSAGE_CONVERSATION_ID = "0192f7a1-ffff-7000-8000-00000000c0c0"
+OTHER_CONVERSATION_ID = "0192f7a1-ffff-7000-8000-00000000c0c1"
+SENT_AT = NOT_BEFORE + 60_000
+MESSAGE_SALT = bytes(range(0x50, 0x60))
+MESSAGE_CEK = bytes(range(0x60, 0x80))
+MESSAGE_NONCE = bytes(range(0x80, 0x8C))
+MESSAGE_BODY = "Rendez-vous à l’UQAC demain, 9 h 30 \U0001F9AD"
+BOB_EK_ID = bytes(range(0xC0, 0xD0))
+# EK propre à Bob : aucune clé privée n'est partagée avec le trousseau de vault.json.
+BOB_EK_PRIVATE, _ = hpke_derive_key_pair(sha256(b"SEAL vecteurs, EK de Bob"))
+RECEIVED_AT = SENT_AT + 1_500  # serverReceivedAt du message (CDC 7.7, étape 6)
+
+
+def uuid_text(value: bytes) -> str:
+    """Forme 8-4-4-4-12 en minuscules de 16 octets : la réciproque de uuid()."""
+    hexa = value.hex()
+    return f"{hexa[0:8]}-{hexa[8:12]}-{hexa[12:16]}-{hexa[16:20]}-{hexa[20:32]}"
+
+
+def with_uuid_bits(value: str, version: int, variant: int) -> str:
+    """L'UUID `value`, sa version (4 bits) et sa variante (2 bits) remplacées, le reste intact."""
+    data = bytearray(uuid(value))
+    data[6] = (version << 4) | (data[6] & 0x0F)
+    data[8] = (variant << 6) | (data[8] & 0x3F)
+    return uuid_text(bytes(data))
+
+
+def uuid_v7(millis: int, random: bytes) -> str:
+    """UUIDv7 (RFC 9562) : 48 bits de millisecondes, version 7, variante 10, 74 bits pris dans `random`."""
+    return with_uuid_bits(uuid_text(millis.to_bytes(6, "big") + random[:10]), 7, 0b10)
+
+
+MESSAGE_ID_V7 = uuid_v7(SENT_AT, bytes(range(0xD0, 0xDA)))
+
+
+def ikm_for(label: str) -> bytes:
+    """Matériau de la clé éphémère d'une encapsulation : fixe, propre à chaque encapsulation des vecteurs."""
+    return sha256(("SEAL vecteurs, clé éphémère : " + label).encode("utf-8"))
+
+
+def message_header(conversation_id: str = MESSAGE_CONVERSATION_ID) -> dict:
+    return {
+        "v": MESSAGE_VERSION,
+        "suite": MESSAGE_SUITE,
+        "messageId": MESSAGE_ID_V7,
+        "conversationId": conversation_id,
+        "senderId": USER_ID,
+        "senderCertSerial": SERIAL,  # certificat de identity.json
+    }
+
+
+def signed_payload_fields(**changes) -> dict:
+    fields = dict(
+        message_header(),
+        conversationType=1,
+        sentAt=SENT_AT,
+        senderSeq=1,
+        groupSeq=0,
+        salt=MESSAGE_SALT,
+        recipientIds=sorted([USER_ID, VICTIM_ID], key=uuid),
+        contentType="text/plain",
+        body=MESSAGE_BODY,
+    )
+    fields.update(changes)
+    return fields
+
+
+def signed_payload_struct(f: dict) -> dict:
+    return STRUCT(
+        "SEAL-msg-v1",
+        U8(f["v"]),
+        TEXT(f["suite"]),
+        UUID(f["messageId"]),
+        UUID(f["conversationId"]),
+        U8(f["conversationType"]),
+        UUID(f["senderId"]),
+        BYTES(f["senderCertSerial"]),
+        U64(f["sentAt"]),
+        U64(f["senderSeq"]),
+        U64(f["groupSeq"]),
+        BYTES(f["salt"]),
+        LIST(*[UUID(recipient) for recipient in f["recipientIds"]]),
+        TEXT(f["contentType"]),
+        TEXT(f["body"]),
+    )
+
+
+def message_aad(h: dict) -> bytes:
+    return encode(
+        STRUCT(
+            "SEAL-aad-v1",
+            U8(h["v"]),
+            TEXT(h["suite"]),
+            UUID(h["messageId"]),
+            UUID(h["conversationId"]),
+            UUID(h["senderId"]),
+            BYTES(h["senderCertSerial"]),
+        )
+    )
+
+
+def wrap_info(h: dict, recipient_id: str, ek_id: bytes) -> bytes:
+    return encode(
+        STRUCT(
+            "SEAL-wrap-v1",
+            TEXT(h["suite"]),
+            UUID(h["messageId"]),
+            UUID(h["conversationId"]),
+            UUID(recipient_id),
+            BYTES(ek_id),
+        )
+    )
+
+
+# Destinataires des vecteurs : l'émetteur (EK d'Alice, sous-clé du coffre de vault.json) et Bob (EK de Bob).
+MESSAGE_RECIPIENTS = {
+    USER_ID: (VAULT_EK_ID, EK_PRIVATE),
+    VICTIM_ID: (BOB_EK_ID, BOB_EK_PRIVATE),
+}
+
+
+def seal_message(header: dict, signed_payload: bytes, signature: bytes, recipients: list[str], label: str,
+                 padding: bytes = b"", cek: bytes | None = None, nonce: bytes | None = None,
+                 plaintext: bytes | None = None) -> dict:
+    """
+    CDC 7.5, étapes 5 à 7 : Plaintext chiffré par la CEK sous l'AAD, CEK encapsulée pour chaque destinataire. Sauf
+    mention contraire, la CEK et le nonce dérivent de `label` : aucun couple ne chiffre deux textes (CDC 7.1).
+    """
+    cek = cek if cek is not None else sha256(("SEAL vecteurs, CEK : " + label).encode("utf-8"))
+    nonce = nonce if nonce is not None else sha256(("SEAL vecteurs, nonce : " + label).encode("utf-8"))[:12]
+    if plaintext is None:
+        plaintext = raw_bytes(signed_payload) + raw_bytes(signature) + raw_bytes(padding)
+    aad = message_aad(header)
+    ciphertext = crypto_lib().AESGCM(cek).encrypt(nonce, plaintext, aad)
+    wraps = []
+    for recipient_id in sorted(recipients, key=uuid):
+        ek_id, ek_private = MESSAGE_RECIPIENTS[recipient_id]
+        info = wrap_info(header, recipient_id, ek_id)
+        ikm = ikm_for(f"{label}, {recipient_id}")
+        sealed = hpke_seal(x25519_public(ek_private), info, aad, cek, ikm)
+        try:
+            reopened = hpke_open(ek_private, sealed.enc, info, aad, sealed.ciphertext)
+        except crypto_lib().InvalidTag:
+            reopened = None
+        if reopened != cek:
+            raise SystemExit("gen_vectors.py : une encapsulation des vecteurs ne s'ouvre pas")
+        wraps.append(
+            {
+                "recipientId": recipient_id,
+                "ekId": b64url(ek_id),
+                "enc": b64url(sealed.enc),
+                "wrappedCek": b64url(sealed.ciphertext),
+                "ikmE": b64url(ikm),
+                "info": b64url(info),
+            }
+        )
+    envelope = {
+        "v": header["v"],
+        "suite": header["suite"],
+        "messageId": header["messageId"],
+        "conversationId": header["conversationId"],
+        "senderId": header["senderId"],
+        "senderCertSerial": b64url(header["senderCertSerial"]),
+        "nonce": b64url(nonce),
+        "ciphertext": b64url(ciphertext),
+        "wraps": [{key: wrap[key] for key in ("recipientId", "ekId", "enc", "wrappedCek")} for wrap in wraps],
+    }
+    return {"plaintext": plaintext, "aad": aad, "ciphertext": ciphertext, "wraps": wraps, "envelope": envelope}
+
+
+def sender_certificate() -> dict:
+    """Certificat de l'émetteur, celui de identity.json, tel que le sert le serveur."""
+    return dict(certificate_fields(), signature=b64url(sign(CA_SEED, encode(certificate_struct(certificate_fields())))))
+
+
+# Ouverture d'une enveloppe (PROTOCOL.md 6.5, ADR 0030, point 4) : troisième implémentation des étapes 1 et 3 à 8, à
+# côté de TypeScript. Le générateur ne publie une falsification que si elle rend le statut qu'il annonce.
+
+B64URL_ALPHABET = re.compile(r"^[A-Za-z0-9_-]*$")
+LOWERCASE_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+ENVELOPE_KEYS = {"v", "suite", "messageId", "conversationId", "senderId", "senderCertSerial", "nonce", "ciphertext", "wraps"}
+WRAP_KEYS = {"recipientId", "ekId", "enc", "wrappedCek"}
+MAX_CIPHERTEXT_BYTES = 24 * 1024  # MSG-21 : chiffré de 24 Kio au plus (ADR 0030, point 7)
+
+
+class Refused(Exception):
+    def __init__(self, status: str) -> None:
+        super().__init__(status)
+        self.status = status
+
+
+class Reader:
+    """Relecture canonique stricte (PROTOCOL.md, section 2), symétrique de canonicalReader.ts."""
+
+    def __init__(self, data: bytes) -> None:
+        self.data, self.offset = data, 0
+
+    def take(self, length: int) -> bytes:
+        if length > len(self.data) - self.offset:
+            raise Rejected("structure tronquée")
+        start, self.offset = self.offset, self.offset + length
+        return self.data[start:self.offset]
+
+    def u8(self) -> int:
+        return self.take(1)[0]
+
+    def u32(self) -> int:
+        return binary.unpack(">I", self.take(4))[0]
+
+    def safe_u64(self) -> int:
+        value = binary.unpack(">Q", self.take(8))[0]
+        if value > 2**53 - 1:
+            raise Rejected("u64 au-delà de 2^53 - 1")
+        return value
+
+    def bytes(self) -> bytes:
+        return self.take(self.u32())
+
+    def text(self) -> str:
+        # strict ; un BOM reste U+FEFF, comme en Java et en TypeScript
+        value = known_characters(self.bytes().decode("utf-8"))
+        if unicodedata.normalize("NFC", value) != value:
+            raise Rejected("texte hors de la forme NFC")
+        return value
+
+    def uuid(self) -> str:
+        return uuid_text(self.take(16))
+
+    def list(self, element) -> list:
+        count = self.u32()
+        if count > len(self.data) - self.offset:
+            raise Rejected("liste plus longue que les octets restants")
+        return [element() for _ in range(count)]
+
+    def end(self) -> None:
+        if self.offset != len(self.data):
+            raise Rejected("octets en trop")
+
+
+def strict_b64url(value: object, length: int | None = None) -> bytes:
+    if not isinstance(value, str) or not B64URL_ALPHABET.fullmatch(value) or len(value) % 4 == 1:
+        raise Rejected("base64url hors de l'alphabet")
+    data = from_b64url(value)
+    if b64url(data) != value or (length is not None and len(data) != length):
+        raise Rejected("base64url non canonique ou de mauvaise taille")
+    return data
+
+
+def decode_signed_payload(data: bytes) -> dict:
+    """CDC 7.7, étape 5 : relecture stricte de SignedPayload ; tout écart lève Rejected."""
+    reader = Reader(data)
+    if reader.text() != "SEAL-msg-v1":
+        raise Rejected("étiquette")
+    f = {
+        "v": reader.u8(),
+        "suite": reader.text(),
+        "messageId": reader.uuid(),
+        "conversationId": reader.uuid(),
+        "conversationType": reader.u8(),
+        "senderId": reader.uuid(),
+        "senderCertSerial": reader.bytes(),
+        "sentAt": reader.safe_u64(),
+        "senderSeq": reader.safe_u64(),
+        "groupSeq": reader.safe_u64(),
+        "salt": reader.bytes(),
+    }
+    f["recipientIds"] = reader.list(reader.uuid)
+    f["contentType"] = reader.text()
+    f["body"] = reader.text()
+    reader.end()
+    recipients = f["recipientIds"]
+    if (
+        f["v"] != MESSAGE_VERSION
+        or f["suite"] != MESSAGE_SUITE
+        or f["conversationType"] not in (1, 2)
+        or len(f["senderCertSerial"]) != 16
+        or len(f["salt"]) != 16
+        or f["contentType"] != "text/plain"
+        or len(f["body"]) > 4000  # points de code (ADR 0030, point 6)
+        or not 1 <= len(recipients) <= 50
+        or any(uuid(a) >= uuid(b) for a, b in zip(recipients, recipients[1:]))
+    ):
+        raise Rejected("SignedPayload hors du format")
+    # PROTOCOL.md 6.2 : UUIDv7 daté de sentAt, senderSeq dès 1, groupSeq nul en direct, émetteur destinataire.
+    message_id = uuid(f["messageId"])
+    if (
+        message_id[6] >> 4 != 7
+        or message_id[8] >> 6 != 0b10
+        or int.from_bytes(message_id[:6], "big") != f["sentAt"]
+        or f["senderSeq"] < 1
+        or (f["conversationType"] == 1 and f["groupSeq"] != 0)
+        or f["senderId"] not in recipients
+    ):
+        raise Rejected("invariants de PROTOCOL.md 6.2")
+    return f
+
+
+def decode_envelope(envelope: object) -> dict:
+    """
+    CDC 7.7, étape 1 : objet strict, UUID en minuscules, base64url canonique, tailles, version, suite et MSG-21
+    (chiffré de 24 576 octets au plus, 50 encapsulations au plus, une par destinataire).
+    """
+    if not isinstance(envelope, dict) or set(envelope) != ENVELOPE_KEYS:
+        raise Rejected("enveloppe hors du schéma")
+    # Sémantique de JSON : 1, 1.0 et 1e0 sont le même nombre, comme après JSON.parse ; un booléen n'en est pas un.
+    version = envelope["v"]
+    if isinstance(version, bool) or not isinstance(version, (int, float)) or version != MESSAGE_VERSION:
+        raise Rejected("version")
+    if envelope["suite"] != MESSAGE_SUITE:
+        raise Rejected("version ou suite")
+
+    def lowercase(value: object) -> str:
+        if not isinstance(value, str) or not LOWERCASE_UUID.fullmatch(value):
+            raise Rejected("UUID hors de la forme canonique en minuscules")
+        return value
+
+    header = {
+        "v": MESSAGE_VERSION,
+        "suite": MESSAGE_SUITE,
+        "messageId": lowercase(envelope["messageId"]),
+        "conversationId": lowercase(envelope["conversationId"]),
+        "senderId": lowercase(envelope["senderId"]),
+        "senderCertSerial": strict_b64url(envelope["senderCertSerial"], 16),
+    }
+    ciphertext = strict_b64url(envelope["ciphertext"])
+    wraps = envelope["wraps"]
+    if not 16 <= len(ciphertext) <= MAX_CIPHERTEXT_BYTES or not isinstance(wraps, list) or len(wraps) > 50:
+        raise Rejected("MSG-21 : taille du chiffré ou nombre d'encapsulations")
+    if any(not isinstance(wrap, dict) or set(wrap) != WRAP_KEYS for wrap in wraps):
+        raise Rejected("encapsulation hors du schéma")
+    decoded = [
+        {
+            "recipientId": lowercase(wrap["recipientId"]),
+            "ekId": strict_b64url(wrap["ekId"], 16),
+            "enc": strict_b64url(wrap["enc"], 32),
+            "wrappedCek": strict_b64url(wrap["wrappedCek"], 48),
+        }
+        for wrap in wraps
+    ]
+    if len({wrap["recipientId"] for wrap in decoded}) != len(decoded):
+        raise Rejected("MSG-21 : une encapsulation par destinataire")
+    return {"header": header, "nonce": strict_b64url(envelope["nonce"], 12), "ciphertext": ciphertext, "wraps": decoded}
+
+
+FIELD_PRIME = 2**255 - 19
+DECIMAL_U64 = re.compile(r"^(0|[1-9][0-9]*)$")
+
+
+def ed25519_y(point: bytes) -> int:
+    """y d'un point encodé : 32 octets petit-boutistes, sans le bit de signe de x (RFC 8032, 5.1.3)."""
+    return int.from_bytes(point[:31] + bytes([point[31] & 0x7F]), "little")
+
+
+SMALL_ORDER_Y = {ed25519_y(bytes.fromhex(point)) for point in SMALL_ORDER_POINTS}
+
+
+def weak_or_non_canonical(point: bytes) -> bool:
+    """ADR 0025, point 14 : point d'ordre faible ou encodage non canonique, comme isWeakOrNonCanonical (ed25519.ts)."""
+    return len(point) < 32 or ed25519_y(point) >= FIELD_PRIME or ed25519_y(point) in SMALL_ORDER_Y
+
+
+def verifies_strictly(public: bytes, message: bytes, signature: bytes) -> bool:
+    """PROTOCOL.md 4 : refuse une clé ou un R d'ordre faible, que la bibliothèque de référence accepterait."""
+    return (
+        len(public) == 32
+        and len(signature) == 64
+        and not weak_or_non_canonical(public)
+        and not weak_or_non_canonical(signature[:32])
+        and verifies(public, message, signature)
+    )
+
+
+def served_u64(value: object) -> int:
+    """
+    Une date du certificat servi : une chaîne décimale dans les vecteurs (PROTOCOL.md 2.5), un nombre entier de JSON
+    dans l'API, comme le lit le client ; rien d'autre, ni chaîne hexadécimale, ni booléen, ni fraction.
+    """
+    if isinstance(value, str) and DECIMAL_U64.fullmatch(value):
+        number = int(value)
+    elif isinstance(value, (int, float)) and not isinstance(value, bool) and float(value).is_integer():
+        number = int(value)
+    else:
+        raise Rejected("u64 hors d'une chaîne décimale ou d'un nombre entier")
+    if not 0 <= number <= 2**53 - 1:
+        raise Rejected("u64 au-delà d'un entier sûr")
+    return number
+
+
+def verified_certificate(served: dict, subject_id: str, at: int) -> dict:
+    """CDC 7.7, étape 6 : signé par l'Autorité, pour `subject_id`, usage et validité à `at`, sans tolérance."""
+    try:
+        f = {key: value for key, value in served.items() if key != "signature"}
+        serial = strict_b64url(f["serial"], 16)
+        issuer_key_id = strict_b64url(f["issuerKeyId"], 8)
+        strict_b64url(f["ikPublic"], 32)
+        signature = strict_b64url(served["signature"], 64)
+        not_before, not_after = served_u64(f["notBefore"]), served_u64(f["notAfter"])
+        # Sémantique de JSON, comme pour la version : 3 et 3.0 sont le même nombre.
+        if isinstance(f["usage"], bool) or not isinstance(f["usage"], (int, float)) or not float(f["usage"]).is_integer():
+            raise Rejected("usage")
+        f = dict(f, usage=int(f["usage"]), notBefore=not_before, notAfter=not_after)
+        valid = (
+            verifies_strictly(public_key(CA_SEED), encode(certificate_struct(f)), signature)
+            and issuer_key_id == sha256(public_key(CA_SEED))[:8]
+            and len(serial) == 16
+            and f["subjectId"] == subject_id
+            and f["usage"] == USAGE
+            and not_after - not_before == CERTIFICATE_VALIDITY_DAYS * DAY_MS
+            and not_before <= at < not_after
+        )
+    except (Rejected, KeyError, TypeError, ValueError, AttributeError) as error:
+        raise Refused("signature_invalid") from error
+    if not valid:
+        raise Refused("signature_invalid")
+    return f
+
+
+def open_message(envelope: dict, reader_id: str, reader_keys: dict, served_certificate: dict, received_at: int) -> str:
+    """CDC 7.7, étapes 1 et 3 à 8 (ADR 0030, point 4) : le statut de l'enveloppe pour `reader_id`."""
+    from cryptography.exceptions import InvalidTag
+
+    try:
+        try:
+            decoded = decode_envelope(envelope)
+            aad = message_aad(decoded["header"])
+        except (Rejected, KeyError, TypeError, ValueError, AttributeError) as error:
+            raise Refused("integrity_failed") from error
+        header = decoded["header"]
+        wrap = next((wrap for wrap in decoded["wraps"] if wrap["recipientId"] == reader_id), None)
+        ek_private = None if wrap is None else reader_keys.get(wrap["ekId"])
+        if wrap is None or ek_private is None:
+            raise Refused("undecryptable")
+        try:
+            cek = hpke_open(ek_private, wrap["enc"], wrap_info(header, reader_id, wrap["ekId"]), aad, wrap["wrappedCek"])
+        except (InvalidTag, ValueError) as error:
+            raise Refused("undecryptable") from error
+        try:
+            plaintext = crypto_lib().AESGCM(cek).decrypt(decoded["nonce"], decoded["ciphertext"], aad)
+            parts = Reader(plaintext)
+            signed_payload, signature = parts.bytes(), parts.bytes()
+            parts.bytes()
+            parts.end()
+            fields = decode_signed_payload(signed_payload)
+        except (InvalidTag, Rejected, UnicodeDecodeError) as error:
+            raise Refused("integrity_failed") from error
+        if any(fields[key] != header[key] for key in ("messageId", "conversationId", "senderId", "senderCertSerial")):
+            raise Refused("integrity_failed")
+        certificate = verified_certificate(served_certificate, header["senderId"], received_at)
+        if from_b64url(certificate["serial"]) != header["senderCertSerial"]:
+            raise Refused("signature_invalid")
+        if not verifies_strictly(from_b64url(certificate["ikPublic"]), signed_payload, signature):
+            raise Refused("signature_invalid")
+        if reader_id not in fields["recipientIds"]:
+            raise Refused("recipients_mismatch")
+        return "verified"
+    except Refused as refusal:
+        return refusal.status
+
+
+def opened_by(envelope: dict, reader_id: str, certificate: dict | None = None) -> str:
+    """Le statut de l'enveloppe pour l'émetteur ou pour Bob, avec la sous-clé de chacun et le certificat donné."""
+    ek_id, ek_private = MESSAGE_RECIPIENTS[reader_id]
+    served = sender_certificate() if certificate is None else certificate
+    return open_message(envelope, reader_id, {ek_id: ek_private}, served, RECEIVED_AT)
+
+
+def flip(text_b64: str, index: int) -> str:
+    """L'octet `index` inversé (tous ses bits)."""
+    value = bytearray(from_b64url(text_b64))
+    value[index] ^= 0xFF
+    return b64url(bytes(value))
+
+
+def message_forgery(name: str, envelope: dict, rejected_by: str, certificate: dict | None = None) -> dict:
+    """Une falsification, et le certificat de l'émetteur que sert le serveur s'il diffère de celui des vecteurs."""
+    status = opened_by(envelope, VICTIM_ID, certificate)
+    if status != rejected_by:
+        raise SystemExit(f"gen_vectors.py : la falsification « {name} » rend {status}, et non {rejected_by}")
+    forged = {"name": name, "reader": VICTIM_ID, "envelope": envelope, "rejectedBy": rejected_by}
+    return forged if certificate is None else dict(forged, senderCertificate=certificate)
+
+
+def accepted_envelope(name: str, envelope: dict) -> dict:
+    for reader_id in MESSAGE_RECIPIENTS:
+        if (status := opened_by(envelope, reader_id)) != "verified":
+            raise SystemExit(f"gen_vectors.py : l'enveloppe « {name} » rend {status} pour {reader_id}")
+    return {"name": name, "reader": VICTIM_ID, "envelope": envelope}
+
+
+def build_envelope() -> str:
+    check_hpke()
+    fields = signed_payload_fields()
+    signed_payload = encode(signed_payload_struct(fields))
+    signature = sign(IK_SEED, signed_payload)
+    header = message_header()
+    sealed = seal_message(header, signed_payload, signature, fields["recipientIds"], "message", cek=MESSAGE_CEK,
+                          nonce=MESSAGE_NONCE)
+    envelope = sealed["envelope"]
+    bob_wrap = next(index for index, wrap in enumerate(envelope["wraps"]) if wrap["recipientId"] == VICTIM_ID)
+
+    def with_wrap(**changes) -> dict:
+        wraps = [dict(wrap) for wrap in envelope["wraps"]]
+        wraps[bob_wrap].update(changes)
+        return dict(envelope, wraps=wraps)
+
+    def padded_to(ciphertext_bytes: int, label: str) -> dict:
+        """Le message des vecteurs, rechiffré avec le padding qui donne un chiffré de `ciphertext_bytes` octets."""
+        # Plaintext = bytes(SignedPayload) || bytes(signature) || bytes(padding), puis l'étiquette GCM de 16 octets.
+        padding = ciphertext_bytes - (4 + len(signed_payload) + 4 + len(signature) + 4 + 16)
+        return seal_message(header, signed_payload, signature, fields["recipientIds"], label, padding=bytes(padding))[
+            "envelope"
+        ]
+
+    def signed_variant(label: str, **changes) -> dict:
+        """Un SignedPayload modifié, signé par l'émetteur, chiffré pour Bob ; l'en-tête reprend son messageId."""
+        variant = signed_payload_fields(**changes)
+        payload = encode(signed_payload_struct(variant))
+        return seal_message(dict(header, messageId=variant["messageId"]), payload, sign(IK_SEED, payload), [VICTIM_ID],
+                            label)["envelope"]
+
+    weak_ik = dict(certificate_fields(), ikPublic=b64url(bytes.fromhex(SMALL_ORDER_POINTS[0])))
+    weak_certificate = dict(weak_ik, signature=b64url(sign(CA_SEED, encode(certificate_struct(weak_ik)))))
+    # Signature universelle d'une clé neutre : R neutre, S nul ; l'équation de vérification tient pour tout message.
+    universal = bytes.fromhex(SMALL_ORDER_POINTS[0]) + bytes(32)
+    loose_serial = sender_certificate()
+    # Bits de fin non nuls : le même numéro de série, dans un base64url non canonique.
+    loose_serial["serial"] = loose_serial["serial"][:-1] + chr(ord(loose_serial["serial"][-1]) + 1)
+    crowd = sorted([USER_ID, VICTIM_ID] + [f"0192f7a1-ffff-7000-8000-{index:012x}" for index in range(49)], key=uuid)
+    unsorted = signed_payload_fields(recipientIds=list(reversed(fields["recipientIds"])))
+    unsorted_payload = encode(signed_payload_struct(unsorted))
+    absent_payload = encode(signed_payload_struct(signed_payload_fields(recipientIds=[USER_ID])))
+    other_header = message_header(OTHER_CONVERSATION_ID)
+    forgeries = [
+        message_forgery("un octet du chiffré inversé", dict(envelope, ciphertext=flip(envelope["ciphertext"], 40)),
+                        "integrity_failed"),
+        message_forgery("un octet du nonce inversé", dict(envelope, nonce=flip(envelope["nonce"], 0)), "integrity_failed"),
+        message_forgery("un octet de enc inversé", with_wrap(enc=flip(envelope["wraps"][bob_wrap]["enc"], 5)),
+                        "undecryptable"),
+        message_forgery(
+            "un octet de la CEK encapsulée inversé",
+            with_wrap(wrappedCek=flip(envelope["wraps"][bob_wrap]["wrappedCek"], 47)),
+            "undecryptable",
+        ),
+        message_forgery("l'en-tête déplacé dans une autre conversation par le serveur",
+                        dict(envelope, conversationId=OTHER_CONVERSATION_ID), "undecryptable"),
+        message_forgery(
+            "le message signé rechiffré par Bob dans une autre conversation (transfert subreptice)",
+            seal_message(other_header, signed_payload, signature, [VICTIM_ID], "transfert")["envelope"],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "le message signé rechiffré par Bob sous un autre messageId",
+            seal_message(dict(header, messageId=uuid_v7(SENT_AT, bytes(range(0xF0, 0xFA)))), signed_payload, signature,
+                         [VICTIM_ID], "autre messageId")["envelope"],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "le message signé rechiffré par Bob, qui s'en annonce l'émetteur",
+            seal_message(dict(header, senderId=VICTIM_ID), signed_payload, signature, [VICTIM_ID], "autre émetteur")[
+                "envelope"
+            ],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "le message signé rechiffré sous un autre numéro de certificat",
+            seal_message(dict(header, senderCertSerial=bytes(range(0x30, 0x40))), signed_payload, signature, [VICTIM_ID],
+                         "autre certificat")["envelope"],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "le message signé par une autre clé d'identité que celle du certificat",
+            seal_message(header, signed_payload, sign(OTHER_SEED, signed_payload), [VICTIM_ID], "autre IK")["envelope"],
+            "signature_invalid",
+        ),
+        message_forgery(
+            "un octet de la signature inversé, puis rechiffré",
+            seal_message(header, signed_payload, from_b64url(flip(b64url(signature), 10)), [VICTIM_ID], "signature")[
+                "envelope"
+            ],
+            "signature_invalid",
+        ),
+        message_forgery(
+            "Bob absent des destinataires signés, mais destinataire d'une encapsulation",
+            seal_message(header, absent_payload, sign(IK_SEED, absent_payload), [VICTIM_ID], "absent")["envelope"],
+            "recipients_mismatch",
+        ),
+        message_forgery("un champ inconnu dans l'enveloppe", dict(envelope, extra=""), "integrity_failed"),
+        message_forgery("un champ inconnu dans l'encapsulation de Bob", with_wrap(extra=""), "integrity_failed"),
+        message_forgery("le messageId en majuscules", dict(envelope, messageId=envelope["messageId"].upper()),
+                        "integrity_failed"),
+        message_forgery(
+            "51 encapsulations pour 51 destinataires distincts (MSG-21)",
+            dict(envelope, wraps=envelope["wraps"] + [
+                dict(envelope["wraps"][1 - bob_wrap], recipientId=f"0192f7a1-ffff-7000-8000-{index:012x}")
+                for index in range(49)
+            ]),
+            "integrity_failed",
+        ),
+        message_forgery("deux encapsulations pour Bob (MSG-21)",
+                        dict(envelope, wraps=envelope["wraps"] + [envelope["wraps"][bob_wrap]]), "integrity_failed"),
+        message_forgery("un chiffré de 24 577 octets, pourtant signé (MSG-21)",
+                        padded_to(MAX_CIPHERTEXT_BYTES + 1, "24 577 octets"), "integrity_failed"),
+        message_forgery("un messageId UUIDv4, pourtant signé",
+                        signed_variant("UUIDv4", messageId="6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b"), "integrity_failed"),
+        message_forgery("un messageId UUIDv7 daté d'une autre milliseconde que sentAt, pourtant signé",
+                        signed_variant("autre instant", messageId=uuid_v7(SENT_AT - 1, bytes(range(0xD0, 0xDA)))),
+                        "integrity_failed"),
+        message_forgery("un messageId de version 8, daté de sentAt, pourtant signé",
+                        signed_variant("version 8", messageId=with_uuid_bits(MESSAGE_ID_V7, 8, 0b10)), "integrity_failed"),
+        message_forgery("un messageId de variante 11, daté de sentAt, pourtant signé",
+                        signed_variant("variante 11", messageId=with_uuid_bits(MESSAGE_ID_V7, 7, 0b11)), "integrity_failed"),
+        message_forgery("un senderSeq nul, pourtant signé", signed_variant("senderSeq nul", senderSeq=0),
+                        "integrity_failed"),
+        message_forgery("un groupSeq non nul en conversation directe, pourtant signé",
+                        signed_variant("groupSeq en direct", groupSeq=1), "integrity_failed"),
+        message_forgery("l'émetteur absent des destinataires signés",
+                        signed_variant("émetteur absent", recipientIds=[VICTIM_ID]), "integrity_failed"),
+        message_forgery("51 destinataires signés", signed_variant("51 destinataires", recipientIds=crowd),
+                        "integrity_failed"),
+        message_forgery(
+            "un Plaintext sans son champ de padding, pourtant chiffré",
+            seal_message(header, signed_payload, signature, [VICTIM_ID], "sans padding",
+                         plaintext=raw_bytes(signed_payload) + raw_bytes(signature))["envelope"],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "un octet après le champ de padding, pourtant chiffré",
+            seal_message(header, signed_payload, signature, [VICTIM_ID], "octet après le padding",
+                         plaintext=raw_bytes(signed_payload) + raw_bytes(signature) + raw_bytes(b"") + b"\x00")["envelope"],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "une IK d'ordre faible, certifiée par l'Autorité, avec une signature universelle",
+            seal_message(header, signed_payload, universal, [VICTIM_ID], "IK d'ordre faible")["envelope"],
+            "signature_invalid",
+            certificate=weak_certificate,
+        ),
+        message_forgery("un numéro de série non canonique en base64url dans le certificat servi", envelope,
+                        "signature_invalid", certificate=loose_serial),
+        message_forgery(
+            "une liste de destinataires non triée, pourtant signée",
+            seal_message(header, unsorted_payload, sign(IK_SEED, unsorted_payload), [VICTIM_ID], "non triée")["envelope"],
+            "integrity_failed",
+        ),
+    ]
+    accepted_envelope("message des vecteurs", envelope)
+    padded = seal_message(header, signed_payload, signature, fields["recipientIds"], "padding", padding=bytes(7))[
+        "envelope"
+    ]
+    document = {
+        "format": "seal-envelope-v1",
+        "subject": "Enveloppe d'un message : PROTOCOL.md, section 6 (CDC 7 ; KEY-20, QA-02 à QA-04, ADR 0030)",
+        "generator": "src/protocol/tools/gen_vectors.py",
+        "suite": MESSAGE_SUITE,
+        "sender": {
+            "userId": USER_ID,
+            "ikPublic": b64url(public_key(IK_SEED)),
+            "certificate": sender_certificate(),
+        },
+        "recipients": [
+            {
+                "userId": recipient_id,
+                "ekId": b64url(MESSAGE_RECIPIENTS[recipient_id][0]),
+                "ekPrivate": b64url(MESSAGE_RECIPIENTS[recipient_id][1]),
+                "ekPublic": b64url(x25519_public(MESSAGE_RECIPIENTS[recipient_id][1])),
+            }
+            for recipient_id in fields["recipientIds"]
+        ],
+        "message": {
+            # u64 en chaîne décimale, comme dans canonical-encoding.json (ADR 0006, point 5 ; PROTOCOL.md, 2.5).
+            "fields": {
+                key: b64url(value) if isinstance(value, bytes) else str(value) if key in U64_FIELDS else value
+                for key, value in fields.items()
+            },
+            "signedPayload": b64url(signed_payload),
+            "signature": b64url(signature),
+            "cek": b64url(MESSAGE_CEK),
+            "nonce": b64url(MESSAGE_NONCE),
+            "plaintext": b64url(sealed["plaintext"]),
+            "aad": b64url(sealed["aad"]),
+            "ciphertext": b64url(sealed["ciphertext"]),
+            "wraps": sealed["wraps"],
+        },
+        # serverReceivedAt du message, en chaîne décimale comme tout u64 (PROTOCOL.md, 2.5).
+        "receivedAt": str(RECEIVED_AT),
+        "envelope": envelope,
+        "accepted": [
+            accepted_envelope("padding de 7 octets, ignoré (ADR 0030, point 7)", padded),
+            accepted_envelope("chiffré de 24 576 octets exactement (MSG-21)", padded_to(MAX_CIPHERTEXT_BYTES, "24 576 octets")),
+        ],
+        "forgeries": forgeries,
+    }
+    return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
+
+
+# U+FDD0 est un non-caractère : non attribué dans toutes les versions d'Unicode, c'est une sonde stable.
+UNASSIGNED_PROBE = "seal\ufdd0"
+
+
+def check_unicode_guard() -> None:
+    """ADR 0006, point 2 : un caractère non attribué arrête le générateur, à l'écriture comme à la relecture."""
+    attempts = {
+        "écriture": lambda: text(UNASSIGNED_PROBE),
+        "relecture": lambda: Reader(raw_bytes(UNASSIGNED_PROBE.encode("utf-8"))).text(),
+    }
+    for step, attempt in attempts.items():
+        try:
+            attempt()
+        except UnassignedCharacter:
+            continue
+        raise AssertionError(f"{step} : un caractère non attribué doit arrêter le générateur (ADR 0006, point 2)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Vecteurs de référence de SEAL (PROTOCOL.md).")
     parser.add_argument("--check", action="store_true", help="échoue si un fichier n'est pas à jour")
     check = parser.parse_args().check
+    check_unicode_guard()
     outputs = [
         (OUTPUT, build(), f"{len(VALID)} cas valides, {len(INVALID)} cas à rejeter"),
         (PASSWORD_OUTPUT, build_password_policy(), f"{len(PASSWORD_CASES)} cas"),
@@ -1043,6 +1938,7 @@ def main() -> int:
         (VAULT_OUTPUT, build_vault(), "clé de récupération, coffre et falsifications"),
         (HKDF_OUTPUT, build_hkdf(), f"{len(HKDF_TESTS)} cas"),
         (X25519_OUTPUT, build_x25519(), "Alice, Bob et leur secret partagé"),
+        (ENVELOPE_OUTPUT, build_envelope(), "message, encapsulations et falsifications"),
     ]
     if check:
         stale = [path for path, content, _ in outputs if not path.exists() or path.read_text(encoding="ascii") != content]

@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -47,6 +48,11 @@ public final class ProtocolVectors {
     /** vectors/vault.json : clé de récupération et coffre de clés (PROTOCOL.md, section 5 ; ADR 0027). */
     public static ProtocolVectors vault() {
         return read("vault.json");
+    }
+
+    /** vectors/envelope.json : enveloppe d'un message (PROTOCOL.md, section 6 ; ADR 0030). */
+    public static ProtocolVectors envelope() {
+        return read("envelope.json");
     }
 
     private static ProtocolVectors read(String file) {
@@ -132,15 +138,26 @@ public final class ProtocolVectors {
         return UUID.fromString(node.get(field).asString());
     }
 
+    /** Chaîne décimale canonique d'un u64 : ni signe, ni zéro en tête, ni partie fractionnaire. */
+    private static final Pattern DECIMAL_U64 = Pattern.compile("0|[1-9][0-9]*");
+
     /**
-     * Millisecondes Unix d'une structure signée : un {@code u64} en chaîne décimale (ADR 0006, point 5 ; PROTOCOL.md,
-     * 2.5). Un nombre JSON est refusé : au-delà de 2^53, {@code JSON.parse} en perdrait la précision côté client.
+     * Un {@code u64} en chaîne décimale, au plus 2^63 - 1 (ADR 0006, point 5 ; PROTOCOL.md, 2.5). Un nombre JSON est
+     * refusé : au-delà de 2^53, {@code JSON.parse} en perdrait la précision côté client.
      */
-    public static Instant instant(JsonNode node, String field) {
+    public static long u64(JsonNode node, String field) {
         JsonNode value = node.get(field);
-        if (value == null || !value.isString()) {
-            throw new IllegalArgumentException(field + " : u64 attendu en chaîne décimale");
+        if (value == null
+                || !value.isString()
+                || !DECIMAL_U64.matcher(value.asString()).matches()) {
+            throw new IllegalArgumentException(field + " : u64 attendu en chaîne décimale, sans signe");
         }
-        return Instant.ofEpochMilli(Long.parseUnsignedLong(value.asString()));
+        // Au-delà de 2^63 - 1, parseLong lève NumberFormatException, une IllegalArgumentException.
+        return Long.parseLong(value.asString());
+    }
+
+    /** Millisecondes Unix d'une structure signée : un {@code u64} en chaîne décimale. */
+    public static Instant instant(JsonNode node, String field) {
+        return Instant.ofEpochMilli(u64(node, field));
     }
 }

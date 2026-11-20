@@ -7,15 +7,13 @@
 import { fromBase64Url } from './base64url'
 import { equalBytes } from './bytes'
 import type { Keyring, SubkeyInfo } from './keyring'
+import { CLOCK_SKEW_MS } from './protocol'
 
 /** Ce que la comparaison lit de GET /api/v1/users/{id}/keys : octets en base64url, dates en millisecondes. */
 export interface ServedKeys {
   readonly certificate: { readonly ikPublic: string; readonly notBefore: number }
   readonly subkeys: readonly { readonly ekId: string }[]
 }
-
-/** ADR 0025, point 7 : écart toléré par le serveur entre l'horloge du client et la sienne. */
-const CLOCK_TOLERANCE_MS = 5 * 60_000
 
 /** ADR 0029, point 11 : 15 jours de marge sur les 45 de validité, contre une horloge très en retard. */
 const REPLACEABLE_AGE_MS = 30 * 86_400_000
@@ -50,7 +48,7 @@ export function neverPublished(
 ): (subkey: Pick<SubkeyInfo, 'ekId' | 'createdAt'>) => boolean {
   const servedIds = served.subkeys.map((subkey) => decoded(subkey.ekId))
   return (subkey) =>
-    subkey.createdAt >= served.certificate.notBefore + CLOCK_TOLERANCE_MS &&
+    subkey.createdAt >= served.certificate.notBefore + CLOCK_SKEW_MS &&
     now - subkey.createdAt < REPLACEABLE_AGE_MS &&
     !servedIds.some((ekId) => ekId !== undefined && equalBytes(ekId, subkey.ekId))
 }

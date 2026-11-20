@@ -1,0 +1,345 @@
+import { afterEach, describe, expect, it } from 'vitest'
+import { commands } from 'vitest/browser'
+import { fromBase64Url, toBase64Url } from './base64url'
+import type { ServedCertificate } from './certificate'
+import { createKeyring, type Keyring, keyringSecrets, openVault } from './keyring'
+import { type KeyStore, openKeyStore, pinAuthority } from './keystore'
+import {
+  chooseSubkey,
+  type ServedSubkey,
+  type ServedUserKeys,
+  SubkeyUnavailableError,
+  type SubkeyUnavailableReason,
+} from './recipientKeys'
+import { servedSubkey } from './testing/messageParties'
+import { vaultPayload, vectorRecoveryKey } from './testing/vaultVectorSuite'
+import { base64url, decimal, number, record, records, string } from './testing/vectorReader'
+
+// QA-02 : certificat de identity.json ; sous-clés du coffre version 2 de vault.json (même IK), liées à ce certificat.
+const identity = record(JSON.parse(await commands.readFile('../protocol/vectors/identity.json')))
+const vault = record(JSON.parse(await commands.readFile('../protocol/vectors/vault.json')))
+const CA_PUBLIC = base64url(record(record(identity['keys'])['ca']), 'publicKey')
+const OTHER_PUBLIC = base64url(record(record(identity['keys'])['other']), 'publicKey')
+const DAY_MS = 86_400_000
+
+const vector = records(identity['certificates'])[0] ?? {}
+const fields = record(vector['fields'])
+const CERTIFICATE: ServedCertificate = {
+  serial: string(fields, 'serial'),
+  issuerKeyId: string(fields, 'issuerKeyId'),
+  subjectId: string(fields, 'subjectId'),
+  username: string(fields, 'username'),
+  ikPublic: string(fields, 'ikPublic'),
+  notBefore: decimal(fields, 'notBefore'),
+  notAfter: decimal(fields, 'notAfter'),
+  usage: number(fields, 'usage'),
+  signature: string(vector, 'signature'),
+}
+const RECIPIENT = CERTIFICATE.subjectId
+const NOT_BEFORE = CERTIFICATE.notBefore
+
+const opened: { store: KeyStore; name: string }[] = []
+
+async function pinnedStore(pin: Uint8Array = CA_PUBLIC): Promise<KeyStore> {
+  const name = `seal-test-${crypto.randomUUID()}`
+  const store = await openKeyStore(name)
+  opened.push({ store, name })
+  await pinAuthority(store, pin)
+  return store
+}
+
+afterEach(async () => {
+  for (const { store, name } of opened.splice(0)) {
+    store.close()
+    await new Promise((resolve) => {
+      indexedDB.deleteDatabase(name).onsuccess = resolve
+    })
+  }
+})
+
+/** Les deux sous-clés du coffre version 2 : A0…AF créée à notBefore, B0…BF trente jours plus tard. */
+async function keyring(): Promise<Keyring> {
+  return openVault(
+    RECIPIENT,
+    vaultPayload(record(vault['nextVersion'])['payload']),
+    vectorRecoveryKey(vault),
+  )
+}
+
+/** Sous-clé servie par GET /users/{id}/keys : la liaison sans son numéro de série, porté par le certificat. */
+async function served(
+  ring: Keyring,
+  index: number,
+  serial = CERTIFICATE.serial,
+): Promise<ServedSubkey> {
+  const subkey = ring.subkeys[index]
+  if (subkey === undefined) throw new Error('sous-clé du vecteur attendue')
+  return servedSubkey(ring, serial, subkey.ekId)
+}
+
+async function servedKeys(subkeys: readonly ServedSubkey[]): Promise<ServedUserKeys> {
+  return Promise.resolve({ certificate: CERTIFICATE, subkeys })
+}
+
+async function refusal(pending: Promise<unknown>): Promise<SubkeyUnavailableReason | undefined> {
+  return pending.then(
+    () => undefined,
+    (error: unknown) => (error instanceof SubkeyUnavailableError ? error.reason : undefined),
+  )
+}
+
+describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 0030, point 5)', () => {
+  it('KEY-20 : la sous-clé non expirée la plus récente est choisie, quel que soit l’ordre servi', async () => {
+    const ring = await keyring()
+    const [older, newer] = [await served(ring, 0), await served(ring, 1)]
+    const store = await pinnedStore()
+
+    for (const order of [
+      [older, newer],
+      [newer, older],
+    ]) {
+      const chosen = await chooseSubkey(
+        store,
+        await servedKeys(order),
+        RECIPIENT,
+        NOT_BEFORE + 31 * DAY_MS,
+      )
+
+      expect(chosen.recipientId).toBe(RECIPIENT)
+      expect(toBase64Url(chosen.ekId)).toBe(newer.ekId)
+      expect(toBase64Url(chosen.ekPublic)).toBe(newer.ekPublic)
+      expect(toBase64Url(chosen.certSerial)).toBe(CERTIFICATE.serial)
+      expect(toBase64Url(chosen.ikPublic)).toBe(CERTIFICATE.ikPublic)
+    }
+  })
+
+  it('KEY-20 : une sous-clé expirée est écartée ; sans sous-clé valide, la clé est indisponible', async () => {
+    const ring = await keyring()
+    const subkeys = [await served(ring, 0), await served(ring, 1)]
+    const store = await pinnedStore()
+    const older = subkeys[0]
+
+    const chosen = await chooseSubkey(
+      store,
+      await servedKeys(older === undefined ? [] : [older]),
+      RECIPIENT,
+      NOT_BEFORE + 44 * DAY_MS,
+    )
+    expect(toBase64Url(chosen.ekId)).toBe(older?.ekId)
+    expect(
+      await refusal(
+        chooseSubkey(
+          store,
+          await servedKeys(older === undefined ? [] : [older]),
+          RECIPIENT,
+          NOT_BEFORE + 45 * DAY_MS,
+        ),
+      ),
+    ).toBe('none')
+    expect(
+      await refusal(
+        chooseSubkey(store, await servedKeys(subkeys), RECIPIENT, NOT_BEFORE + 76 * DAY_MS),
+      ),
+    ).toBe('none')
+    expect(
+      await refusal(chooseSubkey(store, await servedKeys([]), RECIPIENT, NOT_BEFORE + DAY_MS)),
+    ).toBe('none')
+  })
+
+  it('KEY-20, ADR 0025 (point 7) : le certificat du destinataire tolère 5 minutes de retard d’horloge, pas une de plus', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+    const keys = await servedKeys([await served(ring, 0)])
+
+    const chosen = await chooseSubkey(store, keys, RECIPIENT, NOT_BEFORE - 5 * 60_000)
+    expect(chosen.recipientId).toBe(RECIPIENT)
+    expect(await refusal(chooseSubkey(store, keys, RECIPIENT, NOT_BEFORE - 5 * 60_000 - 1))).toBe(
+      'certificate',
+    )
+  })
+
+  it('KEY-20 : un instant qui n’est pas un entier refuse le certificat du destinataire', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+
+    expect(
+      await refusal(
+        chooseSubkey(store, await servedKeys([await served(ring, 0)]), RECIPIENT, Number.NaN),
+      ),
+    ).toBe('certificate')
+  })
+
+  it('KEY-20, ADR 0030 (point 5) : une seule liaison invalide refuse toutes les clés du destinataire', async () => {
+    const ring = await keyring()
+    const [older, newer] = [await served(ring, 0), await served(ring, 1)]
+    const store = await pinnedStore()
+    const now = NOT_BEFORE + 31 * DAY_MS
+    const flipped = Uint8Array.from(fromBase64Url(older.signature))
+    flipped[0] = (flipped[0] ?? 0) ^ 0x01
+    const otherSerial = toBase64Url(new Uint8Array(16))
+
+    for (const [name, forged] of [
+      ['signature altérée', { ...older, signature: toBase64Url(flipped) }],
+      ['liée à un autre certificat', await served(ring, 0, otherSerial)],
+      ['autre clé publique', { ...older, ekPublic: newer.ekPublic }],
+      ['autre KEM', { ...older, kem: 'X-WING' }],
+      ['ekId non canonique', { ...older, ekId: `${older.ekId}=` }],
+      ['ekId de 15 octets', { ...older, ekId: older.ekId.slice(0, 20) }],
+    ] as const) {
+      expect(
+        await refusal(chooseSubkey(store, await servedKeys([forged, newer]), RECIPIENT, now)),
+        name,
+      ).toBe('binding')
+    }
+  })
+
+  it('KEY-21 : une liaison bien signée, mais valable 44 ou 46 jours, est refusée', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+    const newer = await served(ring, 1)
+
+    for (const days of [44, 46]) {
+      // La signature couvre la validité modifiée : seul le contrôle des 45 jours peut la refuser.
+      const forged = createKeyring(
+        {
+          ...ring,
+          subkeys: ring.subkeys.map((subkey, index) =>
+            index === 0 ? { ...subkey, expiresAt: subkey.createdAt + days * DAY_MS } : subkey,
+          ),
+        },
+        keyringSecrets(ring),
+      )
+
+      expect(
+        await refusal(
+          chooseSubkey(
+            store,
+            await servedKeys([await served(forged, 0), newer]),
+            RECIPIENT,
+            NOT_BEFORE + 31 * DAY_MS,
+          ),
+        ),
+        `${String(days)} jours`,
+      ).toBe('binding')
+    }
+  })
+
+  it('KEY-20, ADR 0025 (point 7) : une sous-clé datée de plus de 5 minutes dans le futur est une liaison invalide', async () => {
+    const ring = await keyring()
+    const [older, newer] = [await served(ring, 0), await served(ring, 1)]
+    const store = await pinnedStore()
+
+    expect(
+      await refusal(
+        chooseSubkey(
+          store,
+          await servedKeys([older, newer]),
+          RECIPIENT,
+          newer.createdAt - 6 * 60_000,
+        ),
+      ),
+    ).toBe('binding')
+    const chosen = await chooseSubkey(
+      store,
+      await servedKeys([older, newer]),
+      RECIPIENT,
+      newer.createdAt - 4 * 60_000,
+    )
+    expect(toBase64Url(chosen.ekId)).toBe(newer.ekId)
+  })
+
+  it('KEY-20 : un certificat d’un autre sujet, signé par une autre Autorité ou expiré refuse le destinataire', async () => {
+    const ring = await keyring()
+    const subkeys = [await served(ring, 1)]
+    const now = NOT_BEFORE + 31 * DAY_MS
+
+    expect(
+      await refusal(
+        chooseSubkey(
+          await pinnedStore(),
+          await servedKeys(subkeys),
+          '0192f7a1-ffff-7000-8000-000000000b0b',
+          now,
+        ),
+      ),
+    ).toBe('certificate')
+    expect(
+      await refusal(
+        chooseSubkey(await pinnedStore(OTHER_PUBLIC), await servedKeys(subkeys), RECIPIENT, now),
+      ),
+    ).toBe('certificate')
+    expect(
+      await refusal(
+        chooseSubkey(
+          await pinnedStore(),
+          await servedKeys(subkeys),
+          RECIPIENT,
+          CERTIFICATE.notAfter,
+        ),
+      ),
+    ).toBe('certificate')
+  })
+
+  it('KEY-20, ADR 0030 (point 5) : une réponse mal formée du serveur donne « clé indisponible », jamais une autre erreur', async () => {
+    const ring = await keyring()
+    const older = await served(ring, 0)
+    const store = await pinnedStore()
+    const now = NOT_BEFORE + DAY_MS
+    // Ce que pourrait servir un serveur hostile, hors des types que suppose le code.
+    const hostileSubkeys = (value: unknown) => value as readonly ServedSubkey[]
+    const hostileKeys = (value: unknown) => value as ServedUserKeys
+    const hostileNumber = (value: unknown) => value as number
+
+    for (const [name, subkeys] of [
+      ['sous-clés absentes', hostileSubkeys(null)],
+      ['sous-clé nulle', hostileSubkeys([null])],
+      ['createdAt négatif', [{ ...older, createdAt: -1000, expiresAt: -1000 + 45 * DAY_MS }]],
+      [
+        'expiresAt en chaîne décimale',
+        [{ ...older, expiresAt: hostileNumber(String(older.expiresAt)) }],
+      ],
+    ] as const) {
+      expect(
+        await refusal(chooseSubkey(store, await servedKeys(subkeys), RECIPIENT, now)),
+        name,
+      ).toBe('binding')
+    }
+    for (const response of [null, undefined]) {
+      expect(
+        await refusal(chooseSubkey(store, hostileKeys(response), RECIPIENT, now)),
+        String(response),
+      ).toBe('certificate')
+    }
+  })
+
+  it('KEY-20 : l’identifiant du destinataire est comparé en minuscules ; une autre forme est une erreur de l’appelant', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+    const keys = await servedKeys([await served(ring, 0)])
+
+    const chosen = await chooseSubkey(store, keys, RECIPIENT.toUpperCase(), NOT_BEFORE + DAY_MS)
+
+    expect(chosen.recipientId).toBe(RECIPIENT)
+    await expect(
+      chooseSubkey(store, keys, 'destinataire', NOT_BEFORE + DAY_MS),
+    ).rejects.toBeInstanceOf(TypeError)
+  })
+
+  it('A10 : une panne du trousseau de l’appareil remonte telle quelle, sans passer pour une clé indisponible', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+    const broken: KeyStore = {
+      ...store,
+      loadAuthority: () => Promise.reject(new Error('IndexedDB indisponible')),
+    }
+
+    await expect(
+      chooseSubkey(
+        broken,
+        await servedKeys([await served(ring, 1)]),
+        RECIPIENT,
+        NOT_BEFORE + DAY_MS,
+      ),
+    ).rejects.toThrow('IndexedDB indisponible')
+  })
+})

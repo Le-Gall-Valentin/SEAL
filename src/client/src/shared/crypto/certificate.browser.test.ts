@@ -167,6 +167,13 @@ describe('KEY-06 : le client vérifie le certificat reçu avant de l’enregistr
     await expectRejected(store, VALID, 'validity', OWNER, VALID.notBefore - SKEW_MS - 1)
   })
 
+  it('KEY-06 : un instant qui n’est pas un entier positif sûr refuse le certificat au lieu d’en sauter la validité', async () => {
+    const store = await pinnedStore()
+    for (const now of [Number.NaN, NOW + 0.5, -1, Number.MAX_SAFE_INTEGER + 1]) {
+      await expectRejected(store, VALID, 'validity', OWNER, now)
+    }
+  })
+
   it('ADR 0027, point 9 : une horloge en retard de 5 minutes au plus accepte le certificat tout juste émis', async () => {
     await storeOwnCertificate(await pinnedStore(), served(VALID), OWNER, VALID.notBefore - SKEW_MS)
     await storeOwnCertificate(await pinnedStore(), served(VALID), OWNER, VALID.notAfter - 1)
@@ -184,6 +191,30 @@ describe('KEY-06 : le client vérifie le certificat reçu avant de l’enregistr
     await storeOwnCertificate(store, received, OWNER, NOW)
 
     await expect(store.loadCertificate(OWNER.userId)).resolves.toEqual(VALID)
+  })
+
+  it('KEY-06, ADR 0029 : une date ou un usage qui ne sont pas des entiers sont refusés avant toute vérification', async () => {
+    const store = await pinnedStore()
+    // Ce que pourrait servir un serveur hostile : la signature porte sur la même valeur, une fois convertie.
+    const hostile = (value: unknown) => value as number
+    const valid = served(VALID)
+    for (const [name, forged] of [
+      ['notBefore en chaîne décimale', { ...valid, notBefore: hostile(String(valid.notBefore)) }],
+      [
+        'notAfter en chaîne hexadécimale',
+        { ...valid, notAfter: hostile(`0x${valid.notAfter.toString(16)}`) },
+      ],
+      ['usage en chaîne', { ...valid, usage: hostile(String(valid.usage)) }],
+    ] as const) {
+      const error: unknown = await storeOwnCertificate(store, forged, OWNER, NOW).then(
+        () => undefined,
+        (thrown: unknown) => thrown,
+      )
+
+      expect(error instanceof CertificateRejectedError ? error.reason : error, name).toBe(
+        'encoding',
+      )
+    }
   })
 
   it('ADR 0029 : un base64url non canonique est refusé avant toute vérification', async () => {

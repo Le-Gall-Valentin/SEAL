@@ -30,6 +30,14 @@ export function string(json: Json, field: string): string {
   return value
 }
 
+export function strings(json: Json, field: string): string[] {
+  const value = json[field]
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+    throw new Error(`${field} : liste de chaînes attendue`)
+  }
+  return value
+}
+
 export function number(json: Json, field: string): number {
   const value = json[field]
   if (typeof value !== 'number') throw new Error(`${field} : nombre attendu`)

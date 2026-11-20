@@ -22,6 +22,7 @@ import {
   records,
   string,
 } from './testing/vectorReader'
+import { ed25519Pkcs8 } from './testing/pkcs8'
 
 // QA-01, QA-02 : vecteurs produits par src/protocol/tools/gen_vectors.py, relus aussi par les tests Java.
 const IDENTITY = new URL('../../../../protocol/vectors/identity.json', import.meta.url)
@@ -139,12 +140,9 @@ describe('QA-02 : structures signées de l’identité (PROTOCOL.md, section 4)'
 })
 
 describe('QA-01 : Ed25519 de WebCrypto sur la RFC 8032, section 7.1', () => {
-  // En-tête PKCS#8 d'une clé privée Ed25519 (RFC 8410), suivi de la graine de 32 octets.
-  const PKCS8_PREFIX = Uint8Array.from(Buffer.from('302e020100300506032b657004220420', 'hex'))
-
   for (const test of records(rfc8032['tests'])) {
     it(`QA-01 : ${string(test, 'name')}, signature reproduite et vérifiée`, async () => {
-      const pkcs8 = new Uint8Array([...PKCS8_PREFIX, ...hex(test, 'secretKey')])
+      const pkcs8 = ed25519Pkcs8(hex(test, 'secretKey'))
       const privateKey = await crypto.subtle.importKey('pkcs8', pkcs8, { name: 'Ed25519' }, false, [
         'sign',
       ])

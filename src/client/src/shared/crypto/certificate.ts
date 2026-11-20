@@ -9,15 +9,12 @@ import { encodeCertificate } from './identity'
 import { type KeyStore, saveCertificate, type StoredCertificate } from './keystore'
 import { fromBase64Url } from './base64url'
 import { equalBytes } from './bytes'
+import { CLOCK_SKEW_MS, KEY_ID_BYTES, SERIAL_BYTES } from './protocol'
 
-const SERIAL_BYTES = 16
-const KEY_ID_BYTES = 8
 /** KEY-04 : notAfter = notBefore + 397 jours. */
 const VALIDITY_MS = 397 * 86_400_000
 /** Bit 0 : signature et non-répudiation ; bit 1 : certification de sous-clés. */
 const USAGE = 0b11
-/** ADR 0027, point 9 : retard d'horloge toléré, comme pour le createdAt d'une sous-clé (ADR 0025, point 7). */
-const CLOCK_SKEW_MS = 5 * 60_000
 
 /** Titulaire attendu : la session et le trousseau de l'appareil, jamais la réponse elle-même. */
 export interface ExpectedOwner {
@@ -90,6 +87,33 @@ async function verified(
   expected: ExpectedOwner,
   now: number,
 ): Promise<StoredCertificate> {
+  const certificate = await verifyCertificate(store, served, expected.userId, now, CLOCK_SKEW_MS)
+  if (certificate.username !== expected.username) {
+    throw new CertificateRejectedError('username')
+  }
+  if (!equalBytes(certificate.ikPublic, expected.ikPublic)) {
+    throw new CertificateRejectedError('key')
+  }
+  return certificate
+}
+
+/**
+ * KEY-06, KEY-20, CDC 7.7 (étape 6) : certificat d'un compte, sans titulaire attendu au-delà de son identifiant. Signé
+ * par l'Autorité épinglée (KEY-11), pour `subjectId`, avec l'usage et la validité de KEY-04 à l'instant `at`, avec
+ * `toleranceMs` de retard d'horloge avant `notBefore`. Un `at` qui n'est pas un entier positif sûr est refusé
+ * (`validity`), jamais ignoré (ADR 0030, point 4). Rend ses champs vérifiés ; tout écart lève CertificateRejectedError.
+ */
+export async function verifyCertificate(
+  store: KeyStore,
+  served: ServedCertificate,
+  subjectId: string,
+  at: number,
+  toleranceMs: number,
+): Promise<StoredCertificate> {
+  // Échec fermé : NaN, ou une date mal convertie, rendraient fausses les deux comparaisons de validité.
+  if (!Number.isSafeInteger(at) || at < 0) {
+    throw new CertificateRejectedError('validity')
+  }
   const certificate = decoded(served)
   const authority = await store.loadAuthority()
   if (authority === undefined) {
@@ -105,22 +129,16 @@ async function verified(
   if (!(await signedBy(authority, certificate))) {
     throw new CertificateRejectedError('signature')
   }
-  if (certificate.subjectId !== expected.userId) {
+  if (certificate.subjectId !== subjectId) {
     throw new CertificateRejectedError('subject')
-  }
-  if (certificate.username !== expected.username) {
-    throw new CertificateRejectedError('username')
-  }
-  if (!equalBytes(certificate.ikPublic, expected.ikPublic)) {
-    throw new CertificateRejectedError('key')
   }
   if (certificate.usage !== USAGE) {
     throw new CertificateRejectedError('usage')
   }
   if (
     certificate.notAfter - certificate.notBefore !== VALIDITY_MS ||
-    now < certificate.notBefore - CLOCK_SKEW_MS ||
-    now >= certificate.notAfter
+    at < certificate.notBefore - toleranceMs ||
+    at >= certificate.notAfter
   ) {
     throw new CertificateRejectedError('validity')
   }
@@ -132,6 +150,14 @@ async function verified(
  * valeurs, et rien d'autre n'est enregistré. Un base64url non canonique est refusé ('encoding').
  */
 function decoded(served: ServedCertificate): StoredCertificate {
+  // Une réponse hostile peut servir une date en chaîne (décimale ou hexadécimale) : elle n'est jamais convertie.
+  if (
+    !Number.isSafeInteger(served.notBefore) ||
+    !Number.isSafeInteger(served.notAfter) ||
+    !Number.isInteger(served.usage)
+  ) {
+    throw new CertificateRejectedError('encoding')
+  }
   try {
     return {
       serial: fromBase64Url(served.serial),
