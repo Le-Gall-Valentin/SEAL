@@ -71,7 +71,13 @@ export function text(value: string): Uint8Array<ArrayBuffer> {
   if (!value.isWellFormed()) {
     throw new CanonicalEncodingError('text : demi-caractère Unicode isolé')
   }
-  return bytes(UTF8.encode(value.normalize('NFC')))
+  const encoded = UTF8.encode(value.normalize('NFC'))
+  try {
+    return bytes(encoded)
+  } finally {
+    // PROTOCOL.md 6.2 : un texte signé peut être un message ; sa copie UTF-8 intermédiaire ne survit pas.
+    encoded.fill(0)
+  }
 }
 
 /** `uuid(u)` : 16 octets dans l'ordre réseau, depuis la forme textuelle 8-4-4-4-12 (ADR 0006). */

@@ -2,7 +2,7 @@
  * CDC 7.5, étapes 3 à 7 (PROTOCOL.md 6.4) : scellement d'un message pour ses destinataires (ADR 0030).
  */
 import { toBase64Url, fromBase64Url } from './base64url'
-import { bytes, concat, uuidText } from './canonical'
+import { bytes, concat, u32, uuidText } from './canonical'
 import { sealCek } from './hpke'
 import { type Keyring, signWithIdentity } from './keyring'
 import {
@@ -111,8 +111,9 @@ export async function sealMessageWith(
       body,
     })
     const signature = await signWithIdentity(keyring, signedPayload)
-    // P0 : padding vide (ADR 0030, point 7).
-    plaintext = concat(bytes(signedPayload), bytes(signature), bytes(new Uint8Array()))
+    // Plaintext = bytes(SignedPayload) || bytes(signature) || bytes(padding), padding vide en P0 (ADR 0030, point 7).
+    // bytes(SignedPayload) s'écrit sans copie intermédiaire : seuls SignedPayload et Plaintext portent le corps.
+    plaintext = concat(u32(signedPayload.length), signedPayload, bytes(signature), u32(0))
     const aad = encodeMessageAad(header)
     const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt'])
     const ciphertext = new Uint8Array(

@@ -82,25 +82,30 @@ export interface EnvelopeWire {
 /** `SignedPayload = struct("SEAL-msg-v1", …)` ; un champ hors du format lève MessageFormatError. */
 export function encodeSignedPayload(fields: SignedPayloadFields): Uint8Array<ArrayBuffer> {
   checkPayload(fields)
-  return encoded(() =>
-    struct(
-      'SEAL-msg-v1',
-      u8(fields.v),
-      text(fields.suite),
-      encodeUuid(fields.messageId),
-      encodeUuid(fields.conversationId),
-      u8(fields.conversationType),
-      encodeUuid(fields.senderId),
-      bytes(fields.senderCertSerial),
-      u64(fields.sentAt),
-      u64(fields.senderSeq),
-      u64(fields.groupSeq),
-      bytes(fields.salt),
-      list(encodeUuid, fields.recipientIds),
-      text(fields.contentType),
-      text(fields.body),
-    ),
-  )
+  const parts = encoded(() => [
+    u8(fields.v),
+    text(fields.suite),
+    encodeUuid(fields.messageId),
+    encodeUuid(fields.conversationId),
+    u8(fields.conversationType),
+    encodeUuid(fields.senderId),
+    bytes(fields.senderCertSerial),
+    u64(fields.sentAt),
+    u64(fields.senderSeq),
+    u64(fields.groupSeq),
+    bytes(fields.salt),
+    list(encodeUuid, fields.recipientIds),
+    text(fields.contentType),
+    text(fields.body),
+  ])
+  try {
+    return struct('SEAL-msg-v1', ...parts)
+  } finally {
+    // PROTOCOL.md 6.2 : les champs encodés, corps compris, ne survivent pas à SignedPayload.
+    for (const part of parts) {
+      part.fill(0)
+    }
+  }
 }
 
 /** `AAD = struct("SEAL-aad-v1", u8(v), text(suite), uuid(messageId), uuid(conversationId), uuid(senderId), …)`. */

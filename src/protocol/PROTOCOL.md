@@ -432,7 +432,8 @@ info_r     = struct("SEAL-wrap-v1", text(suite), uuid(messageId),
 - `padding` est vide au scellement en P0 ; à la lecture, toute longueur est acceptée et ignorée, dans la limite de
   MSG-21 (chiffré de 24 576 octets au plus) : il est chiffré mais non signé, et n'a aucun sens (ADR 0030, point 7).
 - La CEK, `Plaintext` et `SignedPayload` sont remis à zéro dès qu'ils ont servi, refus compris : chaque copie que SEAL
-  maîtrise, et la CEK confiée à `@hpke` en `ArrayBuffer` exact, que la bibliothèque ne recopie pas. La CEK n'existe
+  maîtrise, tampons de l'encodage canonique compris, et la CEK confiée à `@hpke` en `ArrayBuffer` exact, que la
+  bibliothèque ne recopie pas. La CEK n'existe
   qu'en mémoire. Restent hors de portée : les chaînes JavaScript (le corps décodé), les copies internes de WebCrypto
   et le contenu rendu au lecteur (ADR 0030, point 9).
 
@@ -456,7 +457,7 @@ signature fausse n'est jamais normale (ADR 0030, point 5).
 2. Signature par l'IK de l'émetteur.
 3. CEK et nonce neufs ; `Plaintext` chiffré en AES-256-GCM sous l'AAD.
 4. CEK encapsulée pour chaque destinataire, émetteur compris, par la sous-clé choisie en 6.3.
-5. CEK et `Plaintext` remis à zéro.
+5. CEK, `Plaintext` et `SignedPayload` remis à zéro, avec leurs copies intermédiaires (6.2).
 
 ### 6.5 Ouverture (CDC 7.7)
 

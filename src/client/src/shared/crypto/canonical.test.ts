@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   bytes,
   CanonicalEncodingError,
@@ -184,6 +184,27 @@ describe('encodeur canonique, cas propres à TypeScript', () => {
 
     expect(uuidText(value)).toBe('0192f7a1-ffff-7000-8000-00000000a11c')
     expect(() => uuidText(value.subarray(1))).toThrow(CanonicalEncodingError)
+  })
+
+  it('PROTOCOL.md 6.2 : text ne garde aucune copie UTF-8 du texte encodé', () => {
+    const seen: Uint8Array[] = []
+    const plain = new TextEncoder()
+    const encode = plain.encode.bind(plain)
+    const spy = vi.spyOn(TextEncoder.prototype, 'encode').mockImplementation((input?: string) => {
+      const output = encode(input)
+      seen.push(output)
+      return output
+    })
+    let encoded
+    try {
+      encoded = text('secret')
+    } finally {
+      spy.mockRestore()
+    }
+
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?.every((byte) => byte === 0)).toBe(true)
+    expect(encoded).toEqual(concat(u32(6), new TextEncoder().encode('secret')))
   })
 
   it('ADR 0006 : CanonicalEncodingError se reconnaît par son nom', () => {
