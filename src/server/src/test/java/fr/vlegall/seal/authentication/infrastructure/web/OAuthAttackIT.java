@@ -173,4 +173,40 @@ class OAuthAttackIT {
                 .isNull();
         mvc.perform(client.from(get("/oauth2/authorization/google"))).andExpect(status().isFound());
     }
+
+    @Test
+    @DisplayName("SEC-10, A06 : un départ OAuth autre que GET ne redirige pas et ne crée aucune session")
+    void sec10NonGetStartCreatesNoSession() throws Exception {
+        MvcResult head = mvc.perform(
+                        client.from(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head(
+                                "/oauth2/authorization/google")))
+                .andReturn();
+        MvcResult post = mvc.perform(client.unsafe(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                "/oauth2/authorization/google"),
+                        null,
+                        null))
+                .andReturn();
+
+        for (MvcResult result : List.of(head, post)) {
+            assertThat(result.getResponse().getStatus()).isNotEqualTo(302);
+            assertThat(result.getResponse().getHeader("Location")).isNull();
+            assertThat(result.getResponse().getCookie(AuthClient.SESSION_COOKIE))
+                    .isNull();
+        }
+    }
+
+    @Test
+    @DisplayName("SEC-10, A06 : la limite des départs compte toute méthode, pas seulement GET")
+    void sec10LimitCountsEveryMethod() throws Exception {
+        AuthClient burst = new AuthClient(mvc, mail);
+        for (int i = 0; i < 20; i++) {
+            mvc.perform(burst.from(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head(
+                    "/oauth2/authorization/google")));
+        }
+
+        mvc.perform(burst.from(get("/oauth2/authorization/google")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+    }
 }

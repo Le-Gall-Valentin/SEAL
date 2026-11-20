@@ -7,7 +7,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -15,7 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * SEC-10, ADR 0032 (point 3) : départs OAuth limités par IP, avant le filtre de Spring qui crée la session de la
  * requête d'autorisation. Un départ refusé ne crée donc aucune session. Le départ est une route de Spring Security, pas
- * un contrôleur : {@code @RateLimited} ne l'atteint pas.
+ * un contrôleur : {@code @RateLimited} ne l'atteint pas. Toute méthode compte, pour qu'aucune ne passe à côté.
  */
 public final class OAuthStartRateLimitFilter extends OncePerRequestFilter {
 
@@ -27,7 +26,7 @@ public final class OAuthStartRateLimitFilter extends OncePerRequestFilter {
     }
 
     private final RequestMatcher start =
-            PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/oauth2/authorization/*");
+            PathPatternRequestMatcher.withDefaults().matcher("/oauth2/authorization/*");
     private final RateLimiter limiter;
     private final Rejection rejection;
 
