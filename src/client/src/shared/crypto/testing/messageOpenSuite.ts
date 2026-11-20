@@ -7,11 +7,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { ServedCertificate } from '../certificate'
 import { type Keyring } from '../keyring'
 import { type KeyStore, openKeyStore, pinAuthority } from '../keystore'
-import { toBase64Url } from '../base64url'
+import { fromBase64Url, toBase64Url } from '../base64url'
 import { type EnvelopeWire, type WrapWire } from '../messageFormat'
 import { openMessage } from '../openMessage'
+import { chooseSubkey } from '../recipientKeys'
 import { sealMessage } from '../sealMessage'
-import { flipBase64Url } from './bytesForTests'
+import { flipBase64Url, flipUuid } from './bytesForTests'
 import { vectorEnvelope as readEnvelope } from './envelopeVectorSuite'
 import { type MessageParties } from './messageParties'
 import { base64url, decimal, type Json, record, records, string } from './vectorReader'
@@ -103,6 +104,48 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
       expect(result.status === 'verified' ? result.message.body : undefined).toBe('Bien reçu 🦭')
     })
 
+    it('KEY-21 : après une rotation, l’ancienne et la nouvelle sous-clé s’ouvrent avec le trousseau qui a les deux', async () => {
+      const store = await pinnedStore()
+      const [sender, rotated] = [await parties.senderKeyring(1), await parties.senderKeyring(2)]
+      const [older, newer] = rotated.subkeys
+      if (older === undefined || newer === undefined) throw new Error('deux sous-clés attendues')
+
+      for (const [subkey, sentAt] of [
+        [older, older.createdAt + 86_400_000],
+        [newer, newer.createdAt + 86_400_000],
+      ] as const) {
+        const own = await chooseSubkey(
+          store,
+          await parties.servedKeys(rotated, [subkey.ekId]),
+          senderId,
+          sentAt,
+        )
+        const bob = await chooseSubkey(
+          store,
+          await parties.servedKeys(await parties.bobKeyring()),
+          bobId,
+          sentAt,
+        )
+        const sealed = await sealMessage(sender, {
+          conversationId: string(fields, 'conversationId'),
+          conversationType: 1,
+          senderCertSerial: string(fields, 'senderCertSerial'),
+          sentAt,
+          senderSeq: 4,
+          groupSeq: 0,
+          body: 'Après la rotation',
+          recipients: [own, bob],
+        })
+        const context = { receivedAt: sentAt + 1_500 }
+
+        expect((await read(rotated, sealed, context)).status).toBe('verified')
+        // Le trousseau d'avant la rotation n'a que l'ancienne sous-clé.
+        expect((await read(sender, sealed, context)).status).toBe(
+          subkey === older ? 'verified' : 'undecryptable',
+        )
+      }
+    })
+
     it('QA-04 : chaque falsification des vecteurs rend son statut, jamais verified', async () => {
       const bob = await parties.bobKeyring()
       const forgeries = records(envelope['forgeries'])
@@ -138,39 +181,43 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
       }
     })
 
-    it('QA-04 : chaque octet du nonce, du chiffré, de enc, de la CEK encapsulée et du numéro de série, inversé, échoue', async () => {
+    it('QA-04 : chaque octet de l’en-tête, du nonce, du chiffré et de l’encapsulation de Bob, modifié, fait échouer la vérification', async () => {
+      // Les encapsulations des autres destinataires ne regardent pas Bob : elles sont hors de l'AAD (CDC 7.3).
       const bob = await parties.bobKeyring()
       const store = await pinnedStore()
-      const wrapIndex = vectorEnvelope.wraps.findIndex((wrap) => wrap.recipientId === bobId)
-      const variants: [string, (index: number) => EnvelopeWire, number][] = [
-        [
-          'nonce',
-          (i) => ({ ...vectorEnvelope, nonce: flipBase64Url(vectorEnvelope.nonce, i) }),
-          12,
-        ],
-        [
-          'chiffré',
-          (i) => ({ ...vectorEnvelope, ciphertext: flipBase64Url(vectorEnvelope.ciphertext, i) }),
-          base64url(message, 'ciphertext').length,
-        ],
+      const flipped = (text: string) => (index: number) => flipBase64Url(text, index)
+      const header = (field: 'messageId' | 'conversationId' | 'senderId') => (index: number) => ({
+        ...vectorEnvelope,
+        [field]: flipUuid(vectorEnvelope[field], index),
+      })
+      const variants: [string, (index: number) => unknown, number][] = [
+        ['messageId', header('messageId'), 16],
+        ['conversationId', header('conversationId'), 16],
+        ['senderId', header('senderId'), 16],
         [
           'numéro de série',
           (i) => ({
             ...vectorEnvelope,
-            senderCertSerial: flipBase64Url(vectorEnvelope.senderCertSerial, i),
+            senderCertSerial: flipped(vectorEnvelope.senderCertSerial)(i),
           }),
           16,
         ],
-        ...(['enc', 'wrappedCek'] as const).map(
-          (field): [string, (index: number) => EnvelopeWire, number] => [
+        ['nonce', (i) => ({ ...vectorEnvelope, nonce: flipped(vectorEnvelope.nonce)(i) }), 12],
+        [
+          'chiffré',
+          (i) => ({ ...vectorEnvelope, ciphertext: flipped(vectorEnvelope.ciphertext)(i) }),
+          base64url(message, 'ciphertext').length,
+        ],
+        [
+          'recipientId',
+          (i) => withBobWrap((wrap) => ({ ...wrap, recipientId: flipUuid(wrap.recipientId, i) })),
+          16,
+        ],
+        ...(['ekId', 'enc', 'wrappedCek'] as const).map(
+          (field): [string, (index: number) => unknown, number] => [
             field,
-            (i) => ({
-              ...vectorEnvelope,
-              wraps: vectorEnvelope.wraps.map((wrap, index) =>
-                index === wrapIndex ? { ...wrap, [field]: flipBase64Url(wrap[field], i) } : wrap,
-              ),
-            }),
-            field === 'enc' ? 32 : 48,
+            (i) => withBobWrap((wrap) => ({ ...wrap, [field]: flipBase64Url(wrap[field], i) })),
+            fromBase64Url(bobWrap[field]).length,
           ],
         ),
       ]
@@ -181,6 +228,7 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
             receivedAt: RECEIVED_AT,
           })
           expect(result.status, `${name}, octet ${String(index)}`).not.toBe('verified')
+          expect('message' in result, `${name}, octet ${String(index)}`).toBe(false)
         }
       }
     })

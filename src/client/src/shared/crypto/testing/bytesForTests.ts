@@ -1,5 +1,6 @@
 /** Outils d'octets des tests. Réservé aux tests. */
 import { fromBase64Url, toBase64Url } from '../base64url'
+import { uuid, uuidText } from '../canonical'
 
 /** Les octets d'un texte hexadécimal. */
 export function fromHex(value: string): Uint8Array<ArrayBuffer> {
@@ -29,4 +30,12 @@ export function flipBase64Url(text: string, index: number): string {
   const view = new DataView(bytes.buffer)
   view.setUint8(index, view.getUint8(index) ^ 0x01)
   return toBase64Url(bytes)
+}
+
+/** L'UUID `value`, son octet `index` modifié (bit de poids faible inversé), en minuscules. */
+export function flipUuid(value: string, index: number): string {
+  const bytes = uuid(value)
+  const view = new DataView(bytes.buffer)
+  view.setUint8(index, view.getUint8(index) ^ 0x01)
+  return uuidText(bytes)
 }

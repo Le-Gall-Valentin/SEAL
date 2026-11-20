@@ -154,6 +154,18 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
     ).toBe('none')
   })
 
+  it('ADR 0025, point 7 : le certificat du destinataire tolère 5 minutes de retard d’horloge, pas une de plus', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+    const keys = await servedKeys([await served(ring, 0)])
+
+    const chosen = await chooseSubkey(store, keys, RECIPIENT, NOT_BEFORE - 5 * 60_000)
+    expect(chosen.recipientId).toBe(RECIPIENT)
+    expect(await refusal(chooseSubkey(store, keys, RECIPIENT, NOT_BEFORE - 5 * 60_000 - 1))).toBe(
+      'certificate',
+    )
+  })
+
   it('KEY-20 : un instant qui n’est pas un entier refuse le certificat du destinataire', async () => {
     const ring = await keyring()
     const store = await pinnedStore()
@@ -181,6 +193,8 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
       ['autre KEM', { ...older, kem: 'X-WING' }],
       ['ekId non canonique', { ...older, ekId: `${older.ekId}=` }],
       ['ekId de 15 octets', { ...older, ekId: older.ekId.slice(0, 20) }],
+      ['validité de 46 jours', { ...older, expiresAt: older.createdAt + 46 * DAY_MS }],
+      ['validité de 44 jours', { ...older, expiresAt: older.createdAt + 44 * DAY_MS }],
     ] as const) {
       expect(
         await refusal(chooseSubkey(store, await servedKeys([forged, newer]), RECIPIENT, now)),
