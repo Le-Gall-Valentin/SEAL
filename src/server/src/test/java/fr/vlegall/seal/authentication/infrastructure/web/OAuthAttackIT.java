@@ -1,0 +1,176 @@
+package fr.vlegall.seal.authentication.infrastructure.web;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import fr.vlegall.seal.support.AuthClient;
+import fr.vlegall.seal.support.FakeOAuthProvider;
+import fr.vlegall.seal.support.FakeOAuthProvider.GitHubAccount;
+import fr.vlegall.seal.support.FakeOAuthProvider.GitHubEmail;
+import fr.vlegall.seal.support.FakeOAuthProvider.GoogleAccount;
+import fr.vlegall.seal.support.OAuthFlow;
+import fr.vlegall.seal.support.OAuthFlow.Started;
+import fr.vlegall.seal.support.OAuthTestConfiguration;
+import fr.vlegall.seal.support.RecordingMailSender;
+import fr.vlegall.seal.support.SealIntegrationTest;
+import java.time.Instant;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+/**
+ * AUTH-30, SEC-10, section 16.1 : retours OAuth forgés et départs en rafale. Chaque retour forgé finit sur
+ * {@code /connexion?erreur=REQUEST_REJECTED}, sans session ouverte.
+ */
+@SealIntegrationTest
+@Import(OAuthTestConfiguration.class)
+class OAuthAttackIT {
+
+    private static final String REJECTED = "/connexion?erreur=REQUEST_REJECTED";
+    private static final AtomicLong GITHUB_IDS = new AtomicLong(9_000_000);
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private RecordingMailSender mail;
+
+    @Autowired
+    private FakeOAuthProvider fake;
+
+    @Autowired
+    private JdbcClient jdbc;
+
+    private AuthClient client;
+    private OAuthFlow oauth;
+
+    @BeforeEach
+    void setUp() {
+        client = new AuthClient(mvc, mail);
+        oauth = new OAuthFlow(mvc, client, fake);
+    }
+
+    @AfterEach
+    void resetFake() {
+        fake.reset();
+    }
+
+    private static GoogleAccount google() {
+        return GoogleAccount.verified("3" + UUID.randomUUID().toString().replaceAll("[^0-9]", ""), "attaque@gmail.com");
+    }
+
+    /** Le retour est refusé, et la session qu'il laisse, s'il en laisse une, n'est pas authentifiée. */
+    private void assertRejected(MvcResult result) throws Exception {
+        assertThat(result.getResponse().getStatus()).isEqualTo(302);
+        assertThat(result.getResponse().getHeader("Location")).isEqualTo(REJECTED);
+        var session = result.getResponse().getCookie(AuthClient.SESSION_COOKIE);
+        if (session != null) {
+            mvc.perform(client.from(get("/api/v1/auth/me")).cookie(session)).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    @DisplayName("AUTH-30 : un jeton d'identité destiné à un autre client est refusé")
+    void auth30OtherAudienceRejected() throws Exception {
+        fake.tweakIdTokens(claims -> claims.audience("client-d-un-autre-site"));
+
+        assertRejected(oauth.signIn("google", google()));
+    }
+
+    @Test
+    @DisplayName("AUTH-30 : un jeton d'identité d'un autre émetteur est refusé")
+    void auth30OtherIssuerRejected() throws Exception {
+        fake.tweakIdTokens(claims -> claims.issuer("https://emetteur.attaquant.example"));
+
+        assertRejected(oauth.signIn("google", google()));
+    }
+
+    @Test
+    @DisplayName("AUTH-30 : un jeton d'identité expiré est refusé")
+    void auth30ExpiredIdTokenRejected() throws Exception {
+        Instant past = Instant.now().minusSeconds(3600);
+        fake.tweakIdTokens(
+                claims -> claims.issueTime(Date.from(past)).expirationTime(Date.from(past.plusSeconds(300))));
+
+        assertRejected(oauth.signIn("google", google()));
+    }
+
+    @Test
+    @DisplayName("AUTH-30 : un jeton d'identité signé par une clé absente des JWKS est refusé")
+    void auth30StrangerKeyRejected() throws Exception {
+        fake.signWithStrangerKey(true);
+
+        assertRejected(oauth.signIn("google", google()));
+    }
+
+    @Test
+    @DisplayName("AUTH-30 : une adresse GitHub sans adresse principale est refusée")
+    void auth30GitHubWithoutPrimaryEmailRejected() throws Exception {
+        long id = GITHUB_IDS.incrementAndGet();
+
+        assertRejected(oauth.signIn(
+                "github", new GitHubAccount(id, "octo", null, List.of(new GitHubEmail("o@exemple.ca", false, true)))));
+    }
+
+    @Test
+    @DisplayName(
+            "SEC-20, SEC-21 : consentement refusé journalisé avec son code ; un code forgé ne passe pas au journal")
+    void sec20ProviderErrorsJournaledSafely() throws Exception {
+        Started refused = oauth.start("google");
+        assertRejected(mvc.perform(client.from(get("/login/oauth2/code/google")
+                                .param("error", "access_denied")
+                                .param("state", refused.state()))
+                        .cookie(refused.session()))
+                .andReturn());
+
+        Started forged = oauth.start("google");
+        String injected = "x\nLOGIN_SUCCEEDED <script>";
+        assertRejected(mvc.perform(client.from(get("/login/oauth2/code/google")
+                                .param("error", injected)
+                                .param("state", forged.state()))
+                        .cookie(forged.session()))
+                .andReturn());
+
+        List<String> causes = jdbc.sql("SELECT details->>'cause' FROM security_events WHERE type = 'LOGIN_FAILED' "
+                        + "AND details->>'method' = 'oauth' ORDER BY created_at DESC LIMIT 2")
+                .query(String.class)
+                .list();
+        assertThat(causes).containsExactlyInAnyOrder("access_denied", "oauth_error");
+        assertThat(jdbc.sql("SELECT count(*) FROM security_events WHERE details::text LIKE '%script%'")
+                        .query(Long.class)
+                        .single())
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("SEC-10, ADR 0032 : 20 départs OAuth par 15 minutes et par IP, puis 429 RATE_LIMITED avec Retry-After")
+    void sec10OAuthStartsLimitedPerIp() throws Exception {
+        AuthClient burst = new AuthClient(mvc, mail);
+        for (int i = 0; i < 20; i++) {
+            mvc.perform(burst.from(get("/oauth2/authorization/google"))).andExpect(status().isFound());
+        }
+
+        MvcResult limited = mvc.perform(burst.from(get("/oauth2/authorization/google")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+                .andExpect(header().exists("Retry-After"))
+                .andReturn();
+        assertThat(limited.getResponse().getCookie(AuthClient.SESSION_COOKIE))
+                .as("aucune session créée pour un départ refusé")
+                .isNull();
+        mvc.perform(client.from(get("/oauth2/authorization/google"))).andExpect(status().isFound());
+    }
+}

@@ -85,6 +85,28 @@ Le fichier `.env` est à sauvegarder lui aussi : il porte le poivre des mots de 
 ADR 0026), gardé hors de la base. Sans lui, aucun mot de passe enregistré ne se vérifie plus, et chaque compte
 devrait passer par « mot de passe oublié ».
 
+### Connexion avec Google et GitHub
+
+La connexion par un fournisseur est facultative. Sans application OAuth, SEAL démarre normalement et masque le bouton
+du fournisseur (OPS-03). Pour l'activer, créez l'application chez le fournisseur, renseignez son identifiant et son
+secret dans `.env`, puis relancez `docker compose up --build`.
+
+- **Google** : Google Cloud Console, « API et services », « Identifiants », « ID client OAuth », type « Application
+  Web » :
+  - URI de redirection autorisée : `https://localhost:8443/login/oauth2/code/google` ;
+  - variables : `SEAL_OAUTH_GOOGLE_CLIENT_ID` et `SEAL_OAUTH_GOOGLE_CLIENT_SECRET`.
+- **GitHub** : Settings, « Developer settings », « OAuth Apps », « New OAuth App » :
+  - Homepage URL : `https://localhost:8443` ;
+  - Authorization callback URL : `https://localhost:8443/login/oauth2/code/github` ;
+  - variables : `SEAL_OAUTH_GITHUB_CLIENT_ID` et `SEAL_OAUTH_GITHUB_CLIENT_SECRET`.
+
+Renseignez les deux valeurs d'un fournisseur, ou aucune. Une seule arrête le démarrage, avec un message qui nomme la
+variable manquante.
+
+Le compte SEAL est lié au compte du fournisseur, jamais à son courriel. À la première connexion, SEAL fait choisir
+l'identifiant, puis crée le compte. Si le courriel vérifié du fournisseur appartient déjà à un compte SEAL, aucune
+liaison n'est faite : connectez-vous avec votre mot de passe (AUTH-33).
+
 ## Développement
 
 Il faut JDK 25 et Node.js 24 LTS (`sdk env` et `nvm use` lisent `.sdkmanrc` et `.nvmrc`).

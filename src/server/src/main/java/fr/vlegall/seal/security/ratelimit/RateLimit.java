@@ -19,7 +19,12 @@ public enum RateLimit {
     /** AUTH-14 : 3 renvois du code par heure. */
     EMAIL_CODE_RESENDS_PER_USER(3, Duration.ofHours(1), RateLimitKind.USER),
     PASSWORD_RESETS_PER_EMAIL(3, Duration.ofHours(1), RateLimitKind.EMAIL),
-    PASSWORD_RESETS_PER_IP(3, Duration.ofHours(1), RateLimitKind.IP);
+    PASSWORD_RESETS_PER_IP(3, Duration.ofHours(1), RateLimitKind.IP),
+    /**
+     * ADR 0032, point 3 : 20 départs OAuth par 15 minutes et par IP. Chaque départ garde sa requête d'autorisation dans
+     * une session en base : sans limite, n'importe qui remplirait la table des sessions.
+     */
+    OAUTH_STARTS_PER_IP(20, Duration.ofMinutes(15), RateLimitKind.IP);
 
     private final int capacity;
     private final Duration period;

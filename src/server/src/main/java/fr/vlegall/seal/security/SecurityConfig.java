@@ -1,6 +1,8 @@
 package fr.vlegall.seal.security;
 
 import fr.vlegall.seal.common.SealProperties;
+import fr.vlegall.seal.security.ratelimit.OAuthStartRateLimitFilter;
+import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.session.AbsoluteSessionTimeoutFilter;
 import fr.vlegall.seal.security.session.CredentialVersionFilter;
 import fr.vlegall.seal.security.session.CredentialVersions;
@@ -25,6 +27,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.client.OAuth2LoginConfigurer;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
@@ -87,7 +90,8 @@ class SecurityConfig {
             Clock clock,
             CsrfTokenRepository csrfTokens,
             CredentialVersions credentialVersions,
-            Customizer<OAuth2LoginConfigurer<HttpSecurity>> oauthLogin) {
+            Customizer<OAuth2LoginConfigurer<HttpSecurity>> oauthLogin,
+            RateLimiter limiter) {
         http.authorizeHttpRequests(requests -> requests
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
@@ -190,6 +194,10 @@ class SecurityConfig {
                         }
                     });
                 })
+                // SEC-10, ADR 0032 : départs OAuth limités par IP avant que Spring ne crée la session du départ.
+                .addFilterBefore(
+                        new OAuthStartRateLimitFilter(limiter, problemDetails::reject),
+                        OAuth2AuthorizationRequestRedirectFilter.class)
                 // A01 : pas de /logout implicite ; la déconnexion est POST /api/v1/auth/logout (AUTH-53).
                 .logout(LogoutConfigurer::disable)
                 // AUTH-52 : la session de plus de 12 heures est invalidée avant de charger le contexte de sécurité.
