@@ -21,8 +21,8 @@ import {
   SALT_BYTES,
   type WrapWire,
 } from './messageFormat'
-import { CEK_BYTES, EK_ID_BYTES } from './protocol'
-import type { ChosenSubkey } from './recipientKeys'
+import { CEK_BYTES } from './protocol'
+import { type ChosenSubkey, verifiedRecipient, type VerifiedRecipient } from './recipientKeys'
 
 /** RFC 9562 : 74 bits aléatoires d'un UUIDv7, pris dans 10 octets. */
 const UUID_RANDOM_BYTES = 10
@@ -46,7 +46,7 @@ export interface MessageDraft {
   readonly senderSeq: number
   readonly groupSeq: number
   readonly body: string
-  /** Sous-clé choisie pour chaque destinataire (KEY-20), émetteur compris ; dans un ordre quelconque. */
+  /** Sous-clé rendue par chooseSubkey pour chaque destinataire (KEY-20), émetteur compris ; dans un ordre quelconque. */
   readonly recipients: readonly ChosenSubkey[]
 }
 
@@ -155,29 +155,26 @@ export async function sealMessageWith(
   }
 }
 
-/** CDC 7.4 : destinataires distincts, émetteur compris, 50 au plus, triés par ordre des octets. */
+/**
+ * CDC 7.4 : 50 destinataires au plus, distincts, émetteur compris, triés par ordre des octets. Chacun est la copie
+ * vérifiée d'une sous-clé rendue par chooseSubkey (KEY-20, ADR 0030, point 8), identifiant en minuscules.
+ */
 function sortedRecipients(
   senderId: string,
   recipients: readonly ChosenSubkey[],
-): readonly ChosenSubkey[] {
-  const normalized = recipients.map((recipient) => ({
-    ...recipient,
-    recipientId: recipient.recipientId.toLowerCase(),
-  }))
-  const ids = new Set(normalized.map((recipient) => recipient.recipientId))
-  if (ids.size !== normalized.length) {
+): readonly VerifiedRecipient[] {
+  if (recipients.length > MAX_RECIPIENTS) {
+    throw new TypeError('MSG-21 : 50 destinataires au plus')
+  }
+  const verified = recipients.map((recipient) => verifiedRecipient(recipient))
+  const ids = new Set(verified.map((recipient) => recipient.recipientId))
+  if (ids.size !== verified.length) {
     throw new TypeError('CDC 7.4 : un destinataire en double')
   }
   if (!ids.has(senderId.toLowerCase())) {
     throw new TypeError('CDC 7.4 : l’émetteur figure parmi les destinataires')
   }
-  if (normalized.length > MAX_RECIPIENTS) {
-    throw new TypeError('MSG-21 : 50 destinataires au plus')
-  }
-  if (normalized.some((recipient) => recipient.ekId.length !== EK_ID_BYTES)) {
-    throw new TypeError('KEY-05 : un ekId fait 16 octets')
-  }
-  return normalized.toSorted((left, right) => compareUuids(left.recipientId, right.recipientId))
+  return verified.toSorted((left, right) => compareUuids(left.recipientId, right.recipientId))
 }
 
 /** RFC 9562 : 48 bits de millisecondes, version 7, variante 10, puis 74 bits pris dans `random`. */

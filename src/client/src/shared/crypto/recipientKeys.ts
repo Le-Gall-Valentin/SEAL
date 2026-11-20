@@ -30,13 +30,35 @@ export interface ServedUserKeys {
   readonly subkeys: readonly ServedSubkey[]
 }
 
-/** Sous-clé retenue pour un destinataire, avec le certificat vérifié qui la porte. */
+/**
+ * Sous-clé retenue pour un destinataire, avec le certificat vérifié qui la porte. Ses champs sont des copies, à
+ * afficher : sealMessage n'accepte que l'objet rendu par chooseSubkey, et scelle avec la copie qu'il garde.
+ */
 export interface ChosenSubkey {
   readonly recipientId: string
   readonly certSerial: Uint8Array<ArrayBuffer>
   readonly ikPublic: Uint8Array<ArrayBuffer>
   readonly ekId: Uint8Array<ArrayBuffer>
   readonly ekPublic: Uint8Array<ArrayBuffer>
+}
+
+/** ADR 0030, point 8 : la sous-clé vérifiée, copiée au moment du choix ; la seule que le scellement utilise. */
+export interface VerifiedRecipient {
+  readonly recipientId: string
+  readonly ekId: Uint8Array<ArrayBuffer>
+  readonly ekPublic: Uint8Array<ArrayBuffer>
+}
+
+/** Sous-clés rendues par chooseSubkey, hors de leur interface publique (comme les secrets d'un trousseau). */
+const CHOSEN = new WeakMap<ChosenSubkey, VerifiedRecipient>()
+
+/** Interne à shared/crypto : la copie vérifiée d'une sous-clé rendue par chooseSubkey ; toute autre lève TypeError. */
+export function verifiedRecipient(chosen: ChosenSubkey): VerifiedRecipient {
+  const verified = CHOSEN.get(chosen)
+  if (verified === undefined) {
+    throw new TypeError('KEY-20 : sous-clé non choisie par chooseSubkey')
+  }
+  return verified
 }
 
 export type SubkeyUnavailableReason = 'certificate' | 'binding' | 'none'
@@ -95,13 +117,15 @@ export async function chooseSubkey(
   if (newest === undefined) {
     throw new SubkeyUnavailableError('none')
   }
-  return {
+  const chosen: ChosenSubkey = Object.freeze({
     recipientId: recipient,
     certSerial: Uint8Array.from(certificate.serial),
     ikPublic: Uint8Array.from(certificate.ikPublic),
-    ekId: newest.ekId,
-    ekPublic: newest.ekPublic,
-  }
+    ekId: Uint8Array.from(newest.ekId),
+    ekPublic: Uint8Array.from(newest.ekPublic),
+  })
+  CHOSEN.set(chosen, { recipientId: recipient, ekId: newest.ekId, ekPublic: newest.ekPublic })
+  return chosen
 }
 
 /** Une réponse hostile peut servir autre chose qu'une liste ; ce test ne change pas le type supposé. */
