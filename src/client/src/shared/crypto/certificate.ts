@@ -9,15 +9,13 @@ import { encodeCertificate } from './identity'
 import { type KeyStore, saveCertificate, type StoredCertificate } from './keystore'
 import { fromBase64Url } from './base64url'
 import { equalBytes } from './bytes'
+import { CLOCK_SKEW_MS, SERIAL_BYTES } from './protocol'
 
-const SERIAL_BYTES = 16
 const KEY_ID_BYTES = 8
 /** KEY-04 : notAfter = notBefore + 397 jours. */
 const VALIDITY_MS = 397 * 86_400_000
 /** Bit 0 : signature et non-répudiation ; bit 1 : certification de sous-clés. */
 const USAGE = 0b11
-/** ADR 0027, point 9 : retard d'horloge toléré, comme pour le createdAt d'une sous-clé (ADR 0025, point 7). */
-const CLOCK_SKEW_MS = 5 * 60_000
 
 /** Titulaire attendu : la session et le trousseau de l'appareil, jamais la réponse elle-même. */
 export interface ExpectedOwner {

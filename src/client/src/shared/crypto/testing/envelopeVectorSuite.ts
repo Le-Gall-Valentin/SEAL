@@ -14,7 +14,7 @@ import {
   MESSAGE_SUITE,
   MessageFormatError,
   type SignedPayloadFields,
-} from '../message'
+} from '../messageFormat'
 import { base64url, decimal, type Json, number, record, records, string } from './vectorReader'
 
 /** RFC 8410 : en-tête PKCS#8 d'une clé privée X25519 brute de 32 octets. */

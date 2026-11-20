@@ -6,10 +6,10 @@
 import { fromBase64Url, toBase64Url } from './base64url'
 import { equalBytes } from './bytes'
 import { encodeProofOfPossession, encodeSubkeyBinding, type Kem } from './identity'
-import { type Keyring, keyringSecrets } from './keyring'
+import { type Keyring, signWithIdentity } from './keyring'
+import { SERIAL_BYTES } from './protocol'
 
 const CHALLENGE_BYTES = 32
-const SERIAL_BYTES = 16
 
 /** Corps de PUT /api/v1/keys/identity (KEY-03). */
 export interface IdentityProof {
@@ -43,7 +43,7 @@ export async function proveIdentity(keyring: Keyring, challenge: string): Promis
   return {
     ikPublic: toBase64Url(keyring.identityPublicKey),
     challenge: toBase64Url(bytes),
-    signature: await signWithIdentity(keyring, signed),
+    signature: toBase64Url(await signWithIdentity(keyring, signed)),
   }
 }
 
@@ -77,11 +77,6 @@ export async function bindSubkey(
     ekPublic: toBase64Url(subkey.publicKey),
     createdAt: subkey.createdAt,
     expiresAt: subkey.expiresAt,
-    signature: await signWithIdentity(keyring, signed),
+    signature: toBase64Url(await signWithIdentity(keyring, signed)),
   }
-}
-
-async function signWithIdentity(keyring: Keyring, data: Uint8Array<ArrayBuffer>): Promise<string> {
-  const signature = await crypto.subtle.sign('Ed25519', keyringSecrets(keyring).identityKey, data)
-  return toBase64Url(new Uint8Array(signature))
 }

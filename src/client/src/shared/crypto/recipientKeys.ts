@@ -9,12 +9,8 @@ import { CertificateRejectedError, type ServedCertificate, verifyCertificate } f
 import { verifyEd25519 } from './ed25519'
 import { encodeSubkeyBinding, KEM } from './identity'
 import type { KeyStore } from './keystore'
+import { CLOCK_SKEW_MS, EK_ID_BYTES, SUBKEY_VALIDITY_MS } from './protocol'
 
-/** ADR 0025, point 7 : retard d'horloge toléré, comme pour le certificat de l'appareil. */
-const CLOCK_SKEW_MS = 5 * 60_000
-/** KEY-21 : une sous-clé vaut 45 jours. */
-const SUBKEY_VALIDITY_MS = 45 * 86_400_000
-const EK_ID_BYTES = 16
 const EK_PUBLIC_BYTES = 32
 
 /** Sous-clé telle que la sert GET /api/v1/users/{id}/keys : sans `certSerial`, porté par le certificat (4.4). */

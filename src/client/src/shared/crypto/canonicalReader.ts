@@ -4,9 +4,8 @@
  * octets restants, u64 au-delà de 2^63 - 1, UTF-8 invalide ou hors de la forme NFC, autre étiquette, octet en trop
  * après `end()`.
  */
-import { CanonicalEncodingError } from './canonical'
+import { CanonicalEncodingError, U64_MAX, uuidText } from './canonical'
 
-const U64_MAX = 2n ** 63n - 1n
 const UUID_BYTES = 16
 const UTF8 = new TextDecoder('utf-8', { fatal: true })
 
@@ -83,10 +82,7 @@ export class CanonicalReader {
   /** 16 octets dans l'ordre réseau, rendus sous la forme 8-4-4-4-12 en minuscules. */
   uuid(): string {
     const start = this.#take(UUID_BYTES)
-    const hex = Array.from(this.#bytes.subarray(start, start + UUID_BYTES), (byte) =>
-      byte.toString(16).padStart(2, '0'),
-    ).join('')
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+    return uuidText(this.#bytes.subarray(start, start + UUID_BYTES))
   }
 
   /**

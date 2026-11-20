@@ -43,18 +43,15 @@ export {
   storeOwnCertificate,
   verifyOwnCertificate,
 } from './certificate'
+export { type EnvelopeWire, type WrapWire } from './messageFormat'
+export { type MessageDraft, MessageTooLongError, sealMessage } from './sealMessage'
 export {
-  type EnvelopeWire,
   type IncomingContext,
-  type MessageDraft,
   type MessageRejection,
-  MessageTooLongError,
   type OpenedMessage,
   openMessage,
   type ReceivedMessage,
-  sealMessage,
-  type WrapWire,
-} from './message'
+} from './openMessage'
 export { compareOwnKeys, type KeysComparison, neverPublished, type ServedKeys } from './ownKeys'
 export {
   type ChosenSubkey,

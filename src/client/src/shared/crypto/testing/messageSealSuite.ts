@@ -13,14 +13,16 @@ import {
   type EnvelopeHeader,
   type EnvelopeWire,
   MESSAGE_SUITE,
-  type MessageDraft,
   MessageFormatError,
+  type SignedPayloadFields,
+} from '../messageFormat'
+import {
+  type MessageDraft,
   MessageTooLongError,
   sealMessage,
   sealMessageWith,
   type SealRandomness,
-  type SignedPayloadFields,
-} from '../message'
+} from '../sealMessage'
 import type { ChosenSubkey } from '../recipientKeys'
 import { vectorX25519Private } from './envelopeVectorSuite'
 import { vaultPayload, vectorRecoveryKey } from './vaultVectorSuite'

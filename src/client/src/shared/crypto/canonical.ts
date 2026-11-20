@@ -15,7 +15,7 @@ export class CanonicalEncodingError extends Error {
 
 const U32_MAX = 0xffff_ffff
 /** ADR 0006 : les u64 s'arrêtent à 2^63-1, comme le long de Java. */
-const U64_MAX = 2n ** 63n - 1n
+export const U64_MAX = 2n ** 63n - 1n
 /** ADR 0006 : forme 8-4-4-4-12 exactement, majuscules ou minuscules. */
 const UUID_FORM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const UTF8 = new TextEncoder()
@@ -85,6 +85,15 @@ export function uuid(value: string): Uint8Array<ArrayBuffer> {
     out[i] = Number.parseInt(digits.slice(2 * i, 2 * i + 2), 16)
   }
   return out
+}
+
+/** Forme 8-4-4-4-12 en minuscules de 16 octets dans l'ordre réseau : la réciproque de `uuid`. */
+export function uuidText(value: Uint8Array): string {
+  if (value.length !== 16) {
+    throw new CanonicalEncodingError('uuid : 16 octets attendus')
+  }
+  const hex = Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
 /**

@@ -4,8 +4,7 @@
  * non extractable de son trousseau et la clé publique relue. Seul shared/crypto importe @hpke (ESLint).
  */
 import { Aes256Gcm, CipherSuite, DhkemX25519HkdfSha256, HkdfSha256 } from '@hpke/core'
-
-const CEK_BYTES = 32
+import { CEK_BYTES } from './protocol'
 
 const SUITE = new CipherSuite({
   kem: new DhkemX25519HkdfSha256(),

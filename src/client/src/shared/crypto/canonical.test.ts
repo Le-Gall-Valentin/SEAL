@@ -11,6 +11,7 @@ import {
   u64,
   u8,
   uuid,
+  uuidText,
 } from './canonical'
 import { isRecord } from './testing/vectorReader'
 
@@ -176,6 +177,13 @@ describe('encodeur canonique, cas propres à TypeScript', () => {
   it('MSG-01 : list passe chaque élément seul à son encodeur, sans son index ni le tableau', () => {
     // map(struct) passerait l'index et le tableau comme champs de la structure.
     expect(list(struct, ['a', 'b'])).toEqual(concat(u32(2), struct('a'), struct('b')))
+  })
+
+  it('ADR 0006 : uuidText rend la forme 8-4-4-4-12 en minuscules de 16 octets, et refuse une autre longueur', () => {
+    const value = uuid('0192F7A1-FFFF-7000-8000-00000000A11C')
+
+    expect(uuidText(value)).toBe('0192f7a1-ffff-7000-8000-00000000a11c')
+    expect(() => uuidText(value.subarray(1))).toThrow(CanonicalEncodingError)
   })
 
   it('ADR 0006 : CanonicalEncodingError se reconnaît par son nom', () => {
