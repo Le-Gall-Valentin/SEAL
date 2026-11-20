@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * minutes. Une attente expirée est retirée à la première lecture.
  */
 @Component
-public class PendingOAuthSession {
+public final class PendingOAuthSession {
 
     /** Nom de l'attribut de session. */
     static final String ATTRIBUTE = "fr.vlegall.seal.oauth.pending";
@@ -25,7 +25,7 @@ public class PendingOAuthSession {
     }
 
     /** Remplace toute attente précédente de la session. */
-    public void store(HttpServletRequest request, ExternalIdentity identity) {
+    public void remember(HttpServletRequest request, ExternalIdentity identity) {
         request.getSession(true)
                 .setAttribute(ATTRIBUTE, PendingOAuthRegistration.startingAt(identity, clock.instant()));
     }
@@ -45,7 +45,7 @@ public class PendingOAuthSession {
     }
 
     /** Retire l'attente : elle ne sert qu'une fois. */
-    public void clear(HttpServletRequest request) {
+    public void forget(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.removeAttribute(ATTRIBUTE);

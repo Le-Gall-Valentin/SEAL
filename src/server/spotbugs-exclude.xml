@@ -57,8 +57,9 @@
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.SessionController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
-    <!-- /api/v1/auth/providers (anonyme ou session complète, AUTH-35) : OAuthProvidersIT,
-         OAuthAuthorizationRequestIT, WebAuthorizationConventionsIT. -->
+    <!-- /api/v1/auth/providers (anonyme ou session complète, AUTH-35), /oauth/pending et /oauth/complete (anonyme
+         seulement, AUTH-32) : OAuthProvidersIT, OAuthAuthorizationRequestIT, OAuthRegistrationIT,
+         WebAuthorizationConventionsIT. -->
     <Match>
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.OAuthController"/>
         <Bug pattern="SPRING_ENDPOINT"/>

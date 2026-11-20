@@ -13,7 +13,8 @@ public abstract sealed class IdentityException extends SealException
                 IdentityException.UsernameTaken,
                 IdentityException.PasswordTooWeak,
                 IdentityException.InvalidCode,
-                IdentityException.CodeExpired {
+                IdentityException.CodeExpired,
+                IdentityException.EmailInUse {
 
     private static final long serialVersionUID = 1L;
 
@@ -72,6 +73,15 @@ public abstract sealed class IdentityException extends SealException
 
         public CodeExpired() {
             super(ErrorCode.CODE_EXPIRED);
+        }
+    }
+
+    /** AUTH-33 : le courriel vérifié d'une inscription OAuth appartient déjà à un compte actif (AUTH-15). */
+    public static final class EmailInUse extends IdentityException {
+        private static final long serialVersionUID = 1L;
+
+        public EmailInUse() {
+            super(ErrorCode.OAUTH_EMAIL_IN_USE);
         }
     }
 }

@@ -89,6 +89,11 @@ class LoginHandlerTest {
         }
 
         @Override
+        public void oauthLinked(UserId user, OAuthProvider provider) {
+            events.add("liée:" + provider + ":" + user.value());
+        }
+
+        @Override
         public void oauthLoginSucceeded(UserId user, OAuthProvider provider) {
             events.add("oauth:" + provider + ":" + user.value());
         }

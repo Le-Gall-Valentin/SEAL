@@ -80,7 +80,7 @@ final class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
             case OAuthLoginOutcome.EmailInUse emailInUse -> response.sendRedirect(EMAIL_IN_USE);
             case OAuthLoginOutcome.Unlinked unlinked -> {
                 sessions.renew(request, response);
-                pending.store(request, unlinked.identity());
+                pending.remember(request, unlinked.identity());
                 response.sendRedirect(CHOOSE_USERNAME);
             }
             case OAuthLoginOutcome.Rejected rejected -> response.sendRedirect(OAuthLoginFailureHandler.REJECTED);

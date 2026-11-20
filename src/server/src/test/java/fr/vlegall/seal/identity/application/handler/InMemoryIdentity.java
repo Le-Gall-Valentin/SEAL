@@ -87,6 +87,20 @@ final class InMemoryIdentity {
             }
 
             @Override
+            public UserId createActive(
+                    Username username, DisplayName displayName, EmailAddress email, Instant verifiedAt) {
+                if (exists(username)) {
+                    throw new IdentityException.UsernameTaken();
+                }
+                if (activeAccountOwns(email)) {
+                    throw new IdentityException.EmailInUse();
+                }
+                UserId id = new UserId(UUID.randomUUID());
+                accounts.put(id, new Account(id, username, displayName, email, AccountStatus.ACTIVE));
+                return id;
+            }
+
+            @Override
             public Optional<Account> findById(UserId id) {
                 return Optional.ofNullable(accounts.get(id));
             }

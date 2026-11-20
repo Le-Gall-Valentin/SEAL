@@ -21,5 +21,7 @@ public enum SecurityEventType {
     /** SEC-20 : clé d'identité publiée et certifiée (KEY-04), avec le numéro de série du certificat. */
     IDENTITY_KEY_PUBLISHED,
     /** SEC-20 : sous-clé de chiffrement publiée (KEY-05), avec son ekId. */
-    SUBKEY_PUBLISHED
+    SUBKEY_PUBLISHED,
+    /** SEC-20 : compte lié à un fournisseur OAuth (AUTH-31), avec le fournisseur. */
+    OAUTH_LINKED
 }

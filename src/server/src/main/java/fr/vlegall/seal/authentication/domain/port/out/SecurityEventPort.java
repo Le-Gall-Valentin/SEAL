@@ -18,6 +18,9 @@ public interface SecurityEventPort {
 
     void loggedOut(UserId user);
 
+    /** SEC-20 : compte lié à un fournisseur OAuth (AUTH-31), dans la transaction qui crée la liaison. */
+    void oauthLinked(UserId user, OAuthProvider provider);
+
     /** SEC-20 : connexion par un fournisseur OAuth, nommé dans le détail. */
     void oauthLoginSucceeded(UserId user, OAuthProvider provider);
 

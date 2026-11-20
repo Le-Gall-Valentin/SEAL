@@ -95,6 +95,11 @@ class OAuthLoginHandlerTest {
         }
 
         @Override
+        public void oauthLinked(UserId user, OAuthProvider provider) {
+            throw new UnsupportedOperationException("le retour OAuth ne lie rien");
+        }
+
+        @Override
         public void oauthLoginSucceeded(UserId user, OAuthProvider provider) {
             events.add("réussie:" + provider + ":" + user.value());
         }

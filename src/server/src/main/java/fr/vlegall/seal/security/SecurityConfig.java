@@ -108,6 +108,11 @@ class SecurityConfig {
                         // passent avant cette règle : le départ d'une session ouverte n'est pas résolu, et tombe ici.
                         .requestMatchers(HttpMethod.GET, "/oauth2/authorization/*", "/login/oauth2/code/*")
                         .anonymous()
+                        // AUTH-32 : inscription OAuth en attente, dans une session non authentifiée (ADR 0032).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/pending")
+                        .anonymous()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/oauth/complete")
+                        .anonymous()
                         // AUTH-16 : toute session, restreinte ou complète, lit son compte ; l'anonyme reçoit 401.
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/me")
                         .authenticated()

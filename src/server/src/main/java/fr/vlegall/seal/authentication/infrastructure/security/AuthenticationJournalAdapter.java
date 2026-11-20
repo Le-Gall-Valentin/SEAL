@@ -37,6 +37,13 @@ public class AuthenticationJournalAdapter implements SecurityEventPort, Password
         journal.recordStandalone(new SecurityEvent(SecurityEventType.LOGIN_FAILED, user, Map.of()));
     }
 
+    /** SEC-20 : dans la transaction qui crée la liaison (ADR 0013, point 6). */
+    @Override
+    public void oauthLinked(UserId user, OAuthProvider provider) {
+        journal.recordInTransaction(
+                new SecurityEvent(SecurityEventType.OAUTH_LINKED, user, Map.of("provider", provider.registrationId())));
+    }
+
     @Override
     public void oauthLoginSucceeded(UserId user, OAuthProvider provider) {
         journal.recordStandalone(new SecurityEvent(

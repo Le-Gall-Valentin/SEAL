@@ -60,6 +60,29 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public UserId createActive(Username username, DisplayName displayName, EmailAddress email, Instant verifiedAt) {
+        try {
+            return new UserId(jdbc.sql(
+                            "INSERT INTO users (username, display_name, email, status, email_verified_at) "
+                                    + "VALUES (:username, :displayName, CAST(:email AS citext), 'ACTIVE', :verifiedAt) RETURNING id")
+                    .param("username", username.value())
+                    .param("displayName", displayName.value())
+                    .param("email", email.value())
+                    .param("verifiedAt", SqlSupport.utc(verifiedAt))
+                    .query(UUID.class)
+                    .single());
+        } catch (DuplicateKeyException e) {
+            if (SqlSupport.violates(e, USERNAME_CONSTRAINT)) {
+                throw new IdentityException.UsernameTaken();
+            }
+            if (SqlSupport.violates(e, VERIFIED_EMAIL_INDEX)) {
+                throw new IdentityException.EmailInUse();
+            }
+            throw e;
+        }
+    }
+
+    @Override
     public Optional<Account> findById(UserId id) {
         return jpa.findById(id.value()).map(UserRepositoryAdapter::toAccount);
     }
