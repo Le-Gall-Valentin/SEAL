@@ -58,9 +58,11 @@ const EnvelopeSchema = z.strictObject({
     .max(MAX_RECIPIENTS),
 })
 
-/** CDC 7.7 : état d'un message reçu, du point de vue de la cryptographie (ADR 0030, point 4). */
-export type MessageRejection =
-  'undecryptable' | 'integrity_failed' | 'signature_invalid' | 'recipients_mismatch'
+/** CDC 7.7 : refus de la cryptographie (ADR 0030, point 4) ; le contenu reste masqué. */
+export type MessageRejection = 'undecryptable' | 'integrity_failed' | 'signature_invalid'
+
+/** CDC 7.7 : anomalie d'un message bien signé ; son contenu est rendu, pour l'afficher sous un avertissement ambre. */
+export type MessageWarning = 'recipients_mismatch'
 
 /** Message vérifié : les champs signés, et de quoi accuser réception ou prouver (P1). */
 export interface ReceivedMessage extends SignedPayloadFields {
@@ -70,8 +72,12 @@ export interface ReceivedMessage extends SignedPayloadFields {
   readonly signature: Uint8Array<ArrayBuffer>
 }
 
+/**
+ * Résultat de l'ouverture. Le contenu rendu n'a passé que les étapes cryptographiques : le lot 4 y ajoute les étapes 2
+ * et 8 à 10 de la section 7.7, KEY-50 et la révocation avant de l'afficher.
+ */
 export type OpenedMessage =
-  | { readonly status: 'verified'; readonly message: ReceivedMessage }
+  | { readonly status: 'verified' | MessageWarning; readonly message: ReceivedMessage }
   | { readonly status: MessageRejection }
 
 export interface IncomingContext {
@@ -107,8 +113,9 @@ interface DecodedEnvelope {
 /**
  * CDC 7.7, PROTOCOL.md 6.5 (ADR 0030, point 4) : ouvre une enveloppe reçue et vérifie, dans l'ordre et en échouant
  * fermé, l'enveloppe, sa propre encapsulation, le chiffré, le contenu signé, le certificat de l'émetteur à
- * `receivedAt`, sa signature, puis que le lecteur figure parmi les destinataires. Le contenu n'est rendu qu'au
- * statut `verified` ; un refus ne lève rien.
+ * `receivedAt`, sa signature, puis que le lecteur figure parmi les destinataires. Le contenu n'est rendu qu'aux
+ * statuts `verified` et `recipients_mismatch` (signature valide, avertissement ambre) ; un refus ne lève rien. Restent
+ * au lot 4, avant tout affichage : les étapes 2 et 8 à 10 de la section 7.7, KEY-50 et la révocation.
  */
 export async function openMessage(
   store: KeyStore,
@@ -130,11 +137,11 @@ export async function openMessage(
     if (!(await verifyEd25519(certificate.ikPublic, parts.signedPayload, parts.signature))) {
       throw new Rejected('signature_invalid')
     }
-    if (!fields.recipientIds.includes(keyring.userId.toLowerCase())) {
-      throw new Rejected('recipients_mismatch')
-    }
     return {
-      status: 'verified',
+      // Étape 8 : la signature est valide, mais le lecteur n'est pas destinataire (transfert subreptice).
+      status: fields.recipientIds.includes(keyring.userId.toLowerCase())
+        ? 'verified'
+        : 'recipients_mismatch',
       message: {
         ...fields,
         senderIkPublic: Uint8Array.from(certificate.ikPublic),

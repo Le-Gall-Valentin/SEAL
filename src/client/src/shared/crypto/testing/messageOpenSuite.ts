@@ -114,6 +114,18 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
       }
     })
 
+    it('CDC 7.7 : un message recipients_mismatch rend son contenu signé, à afficher sous l’avertissement ambre', async () => {
+      const mismatch = records(envelope['forgeries']).find(
+        (forgery) => forgery['rejectedBy'] === 'recipients_mismatch',
+      )
+
+      const result = await read(await parties.bobKeyring(), mismatch?.['envelope'])
+
+      expect(result.status).toBe('recipients_mismatch')
+      expect('message' in result ? result.message.body : undefined).toBe(string(fields, 'body'))
+      expect('message' in result ? result.message.recipientIds : undefined).toEqual([senderId])
+    })
+
     it('ADR 0030, point 7 : un padding non vide, jusqu’à 24 576 octets de chiffré (MSG-21), est accepté et ignoré', async () => {
       const bob = await parties.bobKeyring()
       const accepted = records(envelope['accepted'])

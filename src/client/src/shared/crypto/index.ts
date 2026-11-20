@@ -50,6 +50,7 @@ export { type MessageDraft, MessageTooLongError, sealMessage } from './sealMessa
 export {
   type IncomingContext,
   type MessageRejection,
+  type MessageWarning,
   type OpenedMessage,
   openMessage,
   type ReceivedMessage,

@@ -457,7 +457,8 @@ signature fausse n'est jamais normale (ADR 0030, point 5).
 
 ### 6.5 Ouverture (CDC 7.7)
 
-Les vérifications s'exécutent dans cet ordre et échouent fermé : le contenu n'est rendu qu'au statut `verified`.
+Les vérifications s'exécutent dans cet ordre et échouent fermé : le contenu n'est rendu qu'aux statuts `verified` et
+`recipients_mismatch`, ce dernier affiché sous l'avertissement ambre de la section 7.7 du CDC (ADR 0030, point 4).
 
 | Étape | Vérification | Échec |
 | --- | --- | --- |
