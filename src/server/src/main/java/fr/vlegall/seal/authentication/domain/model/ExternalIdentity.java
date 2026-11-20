@@ -2,6 +2,8 @@ package fr.vlegall.seal.authentication.domain.model;
 
 import fr.vlegall.seal.common.EmailFormat;
 import fr.vlegall.seal.common.Unicode;
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -17,7 +19,12 @@ import org.jspecify.annotations.Nullable;
  *     code au plus (ACC-03), peut-être vide. Ce n'est qu'une suggestion : le nom choisi est vérifié à la création.
  */
 public record ExternalIdentity(
-        OAuthProvider provider, String subject, String email, boolean emailVerified, String displayName) {
+        OAuthProvider provider, String subject, String email, boolean emailVerified, String displayName)
+        implements Serializable {
+
+    /** Gardée dans la session le temps de l'inscription en attente (AUTH-32), donc sérialisée par Spring Session. */
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     /** Longueur maximale d'un identifiant stable. */
     public static final int SUBJECT_MAX_LENGTH = 255;

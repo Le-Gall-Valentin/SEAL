@@ -3,6 +3,7 @@ package fr.vlegall.seal.authentication.application.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.authentication.domain.model.LoginOutcome;
+import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
@@ -37,6 +38,11 @@ class LoginHandlerTest {
         @Override
         public boolean isVerified(UserId user) {
             return verified.contains(user);
+        }
+
+        @Override
+        public boolean isPending(UserId user) {
+            return logins.containsValue(user) && !verified.contains(user);
         }
     };
     private final InMemoryCredentials credentials = new InMemoryCredentials();
@@ -80,6 +86,16 @@ class LoginHandlerTest {
         @Override
         public void loggedOut(UserId user) {
             events.add("sortie:" + user.value());
+        }
+
+        @Override
+        public void oauthLoginSucceeded(UserId user, OAuthProvider provider) {
+            events.add("oauth:" + provider + ":" + user.value());
+        }
+
+        @Override
+        public void oauthLoginFailed(UserId user, OAuthProvider provider, String cause) {
+            events.add("oauth-refusée:" + cause);
         }
     };
     private final LoginHandler handler = new LoginHandler(accounts, credentials, hasher, journal);

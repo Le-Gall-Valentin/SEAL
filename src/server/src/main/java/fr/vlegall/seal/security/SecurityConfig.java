@@ -19,11 +19,13 @@ import org.springframework.security.authorization.AuthenticatedAuthorizationMana
 import org.springframework.security.authorization.AuthorityAuthorizationManager;
 import org.springframework.security.authorization.AuthorizationManagers;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.client.OAuth2LoginConfigurer;
+import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
@@ -171,9 +173,17 @@ class SecurityConfig {
                 // AUTH-30 à AUTH-33 : connexion OAuth. Aucune page de connexion générée (A02) ; le filtre de Spring
                 // n'enregistre rien dans la session : seul SessionEstablisher y écrit le contexte SEAL (ADR 0032).
                 .oauth2Login(login -> {
-                    login.loginPage(ClientRoutesController.LOGIN)
-                            .securityContextRepository(new RequestAttributeSecurityContextRepository());
+                    login.loginPage(ClientRoutesController.LOGIN);
                     oauthLogin.customize(login);
+                    // Spring remplace le dépôt du filtre par celui de la session au moment de le configurer ; le
+                    // post-traitement passe après : l'authentification de Spring ne vit que le temps de la requête.
+                    login.withObjectPostProcessor(new ObjectPostProcessor<OAuth2LoginAuthenticationFilter>() {
+                        @Override
+                        public <O extends OAuth2LoginAuthenticationFilter> O postProcess(O filter) {
+                            filter.setSecurityContextRepository(new RequestAttributeSecurityContextRepository());
+                            return filter;
+                        }
+                    });
                 })
                 // A01 : pas de /logout implicite ; la déconnexion est POST /api/v1/auth/logout (AUTH-53).
                 .logout(LogoutConfigurer::disable)

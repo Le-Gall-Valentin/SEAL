@@ -37,6 +37,9 @@ public interface AccountLookupQuery {
     /** Vrai si le compte est actif, donc son courriel vérifié (AUTH-16). */
     boolean isVerified(UserId user);
 
+    /** AUTH-16, AUTH-32 : vrai si le compte attend la vérification de son courriel ; faux s'il est actif ou supprimé. */
+    boolean isPending(UserId user);
+
     /**
      * AUTH-70 : coordonnées du compte actif dont le courriel vérifié est la saisie, normalisée en NFC et comparée sans
      * tenir compte de la casse. Vide pour un compte en attente, supprimé ou inconnu, et pour toute saisie qui n'est pas

@@ -22,7 +22,10 @@ public class OAuthTestConfiguration {
 
     @Bean(destroyMethod = "close")
     FakeOAuthProvider fakeOAuthProvider() {
-        return FakeOAuthProvider.start();
+        FakeOAuthProvider fake = FakeOAuthProvider.start();
+        fake.client(GOOGLE.clientId(), GOOGLE.clientSecret());
+        fake.client(GITHUB.clientId(), GITHUB.clientSecret());
+        return fake;
     }
 
     @Bean

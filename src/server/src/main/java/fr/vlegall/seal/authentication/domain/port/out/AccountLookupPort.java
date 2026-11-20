@@ -11,4 +11,7 @@ public interface AccountLookupPort {
 
     /** Vrai si le compte est actif, donc son courriel vérifié (AUTH-16). */
     boolean isVerified(UserId user);
+
+    /** AUTH-16 : vrai si le compte attend la vérification de son courriel ; faux s'il est actif ou supprimé. */
+    boolean isPending(UserId user);
 }

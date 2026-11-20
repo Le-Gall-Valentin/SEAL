@@ -32,6 +32,11 @@ public class AccountLookupAdapter implements AccountLookupPort, AccountContactPo
     }
 
     @Override
+    public boolean isPending(UserId user) {
+        return accounts.isPending(user);
+    }
+
+    @Override
     public Optional<AccountContact> findActiveByEmail(String email) {
         return accounts.findActiveByEmail(email).map(AccountLookupAdapter::toContact);
     }
