@@ -43,6 +43,13 @@ export {
   storeOwnCertificate,
   verifyOwnCertificate,
 } from './certificate'
+export {
+  type EnvelopeWire,
+  type MessageDraft,
+  MessageTooLongError,
+  sealMessage,
+  type WrapWire,
+} from './message'
 export { compareOwnKeys, type KeysComparison, neverPublished, type ServedKeys } from './ownKeys'
 export {
   type ChosenSubkey,
