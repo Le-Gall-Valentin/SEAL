@@ -17,7 +17,7 @@ import { CanonicalReader } from './canonicalReader'
 import { SERIAL_BYTES } from './protocol'
 
 export const MESSAGE_SUITE = 'SEAL1-X25519-A256GCM-ED25519'
-export type MessageSuite = typeof MESSAGE_SUITE
+type MessageSuite = typeof MESSAGE_SUITE
 
 /** CDC 7.3 : `text/plain` en v1. */
 export const CONTENT_TYPE = 'text/plain'
@@ -166,7 +166,7 @@ export function decodeSignedPayload(signedPayload: Uint8Array): SignedPayloadFie
     const contentType = reader.text()
     const body = reader.text()
     reader.end()
-    if (v !== 1 || suite !== MESSAGE_SUITE || (conversationType !== 1 && conversationType !== 2)) {
+    if (v !== 1 || suite !== MESSAGE_SUITE || !isConversationType(conversationType)) {
       throw new MessageFormatError(
         'SignedPayload : version, suite ou type de conversation inconnus',
       )
@@ -201,6 +201,11 @@ function checkHeader(header: EnvelopeHeader): void {
 
 function checkPayload(fields: SignedPayloadFields): void {
   checkHeader(fields)
+  // Le type le fixe, mais un appelant non typé pourrait passer autre chose : le scellement refuse ce que la relecture
+  // refuserait (ADR 0030, point 4).
+  if (!isConversationType(fields.conversationType)) {
+    throw new MessageFormatError('SignedPayload : type de conversation inconnu')
+  }
   if (fields.salt.length !== SALT_BYTES) {
     throw new MessageFormatError('SignedPayload : le sel fait 16 octets')
   }
@@ -222,6 +227,11 @@ function checkPayload(fields: SignedPayloadFields): void {
     previous = id
   }
   checkInvariants(fields)
+}
+
+/** CDC 7.3 : 1 pour une conversation directe, 2 pour un groupe. */
+function isConversationType(value: number): value is 1 | 2 {
+  return value === 1 || value === 2
 }
 
 /**

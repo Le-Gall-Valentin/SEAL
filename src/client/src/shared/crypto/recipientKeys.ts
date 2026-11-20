@@ -47,6 +47,10 @@ export interface VerifiedRecipient {
   readonly recipientId: string
   readonly ekId: Uint8Array<ArrayBuffer>
   readonly ekPublic: Uint8Array<ArrayBuffer>
+  /** Fin de validité de la sous-clé (KEY-21) : elle ne scelle plus au-delà (KEY-20). */
+  readonly expiresAt: number
+  /** Fin de validité du certificat qui la porte (KEY-04). */
+  readonly certificateNotAfter: number
 }
 
 /** Sous-clés rendues par chooseSubkey, hors de leur interface publique (comme les secrets d'un trousseau). */
@@ -89,6 +93,9 @@ export async function chooseSubkey(
   now: number,
 ): Promise<ChosenSubkey> {
   const recipient = lowercaseUuid(recipientId)
+  if (!isObject(served)) {
+    throw new SubkeyUnavailableError('certificate')
+  }
   let certificate
   try {
     certificate = await verifyCertificate(store, served.certificate, recipient, now, CLOCK_SKEW_MS)
@@ -124,13 +131,24 @@ export async function chooseSubkey(
     ekId: Uint8Array.from(newest.ekId),
     ekPublic: Uint8Array.from(newest.ekPublic),
   })
-  CHOSEN.set(chosen, { recipientId: recipient, ekId: newest.ekId, ekPublic: newest.ekPublic })
+  CHOSEN.set(chosen, {
+    recipientId: recipient,
+    ekId: newest.ekId,
+    ekPublic: newest.ekPublic,
+    expiresAt: newest.expiresAt,
+    certificateNotAfter: certificate.notAfter,
+  })
   return chosen
 }
 
 /** Une réponse hostile peut servir autre chose qu'une liste ; ce test ne change pas le type supposé. */
 function isList(value: unknown): boolean {
   return Array.isArray(value)
+}
+
+/** De même pour un objet : une réponse nulle n'a pas de certificat. */
+function isObject(value: unknown): boolean {
+  return typeof value === 'object' && value !== null
 }
 
 /** Un identifiant à la forme UUID, comparé en minuscules ; une autre forme est une erreur de l'appelant. */
@@ -170,6 +188,7 @@ async function verifiedSubkey(
       ekId.length !== EK_ID_BYTES ||
       ekPublic.length !== EK_PUBLIC_BYTES ||
       !Number.isSafeInteger(served.createdAt) ||
+      !Number.isSafeInteger(served.expiresAt) ||
       served.createdAt < 0 ||
       served.createdAt > now + CLOCK_SKEW_MS ||
       served.expiresAt - served.createdAt !== SUBKEY_VALIDITY_MS

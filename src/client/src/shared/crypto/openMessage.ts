@@ -130,22 +130,19 @@ export async function openMessage(
     // seul le message rendu au lecteur en garde une copie.
     try {
       const parts = plaintextParts(plaintext)
-      const fields = signedFields(parts.signedPayload, decoded.header)
-      const certificate = await senderCertificate(store, context, decoded.header)
-      if (!(await verifyEd25519(certificate.ikPublic, parts.signedPayload, parts.signature))) {
-        throw new Rejected('signature_invalid')
-      }
-      return {
-        // Étape 8 : la signature est valide, mais le lecteur n'est pas destinataire (transfert subreptice).
-        status: fields.recipientIds.includes(keyring.userId.toLowerCase())
-          ? 'verified'
-          : 'recipients_mismatch',
-        message: {
-          ...fields,
-          senderIkPublic: Uint8Array.from(certificate.ikPublic),
-          signedPayload: Uint8Array.from(parts.signedPayload),
-          signature: Uint8Array.from(parts.signature),
-        },
+      const fields = signedFields(parts.signedPayload)
+      try {
+        checkSameHeader(fields, decoded.header)
+        const certificate = await senderCertificate(store, context, decoded.header)
+        if (!(await verifyEd25519(certificate.ikPublic, parts.signedPayload, parts.signature))) {
+          throw new Rejected('signature_invalid')
+        }
+        return delivered(fields, certificate.ikPublic, parts, keyring)
+      } catch (error) {
+        // PROTOCOL.md 6.2 : sur un refus, les champs relus (sel, numéro de série) ne survivent pas.
+        fields.salt.fill(0)
+        fields.senderCertSerial.fill(0)
+        throw error
       }
     } finally {
       plaintext.fill(0)
@@ -155,6 +152,27 @@ export async function openMessage(
       return { status: error.status }
     }
     throw error
+  }
+}
+
+/** Le message rendu au lecteur, avec ses propres copies de SignedPayload et de la signature. */
+function delivered(
+  fields: SignedPayloadFields,
+  ikPublic: Uint8Array,
+  parts: { readonly signedPayload: Uint8Array; readonly signature: Uint8Array },
+  keyring: Keyring,
+): OpenedMessage {
+  return {
+    // Étape 8 : la signature est valide, mais le lecteur n'est pas destinataire (transfert subreptice).
+    status: fields.recipientIds.includes(keyring.userId.toLowerCase())
+      ? 'verified'
+      : 'recipients_mismatch',
+    message: {
+      ...fields,
+      senderIkPublic: Uint8Array.from(ikPublic),
+      signedPayload: Uint8Array.from(parts.signedPayload),
+      signature: Uint8Array.from(parts.signature),
+    },
   }
 }
 
@@ -175,8 +193,9 @@ function decodeEnvelope(envelope: unknown): DecodedEnvelope {
       senderCertSerial: sized(parsed.senderCertSerial, SERIAL_BYTES),
     }
     const ciphertext = fromBase64Url(parsed.ciphertext)
-    if (ciphertext.length < TAG_BYTES || ciphertext.length > MAX_CIPHERTEXT_BYTES) {
-      throw new MessageFormatError('MSG-21 : chiffré de 16 à 24 576 octets')
+    // Le schéma borne déjà la chaîne à 32 768 caractères, soit 24 576 octets au plus une fois décodés (MSG-21).
+    if (ciphertext.length < TAG_BYTES) {
+      throw new MessageFormatError('enveloppe : chiffré plus court que son étiquette')
     }
     if (new Set(parsed.wraps.map((wrap) => wrap.recipientId)).size !== parsed.wraps.length) {
       throw new MessageFormatError('MSG-21 : une encapsulation par destinataire')
@@ -263,14 +282,17 @@ function plaintextParts(plaintext: Uint8Array): {
   }
 }
 
-/** Étape 5 : `SignedPayload` relu strictement, son en-tête égal à celui de l'enveloppe. */
-function signedFields(signedPayload: Uint8Array, header: EnvelopeHeader): SignedPayloadFields {
-  let fields: SignedPayloadFields
+/** Étape 5 : `SignedPayload` relu strictement. */
+function signedFields(signedPayload: Uint8Array): SignedPayloadFields {
   try {
-    fields = decodeSignedPayload(signedPayload)
+    return decodeSignedPayload(signedPayload)
   } catch {
     throw new Rejected('integrity_failed')
   }
+}
+
+/** Étape 5, suite : l'en-tête signé égal à celui de l'enveloppe. */
+function checkSameHeader(fields: SignedPayloadFields, header: EnvelopeHeader): void {
   if (
     fields.messageId !== header.messageId ||
     fields.conversationId !== header.conversationId ||
@@ -279,7 +301,6 @@ function signedFields(signedPayload: Uint8Array, header: EnvelopeHeader): Signed
   ) {
     throw new Rejected('integrity_failed')
   }
-  return fields
 }
 
 /** Étape 6 : certificat de l'émetteur, à son numéro de série, vérifié à `receivedAt` (sans tolérance : heure serveur). */

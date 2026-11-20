@@ -3,8 +3,9 @@
  * certificat de l'émetteur lit l'Autorité épinglée dans IndexedDB. Les parties sont celles de messageParties.ts.
  * Réservé aux tests.
  */
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ServedCertificate } from '../certificate'
+import { CanonicalReader } from '../canonicalReader'
 import { type Keyring } from '../keyring'
 import { type KeyStore, openKeyStore, pinAuthority } from '../keystore'
 import { fromBase64Url, toBase64Url } from '../base64url'
@@ -196,6 +197,38 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
         // La CEK, puis Plaintext ; SignedPayload, vérifié par l'IK du certificat.
         expect(decrypted.seen, name).toHaveLength(2)
         expect(allZero([...decrypted.seen, ...signed.seen]), name).toBe(true)
+      }
+    })
+
+    it('PROTOCOL.md 6.2 : sur un refus, les champs relus de SignedPayload (sel, numéro de série) sont remis à zéro', async () => {
+      const bob = await parties.bobKeyring()
+      for (const [name, rejectedBy] of [
+        [
+          "le message signé par une autre clé d'identité que celle du certificat",
+          'signature_invalid',
+        ],
+        ['le message signé rechiffré sous un autre numéro de certificat', 'integrity_failed'],
+      ] as const) {
+        const forged = records(envelope['forgeries']).find((forgery) => forgery['name'] === name)
+        // Sans remplacement, l'espion laisse lire et garde chaque copie rendue ; mockRestore efface ce relevé.
+        const copies = vi.spyOn(CanonicalReader.prototype, 'bytes')
+        let result
+        let seen: Uint8Array[] | undefined
+        try {
+          result = await openMessage(await pinnedStore(), bob, forged?.['envelope'], {
+            senderCertificate: certificate,
+            receivedAt: RECEIVED_AT,
+          })
+          seen = copies.mock.results.map((entry): Uint8Array =>
+            entry.type === 'return' ? entry.value : new Uint8Array(1).fill(1),
+          )
+        } finally {
+          copies.mockRestore()
+        }
+
+        expect(result.status, name).toBe(rejectedBy)
+        expect(seen.length, name).toBeGreaterThan(0)
+        expect(allZero(seen), name).toBe(true)
       }
     })
 

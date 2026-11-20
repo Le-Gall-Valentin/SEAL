@@ -22,7 +22,12 @@ import {
   type WrapWire,
 } from './messageFormat'
 import { CEK_BYTES } from './protocol'
-import { type ChosenSubkey, verifiedRecipient, type VerifiedRecipient } from './recipientKeys'
+import {
+  type ChosenSubkey,
+  SubkeyUnavailableError,
+  verifiedRecipient,
+  type VerifiedRecipient,
+} from './recipientKeys'
 
 /** RFC 9562 : 74 bits aléatoires d'un UUIDv7, pris dans 10 octets. */
 const UUID_RANDOM_BYTES = 10
@@ -98,6 +103,15 @@ export async function sealMessageWith(
       conversationId: draft.conversationId.toLowerCase(),
       senderId: keyring.userId.toLowerCase(),
       senderCertSerial: fromBase64Url(draft.senderCertSerial),
+    }
+    // KEY-20 : une sous-clé choisie ne vaut que tant qu'elle et son certificat sont valides à sentAt.
+    for (const recipient of recipients) {
+      if (draft.sentAt >= recipient.certificateNotAfter) {
+        throw new SubkeyUnavailableError('certificate')
+      }
+      if (draft.sentAt >= recipient.expiresAt) {
+        throw new SubkeyUnavailableError('none')
+      }
     }
     signedPayload = encodeSignedPayload({
       ...header,

@@ -449,7 +449,8 @@ L'émetteur relit `GET /api/v1/users/{userId}/keys` et vérifie :
 
 Il prend, parmi les sous-clés non expirées, celle dont `createdAt` est le plus récent. Un certificat ou une seule
 liaison invalides refusent toutes les clés du destinataire, et l'envoi est annulé (« clé indisponible ») : une
-signature fausse n'est jamais normale (ADR 0030, point 5).
+signature fausse n'est jamais normale (ADR 0030, point 5). Le scellement n'accepte que les sous-clés ainsi choisies,
+et les refuse à leur tour si la sous-clé ou son certificat ont expiré à `sentAt` (ADR 0030, point 8).
 
 ### 6.4 Scellement (CDC 7.5, étapes 3 à 7)
 

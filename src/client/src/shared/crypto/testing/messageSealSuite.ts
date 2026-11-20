@@ -16,7 +16,7 @@ import {
   MessageFormatError,
   type SignedPayloadFields,
 } from '../messageFormat'
-import { chooseSubkey, type ChosenSubkey } from '../recipientKeys'
+import { chooseSubkey, type ChosenSubkey, SubkeyUnavailableError } from '../recipientKeys'
 import {
   type MessageDraft,
   MessageTooLongError,
@@ -255,6 +255,53 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
         await expect(sealMessage(keyring, await draft(changes))).rejects.toBeInstanceOf(
           MessageFormatError,
         )
+      }
+    })
+
+    it('KEY-20 : une sous-clé choisie ne scelle plus une fois expirée, ni avec un certificat expiré', async () => {
+      const keyring = await parties.senderKeyring()
+      const sentAt = decimal(fields, 'sentAt')
+      const bobRing = await parties.bobKeyring()
+      const { own, bob } = await parties.chosen(store, sentAt)
+      // Le certificat de Bob émis 396 jours plus tôt expire le lendemain, bien avant sa sous-clé.
+      const keys = await parties.servedKeys(bobRing)
+      const ageing = await chooseSubkey(
+        store,
+        {
+          ...keys,
+          certificate: await parties.signedByCa({
+            ...keys.certificate,
+            notBefore: keys.certificate.notBefore - 396 * 86_400_000,
+            notAfter: keys.certificate.notBefore + 86_400_000,
+          }),
+        },
+        parties.bobId,
+        sentAt,
+      )
+
+      for (const [recipients, later, reason] of [
+        [[own, bob], sentAt + 50 * 86_400_000, 'none'],
+        [[own, ageing], sentAt + 2 * 86_400_000, 'certificate'],
+      ] as const) {
+        const error: unknown = await sealMessage(
+          keyring,
+          await draft({ recipients, sentAt: later }),
+        ).then(
+          () => undefined,
+          (thrown: unknown) => thrown,
+        )
+        expect(error).toBeInstanceOf(SubkeyUnavailableError)
+        expect(error instanceof SubkeyUnavailableError ? error.reason : undefined).toBe(reason)
+      }
+    })
+
+    it('CDC 7.3 : un type de conversation hors de 1 et 2 ne scelle rien', async () => {
+      const keyring = await parties.senderKeyring()
+      // Hors du type de MessageDraft, comme pourrait l'écrire un appelant non typé.
+      for (const conversationType of [0, 3]) {
+        await expect(
+          sealMessage(keyring, await draft({ conversationType: conversationType as 1 })),
+        ).rejects.toBeInstanceOf(MessageFormatError)
       }
     })
 

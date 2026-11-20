@@ -294,17 +294,29 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
     const store = await pinnedStore()
     const now = NOT_BEFORE + DAY_MS
     // Ce que pourrait servir un serveur hostile, hors des types que suppose le code.
-    const hostile = (value: unknown) => value as readonly ServedSubkey[]
+    const hostileSubkeys = (value: unknown) => value as readonly ServedSubkey[]
+    const hostileKeys = (value: unknown) => value as ServedUserKeys
+    const hostileNumber = (value: unknown) => value as number
 
     for (const [name, subkeys] of [
-      ['sous-clés absentes', hostile(null)],
-      ['sous-clé nulle', hostile([null])],
+      ['sous-clés absentes', hostileSubkeys(null)],
+      ['sous-clé nulle', hostileSubkeys([null])],
       ['createdAt négatif', [{ ...older, createdAt: -1000, expiresAt: -1000 + 45 * DAY_MS }]],
+      [
+        'expiresAt en chaîne décimale',
+        [{ ...older, expiresAt: hostileNumber(String(older.expiresAt)) }],
+      ],
     ] as const) {
       expect(
         await refusal(chooseSubkey(store, await servedKeys(subkeys), RECIPIENT, now)),
         name,
       ).toBe('binding')
+    }
+    for (const response of [null, undefined]) {
+      expect(
+        await refusal(chooseSubkey(store, hostileKeys(response), RECIPIENT, now)),
+        String(response),
+      ).toBe('certificate')
     }
   })
 
