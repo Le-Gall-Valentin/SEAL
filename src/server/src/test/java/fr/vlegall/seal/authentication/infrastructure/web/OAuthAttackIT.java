@@ -3,7 +3,6 @@ package fr.vlegall.seal.authentication.infrastructure.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import fr.vlegall.seal.support.AuthClient;
@@ -156,7 +155,8 @@ class OAuthAttackIT {
     }
 
     @Test
-    @DisplayName("SEC-10, ADR 0032 : 20 départs OAuth par 15 minutes et par IP, puis 429 RATE_LIMITED avec Retry-After")
+    @DisplayName(
+            "SEC-10, ADR 0032 : 20 départs OAuth par 15 minutes et par IP, puis retour vers la connexion avec RATE_LIMITED")
     void sec10OAuthStartsLimitedPerIp() throws Exception {
         AuthClient burst = new AuthClient(mvc, mail);
         for (int i = 0; i < 20; i++) {
@@ -164,8 +164,8 @@ class OAuthAttackIT {
         }
 
         MvcResult limited = mvc.perform(burst.from(get("/oauth2/authorization/google")))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/connexion?erreur=RATE_LIMITED"))
                 .andExpect(header().exists("Retry-After"))
                 .andReturn();
         assertThat(limited.getResponse().getCookie(AuthClient.SESSION_COOKIE))
@@ -206,7 +206,36 @@ class OAuthAttackIT {
         }
 
         mvc.perform(burst.from(get("/oauth2/authorization/google")))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/connexion?erreur=RATE_LIMITED"));
+    }
+
+    @Test
+    @DisplayName("SEC-10, ADR 0032 : 20 retours OAuth par 15 minutes et par IP ; au-delà, ni journal ni traitement")
+    void sec10OAuthCallbacksLimitedPerIp() throws Exception {
+        AuthClient burst = new AuthClient(mvc, mail);
+        for (int i = 0; i < 20; i++) {
+            mvc.perform(burst.from(get("/login/oauth2/code/google")
+                            .param("code", "c" + i)
+                            .param("state", "s" + i)))
+                    .andExpect(status().isFound())
+                    .andExpect(header().string("Location", REJECTED));
+        }
+
+        mvc.perform(burst.from(
+                        get("/login/oauth2/code/github").param("code", "c").param("state", "s")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/connexion?erreur=RATE_LIMITED"))
+                .andExpect(header().exists("Retry-After"));
+        assertThat(jdbc.sql("SELECT type, count(*) FROM security_events WHERE ip = CAST(? AS inet) GROUP BY type")
+                        .param(burst.ip())
+                        .query((row, number) -> row.getString(1) + "=" + row.getLong(2))
+                        .list())
+                .as("20 refus journalisés, puis un seul dépassement")
+                .containsExactlyInAnyOrder("LOGIN_FAILED=20", "RATE_LIMIT_EXCEEDED=1");
+        mvc.perform(burst.from(get("/oauth2/authorization/google")))
+                .andExpect(status().isFound())
+                .andExpect(
+                        header().string("Location", org.hamcrest.Matchers.startsWith(fake.uri("/google/authorize"))));
     }
 }

@@ -2,7 +2,10 @@ package fr.vlegall.seal.security.ratelimit;
 
 import java.time.Duration;
 
-/** Limites de débit du lot 1, recopiées de la section 15.2 du CDC (SEC-10). Chaque lot ajoute les siennes. */
+/**
+ * Limites de débit de la section 15.2 du CDC (SEC-10), et celles que les ADR y ajoutent (ADR 0021, ADR 0032). Chaque
+ * lot ajoute les siennes.
+ */
 public enum RateLimit {
     /** AUTH-22 : 5 échecs de connexion par 15 minutes, par identifiant saisi, existant ou non. */
     LOGIN_FAILURES_PER_LOGIN(5, Duration.ofMinutes(15), RateLimitKind.ENTERED),
@@ -24,7 +27,12 @@ public enum RateLimit {
      * ADR 0032, point 3 : 20 départs OAuth par 15 minutes et par IP. Chaque départ garde sa requête d'autorisation dans
      * une session en base : sans limite, n'importe qui remplirait la table des sessions.
      */
-    OAUTH_STARTS_PER_IP(20, Duration.ofMinutes(15), RateLimitKind.IP);
+    OAUTH_STARTS_PER_IP(20, Duration.ofMinutes(15), RateLimitKind.IP),
+    /**
+     * ADR 0032, point 3 : 20 retours OAuth par 15 minutes et par IP. Chaque refus écrit une ligne du journal : sans
+     * limite, n'importe qui le ferait grossir sans fin.
+     */
+    OAUTH_CALLBACKS_PER_IP(20, Duration.ofMinutes(15), RateLimitKind.IP);
 
     private final int capacity;
     private final Duration period;

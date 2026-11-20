@@ -1,7 +1,7 @@
 package fr.vlegall.seal.security;
 
 import fr.vlegall.seal.common.SealProperties;
-import fr.vlegall.seal.security.ratelimit.OAuthStartRateLimitFilter;
+import fr.vlegall.seal.security.ratelimit.OAuthNavigationRateLimitFilter;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.session.AbsoluteSessionTimeoutFilter;
 import fr.vlegall.seal.security.session.CredentialVersionFilter;
@@ -194,10 +194,9 @@ class SecurityConfig {
                         }
                     });
                 })
-                // SEC-10, ADR 0032 : départs OAuth limités par IP avant que Spring ne crée la session du départ.
+                // SEC-10, ADR 0032 : départs et retours OAuth limités par IP, avant les filtres de Spring.
                 .addFilterBefore(
-                        new OAuthStartRateLimitFilter(limiter, problemDetails::reject),
-                        OAuth2AuthorizationRequestRedirectFilter.class)
+                        new OAuthNavigationRateLimitFilter(limiter), OAuth2AuthorizationRequestRedirectFilter.class)
                 // A01 : pas de /logout implicite ; la déconnexion est POST /api/v1/auth/logout (AUTH-53).
                 .logout(LogoutConfigurer::disable)
                 // AUTH-52 : la session de plus de 12 heures est invalidée avant de charger le contexte de sécurité.

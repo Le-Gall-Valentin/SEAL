@@ -1,6 +1,5 @@
 package fr.vlegall.seal.security.web;
 
-import fr.vlegall.seal.common.SealException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -43,12 +42,6 @@ public final class ProblemDetailsSecurityHandler implements AuthenticationEntryP
     /** SEC-01 : corps trop grand, 413 {@code REQUEST_REJECTED} ({@link RequestBodyLimitFilter}). */
     public void rejectTooLarge(HttpServletRequest request, HttpServletResponse response) throws IOException {
         resolve(request, response, new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE), 413);
-    }
-
-    /** SEC-10 : refus d'un filtre, en Problem Details avec son code et, pour une limite, {@code Retry-After}. */
-    public void reject(HttpServletRequest request, HttpServletResponse response, SealException exception)
-            throws IOException {
-        resolve(request, response, exception, exception.code().status());
     }
 
     private void resolve(HttpServletRequest request, HttpServletResponse response, Exception exception, int fallback)
