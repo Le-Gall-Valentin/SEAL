@@ -49,6 +49,11 @@ public final class ProtocolVectors {
         return read("vault.json");
     }
 
+    /** vectors/envelope.json : enveloppe d'un message (PROTOCOL.md, section 6 ; ADR 0030). */
+    public static ProtocolVectors envelope() {
+        return read("envelope.json");
+    }
+
     private static ProtocolVectors read(String file) {
         try {
             return new ProtocolVectors(

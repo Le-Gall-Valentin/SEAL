@@ -9,7 +9,9 @@
 - vectors/vault.json : clé de récupération et coffre de clés (PROTOCOL.md, section 5 ; KEY-30 à KEY-33, QA-02,
   ADR 0027) ;
 - vectors/hkdf-rfc5869.json et vectors/x25519-rfc7748.json : vecteurs officiels de HKDF-SHA256 (RFC 5869, annexe A,
-  cas 1 à 3) et de X25519 (RFC 7748, section 6.1) (QA-01, ADR 0027).
+  cas 1 à 3) et de X25519 (RFC 7748, section 6.1) (QA-01, ADR 0027) ;
+- vectors/envelope.json : enveloppe d'un message, encapsulations HPKE et falsifications (PROTOCOL.md, section 6 ;
+  CDC 7, QA-02 à QA-04, ADR 0030).
 
 Troisième implémentation, indépendante de Java et de TypeScript : les deux suites de tests relisent ces
 vecteurs, aucune ne se valide elle-même. Bibliothèque standard de Python, plus `cryptography` pour signer en
@@ -26,6 +28,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import hmac
 import json
 import re
 import struct as binary
@@ -42,6 +45,7 @@ IDENTITY_OUTPUT = PROTOCOL_DIR / "vectors" / "identity.json"
 VAULT_OUTPUT = PROTOCOL_DIR / "vectors" / "vault.json"
 HKDF_OUTPUT = PROTOCOL_DIR / "vectors" / "hkdf-rfc5869.json"
 X25519_OUTPUT = PROTOCOL_DIR / "vectors" / "x25519-rfc7748.json"
+ENVELOPE_OUTPUT = PROTOCOL_DIR / "vectors" / "envelope.json"
 BLOCKLIST = PROTOCOL_DIR / "password-blocklist.txt"
 
 U32_MAX = 2**32 - 1
@@ -1031,6 +1035,417 @@ def build_x25519() -> str:
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
 
 
+# ---------------------------------------------------------------------------------------------
+# Messages (PROTOCOL.md, section 6 ; CDC 7 ; QA-02 à QA-04, ADR 0030). Le CDC encapsule la CEK avec aad = AAD, et
+# l'API HPKE de `cryptography` ne prend pas d'AAD : le mode base de la RFC 9180 est composé ici avec ses primitives
+# (X25519, HMAC-SHA256, AES-GCM), comme le coffre (ADR 0030, point 2). Il est vérifié contre le vecteur A.1.1 de la
+# RFC 9180, puis contre cryptography.hpke avec une AAD vide ; @hpke/core ouvre ensuite ses encapsulations.
+# ---------------------------------------------------------------------------------------------
+
+HPKE_KEM_ID = 0x0020  # DHKEM(X25519, HKDF-SHA256)
+HPKE_KDF_ID = 0x0001  # HKDF-SHA256
+HPKE_AES_128_GCM = 0x0001
+HPKE_AES_256_GCM = 0x0002
+HPKE_KEM_SUITE = b"KEM" + HPKE_KEM_ID.to_bytes(2, "big")
+
+# RFC 9180, annexe A.1.1 : DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-128-GCM, mode base, première encryption.
+RFC9180_A11 = {
+    "info": "4f6465206f6e2061204772656369616e2055726e",
+    "ikmE": "7268600d403fce431561aef583ee1613527cff655c1343f29812e66706df3234",
+    "pkEm": "37fda3567bdbd628e88668c3c8d7e97d1d1253b6d4ea6d44c150f741f1bf4431",
+    "skEm": "52c4a758a802cd8b936eceea314432798d5baf2d7e9235dc084ab1b9cfa2f736",
+    "ikmR": "6db9df30aa07dd42ee5e8181afdb977e538f5e1fec8a06223f33f7013e525037",
+    "pkRm": "3948cfe0ad1ddb695d780e59077195da6c56506b027329794ab02bca80815c4d",
+    "skRm": "4612c550263fc8ad58375df3f557aac531d26850903e55a9f23f21d8534e8ac8",
+    "shared_secret": "fe0e18c9f024ce43799ae393c7e8fe8fce9d218875e8227b0187c04e7d2ea1fc",
+    "key_schedule_context": "00725611c9d98c07c03f60095cd32d400d8347d45ed67097bbad50fc56da742d07cb6cffde367bb0565ba28bb02c90744a20f5ef37f30523526106f637abb05449",
+    "secret": "12fff91991e93b48de37e7daddb52981084bd8aa64289c3788471d9a9712f397",
+    "key": "4531685d41d65f03dc48f6b8302c05b0",
+    "base_nonce": "56d890e5accaaf011cff4b7d",
+    "pt": "4265617574792069732074727574682c20747275746820626561757479",
+    "aad": "436f756e742d30",
+    "ct": "f938558b5d72f1a23810b4be2ab4f84331acc02fc97babc53a52ae8218a355a96d8770ac83d07bea87e13c512a",
+}
+
+
+def hpke_suite_id(aead_id: int) -> bytes:
+    return b"HPKE" + HPKE_KEM_ID.to_bytes(2, "big") + HPKE_KDF_ID.to_bytes(2, "big") + aead_id.to_bytes(2, "big")
+
+
+def hkdf_extract(salt: bytes, ikm: bytes) -> bytes:
+    return hmac.new(salt if salt else bytes(32), ikm, hashlib.sha256).digest()
+
+
+def hkdf_expand(prk: bytes, info: bytes, length: int) -> bytes:
+    okm, block, counter = b"", b"", 1
+    while len(okm) < length:
+        block = hmac.new(prk, block + info + bytes([counter]), hashlib.sha256).digest()
+        okm += block
+        counter += 1
+    return okm[:length]
+
+
+def labeled_extract(suite_id: bytes, salt: bytes, label: bytes, ikm: bytes) -> bytes:
+    return hkdf_extract(salt, b"HPKE-v1" + suite_id + label + ikm)
+
+
+def labeled_expand(suite_id: bytes, prk: bytes, label: bytes, info: bytes, length: int) -> bytes:
+    return hkdf_expand(prk, length.to_bytes(2, "big") + b"HPKE-v1" + suite_id + label + info, length)
+
+
+def x25519_public(private: bytes) -> bytes:
+    return raw_public(crypto_lib().x25519.X25519PrivateKey.from_private_bytes(private))
+
+
+def x25519_dh(private: bytes, public: bytes) -> bytes:
+    x25519 = crypto_lib().x25519
+    return x25519.X25519PrivateKey.from_private_bytes(private).exchange(x25519.X25519PublicKey.from_public_bytes(public))
+
+
+def hpke_derive_key_pair(ikm: bytes) -> tuple[bytes, bytes]:
+    """RFC 9180, 7.1.3 : DeriveKeyPair pour X25519."""
+    dkp_prk = labeled_extract(HPKE_KEM_SUITE, b"", b"dkp_prk", ikm)
+    private = labeled_expand(HPKE_KEM_SUITE, dkp_prk, b"sk", b"", 32)
+    return private, x25519_public(private)
+
+
+def hpke_shared_secret(dh: bytes, enc: bytes, recipient_public: bytes) -> bytes:
+    eae_prk = labeled_extract(HPKE_KEM_SUITE, b"", b"eae_prk", dh)
+    return labeled_expand(HPKE_KEM_SUITE, eae_prk, b"shared_secret", enc + recipient_public, 32)
+
+
+def hpke_key_schedule(aead_id: int, shared_secret: bytes, info: bytes) -> SimpleNamespace:
+    """RFC 9180, 5.1 : KeyScheduleS en mode base (psk et psk_id vides)."""
+    suite = hpke_suite_id(aead_id)
+    context = bytes([0]) + labeled_extract(suite, b"", b"psk_id_hash", b"") + labeled_extract(suite, b"", b"info_hash", info)
+    secret = labeled_extract(suite, shared_secret, b"secret", b"")
+    key_length = 16 if aead_id == HPKE_AES_128_GCM else 32
+    return SimpleNamespace(
+        context=context,
+        secret=secret,
+        key=labeled_expand(suite, secret, b"key", context, key_length),
+        base_nonce=labeled_expand(suite, secret, b"base_nonce", context, 12),
+    )
+
+
+def hpke_seal(recipient_public: bytes, info: bytes, aad: bytes, plaintext: bytes, ikm_e: bytes,
+              aead_id: int = HPKE_AES_256_GCM) -> SimpleNamespace:
+    """SealBase : la clé éphémère dérive de ikm_e (DeriveKeyPair), pour des vecteurs stables."""
+    private_e, enc = hpke_derive_key_pair(ikm_e)
+    shared = hpke_shared_secret(x25519_dh(private_e, recipient_public), enc, recipient_public)
+    schedule = hpke_key_schedule(aead_id, shared, info)
+    ciphertext = crypto_lib().AESGCM(schedule.key).encrypt(schedule.base_nonce, plaintext, aad)
+    return SimpleNamespace(enc=enc, ciphertext=ciphertext, shared=shared, schedule=schedule)
+
+
+def hpke_open(recipient_private: bytes, enc: bytes, info: bytes, aad: bytes, ciphertext: bytes,
+              aead_id: int = HPKE_AES_256_GCM) -> bytes:
+    shared = hpke_shared_secret(x25519_dh(recipient_private, enc), enc, x25519_public(recipient_private))
+    schedule = hpke_key_schedule(aead_id, shared, info)
+    return crypto_lib().AESGCM(schedule.key).decrypt(schedule.base_nonce, ciphertext, aad)
+
+
+def check_hpke() -> None:
+    """L'HPKE composé ici reproduit la RFC 9180 (A.1.1), puis s'entend avec cryptography.hpke (AAD vide)."""
+    v = {name: bytes.fromhex(value) for name, value in RFC9180_A11.items()}
+    if hpke_derive_key_pair(v["ikmE"]) != (v["skEm"], v["pkEm"]) or hpke_derive_key_pair(v["ikmR"]) != (
+        v["skRm"], v["pkRm"]
+    ):
+        raise SystemExit("gen_vectors.py : DeriveKeyPair ne reproduit pas la RFC 9180, A.1.1")
+    sealed = hpke_seal(v["pkRm"], v["info"], v["aad"], v["pt"], v["ikmE"], HPKE_AES_128_GCM)
+    reproduced = (
+        sealed.enc == v["pkEm"]
+        and sealed.shared == v["shared_secret"]
+        and sealed.schedule.context == v["key_schedule_context"]
+        and sealed.schedule.secret == v["secret"]
+        and sealed.schedule.key == v["key"]
+        and sealed.schedule.base_nonce == v["base_nonce"]
+        and sealed.ciphertext == v["ct"]
+        and hpke_open(v["skRm"], sealed.enc, v["info"], v["aad"], sealed.ciphertext, HPKE_AES_128_GCM) == v["pt"]
+    )
+    if not reproduced:
+        raise SystemExit("gen_vectors.py : l'HPKE composé ne reproduit pas la RFC 9180, A.1.1")
+    try:
+        from cryptography.hazmat.primitives import hpke
+    except ImportError as error:
+        raise SystemExit(
+            "gen_vectors.py : cryptography.hpke manque (cryptography 50.0.2) ; lancez "
+            "python3 -m pip install --require-hashes -r tools/requirements.txt"
+        ) from error
+    x25519 = crypto_lib().x25519
+    suite = hpke.Suite(hpke.KEM.X25519, hpke.KDF.HKDF_SHA256, hpke.AEAD.AES_256_GCM)
+    recipient = x25519.X25519PrivateKey.from_private_bytes(v["skRm"])
+    theirs = suite.encrypt(v["pt"], recipient.public_key(), info=v["info"])
+    ours = hpke_seal(v["pkRm"], v["info"], b"", v["pt"], v["ikmE"])
+    if (
+        hpke_open(v["skRm"], theirs[:32], v["info"], b"", theirs[32:]) != v["pt"]
+        or suite.decrypt(ours.enc + ours.ciphertext, recipient, info=v["info"]) != v["pt"]
+    ):
+        raise SystemExit("gen_vectors.py : l'HPKE composé ne s'entend pas avec cryptography.hpke")
+
+
+MESSAGE_SUITE = SUITE
+U64_FIELDS = ("sentAt", "senderSeq", "groupSeq")
+MESSAGE_VERSION = 1
+MESSAGE_CONVERSATION_ID = "0192f7a1-ffff-7000-8000-00000000c0c0"
+OTHER_CONVERSATION_ID = "0192f7a1-ffff-7000-8000-00000000c0c1"
+SENT_AT = NOT_BEFORE + 60_000
+MESSAGE_SALT = bytes(range(0x50, 0x60))
+MESSAGE_CEK = bytes(range(0x60, 0x80))
+MESSAGE_NONCE = bytes(range(0x80, 0x8C))
+MESSAGE_BODY = "Rendez-vous à l’UQAC demain, 9 h 30 \U0001F9AD"
+SENDER_SERIAL = bytes(range(0x10, 0x20))  # numéro de série du certificat de identity.json
+BOB_EK_ID = bytes(range(0xC0, 0xD0))
+BOB_EK_PRIVATE = NEXT_EK_PRIVATE  # clé privée de Bob, RFC 7748, section 6.1
+
+
+def uuid_v7(millis: int, random: bytes) -> str:
+    """UUIDv7 (RFC 9562) : 48 bits de millisecondes, version 7, variante 10, 74 bits pris dans `random`."""
+    value = bytearray(millis.to_bytes(6, "big") + random[:10])
+    value[6] = 0x70 | (value[6] & 0x0F)
+    value[8] = 0x80 | (value[8] & 0x3F)
+    hexa = value.hex()
+    return f"{hexa[0:8]}-{hexa[8:12]}-{hexa[12:16]}-{hexa[16:20]}-{hexa[20:32]}"
+
+
+MESSAGE_ID_V7 = uuid_v7(SENT_AT, bytes(range(0xD0, 0xDA)))
+
+
+def ikm_for(label: str) -> bytes:
+    """Matériau de la clé éphémère d'une encapsulation : fixe, propre à chaque encapsulation des vecteurs."""
+    return sha256(("SEAL vecteurs, clé éphémère : " + label).encode("utf-8"))
+
+
+def message_header(conversation_id: str = MESSAGE_CONVERSATION_ID) -> dict:
+    return {
+        "v": MESSAGE_VERSION,
+        "suite": MESSAGE_SUITE,
+        "messageId": MESSAGE_ID_V7,
+        "conversationId": conversation_id,
+        "senderId": USER_ID,
+        "senderCertSerial": SENDER_SERIAL,
+    }
+
+
+def signed_payload_fields(**changes) -> dict:
+    fields = dict(
+        message_header(),
+        conversationType=1,
+        sentAt=SENT_AT,
+        senderSeq=1,
+        groupSeq=0,
+        salt=MESSAGE_SALT,
+        recipientIds=sorted([USER_ID, VICTIM_ID], key=uuid),
+        contentType="text/plain",
+        body=MESSAGE_BODY,
+    )
+    fields.update(changes)
+    return fields
+
+
+def signed_payload_struct(f: dict) -> dict:
+    return STRUCT(
+        "SEAL-msg-v1",
+        U8(f["v"]),
+        TEXT(f["suite"]),
+        UUID(f["messageId"]),
+        UUID(f["conversationId"]),
+        U8(f["conversationType"]),
+        UUID(f["senderId"]),
+        BYTES(f["senderCertSerial"]),
+        U64(f["sentAt"]),
+        U64(f["senderSeq"]),
+        U64(f["groupSeq"]),
+        BYTES(f["salt"]),
+        LIST(*[UUID(recipient) for recipient in f["recipientIds"]]),
+        TEXT(f["contentType"]),
+        TEXT(f["body"]),
+    )
+
+
+def message_aad(h: dict) -> bytes:
+    return encode(
+        STRUCT(
+            "SEAL-aad-v1",
+            U8(h["v"]),
+            TEXT(h["suite"]),
+            UUID(h["messageId"]),
+            UUID(h["conversationId"]),
+            UUID(h["senderId"]),
+            BYTES(h["senderCertSerial"]),
+        )
+    )
+
+
+def wrap_info(h: dict, recipient_id: str, ek_id: bytes) -> bytes:
+    return encode(
+        STRUCT(
+            "SEAL-wrap-v1",
+            TEXT(h["suite"]),
+            UUID(h["messageId"]),
+            UUID(h["conversationId"]),
+            UUID(recipient_id),
+            BYTES(ek_id),
+        )
+    )
+
+
+# Destinataires des vecteurs : l'émetteur (EK d'Alice, sous-clé du coffre de vault.json) et Bob (EK de Bob).
+MESSAGE_RECIPIENTS = {
+    USER_ID: (VAULT_EK_ID, EK_PRIVATE),
+    VICTIM_ID: (BOB_EK_ID, BOB_EK_PRIVATE),
+}
+
+
+def seal_message(header: dict, signed_payload: bytes, signature: bytes, recipients: list[str], label: str,
+                 padding: bytes = b"", cek: bytes = MESSAGE_CEK, nonce: bytes = MESSAGE_NONCE) -> dict:
+    """CDC 7.5, étapes 5 à 7 : Plaintext chiffré par la CEK sous l'AAD, CEK encapsulée pour chaque destinataire."""
+    plaintext = raw_bytes(signed_payload) + raw_bytes(signature) + raw_bytes(padding)
+    aad = message_aad(header)
+    ciphertext = crypto_lib().AESGCM(cek).encrypt(nonce, plaintext, aad)
+    wraps = []
+    for recipient_id in sorted(recipients, key=uuid):
+        ek_id, ek_private = MESSAGE_RECIPIENTS[recipient_id]
+        info = wrap_info(header, recipient_id, ek_id)
+        ikm = ikm_for(f"{label}, {recipient_id}")
+        sealed = hpke_seal(x25519_public(ek_private), info, aad, cek, ikm)
+        if hpke_open(ek_private, sealed.enc, info, aad, sealed.ciphertext) != cek:
+            raise SystemExit("gen_vectors.py : une encapsulation des vecteurs ne s'ouvre pas")
+        wraps.append(
+            {
+                "recipientId": recipient_id,
+                "ekId": b64url(ek_id),
+                "enc": b64url(sealed.enc),
+                "wrappedCek": b64url(sealed.ciphertext),
+                "ikmE": b64url(ikm),
+                "info": b64url(info),
+            }
+        )
+    envelope = {
+        "v": header["v"],
+        "suite": header["suite"],
+        "messageId": header["messageId"],
+        "conversationId": header["conversationId"],
+        "senderId": header["senderId"],
+        "senderCertSerial": b64url(header["senderCertSerial"]),
+        "nonce": b64url(nonce),
+        "ciphertext": b64url(ciphertext),
+        "wraps": [{key: wrap[key] for key in ("recipientId", "ekId", "enc", "wrappedCek")} for wrap in wraps],
+    }
+    return {"plaintext": plaintext, "aad": aad, "ciphertext": ciphertext, "wraps": wraps, "envelope": envelope}
+
+
+def flip(text_b64: str, index: int) -> str:
+    value = bytearray(from_b64url(text_b64))
+    value[index] ^= 0x01
+    return b64url(bytes(value))
+
+
+def message_forgery(name: str, envelope: dict, rejected_by: str) -> dict:
+    return {"name": name, "reader": VICTIM_ID, "envelope": envelope, "rejectedBy": rejected_by}
+
+
+def build_envelope() -> str:
+    check_hpke()
+    fields = signed_payload_fields()
+    signed_payload = encode(signed_payload_struct(fields))
+    signature = sign(IK_SEED, signed_payload)
+    header = message_header()
+    sealed = seal_message(header, signed_payload, signature, fields["recipientIds"], "message")
+    envelope = sealed["envelope"]
+    bob_wrap = next(index for index, wrap in enumerate(envelope["wraps"]) if wrap["recipientId"] == VICTIM_ID)
+
+    def with_wrap(**changes) -> dict:
+        wraps = [dict(wrap) for wrap in envelope["wraps"]]
+        wraps[bob_wrap].update(changes)
+        return dict(envelope, wraps=wraps)
+
+    unsorted = signed_payload_fields(recipientIds=list(reversed(fields["recipientIds"])))
+    unsorted_payload = encode(signed_payload_struct(unsorted))
+    other_header = message_header(OTHER_CONVERSATION_ID)
+    forgeries = [
+        message_forgery("un octet du chiffré inversé", dict(envelope, ciphertext=flip(envelope["ciphertext"], 40)),
+                        "integrity_failed"),
+        message_forgery("un octet du nonce inversé", dict(envelope, nonce=flip(envelope["nonce"], 0)), "integrity_failed"),
+        message_forgery("un octet de enc inversé", with_wrap(enc=flip(envelope["wraps"][bob_wrap]["enc"], 5)),
+                        "undecryptable"),
+        message_forgery(
+            "un octet de la CEK encapsulée inversé",
+            with_wrap(wrappedCek=flip(envelope["wraps"][bob_wrap]["wrappedCek"], 47)),
+            "undecryptable",
+        ),
+        message_forgery("l'en-tête déplacé dans une autre conversation par le serveur",
+                        dict(envelope, conversationId=OTHER_CONVERSATION_ID), "undecryptable"),
+        message_forgery(
+            "le message signé rechiffré par Bob dans une autre conversation (transfert subreptice)",
+            seal_message(other_header, signed_payload, signature, [VICTIM_ID], "transfert", cek=bytes(range(0xE0, 0x100)))[
+                "envelope"
+            ],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "le message signé par une autre clé d'identité que celle du certificat",
+            seal_message(header, signed_payload, sign(OTHER_SEED, signed_payload), [VICTIM_ID], "autre IK")["envelope"],
+            "signature_invalid",
+        ),
+        message_forgery(
+            "un octet de la signature inversé, puis rechiffré",
+            seal_message(header, signed_payload, from_b64url(flip(b64url(signature), 10)), [VICTIM_ID], "signature")[
+                "envelope"
+            ],
+            "signature_invalid",
+        ),
+        message_forgery(
+            "une liste de destinataires non triée, pourtant signée",
+            seal_message(header, unsorted_payload, sign(IK_SEED, unsorted_payload), [VICTIM_ID], "non triée")["envelope"],
+            "integrity_failed",
+        ),
+    ]
+    padded = seal_message(header, signed_payload, signature, [VICTIM_ID], "padding", padding=bytes(7))["envelope"]
+    document = {
+        "format": "seal-envelope-v1",
+        "subject": "Enveloppe d'un message : PROTOCOL.md, section 6 (CDC 7 ; KEY-20, QA-02 à QA-04, ADR 0030)",
+        "generator": "src/protocol/tools/gen_vectors.py",
+        "suite": MESSAGE_SUITE,
+        "sender": {
+            "userId": USER_ID,
+            "ikPublic": b64url(public_key(IK_SEED)),
+            "certificate": dict(
+                {key: (b64url(value) if isinstance(value, bytes) else value) for key, value in certificate_fields().items()},
+                signature=b64url(sign(CA_SEED, encode(certificate_struct(certificate_fields())))),
+            ),
+        },
+        "recipients": [
+            {
+                "userId": recipient_id,
+                "ekId": b64url(MESSAGE_RECIPIENTS[recipient_id][0]),
+                "ekPrivate": b64url(MESSAGE_RECIPIENTS[recipient_id][1]),
+                "ekPublic": b64url(x25519_public(MESSAGE_RECIPIENTS[recipient_id][1])),
+            }
+            for recipient_id in fields["recipientIds"]
+        ],
+        "message": {
+            # u64 en chaîne décimale, comme dans canonical-encoding.json (ADR 0006, point 5 ; PROTOCOL.md, 2.5).
+            "fields": {
+                key: b64url(value) if isinstance(value, bytes) else str(value) if key in U64_FIELDS else value
+                for key, value in fields.items()
+            },
+            "signedPayload": b64url(signed_payload),
+            "signature": b64url(signature),
+            "cek": b64url(MESSAGE_CEK),
+            "nonce": b64url(MESSAGE_NONCE),
+            "plaintext": b64url(sealed["plaintext"]),
+            "aad": b64url(sealed["aad"]),
+            "ciphertext": b64url(sealed["ciphertext"]),
+            "wraps": sealed["wraps"],
+        },
+        "envelope": envelope,
+        "accepted": [{"name": "padding de 7 octets, ignoré (ADR 0030, point 7)", "reader": VICTIM_ID, "envelope": padded}],
+        "forgeries": forgeries,
+    }
+    return json.dumps(document, ensure_ascii=True, indent=2) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Vecteurs de référence de SEAL (PROTOCOL.md).")
     parser.add_argument("--check", action="store_true", help="échoue si un fichier n'est pas à jour")
@@ -1043,6 +1458,7 @@ def main() -> int:
         (VAULT_OUTPUT, build_vault(), "clé de récupération, coffre et falsifications"),
         (HKDF_OUTPUT, build_hkdf(), f"{len(HKDF_TESTS)} cas"),
         (X25519_OUTPUT, build_x25519(), "Alice, Bob et leur secret partagé"),
+        (ENVELOPE_OUTPUT, build_envelope(), "message, encapsulations et falsifications"),
     ]
     if check:
         stale = [path for path, content, _ in outputs if not path.exists() or path.read_text(encoding="ascii") != content]
