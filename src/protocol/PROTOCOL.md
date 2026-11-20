@@ -486,5 +486,6 @@ primitives, se vérifie contre le vecteur A.1.1 de la RFC 9180, puis contre `cry
 les deux sens (ADR 0030, point 2). `accepted` donne une enveloppe à padding non vide, qui s'ouvre ; `forgeries` donne
 des enveloppes que Bob NE DOIT PAS accepter, chacune avec le statut attendu (`rejectedBy`) : octet du chiffré, du
 nonce, de `enc` ou de `wrappedCek` ; en-tête déplacé dans une autre conversation ; message signé rechiffré par Bob
-dans une autre conversation (transfert subreptice) ; signature d'une autre IK ; signature altérée ; destinataires
-non triés, pourtant signés.
+dans une autre conversation (transfert subreptice), sous un autre `messageId`, sous un autre émetteur annoncé ou sous
+un autre numéro de certificat ; signature d'une autre IK ; signature altérée ; Bob absent des
+destinataires signés ; destinataires non triés, pourtant signés.

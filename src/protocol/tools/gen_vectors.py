@@ -1362,6 +1362,7 @@ def build_envelope() -> str:
 
     unsorted = signed_payload_fields(recipientIds=list(reversed(fields["recipientIds"])))
     unsorted_payload = encode(signed_payload_struct(unsorted))
+    absent_payload = encode(signed_payload_struct(signed_payload_fields(recipientIds=[USER_ID])))
     other_header = message_header(OTHER_CONVERSATION_ID)
     forgeries = [
         message_forgery("un octet du chiffré inversé", dict(envelope, ciphertext=flip(envelope["ciphertext"], 40)),
@@ -1384,6 +1385,25 @@ def build_envelope() -> str:
             "integrity_failed",
         ),
         message_forgery(
+            "le message signé rechiffré par Bob sous un autre messageId",
+            seal_message(dict(header, messageId=uuid_v7(SENT_AT, bytes(range(0xF0, 0xFA)))), signed_payload, signature,
+                         [VICTIM_ID], "autre messageId")["envelope"],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "le message signé rechiffré par Bob, qui s'en annonce l'émetteur",
+            seal_message(dict(header, senderId=VICTIM_ID), signed_payload, signature, [VICTIM_ID], "autre émetteur")[
+                "envelope"
+            ],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "le message signé rechiffré sous un autre numéro de certificat",
+            seal_message(dict(header, senderCertSerial=bytes(range(0x30, 0x40))), signed_payload, signature, [VICTIM_ID],
+                         "autre certificat")["envelope"],
+            "integrity_failed",
+        ),
+        message_forgery(
             "le message signé par une autre clé d'identité que celle du certificat",
             seal_message(header, signed_payload, sign(OTHER_SEED, signed_payload), [VICTIM_ID], "autre IK")["envelope"],
             "signature_invalid",
@@ -1394,6 +1414,11 @@ def build_envelope() -> str:
                 "envelope"
             ],
             "signature_invalid",
+        ),
+        message_forgery(
+            "Bob absent des destinataires signés, mais destinataire d'une encapsulation",
+            seal_message(header, absent_payload, sign(IK_SEED, absent_payload), [VICTIM_ID], "absent")["envelope"],
+            "recipients_mismatch",
         ),
         message_forgery(
             "une liste de destinataires non triée, pourtant signée",

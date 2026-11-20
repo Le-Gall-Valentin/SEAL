@@ -14,6 +14,7 @@ import {
   type EnvelopeWire,
   MESSAGE_SUITE,
   type MessageDraft,
+  MessageFormatError,
   MessageTooLongError,
   sealMessage,
   sealMessageWith,
@@ -173,12 +174,27 @@ export function describeMessageSeal(envelope: Json, vault: Json, engine: string)
         ['destinataire en double', [own, bobs, bobs]],
         ['émetteur absent', [bobs]],
         ['51 destinataires', [own, ...many]],
+        ['ekId de 15 octets', [own, { ...bobs, ekId: bobs.ekId.slice(0, 15) }]],
       ] as const) {
         await expect(
           sealMessage(keyring, { ...draft, recipients: list }),
           name,
         ).rejects.toBeInstanceOf(TypeError)
       }
+    })
+
+    it('RFC 9562 : un sentAt hors des 48 bits d’un UUIDv7, ou un aléa de 9 octets, ne scellent rien', async () => {
+      const keyring = await senderKeyring()
+
+      await expect(sealMessage(keyring, { ...draft, sentAt: 2 ** 48 })).rejects.toBeInstanceOf(
+        MessageFormatError,
+      )
+      await expect(
+        sealMessageWith(keyring, draft, {
+          ...vectorRandomness(),
+          messageIdRandom: new Uint8Array(9),
+        }),
+      ).rejects.toBeInstanceOf(RangeError)
     })
   })
 }

@@ -45,8 +45,13 @@ export {
 } from './certificate'
 export {
   type EnvelopeWire,
+  type IncomingContext,
   type MessageDraft,
+  type MessageRejection,
   MessageTooLongError,
+  type OpenedMessage,
+  openMessage,
+  type ReceivedMessage,
   sealMessage,
   type WrapWire,
 } from './message'

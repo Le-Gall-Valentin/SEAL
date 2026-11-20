@@ -99,4 +99,14 @@ describe('MSG-01 : relecture de l’encodage canonique (PROTOCOL.md, section 2),
       reader.list(() => reader.u8())
     }).toThrow(CanonicalEncodingError)
   })
+
+  it('CDC 7.3 : une suite de champs sans étiquette, comme Plaintext, se relit avec unlabelled', () => {
+    const reader = CanonicalReader.unlabelled(
+      concat(bytes(Uint8Array.of(7)), bytes(new Uint8Array())),
+    )
+
+    expect(reader.bytes()).toEqual(Uint8Array.of(7))
+    expect(reader.bytes()).toEqual(new Uint8Array())
+    reader.end()
+  })
 })

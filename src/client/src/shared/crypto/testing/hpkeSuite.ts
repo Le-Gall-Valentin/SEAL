@@ -2,6 +2,7 @@
  * KEY-22, CDC 7.1 : encapsulation de la CEK par HPKE (mode base, DHKEM X25519 HKDF-SHA256, HKDF-SHA256,
  * AES-256-GCM), commune aux tests sous Node et dans Chromium. Réservé aux tests.
  */
+import { Aes256Gcm, CipherSuite, DhkemX25519HkdfSha256, HkdfSha256 } from '@hpke/core'
 import { describe, expect, it } from 'vitest'
 import { HpkeOpenError, openCek, sealCek } from '../hpke'
 import { generateKeyring, type Keyring, keyringSecrets } from '../keyring'
@@ -86,6 +87,31 @@ export function describeHpke(engine: string): void {
       await expect(sealCek(key.publicKey, INFO, AAD, new Uint8Array(31))).rejects.toBeInstanceOf(
         RangeError,
       )
+    })
+
+    it('CDC 7.1 : une CEK encapsulée d’une autre taille que 32 octets n’est pas ouverte', async () => {
+      const { key } = await recipient()
+      const suite = new CipherSuite({
+        kem: new DhkemX25519HkdfSha256(),
+        kdf: new HkdfSha256(),
+        aead: new Aes256Gcm(),
+      })
+      const { enc, ct } = await suite.seal(
+        {
+          recipientPublicKey: await suite.kem.importKey(
+            'raw',
+            Uint8Array.from(key.publicKey).buffer,
+            true,
+          ),
+          info: INFO,
+        },
+        new Uint8Array(16),
+        AAD,
+      )
+
+      await expect(
+        openCek(key, new Uint8Array(enc), new Uint8Array(ct), INFO, AAD),
+      ).rejects.toBeInstanceOf(HpkeOpenError)
     })
   })
 }

@@ -168,6 +168,7 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
       ['liée à un autre certificat', await served(ring, 0, otherSerial)],
       ['autre clé publique', { ...older, ekPublic: newer.ekPublic }],
       ['autre KEM', { ...older, kem: 'X-WING' }],
+      ['ekId non canonique', { ...older, ekId: `${older.ekId}=` }],
       ['ekId de 15 octets', { ...older, ekId: older.ekId.slice(0, 20) }],
     ] as const) {
       expect(
@@ -231,5 +232,23 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
         ),
       ),
     ).toBe('certificate')
+  })
+
+  it('A10 : une panne du trousseau de l’appareil remonte telle quelle, sans passer pour une clé indisponible', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+    const broken: KeyStore = {
+      ...store,
+      loadAuthority: () => Promise.reject(new Error('IndexedDB indisponible')),
+    }
+
+    await expect(
+      chooseSubkey(
+        broken,
+        await servedKeys([await served(ring, 1)]),
+        RECIPIENT,
+        NOT_BEFORE + DAY_MS,
+      ),
+    ).rejects.toThrow('IndexedDB indisponible')
   })
 })

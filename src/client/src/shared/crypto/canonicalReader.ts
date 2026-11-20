@@ -20,6 +20,11 @@ export class CanonicalReader {
     this.#view = new DataView(this.#bytes.buffer)
   }
 
+  /** Une suite de champs sans étiquette, comme `Plaintext` d'un message (CDC 7.3). */
+  static unlabelled(encoded: Uint8Array): CanonicalReader {
+    return new CanonicalReader(encoded)
+  }
+
   /** Ouvre la structure `struct(label, …)` et vérifie son étiquette. */
   static of(encoded: Uint8Array, label: string): CanonicalReader {
     const reader = new CanonicalReader(encoded)
