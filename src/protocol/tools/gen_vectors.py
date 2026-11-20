@@ -1208,13 +1208,23 @@ BOB_EK_PRIVATE, _ = hpke_derive_key_pair(sha256(b"SEAL vecteurs, EK de Bob"))
 RECEIVED_AT = SENT_AT + 1_500  # serverReceivedAt du message (CDC 7.7, étape 6)
 
 
-def uuid_v7(millis: int, random: bytes) -> str:
-    """UUIDv7 (RFC 9562) : 48 bits de millisecondes, version 7, variante 10, 74 bits pris dans `random`."""
-    value = bytearray(millis.to_bytes(6, "big") + random[:10])
-    value[6] = 0x70 | (value[6] & 0x0F)
-    value[8] = 0x80 | (value[8] & 0x3F)
+def uuid_text(value: bytes) -> str:
+    """Forme 8-4-4-4-12 en minuscules de 16 octets : la réciproque de uuid()."""
     hexa = value.hex()
     return f"{hexa[0:8]}-{hexa[8:12]}-{hexa[12:16]}-{hexa[16:20]}-{hexa[20:32]}"
+
+
+def with_uuid_bits(value: str, version: int, variant: int) -> str:
+    """L'UUID `value`, sa version (4 bits) et sa variante (2 bits) remplacées, le reste intact."""
+    data = bytearray(uuid(value))
+    data[6] = (version << 4) | (data[6] & 0x0F)
+    data[8] = (variant << 6) | (data[8] & 0x3F)
+    return uuid_text(bytes(data))
+
+
+def uuid_v7(millis: int, random: bytes) -> str:
+    """UUIDv7 (RFC 9562) : 48 bits de millisecondes, version 7, variante 10, 74 bits pris dans `random`."""
+    return with_uuid_bits(uuid_text(millis.to_bytes(6, "big") + random[:10]), 7, 0b10)
 
 
 MESSAGE_ID_V7 = uuid_v7(SENT_AT, bytes(range(0xD0, 0xDA)))
@@ -1406,8 +1416,7 @@ class Reader:
         return value
 
     def uuid(self) -> str:
-        hexa = self.take(16).hex()
-        return f"{hexa[0:8]}-{hexa[8:12]}-{hexa[12:16]}-{hexa[16:20]}-{hexa[20:32]}"
+        return uuid_text(self.take(16))
 
     def list(self, element) -> list:
         count = self.u32()
@@ -1701,6 +1710,14 @@ def build_envelope() -> str:
         message_forgery("un champ inconnu dans l'encapsulation de Bob", with_wrap(extra=""), "integrity_failed"),
         message_forgery("le messageId en majuscules", dict(envelope, messageId=envelope["messageId"].upper()),
                         "integrity_failed"),
+        message_forgery(
+            "51 encapsulations pour 51 destinataires distincts (MSG-21)",
+            dict(envelope, wraps=envelope["wraps"] + [
+                dict(envelope["wraps"][1 - bob_wrap], recipientId=f"0192f7a1-ffff-7000-8000-{index:012x}")
+                for index in range(49)
+            ]),
+            "integrity_failed",
+        ),
         message_forgery("deux encapsulations pour Bob (MSG-21)",
                         dict(envelope, wraps=envelope["wraps"] + [envelope["wraps"][bob_wrap]]), "integrity_failed"),
         message_forgery("un chiffré de 24 577 octets, pourtant signé (MSG-21)",
@@ -1710,6 +1727,10 @@ def build_envelope() -> str:
         message_forgery("un messageId UUIDv7 daté d'une autre milliseconde que sentAt, pourtant signé",
                         signed_variant("autre instant", messageId=uuid_v7(SENT_AT - 1, bytes(range(0xD0, 0xDA)))),
                         "integrity_failed"),
+        message_forgery("un messageId de version 8, daté de sentAt, pourtant signé",
+                        signed_variant("version 8", messageId=with_uuid_bits(MESSAGE_ID_V7, 8, 0b10)), "integrity_failed"),
+        message_forgery("un messageId de variante 11, daté de sentAt, pourtant signé",
+                        signed_variant("variante 11", messageId=with_uuid_bits(MESSAGE_ID_V7, 7, 0b11)), "integrity_failed"),
         message_forgery("un senderSeq nul, pourtant signé", signed_variant("senderSeq nul", senderSeq=0),
                         "integrity_failed"),
         message_forgery("un groupSeq non nul en conversation directe, pourtant signé",
@@ -1722,6 +1743,12 @@ def build_envelope() -> str:
             "un Plaintext sans son champ de padding, pourtant chiffré",
             seal_message(header, signed_payload, signature, [VICTIM_ID], "sans padding",
                          plaintext=raw_bytes(signed_payload) + raw_bytes(signature))["envelope"],
+            "integrity_failed",
+        ),
+        message_forgery(
+            "un octet après le champ de padding, pourtant chiffré",
+            seal_message(header, signed_payload, signature, [VICTIM_ID], "octet après le padding",
+                         plaintext=raw_bytes(signed_payload) + raw_bytes(signature) + raw_bytes(b"") + b"\x00")["envelope"],
             "integrity_failed",
         ),
         message_forgery(

@@ -494,9 +494,10 @@ les deux sens (ADR 0030, point 2). Il ouvre ensuite chaque enveloppe selon 6.5 e
 statut diffère de celui qu'il annonce. `accepted` donne des enveloppes qui s'ouvrent : padding de 7 octets, chiffré de
 24 576 octets exactement. `forgeries` donne des enveloppes que Bob NE DOIT PAS accepter, chacune avec le statut
 attendu (`rejectedBy`) : champ inconnu dans l'enveloppe ou dans une encapsulation ; `messageId` en majuscules ; deux
-encapsulations pour Bob ; chiffré de 24 577 octets, pourtant signé ; `messageId` UUIDv4, ou UUIDv7 d'une autre
-milliseconde que `sentAt` ; `senderSeq` nul ; `groupSeq` non nul en direct ; émetteur absent des destinataires ;
-51 destinataires ; `Plaintext` sans son champ de padding ; octet du chiffré, du
+encapsulations pour Bob ; 51 encapsulations pour 51 destinataires distincts ; chiffré de 24 577 octets, pourtant
+signé ; `messageId` UUIDv4, de version 8 ou de variante 11 datés de `sentAt`, ou UUIDv7 d'une autre milliseconde ;
+`senderSeq` nul ; `groupSeq` non nul en direct ; émetteur absent des destinataires ; 51 destinataires ; `Plaintext`
+sans son champ de padding, ou avec un octet après lui ; octet du chiffré, du
 nonce, de `enc` ou de `wrappedCek` ; en-tête déplacé dans une autre conversation ; message signé rechiffré par Bob
 dans une autre conversation (transfert subreptice), sous un autre `messageId`, sous un autre émetteur annoncé ou sous
 un autre numéro de certificat ; signature d'une autre IK ; signature altérée ; Bob absent des

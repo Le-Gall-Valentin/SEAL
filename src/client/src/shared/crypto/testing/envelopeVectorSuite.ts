@@ -3,7 +3,7 @@
  * Chromium. Réservé aux tests.
  */
 import { describe, expect, it } from 'vitest'
-import { bytes, concat, list, struct, text, u64, u8, uuid } from '../canonical'
+import { bytes, concat, list, struct, text, u64, u8, uuid, uuidText } from '../canonical'
 import { openCek, sealCek } from '../hpke'
 import {
   decodeSignedPayload,
@@ -21,12 +21,21 @@ import { base64url, decimal, type Json, number, record, records, string } from '
 /** Un UUID de version 4 : jamais un messageId (PROTOCOL.md 6.2). */
 const UUID_V4 = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b'
 
-/** Le même UUIDv7, daté d'une milliseconde plus tôt. */
+/** Le même UUID, daté d'une milliseconde plus tôt. */
 function otherInstant(messageId: string): string {
-  const hex = messageId.replaceAll('-', '')
-  const earlier = (Number.parseInt(hex.slice(0, 12), 16) - 1).toString(16).padStart(12, '0')
-  const value = `${earlier}${hex.slice(12)}`
-  return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`
+  const value = uuid(messageId)
+  const view = new DataView(value.buffer)
+  view.setBigUint64(0, view.getBigUint64(0) - (1n << 16n))
+  return uuidText(value)
+}
+
+/** Le même UUID, horodatage compris, sa version (4 bits) et sa variante (2 bits) remplacées. */
+function withBits(messageId: string, version: number, variant: number): string {
+  const value = uuid(messageId)
+  const view = new DataView(value.buffer)
+  view.setUint8(6, (version << 4) | (view.getUint8(6) & 0x0f))
+  view.setUint8(8, (variant << 6) | (view.getUint8(8) & 0x3f))
+  return uuidText(value)
 }
 
 /** RFC 8410 : en-tête PKCS#8 d'une clé privée X25519 brute de 32 octets. */
@@ -208,6 +217,14 @@ export function describeEnvelopeVectors(vectors: Json, engine: string): void {
           'UUIDv7 daté d’un autre instant',
           payload({ messageId: uuid(otherInstant(fields.messageId)) }),
         ],
+        [
+          'version 8, datée de sentAt',
+          payload({ messageId: uuid(withBits(fields.messageId, 8, 0b10)) }),
+        ],
+        [
+          'variante 11, datée de sentAt',
+          payload({ messageId: uuid(withBits(fields.messageId, 7, 0b11)) }),
+        ],
         ['senderSeq nul', payload({ senderSeq: u64(0) })],
         ['groupSeq non nul en direct', payload({ groupSeq: u64(1) })],
         ['émetteur absent', payload({ recipientIds: list(uuid, [bobId]) })],
@@ -232,6 +249,10 @@ export function describeEnvelopeVectors(vectors: Json, engine: string): void {
         ['sel de 15 octets', { ...fields, salt: new Uint8Array(15) }],
         ['corps de 4 001 points de code', { ...fields, body: 'a'.repeat(4001) }],
         ['UUIDv4', { ...fields, messageId: UUID_V4 }],
+        [
+          'version 8, datée de sentAt',
+          { ...fields, messageId: withBits(fields.messageId, 8, 0b10) },
+        ],
         ['senderSeq nul', { ...fields, senderSeq: 0 }],
         ['groupSeq non nul en direct', { ...fields, groupSeq: 1 }],
         ['sentAt fractionnaire', { ...fields, sentAt: fields.sentAt + 0.5 }],

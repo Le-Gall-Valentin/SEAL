@@ -558,6 +558,329 @@
       "rejectedBy": "integrity_failed"
     },
     {
+      "name": "51 encapsulations pour 51 destinataires distincts (MSG-21)",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "gIGCg4SFhoeIiYqL",
+        "ciphertext": "Ij_cG3-DVOrDKcSv36IoqUNg2w9vj2P1pbxXZn5v_0ax3jJE9_Jg3GgUTnjukALl4UdqM9tWEujtF7s805WfWVtJFEL47893ZeojlEtDXBDlFgr7L-C6iBrExHK64ym-nPLkzNtIR_jGhBnTBGRkMYmHseKy3W8yMWMHxT2w0qoSkJemHRGEM7V8Wg_NO6x56kYjAPrAA_mhEo1fPJIAiO6HR_D5AS1q7RVnLVtMGKnpOg9kr7sm_yPOmcj1405cTovvdoYdWc3aC8Q2qJAzssvVuFZAgsl25brhwSeYzEe0eWoYi9_NaV0Ao43OY8qpSq7JGOK2sKLrRkWiv1CiFfX4kSugBeyzw_v1G0J-Nc9CxmLfWC0yeMWdVNjvmB-XAAR8OwBeuKASLov3ZUcgGuwNw18nUhPvlF4Yz4jitqhZMlUmA99kpVAAPvo9_rXVI4RRvgnDX9eImmRzmME",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "C40PzzBWAjD5mVV-6rj7e_1HiEgc2cNO4NccnJf0e3Y",
+            "wrappedCek": "63rrmIE0z43kl4AWStyjsJY0OXlMazq2xzUQlBoSeIzxEdSvborKWO4Dvnm7zDhN"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000a11c",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000000",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000001",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000002",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000003",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000004",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000005",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000006",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000007",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000008",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000009",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000000a",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000000b",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000000c",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000000d",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000000e",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000000f",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000010",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000011",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000012",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000013",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000014",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000015",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000016",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000017",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000018",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000019",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000001a",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000001b",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000001c",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000001d",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000001e",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000001f",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000020",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000021",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000022",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000023",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000024",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000025",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000026",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000027",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000028",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000029",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000002a",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000002b",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000002c",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000002d",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000002e",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000002f",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000030",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
       "name": "deux encapsulations pour Bob (MSG-21)",
       "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
       "envelope": {
@@ -662,6 +985,52 @@
             "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
             "enc": "iOQdLJEmULHx4b2QayHN6S113bS4m59TaWutA1wX9HQ",
             "wrappedCek": "aeQgwemh_fciUthczfntN7PcqEYklU8n6K0ZQMFiNw1pJy_bH7rA-NgJgK7JJLk1"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
+      "name": "un messageId de version 8, dat\u00e9 de sentAt, pourtant sign\u00e9",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-80d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "NzoCqmgkRLNSmbsp",
+        "ciphertext": "hTRxOXMMKOt6veLf5Wasae8A1k0ehQ2l9l55QgGTc8QFMeiZmdCWhIX-8rxY-iFowBT33rfz2kXB2YrTYqkCucA0zN646ewjgwZ4a-bDqV2FC3DHMehHkrvILqtkpaOoTWJz2I-WP_gpumoFhZUqNtxW-OpV-QSElIVvO0yskhjX2Cik5fM0PjtIDS8VQ-Q1mZK9RoX1Qm3WIlay6Jxb5lTfLVq3-vIdZ1qHdrSENFiMZyq8Qn5i-2lDNWFsfaGZQssHX0pRYiUbGkSgWOABN1iFM9qQZ8cP6Yo7lguzm8vfwQydkNpnh4WCz1v-jPxdvLBwj7Hu1mechW_LYG9R4b2FJ9PMaWbugq0xXxx7J5cF6gXoZ2p2qFLt0yO3e8jU2UrBu71H6xCXofr31ccduHDWffzaQ31BeTAb_u5yzvL_pcAEEgA1AsjmL3adrH1HJafVXUCTkY6f_jr_Qfo",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "inGAJGCTG8ZmI32PO5ga4XAJHAx5sGsEL9E80uRHX3A",
+            "wrappedCek": "fWvnCWOkGghyVLNyFDGL33KmxR30lLkVgVOE2xiqng37CXejRAQOT9e7L9sySOCj"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
+      "name": "un messageId de variante 11, dat\u00e9 de sentAt, pourtant sign\u00e9",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-d2d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "bCHjY6fJjU-ogscp",
+        "ciphertext": "Hv0vsdTaBDmDaRPlXtyLjEYEehitACOU8CBiTfPujgZhjgUI0GJLceidS6WLGaJb5e7inHS08Mfahf9DVn8SDKwx4y5La-vIcw2XzA0gKbQ7dFtcvCdE94IpAaIUKgnX55WLx_X1FmfgYu6ddneva3it7WpWLuZ2bfcNixYMIH9Y_FX5v3qee5m94LT5oIbfZhi6xoNFgSTWlmvskJmJIR767YVcwku45qWb98kEoxQ1cFyYPKAmkbxlX7h56SeRk8Ku2aAxl57-JeabXzw-a1TdfygfQuJP5TleHWjawcP9zLU7d_bSlfVfi4XoOV7531fnedAIbh1SJfJdddk5xCiq8AoT-X31jSLB9CBdSPoQsp_C0nA3sLlO9CBoIc8X06uPrndAtDDui6KbU6ox9jmswpCLm1rqiC1ExnbYkf8Xcs_TP4UsX0w7sdFopMsKxBGIfI1O18AQ10qeEO8",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "bw3zJQb_SvorGfBRnir5niHlHDyD6zKfncfrIeKfh38",
+            "wrappedCek": "59IcZieX_CLi4iyMgg1ckvS7KTI4oeQ5yhfCqlb-hVNIUJFctXMclB5dsfmM5iwZ"
           }
         ]
       },
@@ -777,6 +1146,29 @@
             "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
             "enc": "v6uAVe48C9W_G6DeVO1t6HZFQmAZrD1q5AHtEfL8viw",
             "wrappedCek": "fITFHxPUhqmjR70Q9PIJMgkV2z5Wgf8kcpmtdF0dLTx9qRbSQ4rNW9sYjhUQs85e"
+          }
+        ]
+      },
+      "rejectedBy": "integrity_failed"
+    },
+    {
+      "name": "un octet apr\u00e8s le champ de padding, pourtant chiffr\u00e9",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "LoZWWVRSO2vVKTki",
+        "ciphertext": "f4ohXWBgN-cCTy7VgbnHlSrbZujtu0OInUttXTdlKEjNqZtWdQKaIg-WVWTNcyrtilK0Hjb9W4jdNTslHxtS-J6WRHE-5wV3FpzRZlYet-otHt7CU1y77T1lklwvJLsK0DqK2BlU37xPnHIWr4RmMq_01lO5ZctpB2Ay6dWpvBNNWxh7peL3mWl0z5M0tDzSnUZgKHyA4Nr1o64SHYxabqoNa-ZSvBWCfXlwKf5_D1N0kllRAEytGnkYivLccZ0XgqkmdjBc_O8n1WugKQmjYfHXcUzzoVU7WLMaWFppcMIwanrdfCdSe4KsR2WhwZnIz7uxbUYtDBwJLgD2t9lJ2z3GsLApWFoHZfEVJK4zFSUQlGlTgBEZeJM7UsCgkamTjrZiQEn_1uYhZCD73-Fe87A1teQugzOsBP_B27y6GJF4kiDRAVsg7eE1grBFZbT5iiKXPANt_gLFDYLc6LCt",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "fKd4jG2YIOWA6KjuVWVDQ2FHxZz6Bd1BCtiZ1oWwd2s",
+            "wrappedCek": "Ztkvf1VJ_IVVHQ6cErc9aG9RP-WbsdBwpN_-MxGIFhzmOL6s3nFslInTesM7gFH-"
           }
         ]
       },

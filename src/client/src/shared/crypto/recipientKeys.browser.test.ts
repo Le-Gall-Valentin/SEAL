@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { commands } from 'vitest/browser'
 import { fromBase64Url, toBase64Url } from './base64url'
 import type { ServedCertificate } from './certificate'
-import { type Keyring, openVault } from './keyring'
+import { createKeyring, type Keyring, keyringSecrets, openVault } from './keyring'
 import { type KeyStore, openKeyStore, pinAuthority } from './keystore'
 import { bindSubkey } from './publication'
 import {
@@ -193,12 +193,41 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
       ['autre KEM', { ...older, kem: 'X-WING' }],
       ['ekId non canonique', { ...older, ekId: `${older.ekId}=` }],
       ['ekId de 15 octets', { ...older, ekId: older.ekId.slice(0, 20) }],
-      ['validité de 46 jours', { ...older, expiresAt: older.createdAt + 46 * DAY_MS }],
-      ['validité de 44 jours', { ...older, expiresAt: older.createdAt + 44 * DAY_MS }],
     ] as const) {
       expect(
         await refusal(chooseSubkey(store, await servedKeys([forged, newer]), RECIPIENT, now)),
         name,
+      ).toBe('binding')
+    }
+  })
+
+  it('KEY-21 : une liaison bien signée, mais valable 44 ou 46 jours, est refusée', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+    const newer = await served(ring, 1)
+
+    for (const days of [44, 46]) {
+      // La signature couvre la validité modifiée : seul le contrôle des 45 jours peut la refuser.
+      const forged = createKeyring(
+        {
+          ...ring,
+          subkeys: ring.subkeys.map((subkey, index) =>
+            index === 0 ? { ...subkey, expiresAt: subkey.createdAt + days * DAY_MS } : subkey,
+          ),
+        },
+        keyringSecrets(ring),
+      )
+
+      expect(
+        await refusal(
+          chooseSubkey(
+            store,
+            await servedKeys([await served(forged, 0), newer]),
+            RECIPIENT,
+            NOT_BEFORE + 31 * DAY_MS,
+          ),
+        ),
+        `${String(days)} jours`,
       ).toBe('binding')
     }
   })

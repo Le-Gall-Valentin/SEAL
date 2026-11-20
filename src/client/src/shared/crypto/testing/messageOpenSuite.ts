@@ -354,6 +354,19 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
           },
         ],
         [
+          '51 encapsulations pour 51 destinataires distincts',
+          {
+            ...vectorEnvelope,
+            wraps: [
+              ...vectorEnvelope.wraps,
+              ...Array.from({ length: 49 }, (_, index) => ({
+                ...bobWrap,
+                recipientId: `0192f7a1-ffff-7000-8000-${index.toString(16).padStart(12, '0')}`,
+              })),
+            ],
+          },
+        ],
+        [
           'deux encapsulations pour Bob',
           { ...vectorEnvelope, wraps: [...vectorEnvelope.wraps, bobWrap] },
         ],
