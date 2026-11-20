@@ -2,6 +2,7 @@ package fr.vlegall.seal.identity.application.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.AccountLookupQuery.Contact;
 import fr.vlegall.seal.identity.domain.model.Account;
@@ -156,5 +157,29 @@ class AccountLookupHandlerTest {
         identity.add("valentin", "valentin@exemple.ca", AccountStatus.ACTIVE);
 
         assertThat(handler.findActiveByEmail(email)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AUTH-31 : l'état d'un compte lié se lit en une question ; supprimé ou inconnu, il ne sert pas")
+    void auth31LoginStateOfALinkedAccount() {
+        Account active = identity.add("actif", "a@exemple.ca", AccountStatus.ACTIVE);
+        Account pending = identity.add("attente", "b@exemple.ca", AccountStatus.PENDING_EMAIL);
+        Account deleted = identity.add("parti", "c@exemple.ca", AccountStatus.DELETED);
+
+        assertThat(handler.loginState(active.id())).isEqualTo(AccountLoginState.ACTIVE);
+        assertThat(handler.loginState(pending.id())).isEqualTo(AccountLoginState.PENDING_EMAIL);
+        assertThat(handler.loginState(deleted.id())).isEqualTo(AccountLoginState.UNUSABLE);
+        assertThat(handler.loginState(new UserId(java.util.UUID.randomUUID()))).isEqualTo(AccountLoginState.UNUSABLE);
+    }
+
+    @Test
+    @DisplayName("AUTH-33 : seul un compte actif possède son courriel ; une saisie qui n'en est pas un ne trouve rien")
+    void auth33OnlyAnActiveAccountOwnsItsEmail() {
+        identity.add("actif", "actif@exemple.ca", AccountStatus.ACTIVE);
+        identity.add("attente", "attente@exemple.ca", AccountStatus.PENDING_EMAIL);
+
+        assertThat(handler.activeAccountOwns("actif@exemple.ca")).isTrue();
+        assertThat(handler.activeAccountOwns("attente@exemple.ca")).isFalse();
+        assertThat(handler.activeAccountOwns("pas-un-courriel")).isFalse();
     }
 }

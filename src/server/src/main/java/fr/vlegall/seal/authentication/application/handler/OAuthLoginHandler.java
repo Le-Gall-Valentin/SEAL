@@ -4,10 +4,10 @@ import fr.vlegall.seal.authentication.application.port.in.OAuthLoginUseCase;
 import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
-import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
+import fr.vlegall.seal.authentication.domain.port.out.OAuthEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthIdentityRepository;
-import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
+import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
 import java.util.Optional;
@@ -22,17 +22,11 @@ public class OAuthLoginHandler implements OAuthLoginUseCase {
 
     private final OAuthIdentityRepository identities;
     private final AccountLookupPort accounts;
-    private final AccountContactPort contacts;
-    private final SecurityEventPort journal;
+    private final OAuthEventPort journal;
 
-    public OAuthLoginHandler(
-            OAuthIdentityRepository identities,
-            AccountLookupPort accounts,
-            AccountContactPort contacts,
-            SecurityEventPort journal) {
+    public OAuthLoginHandler(OAuthIdentityRepository identities, AccountLookupPort accounts, OAuthEventPort journal) {
         this.identities = identities;
         this.accounts = accounts;
-        this.contacts = contacts;
         this.journal = journal;
     }
 
@@ -47,16 +41,15 @@ public class OAuthLoginHandler implements OAuthLoginUseCase {
         Optional<UserId> linked = identities.findUser(provider, identity.subject());
         if (linked.isPresent()) {
             UserId user = linked.get();
-            boolean active = accounts.isVerified(user);
-            if (!active && !accounts.isPending(user)) {
+            AccountLoginState state = accounts.state(user);
+            if (state == AccountLoginState.UNUSABLE) {
                 journal.oauthLoginFailed(user, provider, "account_unusable");
                 return new OAuthLoginOutcome.Rejected();
             }
             journal.oauthLoginSucceeded(user, provider);
-            return new OAuthLoginOutcome.SignedIn(user, active);
+            return new OAuthLoginOutcome.SignedIn(user, state == AccountLoginState.ACTIVE);
         }
-        if (identity.emailVerified()
-                && contacts.findActiveByEmail(identity.email()).isPresent()) {
+        if (identity.emailVerified() && accounts.activeAccountOwns(identity.email())) {
             journal.oauthLoginFailed(null, provider, "email_in_use");
             return new OAuthLoginOutcome.EmailInUse();
         }

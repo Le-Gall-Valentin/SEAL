@@ -1,5 +1,6 @@
 package fr.vlegall.seal.identity.application.port.in;
 
+import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.UserId;
 import java.util.List;
 import java.util.Optional;
@@ -37,8 +38,14 @@ public interface AccountLookupQuery {
     /** Vrai si le compte est actif, donc son courriel vérifié (AUTH-16). */
     boolean isVerified(UserId user);
 
-    /** AUTH-16, AUTH-32 : vrai si le compte attend la vérification de son courriel ; faux s'il est actif ou supprimé. */
-    boolean isPending(UserId user);
+    /** AUTH-16, AUTH-31 : l'état du compte, lu une seule fois. */
+    AccountLoginState loginState(UserId user);
+
+    /**
+     * AUTH-33 : vrai si un compte actif possède ce courriel, normalisé en NFC et comparé sans tenir compte de la casse ;
+     * faux pour toute saisie qui n'est pas un courriel.
+     */
+    boolean activeAccountOwns(String email);
 
     /**
      * AUTH-70 : coordonnées du compte actif dont le courriel vérifié est la saisie, normalisée en NFC et comparée sans

@@ -5,7 +5,7 @@ import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthRegistration;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthAccountPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthIdentityRepository;
-import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
+import fr.vlegall.seal.authentication.domain.port.out.OAuthLinkEventPort;
 import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
 import java.time.Clock;
@@ -17,11 +17,11 @@ public class CompleteOAuthRegistrationHandler implements CompleteOAuthRegistrati
 
     private final OAuthAccountPort accounts;
     private final OAuthIdentityRepository identities;
-    private final SecurityEventPort journal;
+    private final OAuthLinkEventPort journal;
     private final Clock clock;
 
     public CompleteOAuthRegistrationHandler(
-            OAuthAccountPort accounts, OAuthIdentityRepository identities, SecurityEventPort journal, Clock clock) {
+            OAuthAccountPort accounts, OAuthIdentityRepository identities, OAuthLinkEventPort journal, Clock clock) {
         this.accounts = accounts;
         this.identities = identities;
         this.journal = journal;

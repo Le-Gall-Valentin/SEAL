@@ -1,11 +1,11 @@
 package fr.vlegall.seal.identity.application.handler;
 
+import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.Unicode;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.AccountLookupQuery;
 import fr.vlegall.seal.identity.domain.model.Account;
-import fr.vlegall.seal.identity.domain.model.AccountStatus;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.PersonalWords;
 import fr.vlegall.seal.identity.domain.model.Username;
@@ -48,10 +48,20 @@ public class AccountLookupHandler implements AccountLookupQuery {
 
     @Override
     @Transactional(readOnly = true)
-    public boolean isPending(UserId user) {
+    public AccountLoginState loginState(UserId user) {
         return users.findById(user)
-                .filter(account -> account.status() == AccountStatus.PENDING_EMAIL)
-                .isPresent();
+                .map(account -> switch (account.status()) {
+                    case ACTIVE -> AccountLoginState.ACTIVE;
+                    case PENDING_EMAIL -> AccountLoginState.PENDING_EMAIL;
+                    case DELETED -> AccountLoginState.UNUSABLE;
+                })
+                .orElse(AccountLoginState.UNUSABLE);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean activeAccountOwns(String email) {
+        return EmailAddress.parse(email).map(users::activeAccountOwns).orElse(false);
     }
 
     @Override

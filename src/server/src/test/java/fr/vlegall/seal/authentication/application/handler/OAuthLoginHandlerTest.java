@@ -2,14 +2,13 @@ package fr.vlegall.seal.authentication.application.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import fr.vlegall.seal.authentication.domain.model.AccountContact;
 import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
-import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
+import fr.vlegall.seal.authentication.domain.port.out.OAuthEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthIdentityRepository;
-import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
+import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.UserId;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -55,50 +54,25 @@ class OAuthLoginHandlerTest {
 
         @Override
         public boolean isVerified(UserId user) {
-            return active.contains(user);
+            throw new UnsupportedOperationException("l'état se lit en une question");
         }
 
         @Override
-        public boolean isPending(UserId user) {
-            return pending.contains(user);
+        public AccountLoginState state(UserId user) {
+            if (active.contains(user)) {
+                return AccountLoginState.ACTIVE;
+            }
+            return pending.contains(user) ? AccountLoginState.PENDING_EMAIL : AccountLoginState.UNUSABLE;
         }
-    };
 
-    private final AccountContactPort contacts = new AccountContactPort() {
         @Override
-        public Optional<AccountContact> findActiveByEmail(String email) {
+        public boolean activeAccountOwns(String email) {
             emailLookups.add(email);
-            return Optional.ofNullable(activeEmails.get(email))
-                    .map(user -> new AccountContact(user, "compte", email, List.of("compte")));
-        }
-
-        @Override
-        public Optional<AccountContact> findActiveContact(UserId user) {
-            throw new UnsupportedOperationException();
+            return activeEmails.containsKey(email);
         }
     };
 
-    private final SecurityEventPort journal = new SecurityEventPort() {
-        @Override
-        public void loginSucceeded(UserId user) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void loginFailed(@Nullable UserId user) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void loggedOut(UserId user) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void oauthLinked(UserId user, OAuthProvider provider) {
-            throw new UnsupportedOperationException("le retour OAuth ne lie rien");
-        }
-
+    private final OAuthEventPort journal = new OAuthEventPort() {
         @Override
         public void oauthLoginSucceeded(UserId user, OAuthProvider provider) {
             events.add("réussie:" + provider + ":" + user.value());
@@ -110,7 +84,7 @@ class OAuthLoginHandlerTest {
         }
     };
 
-    private final OAuthLoginHandler handler = new OAuthLoginHandler(identities, accounts, contacts, journal);
+    private final OAuthLoginHandler handler = new OAuthLoginHandler(identities, accounts, journal);
 
     private static ExternalIdentity google(String subject, String email, boolean verified) {
         return ExternalIdentity.of(OAuthProvider.GOOGLE, subject, email, verified, "Nom");

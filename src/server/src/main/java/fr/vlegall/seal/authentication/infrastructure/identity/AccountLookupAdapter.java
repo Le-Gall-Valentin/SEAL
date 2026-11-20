@@ -3,6 +3,7 @@ package fr.vlegall.seal.authentication.infrastructure.identity;
 import fr.vlegall.seal.authentication.domain.model.AccountContact;
 import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
+import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.AccountLookupQuery;
 import java.util.Optional;
@@ -32,8 +33,13 @@ public class AccountLookupAdapter implements AccountLookupPort, AccountContactPo
     }
 
     @Override
-    public boolean isPending(UserId user) {
-        return accounts.isPending(user);
+    public AccountLoginState state(UserId user) {
+        return accounts.loginState(user);
+    }
+
+    @Override
+    public boolean activeAccountOwns(String email) {
+        return accounts.activeAccountOwns(email);
     }
 
     @Override

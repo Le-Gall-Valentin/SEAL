@@ -69,6 +69,9 @@ class OAuthRegistrationIT {
     private MutableClock clock;
 
     @Autowired
+    private fr.vlegall.seal.identity.application.port.in.CreateOAuthAccountUseCase createOAuthAccount;
+
+    @Autowired
     private JdbcIndexedSessionRepository sessions;
 
     private AuthClient client;
@@ -394,5 +397,13 @@ class OAuthRegistrationIT {
                                 ((org.springframework.security.core.authority.FactorGrantedAuthority) factor)
                                         .getIssuedAt())
                         .isBetween(returned.minusSeconds(1), returned.plusSeconds(60)));
+    }
+
+    @Test
+    @DisplayName("AUTH-32 : le compte d'une inscription OAuth ne se crée que dans la transaction qui le lie")
+    void auth32AccountCreationRequiresTheLinkingTransaction() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> createOAuthAccount.create(unique("t"), "Nom", unique("t") + "@exemple.ca", true))
+                .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
     }
 }

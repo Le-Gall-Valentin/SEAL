@@ -1,6 +1,8 @@
 package fr.vlegall.seal.authentication.infrastructure.security;
 
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
+import fr.vlegall.seal.authentication.domain.port.out.OAuthEventPort;
+import fr.vlegall.seal.authentication.domain.port.out.OAuthLinkEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.common.UserId;
@@ -13,12 +15,13 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Écrit les événements de connexion et de réinitialisation dans {@code security_events} : la connexion et la
- * déconnexion chacune dans sa propre transaction (ADR 0021), la réinitialisation dans celle qui remplace le haché (ADR
- * 0013, point 6).
+ * Écrit les événements de connexion, OAuth compris, et de réinitialisation dans {@code security_events} : la connexion
+ * et la déconnexion chacune dans sa propre transaction (ADR 0021), la réinitialisation et la liaison OAuth dans celle
+ * qui les écrit (ADR 0013, point 6).
  */
 @Component
-public class AuthenticationJournalAdapter implements SecurityEventPort, PasswordResetEventPort {
+public class AuthenticationJournalAdapter
+        implements SecurityEventPort, PasswordResetEventPort, OAuthEventPort, OAuthLinkEventPort {
 
     private final SecurityJournal journal;
 

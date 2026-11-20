@@ -11,9 +11,10 @@ public interface CreateOAuthAccountUseCase {
 
     /**
      * Le compte, actif si le fournisseur garantit le courriel, en attente sinon, avec un code SEAL envoyé (ADR 0032,
-     * point 1). Mêmes refus, dans le même ordre, qu'à l'inscription : identifiant invalide, réservé, pris (AUTH-01 à
-     * AUTH-03), puis nom affiché (ACC-03, {@code VALIDATION_FAILED}) ; un courriel vérifié déjà pris par un compte
-     * actif donne {@code OAUTH_EMAIL_IN_USE} (AUTH-33).
+     * point 1). Mêmes refus qu'à l'inscription, l'identifiant d'abord (invalide, réservé, pris : AUTH-01 à AUTH-03),
+     * puis le nom affiché (ACC-03, {@code VALIDATION_FAILED}) ; l'inscription juge le nom affiché en premier, dans sa
+     * requête. Un courriel vérifié déjà pris par un compte actif donne {@code OAUTH_EMAIL_IN_USE} (AUTH-33). Appelé
+     * seulement dans une transaction ouverte, qui lie aussitôt l'identité.
      *
      * @param email courriel du fournisseur, déjà au format attendu
      */
