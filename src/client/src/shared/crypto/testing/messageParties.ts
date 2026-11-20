@@ -13,9 +13,9 @@ import type { KeyStore } from '../keystore'
 import { SUBKEY_VALIDITY_MS } from '../protocol'
 import { bindSubkey } from '../publication'
 import { type ChosenSubkey, chooseSubkey, type ServedUserKeys } from '../recipientKeys'
-import { vectorX25519Private } from './envelopeVectorSuite'
+import { vectorCertificate, vectorX25519Private } from './envelopeVectorSuite'
 import { vaultPayload, vectorRecoveryKey } from './vaultVectorSuite'
-import { base64url, decimal, type Json, number, record, records, string } from './vectorReader'
+import { base64url, decimal, type Json, record, records, string } from './vectorReader'
 
 /** RFC 8410 : en-tête PKCS#8 d'une graine Ed25519 brute de 32 octets. */
 const ED25519_PKCS8_PREFIX = Uint8Array.of(
@@ -94,17 +94,7 @@ export async function messageParties(
     false,
     ['sign'],
   )
-  const senderCertificate: ServedCertificate = {
-    serial: string(certificateJson, 'serial'),
-    issuerKeyId: string(certificateJson, 'issuerKeyId'),
-    subjectId: string(certificateJson, 'subjectId'),
-    username: string(certificateJson, 'username'),
-    ikPublic: string(certificateJson, 'ikPublic'),
-    notBefore: decimal(certificateJson, 'notBefore'),
-    notAfter: decimal(certificateJson, 'notAfter'),
-    usage: number(certificateJson, 'usage'),
-    signature: string(certificateJson, 'signature'),
-  }
+  const senderCertificate = vectorCertificate(certificateJson)
   const sentAt = decimal(record(record(envelope['message'])['fields']), 'sentAt')
   const receivedAt = decimal(envelope, 'receivedAt')
   const bobIdentity = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, [

@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -137,15 +138,21 @@ public final class ProtocolVectors {
         return UUID.fromString(node.get(field).asString());
     }
 
+    /** Chaîne décimale canonique d'un u64 : ni signe, ni zéro en tête, ni partie fractionnaire. */
+    private static final Pattern DECIMAL_U64 = Pattern.compile("0|[1-9][0-9]*");
+
     /**
      * Un {@code u64} en chaîne décimale, au plus 2^63 - 1 (ADR 0006, point 5 ; PROTOCOL.md, 2.5). Un nombre JSON est
      * refusé : au-delà de 2^53, {@code JSON.parse} en perdrait la précision côté client.
      */
     public static long u64(JsonNode node, String field) {
         JsonNode value = node.get(field);
-        if (value == null || !value.isString()) {
-            throw new IllegalArgumentException(field + " : u64 attendu en chaîne décimale");
+        if (value == null
+                || !value.isString()
+                || !DECIMAL_U64.matcher(value.asString()).matches()) {
+            throw new IllegalArgumentException(field + " : u64 attendu en chaîne décimale, sans signe");
         }
+        // Au-delà de 2^63 - 1, parseLong lève NumberFormatException, une IllegalArgumentException.
         return Long.parseLong(value.asString());
     }
 

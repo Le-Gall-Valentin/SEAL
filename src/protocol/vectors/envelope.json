@@ -1175,6 +1175,80 @@
       "rejectedBy": "integrity_failed"
     },
     {
+      "name": "une IK d'ordre faible, certifi\u00e9e par l'Autorit\u00e9, avec une signature universelle",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "qgqmcFb2iw55v4FH",
+        "ciphertext": "J6C556JXpVSNjRNapCKrsLDCIOXJDHyRUKucgvP-WRyxDHy8UyP4RqM3YTIB0MBqSLDOWfLUobqsxlOMgB-_sdUZ5zZHlAtbydXVSsvXWjwpzzOeFBYsd1CZ62GvD8K0VH5xJDWlzVuhrd47rU1W8SLcojTYDFKOiVe5iV8Gs5PrzkQI05NwrqTSHMJIYDn4wZueyZustdMRh8dDNS0ZQUcvbkdrJrxvhfuJPopN9vhghQnTCBq59Qjarj5TsKp8oaWIPqBvGd2nBeUd6d1GYvCJ4gparxgaBYGOT8zOaPH0Q3WPZmOWV8IvB4q-XQcj6tSu2YtQr801dZEgxtWiWTonm7L-v1n6O9hny5wS3lZa92C42rlKlMvJLuOf_Dt01NdIZy2biEIyHg7UPLU9nLGFXK8KIvVNJMH8MpAt1zKdYG1GNGxpOlW8e8XkQam8xi6c1ldkH9SV5GG_BkE",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "q2IIdk8QdMCLHDW4PeNnjtUoUop9RrBuTy7Y0Ps6tDo",
+            "wrappedCek": "YZZflWmQ_b6Y2XvW_N148GaWIr7i7lgFiLsNiB3h1wK8_Ju61qKUHBY_cWqLdf7g"
+          }
+        ]
+      },
+      "rejectedBy": "signature_invalid",
+      "senderCertificate": {
+        "serial": "EBESExQVFhcYGRobHB0eHw",
+        "issuerKeyId": "If4x36FUomE",
+        "subjectId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "username": "valentin.dupont",
+        "ikPublic": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "notBefore": "1794009600000",
+        "notAfter": "1828310400000",
+        "usage": 3,
+        "signature": "HeEkjs-uVc7-dWWV-3QggGnDygF3VU8R8wmr6CsrsGiq4RU84xO2SKXe6LyLfHVMs_MhVZS-IDOGoMurz1YMBw"
+      }
+    },
+    {
+      "name": "un num\u00e9ro de s\u00e9rie non canonique en base64url dans le certificat servi",
+      "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
+      "envelope": {
+        "v": 1,
+        "suite": "SEAL1-X25519-A256GCM-ED25519",
+        "messageId": "01a1b34e-fa60-70d1-92d3-d4d5d6d7d8d9",
+        "conversationId": "0192f7a1-ffff-7000-8000-00000000c0c0",
+        "senderId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "senderCertSerial": "EBESExQVFhcYGRobHB0eHw",
+        "nonce": "gIGCg4SFhoeIiYqL",
+        "ciphertext": "Ij_cG3-DVOrDKcSv36IoqUNg2w9vj2P1pbxXZn5v_0ax3jJE9_Jg3GgUTnjukALl4UdqM9tWEujtF7s805WfWVtJFEL47893ZeojlEtDXBDlFgr7L-C6iBrExHK64ym-nPLkzNtIR_jGhBnTBGRkMYmHseKy3W8yMWMHxT2w0qoSkJemHRGEM7V8Wg_NO6x56kYjAPrAA_mhEo1fPJIAiO6HR_D5AS1q7RVnLVtMGKnpOg9kr7sm_yPOmcj1405cTovvdoYdWc3aC8Q2qJAzssvVuFZAgsl25brhwSeYzEe0eWoYi9_NaV0Ao43OY8qpSq7JGOK2sKLrRkWiv1CiFfX4kSugBeyzw_v1G0J-Nc9CxmLfWC0yeMWdVNjvmB-XAAR8OwBeuKASLov3ZUcgGuwNw18nUhPvlF4Yz4jitqhZMlUmA99kpVAAPvo9_rXVI4RRvgnDX9eImmRzmME",
+        "wraps": [
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-000000000b0b",
+            "ekId": "wMHCw8TFxsfIycrLzM3Ozw",
+            "enc": "C40PzzBWAjD5mVV-6rj7e_1HiEgc2cNO4NccnJf0e3Y",
+            "wrappedCek": "63rrmIE0z43kl4AWStyjsJY0OXlMazq2xzUQlBoSeIzxEdSvborKWO4Dvnm7zDhN"
+          },
+          {
+            "recipientId": "0192f7a1-ffff-7000-8000-00000000a11c",
+            "ekId": "oKGio6SlpqeoqaqrrK2urw",
+            "enc": "UjNLnHH4C8l_AYYotuHpfBQht5N1jJDLNj5-E_9hBxY",
+            "wrappedCek": "c4RSD21QEF6mFWQiCCqRwF7oI1zPeMYeAEK2zYFOJ2gUdyo3YJiwHG2h4lI50cYv"
+          }
+        ]
+      },
+      "rejectedBy": "signature_invalid",
+      "senderCertificate": {
+        "serial": "EBESExQVFhcYGRobHB0eHx",
+        "issuerKeyId": "If4x36FUomE",
+        "subjectId": "0192f7a1-ffff-7000-8000-00000000a11c",
+        "username": "valentin.dupont",
+        "ikPublic": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+        "notBefore": "1794009600000",
+        "notAfter": "1828310400000",
+        "usage": 3,
+        "signature": "D4QLHx9r93c8O-8m5K5_YIKALCYsR70W9AFXJT-LHGoH5sYhaIZaMIxFhCFpi3qKCiXouPgCkkGNIc0P7TslAw"
+      }
+    },
+    {
       "name": "une liste de destinataires non tri\u00e9e, pourtant sign\u00e9e",
       "reader": "0192f7a1-ffff-7000-8000-000000000b0b",
       "envelope": {

@@ -3,6 +3,7 @@
  * Chromium. Réservé aux tests.
  */
 import { describe, expect, it } from 'vitest'
+import type { ServedCertificate } from '../certificate'
 import { bytes, concat, list, struct, text, u64, u8, uuid, uuidText } from '../canonical'
 import { openCek, sealCek } from '../hpke'
 import {
@@ -63,6 +64,21 @@ export async function vectorX25519Private(raw: Uint8Array): Promise<CryptoKey> {
   return crypto.subtle.importKey('pkcs8', concat(X25519_PKCS8_PREFIX, raw), 'X25519', false, [
     'deriveBits',
   ])
+}
+
+/** Un certificat d'un vecteur, tel que le sert le serveur : dates en millisecondes (u64 en chaîne décimale). */
+export function vectorCertificate(json: Json): ServedCertificate {
+  return {
+    serial: string(json, 'serial'),
+    issuerKeyId: string(json, 'issuerKeyId'),
+    subjectId: string(json, 'subjectId'),
+    username: string(json, 'username'),
+    ikPublic: string(json, 'ikPublic'),
+    notBefore: decimal(json, 'notBefore'),
+    notAfter: decimal(json, 'notAfter'),
+    usage: number(json, 'usage'),
+    signature: string(json, 'signature'),
+  }
 }
 
 /** L'enveloppe d'un vecteur, lue champ par champ (sans transtypage). */

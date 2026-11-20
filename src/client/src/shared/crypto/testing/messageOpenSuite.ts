@@ -14,7 +14,7 @@ import { openMessage } from '../openMessage'
 import { chooseSubkey } from '../recipientKeys'
 import { sealMessage } from '../sealMessage'
 import { flipBase64Url, flipUuid } from './bytesForTests'
-import { vectorEnvelope as readEnvelope } from './envelopeVectorSuite'
+import { vectorCertificate, vectorEnvelope as readEnvelope } from './envelopeVectorSuite'
 import { type MessageParties } from './messageParties'
 import { allZero, watchDecrypt, watchSigned } from './subtleWatch'
 import { base64url, decimal, type Json, record, records, string } from './vectorReader'
@@ -153,9 +153,14 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
       const forgeries = records(envelope['forgeries'])
       expect(forgeries.length).toBeGreaterThan(8)
       for (const forgery of forgeries) {
-        expect((await read(bob, forgery['envelope'])).status, string(forgery, 'name')).toBe(
-          string(forgery, 'rejectedBy'),
-        )
+        // Certaines falsifications portent le certificat que sert le serveur pour elles.
+        const served = forgery['senderCertificate']
+        const context =
+          served === undefined ? {} : { senderCertificate: vectorCertificate(record(served)) }
+        expect(
+          (await read(bob, forgery['envelope'], context)).status,
+          string(forgery, 'name'),
+        ).toBe(string(forgery, 'rejectedBy'))
       }
     })
 

@@ -442,6 +442,7 @@ def crypto_lib() -> SimpleNamespace:
         from cryptography.hazmat.primitives import hashes, serialization
         from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.exceptions import InvalidTag
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF, HKDFExpand
     except ImportError as error:
         raise SystemExit(
@@ -456,6 +457,7 @@ def crypto_lib() -> SimpleNamespace:
         AESGCM=AESGCM,
         HKDF=HKDF,
         HKDFExpand=HKDFExpand,
+        InvalidTag=InvalidTag,
     )
 
 
@@ -1335,7 +1337,11 @@ def seal_message(header: dict, signed_payload: bytes, signature: bytes, recipien
         info = wrap_info(header, recipient_id, ek_id)
         ikm = ikm_for(f"{label}, {recipient_id}")
         sealed = hpke_seal(x25519_public(ek_private), info, aad, cek, ikm)
-        if hpke_open(ek_private, sealed.enc, info, aad, sealed.ciphertext) != cek:
+        try:
+            reopened = hpke_open(ek_private, sealed.enc, info, aad, sealed.ciphertext)
+        except crypto_lib().InvalidTag:
+            reopened = None
+        if reopened != cek:
             raise SystemExit("gen_vectors.py : une encapsulation des vecteurs ne s'ouvre pas")
         wraps.append(
             {
@@ -1494,7 +1500,11 @@ def decode_envelope(envelope: object) -> dict:
     """
     if not isinstance(envelope, dict) or set(envelope) != ENVELOPE_KEYS:
         raise Rejected("enveloppe hors du schéma")
-    if not is_integer(envelope["v"]) or envelope["v"] != MESSAGE_VERSION or envelope["suite"] != MESSAGE_SUITE:
+    # Sémantique de JSON : 1, 1.0 et 1e0 sont le même nombre, comme après JSON.parse ; un booléen n'en est pas un.
+    version = envelope["v"]
+    if isinstance(version, bool) or not isinstance(version, (int, float)) or version != MESSAGE_VERSION:
+        raise Rejected("version")
+    if envelope["suite"] != MESSAGE_SUITE:
         raise Rejected("version ou suite")
 
     def lowercase(value: object) -> str:
@@ -1530,19 +1540,64 @@ def decode_envelope(envelope: object) -> dict:
     return {"header": header, "nonce": strict_b64url(envelope["nonce"], 12), "ciphertext": ciphertext, "wraps": decoded}
 
 
+FIELD_PRIME = 2**255 - 19
+DECIMAL_U64 = re.compile(r"^(0|[1-9][0-9]*)$")
+
+
+def ed25519_y(point: bytes) -> int:
+    """y d'un point encodé : 32 octets petit-boutistes, sans le bit de signe de x (RFC 8032, 5.1.3)."""
+    return int.from_bytes(point[:31] + bytes([point[31] & 0x7F]), "little")
+
+
+SMALL_ORDER_Y = {ed25519_y(bytes.fromhex(point)) for point in SMALL_ORDER_POINTS}
+
+
+def weak_or_non_canonical(point: bytes) -> bool:
+    """ADR 0025, point 14 : point d'ordre faible ou encodage non canonique, comme isWeakOrNonCanonical (ed25519.ts)."""
+    return len(point) < 32 or ed25519_y(point) >= FIELD_PRIME or ed25519_y(point) in SMALL_ORDER_Y
+
+
+def verifies_strictly(public: bytes, message: bytes, signature: bytes) -> bool:
+    """PROTOCOL.md 4 : refuse une clé ou un R d'ordre faible, que la bibliothèque de référence accepterait."""
+    return (
+        len(public) == 32
+        and len(signature) == 64
+        and not weak_or_non_canonical(public)
+        and not weak_or_non_canonical(signature[:32])
+        and verifies(public, message, signature)
+    )
+
+
+def served_u64(value: object) -> int:
+    """Un u64 des vecteurs : une chaîne décimale (PROTOCOL.md 2.5), rien d'autre."""
+    if not isinstance(value, str) or not DECIMAL_U64.fullmatch(value) or int(value) > U64_MAX:
+        raise Rejected("u64 hors d'une chaîne décimale")
+    return int(value)
+
+
 def verified_certificate(served: dict, subject_id: str, at: int) -> dict:
     """CDC 7.7, étape 6 : signé par l'Autorité, pour `subject_id`, usage et validité à `at`, sans tolérance."""
-    f = {key: value for key, value in served.items() if key != "signature"}
-    not_before, not_after = int(f["notBefore"]), int(f["notAfter"])
-    if (
-        not verifies(public_key(CA_SEED), encode(certificate_struct(f)), from_b64url(served["signature"]))
-        or from_b64url(f["issuerKeyId"]) != sha256(public_key(CA_SEED))[:8]
-        or len(from_b64url(f["serial"])) != 16
-        or f["subjectId"] != subject_id
-        or f["usage"] != USAGE
-        or not_after - not_before != CERTIFICATE_VALIDITY_DAYS * DAY_MS
-        or not not_before <= at < not_after
-    ):
+    try:
+        f = {key: value for key, value in served.items() if key != "signature"}
+        serial = strict_b64url(f["serial"], 16)
+        issuer_key_id = strict_b64url(f["issuerKeyId"], 8)
+        strict_b64url(f["ikPublic"], 32)
+        signature = strict_b64url(served["signature"], 64)
+        not_before, not_after = served_u64(f["notBefore"]), served_u64(f["notAfter"])
+        if not is_integer(f["usage"]):
+            raise Rejected("usage")
+        valid = (
+            verifies_strictly(public_key(CA_SEED), encode(certificate_struct(f)), signature)
+            and issuer_key_id == sha256(public_key(CA_SEED))[:8]
+            and len(serial) == 16
+            and f["subjectId"] == subject_id
+            and f["usage"] == USAGE
+            and not_after - not_before == CERTIFICATE_VALIDITY_DAYS * DAY_MS
+            and not_before <= at < not_after
+        )
+    except (Rejected, KeyError, TypeError, ValueError, AttributeError) as error:
+        raise Refused("signature_invalid") from error
+    if not valid:
         raise Refused("signature_invalid")
     return f
 
@@ -1580,7 +1635,7 @@ def open_message(envelope: dict, reader_id: str, reader_keys: dict, served_certi
         certificate = verified_certificate(served_certificate, header["senderId"], received_at)
         if from_b64url(certificate["serial"]) != header["senderCertSerial"]:
             raise Refused("signature_invalid")
-        if not verifies(from_b64url(certificate["ikPublic"]), signed_payload, signature):
+        if not verifies_strictly(from_b64url(certificate["ikPublic"]), signed_payload, signature):
             raise Refused("signature_invalid")
         if reader_id not in fields["recipientIds"]:
             raise Refused("recipients_mismatch")
@@ -1589,10 +1644,11 @@ def open_message(envelope: dict, reader_id: str, reader_keys: dict, served_certi
         return refusal.status
 
 
-def opened_by(envelope: dict, reader_id: str) -> str:
-    """Le statut de l'enveloppe des vecteurs pour l'émetteur ou pour Bob, avec la sous-clé de chacun."""
+def opened_by(envelope: dict, reader_id: str, certificate: dict | None = None) -> str:
+    """Le statut de l'enveloppe pour l'émetteur ou pour Bob, avec la sous-clé de chacun et le certificat donné."""
     ek_id, ek_private = MESSAGE_RECIPIENTS[reader_id]
-    return open_message(envelope, reader_id, {ek_id: ek_private}, sender_certificate(), RECEIVED_AT)
+    served = sender_certificate() if certificate is None else certificate
+    return open_message(envelope, reader_id, {ek_id: ek_private}, served, RECEIVED_AT)
 
 
 def flip(text_b64: str, index: int) -> str:
@@ -1602,11 +1658,13 @@ def flip(text_b64: str, index: int) -> str:
     return b64url(bytes(value))
 
 
-def message_forgery(name: str, envelope: dict, rejected_by: str) -> dict:
-    status = opened_by(envelope, VICTIM_ID)
+def message_forgery(name: str, envelope: dict, rejected_by: str, certificate: dict | None = None) -> dict:
+    """Une falsification, et le certificat de l'émetteur que sert le serveur s'il diffère de celui des vecteurs."""
+    status = opened_by(envelope, VICTIM_ID, certificate)
     if status != rejected_by:
         raise SystemExit(f"gen_vectors.py : la falsification « {name} » rend {status}, et non {rejected_by}")
-    return {"name": name, "reader": VICTIM_ID, "envelope": envelope, "rejectedBy": rejected_by}
+    forged = {"name": name, "reader": VICTIM_ID, "envelope": envelope, "rejectedBy": rejected_by}
+    return forged if certificate is None else dict(forged, senderCertificate=certificate)
 
 
 def accepted_envelope(name: str, envelope: dict) -> dict:
@@ -1647,6 +1705,13 @@ def build_envelope() -> str:
         return seal_message(dict(header, messageId=variant["messageId"]), payload, sign(IK_SEED, payload), [VICTIM_ID],
                             label)["envelope"]
 
+    weak_ik = dict(certificate_fields(), ikPublic=b64url(bytes.fromhex(SMALL_ORDER_POINTS[0])))
+    weak_certificate = dict(weak_ik, signature=b64url(sign(CA_SEED, encode(certificate_struct(weak_ik)))))
+    # Signature universelle d'une clé neutre : R neutre, S nul ; l'équation de vérification tient pour tout message.
+    universal = bytes.fromhex(SMALL_ORDER_POINTS[0]) + bytes(32)
+    loose_serial = sender_certificate()
+    # Bits de fin non nuls : le même numéro de série, dans un base64url non canonique.
+    loose_serial["serial"] = loose_serial["serial"][:-1] + chr(ord(loose_serial["serial"][-1]) + 1)
     crowd = sorted([USER_ID, VICTIM_ID] + [f"0192f7a1-ffff-7000-8000-{index:012x}" for index in range(49)], key=uuid)
     unsorted = signed_payload_fields(recipientIds=list(reversed(fields["recipientIds"])))
     unsorted_payload = encode(signed_payload_struct(unsorted))
@@ -1751,6 +1816,14 @@ def build_envelope() -> str:
                          plaintext=raw_bytes(signed_payload) + raw_bytes(signature) + raw_bytes(b"") + b"\x00")["envelope"],
             "integrity_failed",
         ),
+        message_forgery(
+            "une IK d'ordre faible, certifiée par l'Autorité, avec une signature universelle",
+            seal_message(header, signed_payload, universal, [VICTIM_ID], "IK d'ordre faible")["envelope"],
+            "signature_invalid",
+            certificate=weak_certificate,
+        ),
+        message_forgery("un numéro de série non canonique en base64url dans le certificat servi", envelope,
+                        "signature_invalid", certificate=loose_serial),
         message_forgery(
             "une liste de destinataires non triée, pourtant signée",
             seal_message(header, unsorted_payload, sign(IK_SEED, unsorted_payload), [VICTIM_ID], "non triée")["envelope"],

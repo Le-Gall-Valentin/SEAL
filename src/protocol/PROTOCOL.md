@@ -493,13 +493,16 @@ encapsulations à l'octet près. Hors du message principal, chaque enveloppe chi
 L'API HPKE de `cryptography` ne prend pas d'AAD : `gen_vectors.py` compose le mode base de la RFC 9180 avec ses
 primitives, se vérifie contre le vecteur A.1.1 de la RFC 9180, puis contre `cryptography.hpke` avec une AAD vide, dans
 les deux sens (ADR 0030, point 2). Il ouvre ensuite chaque enveloppe selon 6.5 et refuse de publier un vecteur dont le
-statut diffère de celui qu'il annonce. `accepted` donne des enveloppes qui s'ouvrent : padding de 7 octets, chiffré de
+statut diffère de celui qu'il annonce ; ses vérifications de signature refusent, comme celles du client, une clé ou
+un R d'ordre faible (section 4). Une falsification peut porter le certificat que sert le serveur pour elle
+(`senderCertificate`). `accepted` donne des enveloppes qui s'ouvrent : padding de 7 octets, chiffré de
 24 576 octets exactement. `forgeries` donne des enveloppes que Bob NE DOIT PAS accepter, chacune avec le statut
 attendu (`rejectedBy`) : champ inconnu dans l'enveloppe ou dans une encapsulation ; `messageId` en majuscules ; deux
 encapsulations pour Bob ; 51 encapsulations pour 51 destinataires distincts ; chiffré de 24 577 octets, pourtant
 signé ; `messageId` UUIDv4, de version 8 ou de variante 11 datés de `sentAt`, ou UUIDv7 d'une autre milliseconde ;
 `senderSeq` nul ; `groupSeq` non nul en direct ; émetteur absent des destinataires ; 51 destinataires ; `Plaintext`
-sans son champ de padding, ou avec un octet après lui ; octet du chiffré, du
+sans son champ de padding, ou avec un octet après lui ; IK d'ordre faible certifiée, avec une signature universelle ;
+numéro de série non canonique dans le certificat servi ; octet du chiffré, du
 nonce, de `enc` ou de `wrappedCek` ; en-tête déplacé dans une autre conversation ; message signé rechiffré par Bob
 dans une autre conversation (transfert subreptice), sous un autre `messageId`, sous un autre émetteur annoncé ou sous
 un autre numéro de certificat ; signature d'une autre IK ; signature altérée ; Bob absent des
