@@ -28,6 +28,11 @@ public enum ErrorCode {
     CODE_EXPIRED(422),
     /** AUTH-21 : tout échec de connexion, sans en dire la raison (ADR 0021, point 1). */
     INVALID_CREDENTIALS(401),
+    // OAuth : statuts fixés par l'ADR 0032, sur le modèle d'USERNAME_TAKEN.
+    /** AUTH-33 : le courriel vérifié du fournisseur appartient déjà à un compte actif ; aucune liaison automatique. */
+    OAUTH_EMAIL_IN_USE(409),
+    /** AUTH-31 : ce compte du fournisseur est déjà lié à un compte SEAL, ou ce compte SEAL l'est déjà à ce fournisseur. */
+    OAUTH_ALREADY_LINKED(409),
     // Cryptographie : statuts fixés par l'ADR 0025, point 5.
     /** Le certificat ou le coffre désigné n'existe pas (KEY-05, KEY-32). */
     KEY_NOT_FOUND(404),
