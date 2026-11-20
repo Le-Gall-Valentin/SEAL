@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { fromBase64Url } from '../base64url'
 import { HpkeSealError, openCek } from '../hpke'
+import { createKeyring, keyringSecrets } from '../keyring'
 import {
   decodeSignedPayload,
   encodeMessageAad,
@@ -170,6 +171,24 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       await expect(
         sealMessage(keyring, await draft({ body: '🦭'.repeat(4001) })),
       ).rejects.toBeInstanceOf(MessageTooLongError)
+    })
+
+    it('ADR 0030, point 4 : l’enveloppe porte ses identifiants en minuscules, quelle que soit leur casse donnée', async () => {
+      const sender = await parties.senderKeyring()
+      const shouting = createKeyring(
+        { ...sender, userId: sender.userId.toUpperCase() },
+        keyringSecrets(sender),
+      )
+      const conversationId = string(fields, 'conversationId')
+
+      const sealed = await sealMessage(
+        shouting,
+        await draft({ conversationId: conversationId.toUpperCase() }),
+      )
+
+      expect(sealed.senderId).toBe(parties.senderId)
+      expect(sealed.conversationId).toBe(conversationId)
+      expect((await readAsBob(sealed)).payload.senderId).toBe(parties.senderId)
     })
 
     it('CDC 7.4 : un destinataire en double, l’émetteur absent ou plus de 50 destinataires sont refusés', async () => {

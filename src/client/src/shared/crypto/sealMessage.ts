@@ -96,7 +96,7 @@ export async function sealMessageWith(
       suite: MESSAGE_SUITE,
       messageId: uuidV7(draft.sentAt, randomness.messageIdRandom),
       conversationId: draft.conversationId.toLowerCase(),
-      senderId: keyring.userId,
+      senderId: keyring.userId.toLowerCase(),
       senderCertSerial: fromBase64Url(draft.senderCertSerial),
     }
     signedPayload = encodeSignedPayload({
