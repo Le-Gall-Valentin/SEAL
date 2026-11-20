@@ -4,7 +4,7 @@ package fr.vlegall.seal.security.journal;
 public enum SecurityEventType {
     /** SEC-10 : une limite de débit a été dépassée. */
     RATE_LIMIT_EXCEEDED,
-    /** SEC-20 : inscription classique (AUTH-10). */
+    /** SEC-20 : inscription, classique (AUTH-10) ou OAuth (AUTH-32). */
     ACCOUNT_REGISTERED,
     /** SEC-20 : courriel d'un compte remplacé (AUTH-17). */
     EMAIL_CHANGED,

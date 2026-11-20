@@ -91,8 +91,9 @@ La connexion par un fournisseur est facultative. Sans application OAuth, SEAL d�
 du fournisseur (OPS-03). Pour l'activer, créez l'application chez le fournisseur, renseignez son identifiant et son
 secret dans `.env`, puis relancez `docker compose up --build`.
 
-- **Google** : Google Cloud Console, « API et services », « Identifiants », « ID client OAuth », type « Application
-  Web » :
+- **Google** : Google Cloud Console, « API et services ». Configurez d'abord l'écran de consentement OAuth (type
+  « Externe ») et, tant que l'application n'est pas publiée, ajoutez-y les comptes de démonstration comme utilisateurs
+  de test. Puis « Identifiants », « ID client OAuth », type « Application Web » :
   - URI de redirection autorisée : `https://localhost:8443/login/oauth2/code/google` ;
   - variables : `SEAL_OAUTH_GOOGLE_CLIENT_ID` et `SEAL_OAUTH_GOOGLE_CLIENT_SECRET`.
 - **GitHub** : Settings, « Developer settings », « OAuth Apps », « New OAuth App » :
@@ -105,7 +106,8 @@ variable manquante.
 
 Le compte SEAL est lié au compte du fournisseur, jamais à son courriel. À la première connexion, SEAL fait choisir
 l'identifiant, puis crée le compte. Si le courriel vérifié du fournisseur appartient déjà à un compte SEAL, aucune
-liaison n'est faite : connectez-vous avec votre mot de passe (AUTH-33).
+liaison n'est faite : connectez-vous par votre méthode habituelle (AUTH-33). La liaison d'un fournisseur depuis les
+paramètres viendra plus tard (ACC-04).
 
 ## Développement
 

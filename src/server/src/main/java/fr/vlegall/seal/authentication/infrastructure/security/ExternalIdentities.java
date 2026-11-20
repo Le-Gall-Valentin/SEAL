@@ -10,7 +10,9 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 
 /**
  * Section 5.4 du CDC : l'identité stable et le courriel de chaque fournisseur, lus strictement. Une valeur absente ou
- * mal typée refuse la connexion (échec fermé) ; seul un booléen {@code true} vaut un courriel vérifié.
+ * mal typée refuse la connexion (échec fermé) ; seul un booléen {@code true} vaut un courriel vérifié. Pour Google,
+ * Spring Security a déjà converti les déclarations : un texte {@code "true"} y arrive en booléen, ce que l'ADR 0032
+ * (point 9) accepte, le jeton étant signé par Google.
  */
 final class ExternalIdentities {
 

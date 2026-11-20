@@ -301,4 +301,14 @@ class OAuthLoginIT {
                         .list())
                 .containsExactly("account_unusable");
     }
+
+    @Test
+    @DisplayName("ADR 0032, point 9 : email_verified en texte \"true\", converti par Spring, vaut vérifié (AUTH-33)")
+    void adr0032EmailVerifiedAsTextCountsAsVerified() throws Exception {
+        Registered owner = active(unique("t"));
+
+        MvcResult result = oauth.signIn("google", new GoogleAccount(googleSubject(), owner.email(), "true", "Nom"));
+
+        assertThat(location(result)).isEqualTo("/connexion?erreur=OAUTH_EMAIL_IN_USE");
+    }
 }

@@ -68,7 +68,8 @@ class ExternalIdentitiesTest {
     }
 
     @Test
-    @DisplayName("Section 5.4 : seul email_verified booléen vrai vaut vérifié ; absent, faux ou en texte, non vérifié")
+    @DisplayName(
+            "Section 5.4 : à la lecture de SEAL, seul un booléen vrai vaut vérifié (Spring convertit le texte avant, ADR 0032)")
     void cdc54GoogleEmailVerifiedReadStrictly() {
         Map<String, Object> absent = googleClaims();
         absent.remove("email_verified");
