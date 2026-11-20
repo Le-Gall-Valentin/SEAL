@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class ClientRoutesController {
 
-    private static final String LOGIN = "/connexion";
+    public static final String LOGIN = "/connexion";
     private static final String REGISTER = "/inscription";
     private static final String VERIFY_EMAIL = "/verification-courriel";
     private static final String FORGOT_PASSWORD = "/mot-de-passe/oublie";

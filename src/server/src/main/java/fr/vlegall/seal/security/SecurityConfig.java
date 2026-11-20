@@ -18,11 +18,14 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authorization.AuthenticatedAuthorizationManager;
 import org.springframework.security.authorization.AuthorityAuthorizationManager;
 import org.springframework.security.authorization.AuthorizationManagers;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
+import org.springframework.security.config.annotation.web.configurers.oauth2.client.OAuth2LoginConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
@@ -81,7 +84,8 @@ class SecurityConfig {
             ProblemDetailsSecurityHandler problemDetails,
             Clock clock,
             CsrfTokenRepository csrfTokens,
-            CredentialVersions credentialVersions) {
+            CredentialVersions credentialVersions,
+            Customizer<OAuth2LoginConfigurer<HttpSecurity>> oauthLogin) {
         http.authorizeHttpRequests(requests -> requests
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
@@ -92,6 +96,16 @@ class SecurityConfig {
                         // AUTH-60 : jeton CSRF rechargé par le client.
                         .requestMatchers(HttpMethod.GET, "/api/v1/csrf")
                         .permitAll()
+                        // AUTH-35, OPS-03 : fournisseurs OAuth configurés, pour l'anonyme (écrans de connexion) ou la
+                        // session complète ; jamais la session restreinte (AUTH-16).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/providers")
+                        .access(AuthorizationManagers.anyOf(
+                                AuthenticatedAuthorizationManager.anonymous(),
+                                AuthorityAuthorizationManager.hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)))
+                        // AUTH-30 : départ et retour OAuth, réservés aux anonymes (ADR 0032). Les filtres de Spring
+                        // passent avant cette règle : le départ d'une session ouverte n'est pas résolu, et tombe ici.
+                        .requestMatchers(HttpMethod.GET, "/oauth2/authorization/*", "/login/oauth2/code/*")
+                        .anonymous()
                         // AUTH-16 : toute session, restreinte ou complète, lit son compte ; l'anonyme reçoit 401.
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/me")
                         .authenticated()
@@ -154,6 +168,13 @@ class SecurityConfig {
                 // Une requête anonyme refusée ne doit pas créer de session pour mémoriser son URL : sinon n'importe
                 // qui remplirait la table des sessions.
                 .requestCache(RequestCacheConfigurer::disable)
+                // AUTH-30 à AUTH-33 : connexion OAuth. Aucune page de connexion générée (A02) ; le filtre de Spring
+                // n'enregistre rien dans la session : seul SessionEstablisher y écrit le contexte SEAL (ADR 0032).
+                .oauth2Login(login -> {
+                    login.loginPage(ClientRoutesController.LOGIN)
+                            .securityContextRepository(new RequestAttributeSecurityContextRepository());
+                    oauthLogin.customize(login);
+                })
                 // A01 : pas de /logout implicite ; la déconnexion est POST /api/v1/auth/logout (AUTH-53).
                 .logout(LogoutConfigurer::disable)
                 // AUTH-52 : la session de plus de 12 heures est invalidée avant de charger le contexte de sécurité.
