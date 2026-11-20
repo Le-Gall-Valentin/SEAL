@@ -7,16 +7,21 @@
 import { CanonicalEncodingError, U64_MAX, uuidText } from './canonical'
 
 const UUID_BYTES = 16
-const UTF8 = new TextDecoder('utf-8', { fatal: true })
+/** UTF-8 strict ; un BOM en tête est gardé (U+FEFF), comme le décodeur de Java, au lieu d'être retiré. */
+const UTF8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
 
 export class CanonicalReader {
-  readonly #bytes: Uint8Array<ArrayBuffer>
+  readonly #bytes: Uint8Array
   readonly #view: DataView
   #offset = 0
 
+  /**
+   * Lit le tampon de l'appelant, sans le recopier : sa remise à zéro (PROTOCOL.md 6.2) couvre aussi le lecteur. Les
+   * lectures sont synchrones ; `bytes()` rend des copies.
+   */
   private constructor(encoded: Uint8Array) {
-    this.#bytes = Uint8Array.from(encoded)
-    this.#view = new DataView(this.#bytes.buffer)
+    this.#bytes = encoded
+    this.#view = new DataView(encoded.buffer, encoded.byteOffset, encoded.byteLength)
   }
 
   /** Une suite de champs sans étiquette, comme `Plaintext` d'un message (CDC 7.3). */
@@ -60,16 +65,14 @@ export class CanonicalReader {
   }
 
   bytes(): Uint8Array<ArrayBuffer> {
-    const length = this.u32()
-    const start = this.#take(length)
-    return this.#bytes.slice(start, start + length)
+    return Uint8Array.from(this.#field())
   }
 
   /** PROTOCOL.md 2.1, ADR 0006 : UTF-8 strict, en forme NFC, comme l'écrit `text()`. */
   text(): string {
     let value: string
     try {
-      value = UTF8.decode(this.bytes())
+      value = UTF8.decode(this.#field())
     } catch {
       throw new CanonicalEncodingError('text : UTF-8 invalide')
     }
@@ -102,6 +105,13 @@ export class CanonicalReader {
     if (this.#offset !== this.#bytes.length) {
       throw new CanonicalEncodingError('octets en trop après la structure')
     }
+  }
+
+  /** Les octets de `bytes(…)`, en vue sur le tampon lu. */
+  #field(): Uint8Array {
+    const length = this.u32()
+    const start = this.#take(length)
+    return this.#bytes.subarray(start, start + length)
   }
 
   #take(length: number): number {

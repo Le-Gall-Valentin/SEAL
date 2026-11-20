@@ -109,4 +109,24 @@ describe('MSG-01 : relecture de l’encodage canonique (PROTOCOL.md, section 2),
     expect(reader.bytes()).toEqual(new Uint8Array())
     reader.end()
   })
+
+  it('MSG-01 : un BOM en tête de texte est gardé (U+FEFF), comme le lecteur Java : il ne vaut pas l’étiquette', () => {
+    expect(CanonicalReader.unlabelled(text('\uFEFFSEAL')).text()).toBe('\uFEFFSEAL')
+    expect(() => CanonicalReader.of(struct(`\uFEFF${LABEL}`), LABEL)).toThrow(
+      CanonicalEncodingError,
+    )
+  })
+
+  it('PROTOCOL.md 6.2 : le lecteur lit le tampon de l’appelant sans le recopier, et rend des copies', () => {
+    const encoded = concat(bytes(Uint8Array.of(7, 8)), bytes(Uint8Array.of(9)))
+    expect(CanonicalReader.unlabelled(encoded.subarray(6)).bytes()).toEqual(Uint8Array.of(9))
+    const reader = CanonicalReader.unlabelled(encoded)
+    const first = reader.bytes()
+
+    // La remise à zéro du tampon par l'appelant atteint le lecteur, qui n'en garde aucune copie.
+    encoded.fill(0)
+
+    expect(first).toEqual(Uint8Array.of(7, 8))
+    expect(reader.bytes()).toEqual(new Uint8Array())
+  })
 })
