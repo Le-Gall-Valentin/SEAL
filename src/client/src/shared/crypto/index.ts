@@ -45,7 +45,9 @@ export {
 } from './certificate'
 // sealMessage lève HpkeSealError pour une sous-clé de destinataire inutilisable (RFC 9180, 7.1.4).
 export { HpkeSealError } from './hpke'
-export { type EnvelopeWire, type WrapWire } from './messageFormat'
+// sealMessage lève aussi MessageFormatError (brouillon hors du format) et Base64UrlError (numéro de série illisible).
+export { Base64UrlError } from './base64url'
+export { type EnvelopeWire, MessageFormatError, type WrapWire } from './messageFormat'
 export { type MessageDraft, MessageTooLongError, sealMessage } from './sealMessage'
 export {
   type IncomingContext,

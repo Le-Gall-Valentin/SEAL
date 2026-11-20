@@ -24,18 +24,20 @@ export const SMALL_ORDER_X25519: readonly (readonly [string, string])[] = [
   ['1, bit haut', '0100000000000000000000000000000000000000000000000000000000000080'],
 ]
 
+/** Une copie de `bytes`, l'octet `index` modifié (son bit de poids faible inversé). */
+export function flipByte(bytes: Uint8Array, index: number): Uint8Array<ArrayBuffer> {
+  const copy = Uint8Array.from(bytes)
+  const view = new DataView(copy.buffer)
+  view.setUint8(index, view.getUint8(index) ^ 0x01)
+  return copy
+}
+
 /** Le texte base64url `text`, l'octet `index` modifié (son bit de poids faible inversé). */
 export function flipBase64Url(text: string, index: number): string {
-  const bytes = fromBase64Url(text)
-  const view = new DataView(bytes.buffer)
-  view.setUint8(index, view.getUint8(index) ^ 0x01)
-  return toBase64Url(bytes)
+  return toBase64Url(flipByte(fromBase64Url(text), index))
 }
 
 /** L'UUID `value`, son octet `index` modifié (bit de poids faible inversé), en minuscules. */
 export function flipUuid(value: string, index: number): string {
-  const bytes = uuid(value)
-  const view = new DataView(bytes.buffer)
-  view.setUint8(index, view.getUint8(index) ^ 0x01)
-  return uuidText(bytes)
+  return uuidText(flipByte(uuid(value), index))
 }

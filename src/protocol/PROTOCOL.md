@@ -469,7 +469,7 @@ Les vérifications s'exécutent dans cet ordre et échouent fermé : le contenu 
 | 3 | L'encapsulation pour soi, dont l'`ekId` est dans le trousseau, ouverte par HPKE | `undecryptable` |
 | 4 | `Plaintext` déchiffré par AES-256-GCM sous l'AAD | `integrity_failed` |
 | 5 | `SignedPayload` relu strictement, invariants de 6.2 compris (`messageId` UUIDv7 daté de `sentAt`, `senderSeq` ≥ 1, `groupSeq` = 0 en direct, émetteur parmi les destinataires) ; version, suite, identifiants et numéro de série égaux à l'enveloppe | `integrity_failed` |
-| 6 | Certificat de l'émetteur : Autorité, sujet, numéro de série, validité à `serverReceivedAt` | `signature_invalid` |
+| 6 | Certificat de l'émetteur : Autorité, sujet, numéro de série, usage, validité à `serverReceivedAt` (un instant qui n'est pas un entier positif sûr est refusé, jamais ignoré) | `signature_invalid` |
 | 7 | Signature Ed25519 de `SignedPayload` par l'IK du certificat | `signature_invalid` |
 | 8 | Le lecteur figure dans `recipientIds` | `recipients_mismatch` |
 

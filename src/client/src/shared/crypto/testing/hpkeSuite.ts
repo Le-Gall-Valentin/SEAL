@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { HpkeOpenError, HpkeSealError, openCek, sealCek } from '../hpke'
 import { generateKeyring, type Keyring, keyringSecrets } from '../keyring'
 import { generateRecoveryKey } from '../recovery'
-import { fromHex, SMALL_ORDER_X25519 } from './bytesForTests'
+import { flipByte, fromHex, SMALL_ORDER_X25519 } from './bytesForTests'
 import { allZero, watchEncrypt } from './subtleWatch'
 
 const USER_ID = '0192f7a1-ffff-7000-8000-00000000a11c'
@@ -24,12 +24,6 @@ async function recipient(): Promise<{
   const subkey = keyring.subkeys[0]
   if (privateKey === undefined || subkey === undefined) throw new Error('une sous-clé attendue')
   return { keyring, key: { privateKey, publicKey: subkey.publicKey } }
-}
-
-function flipped(bytes: Uint8Array, index: number): Uint8Array {
-  const copy = Uint8Array.from(bytes)
-  copy[index] = (copy[index] ?? 0) ^ 0x01
-  return copy
 }
 
 export function describeHpke(engine: string): void {
@@ -71,13 +65,13 @@ export function describeHpke(engine: string): void {
 
       for (let index = 0; index < enc.length; index += 1) {
         await expect(
-          openCek(key, flipped(enc, index), wrappedCek, INFO, AAD),
+          openCek(key, flipByte(enc, index), wrappedCek, INFO, AAD),
           `enc ${String(index)}`,
         ).rejects.toBeInstanceOf(HpkeOpenError)
       }
       for (let index = 0; index < wrappedCek.length; index += 1) {
         await expect(
-          openCek(key, enc, flipped(wrappedCek, index), INFO, AAD),
+          openCek(key, enc, flipByte(wrappedCek, index), INFO, AAD),
           `wrappedCek ${String(index)}`,
         ).rejects.toBeInstanceOf(HpkeOpenError)
       }
