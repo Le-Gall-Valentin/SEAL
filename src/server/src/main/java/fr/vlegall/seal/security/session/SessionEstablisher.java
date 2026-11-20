@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -102,10 +103,24 @@ public final class SessionEstablisher {
      */
     public Authentication openWithAuthorizationCode(
             UserId user, boolean active, HttpServletRequest request, HttpServletResponse response) {
+        return openWithAuthorizationCode(user, active, clock.instant(), request, response);
+    }
+
+    /**
+     * ADR 0032, point 8 : comme {@link #openWithAuthorizationCode(UserId, boolean, HttpServletRequest,
+     * HttpServletResponse)}, avec le facteur daté du retour du fournisseur, quand la session ne s'ouvre qu'au terme de
+     * l'inscription OAuth.
+     */
+    public Authentication openWithAuthorizationCode(
+            UserId user,
+            boolean active,
+            Instant factorIssuedAt,
+            HttpServletRequest request,
+            HttpServletResponse response) {
         GrantedAuthority account = new SimpleGrantedAuthority(
                 active ? SealAuthorities.ACCOUNT_ACTIVE : SealAuthorities.ACCOUNT_PENDING_EMAIL);
         GrantedAuthority factor = FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_AUTHORIZATION_CODE)
-                .issuedAt(clock.instant())
+                .issuedAt(factorIssuedAt)
                 .build();
         return establish(new SealPrincipal(user), List.of(account, factor), request, response);
     }

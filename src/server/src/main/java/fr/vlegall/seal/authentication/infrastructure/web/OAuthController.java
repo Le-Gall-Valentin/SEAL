@@ -74,7 +74,9 @@ public class OAuthController {
         OAuthRegistration created =
                 registrations.complete(registration.identity(), body.username(), body.displayName());
         pending.forget(request);
-        sessions.openWithAuthorizationCode(created.user(), created.active(), request, response);
+        // ADR 0032, point 8 : le facteur est daté du retour du fournisseur, pas de la création du compte.
+        sessions.openWithAuthorizationCode(
+                created.user(), created.active(), registration.authenticatedAt(), request, response);
     }
 
     private PendingOAuthRegistration livePending(HttpServletRequest request) {

@@ -370,4 +370,29 @@ class OAuthRegistrationIT {
                 .as("aucun lien pour un compte sans mot de passe")
                 .isEmpty();
     }
+
+    @Test
+    @DisplayName("ADR 0032, point 8 : après complete, le facteur est daté du retour du fournisseur, pas de la création")
+    void adr0032FactorDatedFromTheProviderReturn() throws Exception {
+        String username = unique("f");
+        Cookie session = pendingGoogle(googleSubject(), username + "@gmail.com");
+        java.time.Instant returned = clock.instant();
+        clock.advance(Duration.ofMinutes(5));
+
+        MvcResult result = complete(session, choice(username, "Nom"));
+
+        Cookie opened = AuthClient.sessionOf(result);
+        String openedId = new String(Base64.getDecoder().decode(opened.getValue()), StandardCharsets.UTF_8);
+        Session stored = sessions.findById(openedId);
+        org.springframework.security.core.context.SecurityContext context = stored.getAttribute(
+                org.springframework.security.web.context.HttpSessionSecurityContextRepository
+                        .SPRING_SECURITY_CONTEXT_KEY);
+        assertThat(context.getAuthentication().getAuthorities())
+                .filteredOn(org.springframework.security.core.authority.FactorGrantedAuthority.class::isInstance)
+                .singleElement()
+                .satisfies(factor -> assertThat(
+                                ((org.springframework.security.core.authority.FactorGrantedAuthority) factor)
+                                        .getIssuedAt())
+                        .isBetween(returned.minusSeconds(1), returned.plusSeconds(60)));
+    }
 }
