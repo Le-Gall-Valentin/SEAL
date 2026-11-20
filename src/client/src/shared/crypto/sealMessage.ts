@@ -54,7 +54,7 @@ export interface MessageDraft {
 export interface SealRandomness {
   readonly messageIdRandom: Uint8Array
   readonly salt: Uint8Array
-  /** Remise à zéro dès qu'elle a servi (KEY-40). */
+  /** Remise à zéro dès qu'elle a servi (CDC 7.5, étape 8). */
   readonly cek: Uint8Array<ArrayBuffer>
   readonly nonce: Uint8Array<ArrayBuffer>
   /** Matériau de la clé éphémère HPKE de chaque destinataire (`ikmE`) ; tiré par HPKE si absent. */
@@ -83,6 +83,7 @@ export async function sealMessageWith(
   randomness: SealRandomness,
 ): Promise<EnvelopeWire> {
   const { cek } = randomness
+  let signedPayload: Uint8Array<ArrayBuffer> | undefined
   let plaintext: Uint8Array<ArrayBuffer> | undefined
   try {
     const body = draft.body.normalize('NFC')
@@ -98,7 +99,7 @@ export async function sealMessageWith(
       senderId: keyring.userId,
       senderCertSerial: fromBase64Url(draft.senderCertSerial),
     }
-    const signedPayload = encodeSignedPayload({
+    signedPayload = encodeSignedPayload({
       ...header,
       conversationType: draft.conversationType,
       sentAt: draft.sentAt,
@@ -149,8 +150,9 @@ export async function sealMessageWith(
       wraps,
     }
   } finally {
-    // KEY-40 : la CEK et le texte clair n'existent qu'en mémoire, le temps de sceller.
+    // CDC 7.5, étape 8, et PROTOCOL.md 6.2 : la CEK et le texte clair n'existent qu'en mémoire, le temps de sceller.
     cek.fill(0)
+    signedPayload?.fill(0)
     plaintext?.fill(0)
   }
 }

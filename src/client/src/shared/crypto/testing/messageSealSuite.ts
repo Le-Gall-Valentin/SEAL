@@ -25,6 +25,7 @@ import {
 } from '../sealMessage'
 import { vectorX25519Private } from './envelopeVectorSuite'
 import { authorityStore, type MessageParties } from './messageParties'
+import { allZero, watchEncrypt, watchSigned } from './subtleWatch'
 import { base64url, decimal, type Json, number, record, records, string } from './vectorReader'
 
 /** En-tête d'une enveloppe scellée, relu pour recalculer son AAD et ses info_r. */
@@ -125,6 +126,23 @@ export function describeMessageSeal(envelope: Json, parties: MessageParties, eng
       await sealMessageWith(await parties.senderKeyring(), await draft(), randomness)
 
       expect(randomness.cek.every((byte) => byte === 0)).toBe(true)
+    })
+
+    it('PROTOCOL.md 6.2 : SignedPayload, Plaintext et chaque copie de la CEK sont remis à zéro après le scellement', async () => {
+      const keyring = await parties.senderKeyring()
+      const vector = await draft()
+      const [encrypted, signed] = [watchEncrypt(), watchSigned()]
+      try {
+        await sealMessage(keyring, vector)
+      } finally {
+        encrypted.restore()
+        signed.restore()
+      }
+
+      // Plaintext, puis la CEK de chacun des deux destinataires ; SignedPayload, signé par l'IK.
+      expect(encrypted.seen).toHaveLength(3)
+      expect(signed.seen).toHaveLength(1)
+      expect(allZero([...encrypted.seen, ...signed.seen])).toBe(true)
     })
 
     it('CDC 7.5 : messageId est un UUIDv7 à sentAt ; deux scellements tirent un sel, une CEK et un nonce neufs', async () => {

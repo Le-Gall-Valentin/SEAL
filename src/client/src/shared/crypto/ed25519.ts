@@ -81,12 +81,13 @@ export async function verifyEd25519(
       false,
       ['verify'],
     )
-    return await crypto.subtle.verify(
-      { name: 'Ed25519' },
-      key,
-      Uint8Array.from(signature),
-      Uint8Array.from(message),
-    )
+    const data = Uint8Array.from(message)
+    try {
+      return await crypto.subtle.verify({ name: 'Ed25519' }, key, Uint8Array.from(signature), data)
+    } finally {
+      // PROTOCOL.md 6.2 : la donnée signée peut être un texte clair (SignedPayload) ; sa copie ne survit pas.
+      data.fill(0)
+    }
   } catch {
     // Clé hors de la courbe : WebCrypto la refuse à l'import.
     return false

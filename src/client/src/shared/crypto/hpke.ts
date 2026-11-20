@@ -56,6 +56,9 @@ export async function sealCek(
   if (cek.length !== CEK_BYTES) {
     throw new RangeError('la CEK fait 32 octets')
   }
+  // PROTOCOL.md 6.2 (ADR 0030, point 9) : @hpke recopie une vue, jamais un ArrayBuffer exact. La CEK lui est confiée
+  // dans une copie à soi, effacée une fois scellée ; celle de l'appelant reste à lui.
+  const exact = Uint8Array.from(cek)
   let sealed
   try {
     sealed = await SUITE.seal(
@@ -64,12 +67,14 @@ export async function sealCek(
         info,
         ...(ephemeral === undefined ? {} : { ekm: ephemeral }),
       },
-      cek,
+      exact.buffer,
       aad,
     )
   } catch (error) {
     // WebCrypto refuse un secret DH nul : une clé d'ordre faible ne donne jamais une CEK lisible par tous.
     throw new HpkeSealError({ cause: error })
+  } finally {
+    exact.fill(0)
   }
   return { enc: new Uint8Array(sealed.enc), wrappedCek: new Uint8Array(sealed.ct) }
 }

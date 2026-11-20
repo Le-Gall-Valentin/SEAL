@@ -8,6 +8,7 @@ import { HpkeOpenError, HpkeSealError, openCek, sealCek } from '../hpke'
 import { generateKeyring, type Keyring, keyringSecrets } from '../keyring'
 import { generateRecoveryKey } from '../recovery'
 import { fromHex, SMALL_ORDER_X25519 } from './bytesForTests'
+import { allZero, watchEncrypt } from './subtleWatch'
 
 const USER_ID = '0192f7a1-ffff-7000-8000-00000000a11c'
 const NOW = 1_794_009_600_000
@@ -95,6 +96,21 @@ export function describeHpke(engine: string): void {
           name,
         ).rejects.toBeInstanceOf(HpkeOpenError)
       }
+    })
+
+    it('PROTOCOL.md 6.2 : HPKE ne garde aucune copie de la CEK, celle de l’appelant reste à lui', async () => {
+      const { key } = await recipient()
+      const cek = crypto.getRandomValues(new Uint8Array(32))
+      const encrypted = watchEncrypt()
+      try {
+        await sealCek(key.publicKey, INFO, AAD, cek)
+      } finally {
+        encrypted.restore()
+      }
+
+      expect(encrypted.seen).toHaveLength(1)
+      expect(allZero(encrypted.seen)).toBe(true)
+      expect(allZero([cek])).toBe(false)
     })
 
     it('CDC 7.1 : une CEK d’une autre taille que 32 octets n’est pas scellée', async () => {

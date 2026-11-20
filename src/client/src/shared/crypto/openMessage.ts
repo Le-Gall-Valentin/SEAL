@@ -126,28 +126,29 @@ export async function openMessage(
   try {
     const decoded = decodeEnvelope(envelope)
     const plaintext = await decrypted(keyring, decoded)
-    let parts
+    // PROTOCOL.md 6.2 : SignedPayload et sa signature sont lus en vues sur Plaintext, effacé quelle que soit l'issue ;
+    // seul le message rendu au lecteur en garde une copie.
     try {
-      parts = plaintextParts(plaintext)
+      const parts = plaintextParts(plaintext)
+      const fields = signedFields(parts.signedPayload, decoded.header)
+      const certificate = await senderCertificate(store, context, decoded.header)
+      if (!(await verifyEd25519(certificate.ikPublic, parts.signedPayload, parts.signature))) {
+        throw new Rejected('signature_invalid')
+      }
+      return {
+        // Étape 8 : la signature est valide, mais le lecteur n'est pas destinataire (transfert subreptice).
+        status: fields.recipientIds.includes(keyring.userId.toLowerCase())
+          ? 'verified'
+          : 'recipients_mismatch',
+        message: {
+          ...fields,
+          senderIkPublic: Uint8Array.from(certificate.ikPublic),
+          signedPayload: Uint8Array.from(parts.signedPayload),
+          signature: Uint8Array.from(parts.signature),
+        },
+      }
     } finally {
       plaintext.fill(0)
-    }
-    const fields = signedFields(parts.signedPayload, decoded.header)
-    const certificate = await senderCertificate(store, context, decoded.header)
-    if (!(await verifyEd25519(certificate.ikPublic, parts.signedPayload, parts.signature))) {
-      throw new Rejected('signature_invalid')
-    }
-    return {
-      // Étape 8 : la signature est valide, mais le lecteur n'est pas destinataire (transfert subreptice).
-      status: fields.recipientIds.includes(keyring.userId.toLowerCase())
-        ? 'verified'
-        : 'recipients_mismatch',
-      message: {
-        ...fields,
-        senderIkPublic: Uint8Array.from(certificate.ikPublic),
-        signedPayload: parts.signedPayload,
-        signature: parts.signature,
-      },
     }
   } catch (error) {
     if (error instanceof Rejected) {
@@ -247,14 +248,14 @@ async function decrypted(
 
 /** `Plaintext = bytes(SignedPayload) || bytes(signature) || bytes(padding)` ; le padding est ignoré (point 7). */
 function plaintextParts(plaintext: Uint8Array): {
-  readonly signedPayload: Uint8Array<ArrayBuffer>
-  readonly signature: Uint8Array<ArrayBuffer>
+  readonly signedPayload: Uint8Array
+  readonly signature: Uint8Array
 } {
   try {
     const reader = CanonicalReader.unlabelled(plaintext)
-    const signedPayload = reader.bytes()
-    const signature = reader.bytes()
-    reader.bytes()
+    const signedPayload = reader.bytesView()
+    const signature = reader.bytesView()
+    reader.bytesView()
     reader.end()
     return { signedPayload, signature }
   } catch {

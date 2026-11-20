@@ -431,7 +431,10 @@ info_r     = struct("SEAL-wrap-v1", text(suite), uuid(messageId),
 - Le corps se compte en points de code après NFC : un émoji compte pour un (ADR 0030, point 6).
 - `padding` est vide au scellement en P0 ; à la lecture, toute longueur est acceptée et ignorée, dans la limite de
   MSG-21 (chiffré de 24 576 octets au plus) : il est chiffré mais non signé, et n'a aucun sens (ADR 0030, point 7).
-- La CEK et `Plaintext` sont remis à zéro dès qu'ils ont servi ; la CEK n'existe qu'en mémoire.
+- La CEK, `Plaintext` et `SignedPayload` sont remis à zéro dès qu'ils ont servi, refus compris : chaque copie que SEAL
+  maîtrise, et la CEK confiée à `@hpke` en `ArrayBuffer` exact, que la bibliothèque ne recopie pas. La CEK n'existe
+  qu'en mémoire. Restent hors de portée : les chaînes JavaScript (le corps décodé), les copies internes de WebCrypto
+  et le contenu rendu au lecteur (ADR 0030, point 9).
 
 ### 6.3 Sous-clé d'un destinataire (KEY-20)
 

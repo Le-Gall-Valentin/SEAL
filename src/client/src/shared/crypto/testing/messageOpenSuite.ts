@@ -15,6 +15,7 @@ import { sealMessage } from '../sealMessage'
 import { flipBase64Url, flipUuid } from './bytesForTests'
 import { vectorEnvelope as readEnvelope } from './envelopeVectorSuite'
 import { type MessageParties } from './messageParties'
+import { allZero, watchDecrypt, watchSigned } from './subtleWatch'
 import { base64url, decimal, type Json, record, records, string } from './vectorReader'
 
 export function describeMessageOpen(envelope: Json, parties: MessageParties, engine: string): void {
@@ -167,6 +168,35 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
       expect(result.status).toBe('recipients_mismatch')
       expect('message' in result ? result.message.body : undefined).toBe(string(fields, 'body'))
       expect('message' in result ? result.message.recipientIds : undefined).toEqual([senderId])
+    })
+
+    it('PROTOCOL.md 6.2 : à l’ouverture, la CEK, Plaintext et SignedPayload sont remis à zéro, refus compris', async () => {
+      const bob = await parties.bobKeyring()
+      const store = await pinnedStore()
+      const forged = records(envelope['forgeries']).find(
+        (forgery) => forgery['rejectedBy'] === 'signature_invalid',
+      )
+      for (const [name, sealed, status] of [
+        ['message des vecteurs', vectorEnvelope, 'verified'],
+        ['signature d’une autre IK', forged?.['envelope'], 'signature_invalid'],
+      ] as const) {
+        const [decrypted, signed] = [watchDecrypt(), watchSigned()]
+        let result
+        try {
+          result = await openMessage(store, bob, sealed, {
+            senderCertificate: certificate,
+            receivedAt: RECEIVED_AT,
+          })
+        } finally {
+          decrypted.restore()
+          signed.restore()
+        }
+
+        expect(result.status, name).toBe(status)
+        // La CEK, puis Plaintext ; SignedPayload, vérifié par l'IK du certificat.
+        expect(decrypted.seen, name).toHaveLength(2)
+        expect(allZero([...decrypted.seen, ...signed.seen]), name).toBe(true)
+      }
     })
 
     it('ADR 0030, point 7 : un padding non vide, jusqu’à 24 576 octets de chiffré (MSG-21), est accepté et ignoré', async () => {

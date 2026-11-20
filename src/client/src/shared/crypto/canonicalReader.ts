@@ -68,6 +68,11 @@ export class CanonicalReader {
     return Uint8Array.from(this.#field())
   }
 
+  /** Comme `bytes()`, mais en vue sur le tampon lu, sans copie : valable tant que l'appelant ne l'efface pas. */
+  bytesView(): Uint8Array {
+    return this.#field()
+  }
+
   /** PROTOCOL.md 2.1, ADR 0006 : UTF-8 strict, en forme NFC, comme l'écrit `text()`. */
   text(): string {
     let value: string
