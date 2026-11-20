@@ -7,10 +7,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { ServedCertificate } from '../certificate'
 import { type Keyring } from '../keyring'
 import { type KeyStore, openKeyStore, pinAuthority } from '../keystore'
-import { type EnvelopeWire } from '../messageFormat'
+import { toBase64Url } from '../base64url'
+import { type EnvelopeWire, type WrapWire } from '../messageFormat'
 import { openMessage } from '../openMessage'
 import { sealMessage } from '../sealMessage'
 import { flipBase64Url } from './bytesForTests'
+import { vectorEnvelope as readEnvelope } from './envelopeVectorSuite'
 import { type MessageParties } from './messageParties'
 import { base64url, decimal, type Json, record, records, string } from './vectorReader'
 
@@ -42,7 +44,7 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
 
   async function read(
     keyring: Keyring,
-    sealed: EnvelopeWire,
+    sealed: unknown,
     context: { senderCertificate?: ServedCertificate; receivedAt?: number } = {},
   ) {
     return openMessage(await pinnedStore(), keyring, sealed, {
@@ -51,7 +53,17 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
     })
   }
 
-  const vectorEnvelope = record(envelope['envelope']) as unknown as EnvelopeWire
+  const vectorEnvelope: EnvelopeWire = readEnvelope(record(envelope['envelope']))
+  const bobWrap = vectorEnvelope.wraps.find((wrap) => wrap.recipientId === bobId)
+  if (bobWrap === undefined) throw new Error('encapsulation de Bob attendue')
+
+  /** L'enveloppe des vecteurs, l'encapsulation de Bob remplacée par `change(…)`. */
+  function withBobWrap(change: (wrap: WrapWire) => unknown): unknown {
+    return {
+      ...vectorEnvelope,
+      wraps: vectorEnvelope.wraps.map((wrap) => (wrap === bobWrap ? change(wrap) : wrap)),
+    }
+  }
 
   describe(`CDC 7.7 : ouverture d'un message reçu (${engine})`, () => {
     it('CDC 7.7 : Bob ouvre le message des vecteurs, vérifié, avec son contenu signé', async () => {
@@ -96,24 +108,22 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
       const forgeries = records(envelope['forgeries'])
       expect(forgeries.length).toBeGreaterThan(8)
       for (const forgery of forgeries) {
-        expect(
-          (await read(bob, record(forgery['envelope']) as unknown as EnvelopeWire)).status,
-          string(forgery, 'name'),
-        ).toBe(string(forgery, 'rejectedBy'))
+        expect((await read(bob, forgery['envelope'])).status, string(forgery, 'name')).toBe(
+          string(forgery, 'rejectedBy'),
+        )
       }
     })
 
-    it('ADR 0030, point 7 : un padding non vide est accepté et ignoré', async () => {
-      const accepted = records(envelope['accepted'])[0] ?? {}
+    it('ADR 0030, point 7 : un padding non vide, jusqu’à 24 576 octets de chiffré (MSG-21), est accepté et ignoré', async () => {
+      const bob = await parties.bobKeyring()
+      const accepted = records(envelope['accepted'])
+      expect(accepted.length).toBeGreaterThan(1)
 
-      expect(
-        (
-          await read(
-            await parties.bobKeyring(),
-            record(accepted['envelope']) as unknown as EnvelopeWire,
-          )
-        ).status,
-      ).toBe('verified')
+      for (const vector of accepted) {
+        expect((await read(bob, vector['envelope'])).status, string(vector, 'name')).toBe(
+          'verified',
+        )
+      }
     })
 
     it('QA-04 : chaque octet du nonce, du chiffré, de enc, de la CEK encapsulée et du numéro de série, inversé, échoue', async () => {
@@ -204,21 +214,58 @@ export function describeMessageOpen(envelope: Json, parties: MessageParties, eng
       expect((await read(await parties.bobKeyring(), sealed)).status).toBe('undecryptable')
     })
 
-    it('CDC 7.7, étape 1 : une enveloppe illisible (version, suite, base64url, tailles) est refusée', async () => {
+    it('CDC 7.7, étape 1 : une enveloppe illisible (schéma, version, suite, base64url, tailles, MSG-21) est refusée', async () => {
       const bob = await parties.bobKeyring()
+      const withoutNonce = Object.fromEntries(
+        Object.entries(vectorEnvelope).filter(([key]) => key !== 'nonce'),
+      )
+      const short = toBase64Url(new Uint8Array(15))
       for (const [name, forged] of [
+        ['enveloppe nulle', null],
+        ['champ manquant', withoutNonce],
+        ['champ inconnu', { ...vectorEnvelope, extra: '' }],
+        ['champ inconnu dans une encapsulation', withBobWrap((wrap) => ({ ...wrap, extra: '' }))],
+        ['encapsulations absentes', { ...vectorEnvelope, wraps: null }],
         ['version 2', { ...vectorEnvelope, v: 2 }],
+        ['version booléenne', { ...vectorEnvelope, v: true }],
         ['autre suite', { ...vectorEnvelope, suite: 'SEAL1-XWING-A256GCM-ED25519' }],
-        ['nonce non canonique', { ...vectorEnvelope, nonce: `${vectorEnvelope.nonce}=` }],
         ['messageId hors de la forme UUID', { ...vectorEnvelope, messageId: 'message' }],
+        [
+          'conversationId en majuscules',
+          { ...vectorEnvelope, conversationId: vectorEnvelope.conversationId.toUpperCase() },
+        ],
+        ['senderId en majuscules', { ...vectorEnvelope, senderId: senderId.toUpperCase() }],
+        [
+          'recipientId en majuscules',
+          withBobWrap((wrap) => ({ ...wrap, recipientId: wrap.recipientId.toUpperCase() })),
+        ],
+        ['nonce non canonique', { ...vectorEnvelope, nonce: `${vectorEnvelope.nonce}=` }],
         ['nonce de 11 octets', { ...vectorEnvelope, nonce: 'AAAAAAAAAAAAAAA' }],
+        ['numéro de série de 15 octets', { ...vectorEnvelope, senderCertSerial: short }],
+        ['ekId de 15 octets', withBobWrap((wrap) => ({ ...wrap, ekId: short }))],
+        [
+          'enc de 31 octets',
+          withBobWrap((wrap) => ({ ...wrap, enc: toBase64Url(new Uint8Array(31)) })),
+        ],
+        [
+          'wrappedCek de 47 octets',
+          withBobWrap((wrap) => ({ ...wrap, wrappedCek: toBase64Url(new Uint8Array(47)) })),
+        ],
         ['chiffré plus court que son étiquette', { ...vectorEnvelope, ciphertext: 'AAAA' }],
+        [
+          'chiffré de plus de 24 576 octets',
+          { ...vectorEnvelope, ciphertext: toBase64Url(new Uint8Array(24_577)) },
+        ],
         [
           '52 encapsulations',
           {
             ...vectorEnvelope,
             wraps: Array.from({ length: 26 }, () => vectorEnvelope.wraps).flat(),
           },
+        ],
+        [
+          'deux encapsulations pour Bob',
+          { ...vectorEnvelope, wraps: [...vectorEnvelope.wraps, bobWrap] },
         ],
       ] as const) {
         expect((await read(bob, forged)).status, name).toBe('integrity_failed')

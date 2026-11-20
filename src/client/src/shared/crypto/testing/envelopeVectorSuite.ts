@@ -8,6 +8,7 @@ import { openCek, sealCek } from '../hpke'
 import {
   decodeSignedPayload,
   type EnvelopeHeader,
+  type EnvelopeWire,
   encodeMessageAad,
   encodeSignedPayload,
   encodeWrapInfo,
@@ -42,6 +43,26 @@ export async function vectorX25519Private(raw: Uint8Array): Promise<CryptoKey> {
   return crypto.subtle.importKey('pkcs8', concat(X25519_PKCS8_PREFIX, raw), 'X25519', false, [
     'deriveBits',
   ])
+}
+
+/** L'enveloppe d'un vecteur, lue champ par champ (sans transtypage). */
+export function vectorEnvelope(json: Json): EnvelopeWire {
+  return {
+    v: number(json, 'v'),
+    suite: string(json, 'suite'),
+    messageId: string(json, 'messageId'),
+    conversationId: string(json, 'conversationId'),
+    senderId: string(json, 'senderId'),
+    senderCertSerial: string(json, 'senderCertSerial'),
+    nonce: string(json, 'nonce'),
+    ciphertext: string(json, 'ciphertext'),
+    wraps: records(json['wraps']).map((wrap) => ({
+      recipientId: string(wrap, 'recipientId'),
+      ekId: string(wrap, 'ekId'),
+      enc: string(wrap, 'enc'),
+      wrappedCek: string(wrap, 'wrappedCek'),
+    })),
+  }
 }
 
 export function vectorFields(json: Json): SignedPayloadFields {

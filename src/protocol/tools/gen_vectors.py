@@ -1358,6 +1358,10 @@ def sender_certificate() -> dict:
 # côté de TypeScript. Le générateur ne publie une falsification que si elle rend le statut qu'il annonce.
 
 B64URL_ALPHABET = re.compile(r"^[A-Za-z0-9_-]*$")
+LOWERCASE_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+ENVELOPE_KEYS = {"v", "suite", "messageId", "conversationId", "senderId", "senderCertSerial", "nonce", "ciphertext", "wraps"}
+WRAP_KEYS = {"recipientId", "ekId", "enc", "wrappedCek"}
+MAX_CIPHERTEXT_BYTES = 24 * 1024  # MSG-21 : chiffré de 24 Kio au plus (ADR 0030, point 7)
 
 
 class Refused(Exception):
@@ -1461,35 +1465,47 @@ def decode_signed_payload(data: bytes) -> dict:
     return f
 
 
-def decode_envelope(envelope: dict) -> dict:
-    """CDC 7.7, étape 1 : base64url canonique, tailles, version et suite."""
-    if envelope["v"] != MESSAGE_VERSION or envelope["suite"] != MESSAGE_SUITE:
+def decode_envelope(envelope: object) -> dict:
+    """
+    CDC 7.7, étape 1 : objet strict, UUID en minuscules, base64url canonique, tailles, version, suite et MSG-21
+    (chiffré de 24 576 octets au plus, 50 encapsulations au plus, une par destinataire).
+    """
+    if not isinstance(envelope, dict) or set(envelope) != ENVELOPE_KEYS:
+        raise Rejected("enveloppe hors du schéma")
+    if not is_integer(envelope["v"]) or envelope["v"] != MESSAGE_VERSION or envelope["suite"] != MESSAGE_SUITE:
         raise Rejected("version ou suite")
-    def canonical(value: str) -> str:
-        uuid(value)
-        return value.lower()
+
+    def lowercase(value: object) -> str:
+        if not isinstance(value, str) or not LOWERCASE_UUID.fullmatch(value):
+            raise Rejected("UUID hors de la forme canonique en minuscules")
+        return value
 
     header = {
         "v": MESSAGE_VERSION,
         "suite": MESSAGE_SUITE,
-        "messageId": canonical(envelope["messageId"]),
-        "conversationId": canonical(envelope["conversationId"]),
-        "senderId": canonical(envelope["senderId"]),
+        "messageId": lowercase(envelope["messageId"]),
+        "conversationId": lowercase(envelope["conversationId"]),
+        "senderId": lowercase(envelope["senderId"]),
         "senderCertSerial": strict_b64url(envelope["senderCertSerial"], 16),
     }
     ciphertext = strict_b64url(envelope["ciphertext"])
-    if len(ciphertext) < 16 or len(envelope["wraps"]) > 50:
-        raise Rejected("chiffré trop court ou trop d'encapsulations")
-    wraps = [
+    wraps = envelope["wraps"]
+    if not 16 <= len(ciphertext) <= MAX_CIPHERTEXT_BYTES or not isinstance(wraps, list) or len(wraps) > 50:
+        raise Rejected("MSG-21 : taille du chiffré ou nombre d'encapsulations")
+    if any(not isinstance(wrap, dict) or set(wrap) != WRAP_KEYS for wrap in wraps):
+        raise Rejected("encapsulation hors du schéma")
+    decoded = [
         {
-            "recipientId": canonical(wrap["recipientId"]),
+            "recipientId": lowercase(wrap["recipientId"]),
             "ekId": strict_b64url(wrap["ekId"], 16),
             "enc": strict_b64url(wrap["enc"], 32),
             "wrappedCek": strict_b64url(wrap["wrappedCek"], 48),
         }
-        for wrap in envelope["wraps"]
+        for wrap in wraps
     ]
-    return {"header": header, "nonce": strict_b64url(envelope["nonce"], 12), "ciphertext": ciphertext, "wraps": wraps}
+    if len({wrap["recipientId"] for wrap in decoded}) != len(decoded):
+        raise Rejected("MSG-21 : une encapsulation par destinataire")
+    return {"header": header, "nonce": strict_b64url(envelope["nonce"], 12), "ciphertext": ciphertext, "wraps": decoded}
 
 
 def verified_certificate(served: dict, subject_id: str, at: int) -> dict:
@@ -1517,22 +1533,17 @@ def open_message(envelope: dict, reader_id: str, reader_keys: dict, served_certi
         try:
             decoded = decode_envelope(envelope)
             aad = message_aad(decoded["header"])
-        except (Rejected, KeyError, TypeError, ValueError) as error:
+        except (Rejected, KeyError, TypeError, ValueError, AttributeError) as error:
             raise Refused("integrity_failed") from error
         header = decoded["header"]
-        cek = None
-        for wrap in decoded["wraps"]:
-            ek_private = reader_keys.get(wrap["ekId"])
-            if wrap["recipientId"] != reader_id or ek_private is None:
-                continue
-            try:
-                cek = hpke_open(ek_private, wrap["enc"], wrap_info(header, reader_id, wrap["ekId"]), aad,
-                                wrap["wrappedCek"])
-                break
-            except (InvalidTag, ValueError):
-                continue
-        if cek is None:
+        wrap = next((wrap for wrap in decoded["wraps"] if wrap["recipientId"] == reader_id), None)
+        ek_private = None if wrap is None else reader_keys.get(wrap["ekId"])
+        if wrap is None or ek_private is None:
             raise Refused("undecryptable")
+        try:
+            cek = hpke_open(ek_private, wrap["enc"], wrap_info(header, reader_id, wrap["ekId"]), aad, wrap["wrappedCek"])
+        except (InvalidTag, ValueError) as error:
+            raise Refused("undecryptable") from error
         try:
             plaintext = crypto_lib().AESGCM(cek).decrypt(decoded["nonce"], decoded["ciphertext"], aad)
             parts = Reader(plaintext)
@@ -1599,6 +1610,14 @@ def build_envelope() -> str:
         wraps[bob_wrap].update(changes)
         return dict(envelope, wraps=wraps)
 
+    def padded_to(ciphertext_bytes: int, label: str) -> dict:
+        """Le message des vecteurs, rechiffré avec le padding qui donne un chiffré de `ciphertext_bytes` octets."""
+        # Plaintext = bytes(SignedPayload) || bytes(signature) || bytes(padding), puis l'étiquette GCM de 16 octets.
+        padding = ciphertext_bytes - (4 + len(signed_payload) + 4 + len(signature) + 4 + 16)
+        return seal_message(header, signed_payload, signature, fields["recipientIds"], label, padding=bytes(padding))[
+            "envelope"
+        ]
+
     unsorted = signed_payload_fields(recipientIds=list(reversed(fields["recipientIds"])))
     unsorted_payload = encode(signed_payload_struct(unsorted))
     absent_payload = encode(signed_payload_struct(signed_payload_fields(recipientIds=[USER_ID])))
@@ -1657,6 +1676,14 @@ def build_envelope() -> str:
             seal_message(header, absent_payload, sign(IK_SEED, absent_payload), [VICTIM_ID], "absent")["envelope"],
             "recipients_mismatch",
         ),
+        message_forgery("un champ inconnu dans l'enveloppe", dict(envelope, extra=""), "integrity_failed"),
+        message_forgery("un champ inconnu dans l'encapsulation de Bob", with_wrap(extra=""), "integrity_failed"),
+        message_forgery("le messageId en majuscules", dict(envelope, messageId=envelope["messageId"].upper()),
+                        "integrity_failed"),
+        message_forgery("deux encapsulations pour Bob (MSG-21)",
+                        dict(envelope, wraps=envelope["wraps"] + [envelope["wraps"][bob_wrap]]), "integrity_failed"),
+        message_forgery("un chiffré de 24 577 octets, pourtant signé (MSG-21)",
+                        padded_to(MAX_CIPHERTEXT_BYTES + 1, "24 577 octets"), "integrity_failed"),
         message_forgery(
             "une liste de destinataires non triée, pourtant signée",
             seal_message(header, unsorted_payload, sign(IK_SEED, unsorted_payload), [VICTIM_ID], "non triée")["envelope"],
@@ -1704,7 +1731,10 @@ def build_envelope() -> str:
         # serverReceivedAt du message, en chaîne décimale comme tout u64 (PROTOCOL.md, 2.5).
         "receivedAt": str(RECEIVED_AT),
         "envelope": envelope,
-        "accepted": [accepted_envelope("padding de 7 octets, ignoré (ADR 0030, point 7)", padded)],
+        "accepted": [
+            accepted_envelope("padding de 7 octets, ignoré (ADR 0030, point 7)", padded),
+            accepted_envelope("chiffré de 24 576 octets exactement (MSG-21)", padded_to(MAX_CIPHERTEXT_BYTES, "24 576 octets")),
+        ],
         "forgeries": forgeries,
     }
     return json.dumps(document, ensure_ascii=True, indent=2) + "\n"

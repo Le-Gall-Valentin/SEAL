@@ -1,6 +1,7 @@
 /**
  * CDC 7.7, PROTOCOL.md 6.5 (ADR 0030, point 4) : ouverture et vérification d'un message reçu, en échouant fermé.
  */
+import { z } from 'zod'
 import { fromBase64Url } from './base64url'
 import { equalBytes } from './bytes'
 import { CanonicalReader } from './canonicalReader'
@@ -10,12 +11,10 @@ import { openCek } from './hpke'
 import { type Keyring, keyringSecrets } from './keyring'
 import type { KeyStore } from './keystore'
 import {
-  canonicalUuid,
   decodeSignedPayload,
   encodeMessageAad,
   encodeWrapInfo,
   type EnvelopeHeader,
-  type EnvelopeWire,
   MAX_RECIPIENTS,
   MESSAGE_SUITE,
   MessageFormatError,
@@ -28,6 +27,36 @@ const ENC_BYTES = 32
 const WRAPPED_CEK_BYTES = 48
 /** Étiquette AES-GCM de 128 bits : un chiffré en compte au moins 16 octets. */
 const TAG_BYTES = 16
+/** MSG-21 : chiffré de 24 Kio au plus, une fois décodé (ADR 0030, point 7). */
+const MAX_CIPHERTEXT_BYTES = 24 * 1024
+
+/** RFC 9562, forme canonique : 8-4-4-4-12 en minuscules (ADR 0030, point 4). */
+const LOWERCASE_UUID = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+
+/** CDC 7.7, étape 1 : schéma de l'enveloppe, sans champ inconnu ; les octets sont relus ensuite par `sized`. */
+const EnvelopeSchema = z.strictObject({
+  v: z.literal(1),
+  suite: z.literal(MESSAGE_SUITE),
+  messageId: LOWERCASE_UUID,
+  conversationId: LOWERCASE_UUID,
+  senderId: LOWERCASE_UUID,
+  senderCertSerial: z.string(),
+  nonce: z.string(),
+  // En base64url, 24 Kio tiennent en 32 768 caractères : rien de plus long n'est décodé.
+  ciphertext: z.string().max(Math.ceil(MAX_CIPHERTEXT_BYTES / 3) * 4),
+  wraps: z
+    .array(
+      z.strictObject({
+        recipientId: LOWERCASE_UUID,
+        ekId: z.string(),
+        enc: z.string(),
+        wrappedCek: z.string(),
+      }),
+    )
+    .max(MAX_RECIPIENTS),
+})
 
 /** CDC 7.7 : état d'un message reçu, du point de vue de la cryptographie (ADR 0030, point 4). */
 export type MessageRejection =
@@ -64,6 +93,7 @@ class Rejected extends Error {
 
 interface DecodedEnvelope {
   readonly header: EnvelopeHeader
+  readonly aad: Uint8Array<ArrayBuffer>
   readonly nonce: Uint8Array<ArrayBuffer>
   readonly ciphertext: Uint8Array<ArrayBuffer>
   readonly wraps: readonly {
@@ -83,13 +113,12 @@ interface DecodedEnvelope {
 export async function openMessage(
   store: KeyStore,
   keyring: Keyring,
-  envelope: EnvelopeWire,
+  envelope: unknown,
   context: IncomingContext,
 ): Promise<OpenedMessage> {
   try {
     const decoded = decodeEnvelope(envelope)
-    const aad = encodeMessageAad(decoded.header)
-    const plaintext = await decrypted(keyring, decoded, aad)
+    const plaintext = await decrypted(keyring, decoded)
     let parts
     try {
       parts = plaintextParts(plaintext)
@@ -121,30 +150,36 @@ export async function openMessage(
   }
 }
 
-/** Étape 1 : base64url canonique, tailles, version et suite ; tout écart vaut `integrity_failed`. */
-function decodeEnvelope(envelope: EnvelopeWire): DecodedEnvelope {
+/**
+ * Étape 1 : schéma strict (aucun champ inconnu, UUID en minuscules), base64url canonique, tailles, version, suite et
+ * MSG-21 (chiffré de 24 576 octets au plus, 50 encapsulations au plus, une par destinataire) ; tout écart vaut
+ * `integrity_failed`. L'AAD est calculée ici : un en-tête impossible à encoder est refusé de même.
+ */
+function decodeEnvelope(envelope: unknown): DecodedEnvelope {
   try {
-    if (envelope.v !== 1 || envelope.suite !== MESSAGE_SUITE) {
-      throw new MessageFormatError('enveloppe : version ou suite inconnues')
-    }
+    const parsed = EnvelopeSchema.parse(envelope)
     const header: EnvelopeHeader = {
       v: 1,
       suite: MESSAGE_SUITE,
-      messageId: canonicalUuid(envelope.messageId),
-      conversationId: canonicalUuid(envelope.conversationId),
-      senderId: canonicalUuid(envelope.senderId),
-      senderCertSerial: sized(envelope.senderCertSerial, SERIAL_BYTES),
+      messageId: parsed.messageId,
+      conversationId: parsed.conversationId,
+      senderId: parsed.senderId,
+      senderCertSerial: sized(parsed.senderCertSerial, SERIAL_BYTES),
     }
-    const ciphertext = fromBase64Url(envelope.ciphertext)
-    if (ciphertext.length < TAG_BYTES || envelope.wraps.length > MAX_RECIPIENTS) {
-      throw new MessageFormatError('enveloppe : chiffré trop court ou trop d’encapsulations')
+    const ciphertext = fromBase64Url(parsed.ciphertext)
+    if (ciphertext.length < TAG_BYTES || ciphertext.length > MAX_CIPHERTEXT_BYTES) {
+      throw new MessageFormatError('MSG-21 : chiffré de 16 à 24 576 octets')
+    }
+    if (new Set(parsed.wraps.map((wrap) => wrap.recipientId)).size !== parsed.wraps.length) {
+      throw new MessageFormatError('MSG-21 : une encapsulation par destinataire')
     }
     return {
       header,
-      nonce: sized(envelope.nonce, NONCE_BYTES),
+      aad: encodeMessageAad(header),
+      nonce: sized(parsed.nonce, NONCE_BYTES),
       ciphertext,
-      wraps: envelope.wraps.map((wrap) => ({
-        recipientId: canonicalUuid(wrap.recipientId),
+      wraps: parsed.wraps.map((wrap) => ({
+        recipientId: wrap.recipientId,
         ekId: sized(wrap.ekId, EK_ID_BYTES),
         enc: sized(wrap.enc, ENC_BYTES),
         wrappedCek: sized(wrap.wrappedCek, WRAPPED_CEK_BYTES),
@@ -156,45 +191,42 @@ function decodeEnvelope(envelope: EnvelopeWire): DecodedEnvelope {
 }
 
 /**
- * Étapes 3 et 4 : une encapsulation pour soi, dont la sous-clé est dans le trousseau, ouverte par HPKE (sinon
+ * Étapes 3 et 4 : l'encapsulation pour soi, dont la sous-clé est dans le trousseau, ouverte par HPKE (sinon
  * `undecryptable`) ; puis `Plaintext` déchiffré par AES-GCM sous l'AAD (sinon `integrity_failed`).
  */
 async function decrypted(
   keyring: Keyring,
   envelope: DecodedEnvelope,
-  aad: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array<ArrayBuffer>> {
   const readerId = keyring.userId.toLowerCase()
-  const { subkeyKeys } = keyringSecrets(keyring)
-  let cek: Uint8Array<ArrayBuffer> | undefined
-  for (const wrap of envelope.wraps) {
-    const index = keyring.subkeys.findIndex((subkey) => equalBytes(subkey.ekId, wrap.ekId))
-    const privateKey = subkeyKeys[index]
-    const subkey = keyring.subkeys[index]
-    if (wrap.recipientId !== readerId || privateKey === undefined || subkey === undefined) {
-      continue
-    }
-    try {
-      cek = await openCek(
-        { privateKey, publicKey: subkey.publicKey },
-        wrap.enc,
-        wrap.wrappedCek,
-        encodeWrapInfo(envelope.header, wrap.recipientId, wrap.ekId),
-        aad,
-      )
-      break
-    } catch {
-      // openCek ne lève que HpkeOpenError : une autre encapsulation pour soi peut encore s'ouvrir.
-    }
+  const wrap = envelope.wraps.find((candidate) => candidate.recipientId === readerId)
+  const index =
+    wrap === undefined
+      ? -1
+      : keyring.subkeys.findIndex((subkey) => equalBytes(subkey.ekId, wrap.ekId))
+  const privateKey = keyringSecrets(keyring).subkeyKeys[index]
+  const subkey = keyring.subkeys[index]
+  if (wrap === undefined || privateKey === undefined || subkey === undefined) {
+    throw new Rejected('undecryptable')
   }
-  if (cek === undefined) {
+  let cek: Uint8Array<ArrayBuffer>
+  try {
+    cek = await openCek(
+      { privateKey, publicKey: subkey.publicKey },
+      wrap.enc,
+      wrap.wrappedCek,
+      encodeWrapInfo(envelope.header, wrap.recipientId, wrap.ekId),
+      envelope.aad,
+    )
+  } catch {
+    // openCek ne lève que HpkeOpenError : autre clé, autre en-tête ou encapsulation altérée.
     throw new Rejected('undecryptable')
   }
   try {
     const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['decrypt'])
     return new Uint8Array(
       await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: envelope.nonce, additionalData: aad },
+        { name: 'AES-GCM', iv: envelope.nonce, additionalData: envelope.aad },
         key,
         envelope.ciphertext,
       ),

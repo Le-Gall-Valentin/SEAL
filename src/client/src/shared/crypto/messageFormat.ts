@@ -229,7 +229,7 @@ export function compareUuids(left: string, right: string): number {
 }
 
 /** Un UUID à la forme 8-4-4-4-12, rendu en minuscules. */
-export function canonicalUuid(value: string): string {
+function canonicalUuid(value: string): string {
   encodeUuid(value)
   return value.toLowerCase()
 }
