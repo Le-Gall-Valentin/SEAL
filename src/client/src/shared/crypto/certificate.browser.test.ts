@@ -167,6 +167,13 @@ describe('KEY-06 : le client vérifie le certificat reçu avant de l’enregistr
     await expectRejected(store, VALID, 'validity', OWNER, VALID.notBefore - SKEW_MS - 1)
   })
 
+  it('KEY-06 : un instant qui n’est pas un entier positif sûr refuse le certificat au lieu d’en sauter la validité', async () => {
+    const store = await pinnedStore()
+    for (const now of [Number.NaN, NOW + 0.5, -1, Number.MAX_SAFE_INTEGER + 1]) {
+      await expectRejected(store, VALID, 'validity', OWNER, now)
+    }
+  })
+
   it('ADR 0027, point 9 : une horloge en retard de 5 minutes au plus accepte le certificat tout juste émis', async () => {
     await storeOwnCertificate(await pinnedStore(), served(VALID), OWNER, VALID.notBefore - SKEW_MS)
     await storeOwnCertificate(await pinnedStore(), served(VALID), OWNER, VALID.notAfter - 1)

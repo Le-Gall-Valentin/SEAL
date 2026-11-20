@@ -101,8 +101,8 @@ async function verified(
 /**
  * KEY-06, KEY-20, CDC 7.7 (étape 6) : certificat d'un compte, sans titulaire attendu au-delà de son identifiant. Signé
  * par l'Autorité épinglée (KEY-11), pour `subjectId`, avec l'usage et la validité de KEY-04 à l'instant `at`, avec
- * `toleranceMs` de retard d'horloge avant `notBefore`. Rend ses champs vérifiés ; tout écart lève
- * CertificateRejectedError.
+ * `toleranceMs` de retard d'horloge avant `notBefore`. Un `at` qui n'est pas un entier positif sûr est refusé
+ * (`validity`), jamais ignoré (ADR 0030, point 4). Rend ses champs vérifiés ; tout écart lève CertificateRejectedError.
  */
 export async function verifyCertificate(
   store: KeyStore,
@@ -111,6 +111,10 @@ export async function verifyCertificate(
   at: number,
   toleranceMs: number,
 ): Promise<StoredCertificate> {
+  // Échec fermé : NaN, ou une date mal convertie, rendraient fausses les deux comparaisons de validité.
+  if (!Number.isSafeInteger(at) || at < 0) {
+    throw new CertificateRejectedError('validity')
+  }
   const certificate = decoded(served)
   const authority = await store.loadAuthority()
   if (authority === undefined) {

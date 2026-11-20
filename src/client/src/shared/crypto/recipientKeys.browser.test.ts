@@ -154,6 +154,17 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
     ).toBe('none')
   })
 
+  it('KEY-20 : un instant qui n’est pas un entier refuse le certificat du destinataire', async () => {
+    const ring = await keyring()
+    const store = await pinnedStore()
+
+    expect(
+      await refusal(
+        chooseSubkey(store, await servedKeys([await served(ring, 0)]), RECIPIENT, Number.NaN),
+      ),
+    ).toBe('certificate')
+  })
+
   it('ADR 0030, point 5 : une seule liaison invalide refuse toutes les clés du destinataire', async () => {
     const ring = await keyring()
     const [older, newer] = [await served(ring, 0), await served(ring, 1)]

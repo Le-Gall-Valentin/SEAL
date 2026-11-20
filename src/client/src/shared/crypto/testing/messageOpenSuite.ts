@@ -242,6 +242,16 @@ export function describeMessageOpen(
       ).toBe('signature_invalid')
     })
 
+    it('CDC 7.7, étape 6 : un serverReceivedAt qui n’est pas un entier refuse le certificat au lieu d’en sauter la validité', async () => {
+      const bob = await bobKeyring()
+
+      for (const receivedAt of [Number.NaN, RECEIVED_AT + 0.5]) {
+        expect((await read(bob, vectorEnvelope, { receivedAt })).status, String(receivedAt)).toBe(
+          'signature_invalid',
+        )
+      }
+    })
+
     it('CDC 7.7, étape 3 : sans encapsulation pour soi, le message est illisible sur cet appareil', async () => {
       const own = recipients.find((recipient) => string(recipient, 'userId') === senderId) ?? {}
       const sealed = await sealMessage(await senderKeyring(), {
