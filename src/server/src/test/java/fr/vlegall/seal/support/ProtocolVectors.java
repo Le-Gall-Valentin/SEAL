@@ -138,14 +138,19 @@ public final class ProtocolVectors {
     }
 
     /**
-     * Millisecondes Unix d'une structure signée : un {@code u64} en chaîne décimale (ADR 0006, point 5 ; PROTOCOL.md,
-     * 2.5). Un nombre JSON est refusé : au-delà de 2^53, {@code JSON.parse} en perdrait la précision côté client.
+     * Un {@code u64} en chaîne décimale, au plus 2^63 - 1 (ADR 0006, point 5 ; PROTOCOL.md, 2.5). Un nombre JSON est
+     * refusé : au-delà de 2^53, {@code JSON.parse} en perdrait la précision côté client.
      */
-    public static Instant instant(JsonNode node, String field) {
+    public static long u64(JsonNode node, String field) {
         JsonNode value = node.get(field);
         if (value == null || !value.isString()) {
             throw new IllegalArgumentException(field + " : u64 attendu en chaîne décimale");
         }
-        return Instant.ofEpochMilli(Long.parseUnsignedLong(value.asString()));
+        return Long.parseLong(value.asString());
+    }
+
+    /** Millisecondes Unix d'une structure signée : un {@code u64} en chaîne décimale. */
+    public static Instant instant(JsonNode node, String field) {
+        return Instant.ofEpochMilli(u64(node, field));
     }
 }

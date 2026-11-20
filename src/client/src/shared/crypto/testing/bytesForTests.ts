@@ -23,7 +23,7 @@ export const SMALL_ORDER_X25519: readonly (readonly [string, string])[] = [
   ['1, bit haut', '0100000000000000000000000000000000000000000000000000000000000080'],
 ]
 
-/** Le texte base64url `text`, l'octet `index` inversé (bit de poids faible). */
+/** Le texte base64url `text`, l'octet `index` modifié (son bit de poids faible inversé). */
 export function flipBase64Url(text: string, index: number): string {
   const bytes = fromBase64Url(text)
   const view = new DataView(bytes.buffer)

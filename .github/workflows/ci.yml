@@ -53,8 +53,9 @@ jobs:
         with:
           python-version: '3.12'
 
-      # ADR 0025, point 3 : cryptography signe les vecteurs de la section 4, installée seulement depuis les
-      # fichiers dont tools/requirements.txt fixe l'empreinte.
+      # ADR 0025, point 3 et ADR 0030, point 2 : cryptography signe les vecteurs de la section 4 et vérifie
+      # l'HPKE de la section 6 (cryptography.hpke, 50.0.2) ; installée seulement depuis les fichiers dont
+      # tools/requirements.txt fixe l'empreinte.
       - run: python3 -m pip install --require-hashes --no-deps -r tools/requirements.txt
 
       # MSG-02, ADR 0006 : les vecteurs relus par Java et TypeScript sont exactement ceux que produit

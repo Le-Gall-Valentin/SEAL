@@ -1,6 +1,7 @@
 package fr.vlegall.seal.crypto;
 
 import static fr.vlegall.seal.support.ProtocolVectors.bytes;
+import static fr.vlegall.seal.support.ProtocolVectors.u64;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.support.ProtocolVectors;
@@ -24,11 +25,6 @@ class EnvelopeVectorsTest {
 
     private static String text(JsonNode node, String field) {
         return node.get(field).asString();
-    }
-
-    /** u64 en chaîne décimale (PROTOCOL.md, 2.5). */
-    private static long u64(JsonNode node, String field) {
-        return Long.parseLong(text(node, field));
     }
 
     private static byte[] signedPayload() {

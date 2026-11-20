@@ -106,6 +106,7 @@ export async function messageParties(
     signature: string(certificateJson, 'signature'),
   }
   const sentAt = decimal(record(record(envelope['message'])['fields']), 'sentAt')
+  const receivedAt = decimal(envelope, 'receivedAt')
   const bobIdentity = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, [
     'sign',
     'verify',
@@ -196,7 +197,7 @@ export async function messageParties(
     bobId,
     senderCertificate,
     authorityPublicKey: base64url(ca, 'publicKey'),
-    receivedAt: sentAt + 1_500,
+    receivedAt,
     senderKeyring,
     bobKeyring,
     servedKeys,

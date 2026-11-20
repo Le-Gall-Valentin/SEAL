@@ -476,14 +476,16 @@ L'AAD et `info_r` portent l'en-tête : un en-tête modifié par le serveur fait 
 
 `vectors/envelope.json` donne un message d'un compte à lui-même et à Bob : les champs de `SignedPayload` (u64 en
 chaîne décimale), ses octets et sa signature, la CEK, le nonce, `Plaintext`, l'AAD, le chiffré, chaque `info_r`,
-`enc` et `wrappedCek`, et l'enveloppe. L'émetteur est celui de `identity.json` et de `vault.json` (IK : graine du test
-2 de la RFC 8032 ; EK : clé privée d'Alice de la RFC 7748) ; Bob a la clé privée de Bob de la RFC 7748. Les
+`enc` et `wrappedCek`, l'enveloppe et son `serverReceivedAt` (`receivedAt`, chaîne décimale). L'émetteur est celui
+de `identity.json` et de `vault.json` (IK : graine du test 2 de la RFC 8032 ; EK : clé privée d'Alice de la RFC
+7748) ; l'EK de Bob dérive de « SEAL vecteurs, EK de Bob » (DeriveKeyPair), sans clé commune avec `vault.json`. Les
 clés éphémères dérivent de `ikmE` (DeriveKeyPair, RFC 9180, 7.1.3), pour que chaque implémentation reproduise les
-encapsulations à l'octet près.
+encapsulations à l'octet près. Hors du message principal, chaque enveloppe chiffre sous une CEK et un nonce propres.
 
 L'API HPKE de `cryptography` ne prend pas d'AAD : `gen_vectors.py` compose le mode base de la RFC 9180 avec ses
 primitives, se vérifie contre le vecteur A.1.1 de la RFC 9180, puis contre `cryptography.hpke` avec une AAD vide, dans
-les deux sens (ADR 0030, point 2). `accepted` donne une enveloppe à padding non vide, qui s'ouvre ; `forgeries` donne
+les deux sens (ADR 0030, point 2). Il ouvre ensuite chaque enveloppe selon 6.5 et refuse de publier un vecteur dont le
+statut diffère de celui qu'il annonce. `accepted` donne des enveloppes qui s'ouvrent ; `forgeries` donne
 des enveloppes que Bob NE DOIT PAS accepter, chacune avec le statut attendu (`rejectedBy`) : octet du chiffré, du
 nonce, de `enc` ou de `wrappedCek` ; en-tête déplacé dans une autre conversation ; message signé rechiffré par Bob
 dans une autre conversation (transfert subreptice), sous un autre `messageId`, sous un autre émetteur annoncé ou sous
