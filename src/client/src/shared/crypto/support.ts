@@ -4,6 +4,7 @@
  * deux côtés d'un échange X25519 doivent dériver le même secret.
  */
 import { generateX25519 } from './webcrypto'
+import { equalBytes } from './bytes'
 
 const PROBE = new TextEncoder().encode('SEAL KEY-01')
 
@@ -34,13 +35,8 @@ async function x25519Works(): Promise<boolean> {
     bob.privateKey,
     256,
   )
-  return equal(new Uint8Array(fromAlice), new Uint8Array(fromBob))
-}
-
-function equal(left: Uint8Array, right: Uint8Array): boolean {
+  // Un secret partagé X25519 fait 32 octets : une dérivation plus courte ne prouve rien.
   return (
-    left.length === 32 &&
-    left.length === right.length &&
-    left.every((byte, index) => byte === right[index])
+    fromAlice.byteLength === 32 && equalBytes(new Uint8Array(fromAlice), new Uint8Array(fromBob))
   )
 }

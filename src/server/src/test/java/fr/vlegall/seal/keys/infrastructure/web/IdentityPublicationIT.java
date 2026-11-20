@@ -25,6 +25,7 @@ import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -174,6 +175,17 @@ class IdentityPublicationIT {
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
         victim.putIdentity(proof(victim.id, stolen, victim.ik)).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("KEY-03 : l'expiration du défi est servie à la milliseconde, comme les autres dates de l'API")
+    void key03ChallengeExpiryIsServedToTheMillisecond() throws Exception {
+        KeysTestClient account = account("pop_milli");
+        clock.advance(Duration.ofNanos(123_457));
+
+        String expiresAt = account.challengeBody().get("expiresAt").asString();
+
+        assertThat(expiresAt).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z");
     }
 
     @Test

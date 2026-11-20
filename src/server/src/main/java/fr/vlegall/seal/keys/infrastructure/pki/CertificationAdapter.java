@@ -1,9 +1,9 @@
 package fr.vlegall.seal.keys.infrastructure.pki;
 
 import fr.vlegall.seal.common.UserId;
-import fr.vlegall.seal.keys.domain.model.CurrentCertificate;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
+import fr.vlegall.seal.pki.application.port.in.CertificateDetails;
 import fr.vlegall.seal.pki.application.port.in.CurrentCertificateQuery;
 import fr.vlegall.seal.pki.application.port.in.IssueCertificateUseCase;
 import java.util.Optional;
@@ -23,23 +23,24 @@ public class CertificationAdapter implements CertificationPort {
 
     @Override
     public Optional<IdentityCertificate> certify(UserId subject, String username, byte[] ikPublic) {
-        return issuance.issue(subject, username, ikPublic)
-                .map(issued -> new IdentityCertificate(
-                        issued.serial(),
-                        issued.issuerKeyId(),
-                        issued.subject(),
-                        issued.username(),
-                        issued.ikPublic(),
-                        issued.notBefore(),
-                        issued.notAfter(),
-                        issued.usage(),
-                        issued.signature()));
+        return issuance.issue(subject, username, ikPublic).map(CertificationAdapter::toCertificate);
     }
 
     @Override
-    public Optional<CurrentCertificate> current(UserId subject) {
-        return currentCertificates
-                .current(subject)
-                .map(certificate -> new CurrentCertificate(certificate.serial(), certificate.ikPublic()));
+    public Optional<IdentityCertificate> current(UserId subject) {
+        return currentCertificates.current(subject).map(CertificationAdapter::toCertificate);
+    }
+
+    private static IdentityCertificate toCertificate(CertificateDetails details) {
+        return new IdentityCertificate(
+                details.serial(),
+                details.issuerKeyId(),
+                details.subject(),
+                details.username(),
+                details.ikPublic(),
+                details.notBefore(),
+                details.notAfter(),
+                details.usage(),
+                details.signature());
     }
 }

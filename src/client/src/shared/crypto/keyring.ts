@@ -8,9 +8,17 @@
  */
 import { z } from 'zod'
 import { fromBase64Url, toBase64Url } from './base64url'
+import { equalBytes } from './bytes'
 import { KEM, type Kem } from './identity'
-import { generateRecoveryKey, type RecoveryKey } from './recovery'
-import { openVaultBytes, sealVault, type VaultPayload, VaultOpenError } from './vault'
+import { type RecoveryKey } from './recovery'
+import {
+  decryptBlob,
+  openVaultBytes,
+  sealNextVersion,
+  sealVault,
+  type VaultPayload,
+  VaultOpenError,
+} from './vault'
 import { generateX25519 } from './webcrypto'
 
 const FORMAT_VERSION = 1
@@ -82,7 +90,6 @@ export function keyringSecrets(keyring: Keyring): KeyringSecrets {
 
 export interface NewKeyring {
   readonly keyring: Keyring
-  readonly recoveryKey: RecoveryKey
   readonly vault: VaultPayload
 }
 
@@ -144,10 +151,15 @@ export function serializeKeyring(keyring: KeyringExport): Uint8Array<ArrayBuffer
 }
 
 /**
- * KEY-02, KEY-40 : IK, EK et VDK neuves, la clé de récupération et le premier coffre (version 1). Rien n'est publié
- * ni enregistré ici : le parcours de première connexion le fera, coffre d'abord.
+ * KEY-02, KEY-40 : IK, EK et VDK neuves, et le premier coffre (version 1) sous la clé de récupération que
+ * l'utilisateur vient de confirmer (ADR 0029, point 2). Rien n'est publié ni enregistré ici : le parcours de première
+ * connexion le fera, coffre d'abord.
  */
-export async function generateKeyring(userId: string, now: number): Promise<NewKeyring> {
+export async function generateKeyring(
+  userId: string,
+  recoveryKey: RecoveryKey,
+  now: number,
+): Promise<NewKeyring> {
   // KEY-40 : chaque tampon secret est remis à zéro à la sortie, même sur une exception.
   const buffers: Uint8Array[] = []
   const held = <T extends Uint8Array>(buffer: T): T => {
@@ -174,7 +186,6 @@ export async function generateKeyring(userId: string, now: number): Promise<NewK
         createdAt: now,
       }),
     )
-    const recoveryKey = generateRecoveryKey()
     const vault = await sealVault({ userId, vaultVersion: 1, recoveryKey, vdk, plaintext })
     const keyring = createKeyring(
       {
@@ -196,7 +207,7 @@ export async function generateKeyring(userId: string, now: number): Promise<NewK
         vdk: await crypto.subtle.importKey('raw', vdk, 'AES-GCM', false, ['encrypt', 'decrypt']),
       },
     )
-    return { keyring, recoveryKey, vault }
+    return { keyring, vault }
   } finally {
     for (const buffer of buffers) {
       buffer.fill(0)
@@ -214,6 +225,137 @@ export async function openVault(
   recoveryKey: RecoveryKey,
 ): Promise<Keyring> {
   const { vdk, plaintext } = await openVaultBytes(userId, payload, recoveryKey)
+  return keyringFromPlaintext(userId, plaintext, vdk)
+}
+
+/**
+ * KEY-32, PROTOCOL.md 5.5 : relit une version du coffre avec la seule VDK du trousseau, sans la clé de récupération ;
+ * mêmes contrôles et mêmes refus que openVault. Le trousseau relu DOIT contenir toutes les sous-clés de celui de
+ * l'appareil : une version plus ancienne, resservie, en perdrait ('keyring').
+ */
+export async function reopenVault(keyring: Keyring, payload: VaultPayload): Promise<Keyring> {
+  const { vdk } = keyringSecrets(keyring)
+  const plaintext = await decryptBlob(keyring.userId, payload, vdk)
+  const reopened = await keyringFromPlaintext(keyring.userId, plaintext, vdk)
+  if (!keepsSubkeys(keyring, reopened.subkeys)) {
+    throw new VaultOpenError('keyring')
+  }
+  return reopened
+}
+
+/** PROTOCOL.md 5.5 : chaque sous-clé du trousseau de l'appareil se retrouve parmi `kept`. */
+function keepsSubkeys(keyring: Keyring, kept: readonly { readonly ekId: Uint8Array }[]): boolean {
+  return keyring.subkeys.every((local) =>
+    kept.some((subkey) => equalBytes(subkey.ekId, local.ekId)),
+  )
+}
+
+/**
+ * KEY-32, PROTOCOL.md 5.5 : ajoute au coffre une sous-clé neuve de 45 jours, en version suivante rechiffrée par la VDK.
+ * Le coffre relu DOIT contenir toutes les sous-clés du trousseau : une version plus ancienne, resservie, en
+ * perdrait. Rien n'est publié ni enregistré ici ; la sous-clé n'existe qu'en mémoire jusqu'à l'écriture du coffre.
+ */
+export async function addSubkey(
+  keyring: Keyring,
+  payload: VaultPayload,
+  now: number,
+): Promise<NewKeyring> {
+  const ek = await generateX25519(true, ['deriveBits'])
+  // KEY-40 : la clé privée exportée est remise à zéro à la sortie, même sur un refus du coffre relu.
+  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', ek.privateKey))
+  try {
+    return await nextVersion(keyring, payload, (eks) => [
+      ...eks,
+      {
+        ekId: crypto.getRandomValues(new Uint8Array(EK_ID_BYTES)),
+        kem: KEM,
+        pkcs8,
+        createdAt: now,
+        expiresAt: now + SUBKEY_VALIDITY_MS,
+      },
+    ])
+  } finally {
+    pkcs8.fill(0)
+  }
+}
+
+/**
+ * ADR 0029 (point 11), PROTOCOL.md 5.5 : redate une sous-clé jamais publiée (`createdAt` = `now`, 45 jours), en version
+ * suivante rechiffrée par la VDK : une reprise qui échoue réutilise la même sous-clé au lieu d'en ajouter une, et le
+ * coffre ne grossit pas. Aucune clé n'est retirée ; mêmes contrôles qu'addSubkey, et une sous-clé absente du coffre
+ * relu le refuse ('keyring').
+ */
+export async function redateSubkey(
+  keyring: Keyring,
+  payload: VaultPayload,
+  ekId: Uint8Array,
+  now: number,
+): Promise<NewKeyring> {
+  return nextVersion(keyring, payload, (eks) => {
+    if (!eks.some((subkey) => equalBytes(subkey.ekId, ekId))) {
+      throw new VaultOpenError('keyring')
+    }
+    return eks.map((subkey) =>
+      equalBytes(subkey.ekId, ekId)
+        ? { ...subkey, createdAt: now, expiresAt: now + SUBKEY_VALIDITY_MS }
+        : subkey,
+    )
+  })
+}
+
+/**
+ * PROTOCOL.md 5.5 : version suivante du coffre, rechiffrée par la VDK, après `edit` des sous-clés du trousseau relu. Le
+ * coffre relu DOIT contenir toutes les sous-clés de l'appareil.
+ */
+async function nextVersion(
+  keyring: Keyring,
+  payload: VaultPayload,
+  edit: (eks: readonly SubkeyExport[]) => readonly SubkeyExport[],
+): Promise<NewKeyring> {
+  const { userId } = keyring
+  const { vdk } = keyringSecrets(keyring)
+  const current = await decryptBlob(userId, payload, vdk)
+  // KEY-40 : chaque tampon secret est remis à zéro à la sortie, même sur une exception.
+  const buffers: Uint8Array[] = [current]
+  const held = <T extends Uint8Array>(buffer: T): T => {
+    buffers.push(buffer)
+    return buffer
+  }
+  try {
+    const json = parsedKeyring(userId, current)
+    const eks = json.eks.map((subkey) => ({
+      ekId: fromBase64Url(subkey.ekId),
+      kem: subkey.kem,
+      pkcs8: held(fromBase64Url(subkey.pkcs8)),
+      createdAt: subkey.createdAt,
+      expiresAt: subkey.expiresAt,
+    }))
+    if (!keepsSubkeys(keyring, eks)) {
+      throw new VaultOpenError('keyring')
+    }
+    const edited = edit(eks)
+    for (const subkey of edited) {
+      held(subkey.pkcs8)
+    }
+    const plaintext = held(
+      serializeKeyring({
+        userId,
+        ik: held(fromBase64Url(json.ik)),
+        eks: edited,
+        createdAt: json.createdAt,
+      }),
+    )
+    const vault = await sealNextVersion(userId, payload, vdk, plaintext)
+    return { keyring: await keyringFromPlaintext(userId, Uint8Array.from(plaintext), vdk), vault }
+  } finally {
+    for (const buffer of buffers) {
+      buffer.fill(0)
+    }
+  }
+}
+
+/** PROTOCOL.md 5.2 : relecture stricte du trousseau en clair ; tout écart refuse le coffre à l'étage 'keyring'. */
+function parsedKeyring(userId: string, plaintext: Uint8Array): z.infer<typeof KeyringJson> {
   try {
     const json = KeyringJson.parse(
       JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(plaintext)),
@@ -221,6 +363,20 @@ export async function openVault(
     if (json.userId !== userId) {
       throw new VaultOpenError('keyring')
     }
+    return json
+  } catch (error) {
+    throw error instanceof VaultOpenError ? error : new VaultOpenError('keyring', { cause: error })
+  }
+}
+
+/** Trousseau relu de son clair, clés importées non extractables ; le clair est remis à zéro à la sortie. */
+async function keyringFromPlaintext(
+  userId: string,
+  plaintext: Uint8Array<ArrayBuffer>,
+  vdk: CryptoKey,
+): Promise<Keyring> {
+  try {
+    const json = parsedKeyring(userId, plaintext)
     const identity = await importPrivate(fromBase64Url(json.ik), 'Ed25519', ['sign'])
     const subkeys = await Promise.all(
       json.eks.map(async (subkey) => {

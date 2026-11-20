@@ -3,7 +3,7 @@ import { Wordmark } from '@/shared/ui'
 
 /**
  * Accueil provisoire du lot 1 (ADR 0024, point 2) : le logo et le seul bouton « Se déconnecter », jusqu'aux
- * conversations (lot 3) et à la restauration des clés (noyau cryptographique). Écart temporaire à la maquette.
+ * conversations (lot 3). Il ne s'affiche qu'avec un trousseau complet (ADR 0029). Écart temporaire à la maquette.
  */
 export function HomePage() {
   return (

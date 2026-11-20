@@ -62,6 +62,10 @@ Ouvrez ensuite :
 - les courriels envoyés par SEAL, capturés par Mailpit : <http://localhost:8025>, où arrivent le code de
   vérification du courriel et le lien de réinitialisation du mot de passe.
 
+À la première connexion d'un compte, SEAL affiche sa clé de récupération (8 groupes de 4 caractères) et la fait
+confirmer avant de générer et de publier les clés (KEY-02, KEY-30). Notez-la : sur un nouveau navigateur, ou après
+avoir effacé les données du site, c'est elle qui restaure les clés du compte (KEY-33), et SEAL ne peut pas la retrouver.
+
 Pour arrêter SEAL : `docker compose down`. Pour effacer aussi la base et les données :
 `docker compose down -v`.
 
@@ -74,7 +78,8 @@ Chaque navigateur épingle la clé de l'Autorité au premier usage (KEY-11). Apr
 (`docker compose down -v`, ou volume `app-data` perdu), un navigateur déjà venu se bloque donc sur « Autorité SEAL
 modifiée » : c'est voulu, une autre clé pouvant être celle d'un attaquant. Pour repartir en local, effacez les données
 du site `https://localhost:8443` dans ce navigateur (dans Chrome : outils de développement, onglet Application,
-« Clear site data »).
+« Clear site data »). Cela efface aussi le trousseau du navigateur : la connexion suivante demande la clé de
+récupération du compte, ou un nouveau compte si la base a été effacée.
 
 Le fichier `.env` est à sauvegarder lui aussi : il porte le poivre des mots de passe (`SEAL_PASSWORD_PEPPER`,
 ADR 0026), gardé hors de la base. Sans lui, aucun mot de passe enregistré ne se vérifie plus, et chaque compte

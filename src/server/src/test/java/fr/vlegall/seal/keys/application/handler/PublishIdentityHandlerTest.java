@@ -6,7 +6,6 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.crypto.Digests;
 import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.keys.domain.model.Challenge;
-import fr.vlegall.seal.keys.domain.model.CurrentCertificate;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
 import fr.vlegall.seal.keys.domain.model.IdentityPublication;
 import fr.vlegall.seal.keys.domain.model.IssuedChallenge;
@@ -229,7 +228,7 @@ class PublishIdentityHandlerTest {
         }
 
         @Override
-        public Optional<CurrentCertificate> current(UserId subject) {
+        public Optional<IdentityCertificate> current(UserId subject) {
             return Optional.empty();
         }
     }

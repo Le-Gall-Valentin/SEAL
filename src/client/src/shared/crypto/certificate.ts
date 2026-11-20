@@ -7,6 +7,8 @@
 import { verifyEd25519 } from './ed25519'
 import { encodeCertificate } from './identity'
 import { type KeyStore, saveCertificate, type StoredCertificate } from './keystore'
+import { fromBase64Url } from './base64url'
+import { equalBytes } from './bytes'
 
 const SERIAL_BYTES = 16
 const KEY_ID_BYTES = 8
@@ -25,6 +27,7 @@ export interface ExpectedOwner {
 }
 
 export type CertificateRejection =
+  | 'encoding'
   | 'authority'
   | 'serial'
   | 'issuer'
@@ -45,13 +48,49 @@ export class CertificateRejectedError extends Error {
   }
 }
 
-export async function storeOwnCertificate(
+/**
+ * Certificat tel que le serveur le sert (PUT /api/v1/keys/identity, GET /api/v1/users/{id}/keys) : octets en
+ * base64url, dates en millisecondes Unix (l'adaptateur réseau convertit l'ISO 8601 ; ADR 0029).
+ */
+export interface ServedCertificate {
+  readonly serial: string
+  readonly issuerKeyId: string
+  readonly subjectId: string
+  readonly username: string
+  readonly ikPublic: string
+  readonly notBefore: number
+  readonly notAfter: number
+  readonly usage: number
+  readonly signature: string
+}
+
+/** KEY-06 : vérifie le certificat reçu, sans rien enregistrer (ADR 0029, point 3 : il s'enregistre en dernier). */
+export async function verifyOwnCertificate(
   store: KeyStore,
-  received: StoredCertificate,
+  served: ServedCertificate,
   expected: ExpectedOwner,
   now: number,
 ): Promise<void> {
-  const certificate = copyOf(received)
+  await verified(store, served, expected, now)
+}
+
+/** KEY-06 : vérifie le certificat reçu, puis enregistre ses seuls champs vérifiés. */
+export async function storeOwnCertificate(
+  store: KeyStore,
+  served: ServedCertificate,
+  expected: ExpectedOwner,
+  now: number,
+): Promise<void> {
+  await saveCertificate(store, expected.userId, await verified(store, served, expected, now))
+}
+
+async function verified(
+  store: KeyStore,
+  served: ServedCertificate,
+  expected: ExpectedOwner,
+  now: number,
+): Promise<StoredCertificate> {
+  const certificate = decoded(served)
   const authority = await store.loadAuthority()
   if (authority === undefined) {
     throw new CertificateRejectedError('authority')
@@ -60,7 +99,7 @@ export async function storeOwnCertificate(
     throw new CertificateRejectedError('serial')
   }
   const authorityDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', authority))
-  if (!equal(certificate.issuerKeyId, authorityDigest.subarray(0, KEY_ID_BYTES))) {
+  if (!equalBytes(certificate.issuerKeyId, authorityDigest.subarray(0, KEY_ID_BYTES))) {
     throw new CertificateRejectedError('issuer')
   }
   if (!(await signedBy(authority, certificate))) {
@@ -72,7 +111,7 @@ export async function storeOwnCertificate(
   if (certificate.username !== expected.username) {
     throw new CertificateRejectedError('username')
   }
-  if (!equal(certificate.ikPublic, expected.ikPublic)) {
+  if (!equalBytes(certificate.ikPublic, expected.ikPublic)) {
     throw new CertificateRejectedError('key')
   }
   if (certificate.usage !== USAGE) {
@@ -85,24 +124,28 @@ export async function storeOwnCertificate(
   ) {
     throw new CertificateRejectedError('validity')
   }
-  await saveCertificate(store, expected.userId, certificate)
+  return certificate
 }
 
 /**
- * Les neuf champs du certificat, copiés une fois : la vérification et l'enregistrement portent sur les mêmes valeurs,
- * et rien d'autre n'est enregistré.
+ * Les neuf champs décodés une fois, en copies neuves : la vérification et l'enregistrement portent sur les mêmes
+ * valeurs, et rien d'autre n'est enregistré. Un base64url non canonique est refusé ('encoding').
  */
-function copyOf(received: StoredCertificate): StoredCertificate {
-  return {
-    serial: Uint8Array.from(received.serial),
-    issuerKeyId: Uint8Array.from(received.issuerKeyId),
-    subjectId: received.subjectId,
-    username: received.username,
-    ikPublic: Uint8Array.from(received.ikPublic),
-    notBefore: received.notBefore,
-    notAfter: received.notAfter,
-    usage: received.usage,
-    signature: Uint8Array.from(received.signature),
+function decoded(served: ServedCertificate): StoredCertificate {
+  try {
+    return {
+      serial: fromBase64Url(served.serial),
+      issuerKeyId: fromBase64Url(served.issuerKeyId),
+      subjectId: served.subjectId,
+      username: served.username,
+      ikPublic: fromBase64Url(served.ikPublic),
+      notBefore: served.notBefore,
+      notAfter: served.notAfter,
+      usage: served.usage,
+      signature: fromBase64Url(served.signature),
+    }
+  } catch {
+    throw new CertificateRejectedError('encoding')
   }
 }
 
@@ -115,8 +158,4 @@ async function signedBy(authority: Uint8Array, received: StoredCertificate): Pro
     return false
   }
   return verifyEd25519(authority, encoded, received.signature)
-}
-
-function equal(left: Uint8Array, right: Uint8Array): boolean {
-  return left.length === right.length && left.every((byte, index) => byte === right[index])
 }

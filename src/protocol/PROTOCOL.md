@@ -256,6 +256,10 @@ sous-clés non expirées pour son certificat courant : au-delà, la publication 
 point 15) ; celles d'un ancien certificat ne comptent pas. Le serveur ne vérifie de
 `ekPublic` que sa longueur : l'émetteur rejette un secret partagé nul (RFC 9180).
 
+`GET /api/v1/users/{userId}/keys` sert les sous-clés sans leur `certSerial` : ce sont celles du certificat servi avec
+elles, et un client qui vérifie l'une de ces liaisons la reconstruit avec le numéro de série de ce certificat
+(ADR 0029, point 4).
+
 ### 4.5 Vecteurs (QA-01, QA-02)
 
 - `vectors/ed25519-rfc8032.json` : les tests 1 à 3 de la RFC 8032, section 7.1, en hexadécimal.
@@ -316,8 +320,12 @@ point 6). Une étiquette GCM fausse, à l'un ou l'autre niveau, fait échouer l'
 
 **Limite : le rejeu d'une ancienne version.** L'AAD lie le blob à la version que porte la charge, pas à une version
 attendue : une version réétiquetée est refusée, mais un serveur malveillant peut resservir une ancienne version
-authentique, qui s'ouvre avec moins de sous-clés. La restauration (KEY-33) DEVRA vérifier que le trousseau restauré
-contient toutes les sous-clés non expirées publiées pour le certificat courant (ADR 0027, point 10).
+authentique, qui s'ouvre avec moins de sous-clés. La restauration (KEY-33) et la reprise d'une publication
+(ADR 0029, point 3) vérifient donc que le trousseau ouvert contient toutes les sous-clés non expirées que
+`GET /api/v1/users/{moi}/keys` sert pour le certificat courant (ADR 0027, point 10) ; sinon le coffre est refusé.
+Ce contrôle ne détecte qu'un serveur incohérent : un serveur qui resservirait une ancienne version en taisant, de façon
+cohérente, les sous-clés publiées depuis (ou en répondant 404 sur les clés) ferait perdre à l'appareil restauré les
+messages chiffrés pour elles. Ni la confidentialité ni l'IK, authentifiée par RK, ne sont atteintes.
 
 ### 5.4 Vecteurs (QA-02)
 
@@ -325,9 +333,40 @@ contient toutes les sous-clés non expirées publiées pour le certificat couran
 le trousseau et ses octets, les clés publiques attendues, la charge envoyée au serveur (`payload`, corps de
 `PUT /api/v1/keys/vault`) et onze falsifications (`forgeries`) qu'aucune implémentation NE DOIT ouvrir. Chacune nomme
 l'étage qui DOIT la refuser (`rejectedBy`) : `key` (la VDK ne se désenveloppe pas), `blob` (le trousseau ne se
-déchiffre pas) ou `keyring` (il se déchiffre, et sa relecture stricte le refuse) ; le générateur le vérifie. IK est la graine du test 2
-de la RFC 8032, EK la clé privée d'Alice de la RFC 7748 (section 6.1) : jamais de vraies clés.
+déchiffre pas) ou `keyring` (il se déchiffre, et sa relecture stricte le refuse) ; le générateur le vérifie. IK est la
+graine du test 2 de la RFC 8032, EK la clé privée d'Alice de la RFC 7748 (section 6.1) : jamais de vraies clés.
 
 `vectors/hkdf-rfc5869.json` (RFC 5869, annexe A, cas 1 à 3) et `vectors/x25519-rfc7748.json` (RFC 7748, section 6.1)
 sont les vecteurs officiels des deux primitives du coffre et des sous-clés (QA-01). `gen_vectors.py` les recopie des
 RFC et les recalcule avec `cryptography` avant de les écrire ; WebCrypto (Node et Chromium) et la JCA les rejouent.
+
+### 5.5 Version suivante (KEY-32, ADR 0029)
+
+Une nouvelle sous-clé (rotation, ou reprise d'une publication interrompue) s'écrit dans une nouvelle version du coffre,
+sans la clé de récupération : le client déchiffre le blob avec la VDK de son trousseau, ajoute la sous-clé au trousseau
+et le rechiffre avec la même VDK, sous l'AAD de la version suivante (`vaultVersion + 1`) et avec un `nonceB` neuf.
+`salt`, `nonceK` et `wrappedVdk` ne changent pas ; seule la régénération de RK (KEY-35) les renouvelle. Le trousseau
+relu DOIT contenir toutes les sous-clés du trousseau de l'appareil : une version plus ancienne, resservie, en
+perdrait. Le serveur n'accepte que la version qui suit l'enregistrée (409 `VAULT_VERSION_CONFLICT` sinon).
+
+**Sous-clé jamais publiée (ADR 0029, point 11).** Quand la sous-clé la plus récente a plus de 4 minutes, la reprise
+la redate au lieu d'en ajouter une, si elle est tenue pour jamais publiée : `GET /api/v1/users/{moi}/keys` ne la sert
+pas, et elle a été créée plus de 5 minutes après le `notBefore` du certificat servi et il y a moins de 30 jours
+(`createdAt` et horloge de l'appareil). Une sous-clé d'un certificat précédent, ou expirée, n'est plus servie mais a pu
+servir : les deux bornes la gardent, et une sous-clé neuve est ajoutée. Redater écrit, dans la version suivante, la
+même sous-clé (même `ekId`, même clé) avec `createdAt` à l'heure de l'appareil et 45 jours de validité ; aucune
+sous-clé n'est retirée, et la relecture garde tout son contrôle anti-rejeu. Des reprises qui échouent (horloge
+décalée, panne, refus du serveur) ne font donc plus grossir le coffre. Une erreur de jugement, par un serveur qui tait
+une sous-clé publiée ou par un autre appareil qui la publie au même moment, ne retire rien : le serveur refuse de
+republier un `ekId` (400 `VALIDATION_FAILED`), et la reprise suivante relit la sous-clé publiée. Les dates du coffre
+diffèrent alors de la liaison publiée, qui seule fait foi pour les correspondants. Un serveur qui continue de taire la
+sous-clé bloque la reprise, ce qu'il peut déjà faire en refusant toute publication.
+
+Un client qui reçoit 409 relit le coffre : identique à celui qu'il envoyait, il a été écrit par une requête dont la
+réponse s'est perdue. Différent au premier coffre, un autre appareil a créé le trousseau entre-temps, et le client
+passe à la restauration (KEY-33) ; différent à une version suivante, la reprise s'arrête en erreur, et la suivante
+repart du coffre relu.
+
+`vectors/vault.json` donne la version 2 dans `nextVersion` : l'AAD (`vaultAad`), les octets du trousseau à deux
+sous-clés (`keyringBytes`), la clé publique de la seconde (`ekPublic`, celle de Bob dans la RFC 7748) et la charge
+(`payload`), qui s'ouvre aussi par RK.

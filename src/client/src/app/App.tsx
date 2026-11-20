@@ -9,6 +9,7 @@ import { passwordResetApi } from '@/features/password-reset'
 import { registerApi } from '@/features/register'
 import { verifyEmailApi } from '@/features/verify-email'
 import { authorityApi } from '@/entities/authority'
+import { keysApi } from '@/entities/keyring'
 import { LanguageProvider } from '@/shared/i18n'
 import {
   ApiProviders,
@@ -29,6 +30,7 @@ const queryClient = createQueryClient()
 const apis: Apis = {
   session: sessionApi,
   authority: authorityApi,
+  keys: keysApi,
   passwordBlocklist,
   login: loginApi,
   register: registerApi,

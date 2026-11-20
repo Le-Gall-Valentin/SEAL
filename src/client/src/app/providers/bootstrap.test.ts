@@ -7,6 +7,14 @@ function apisWith(reloadCsrf: () => Promise<void>): Apis {
   return {
     session: { me: never, reloadCsrf },
     authority: { fetchAuthority: never },
+    keys: {
+      createChallenge: never,
+      publishIdentity: never,
+      publishSubkey: never,
+      readVault: never,
+      saveVault: never,
+      readOwnKeys: never,
+    },
     passwordBlocklist: { load: never },
     login: { login: never },
     register: { register: never, usernameAvailability: never },

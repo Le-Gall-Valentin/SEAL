@@ -2,6 +2,7 @@ package fr.vlegall.seal.pki.domain.model;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.crypto.Canonical;
+import fr.vlegall.seal.crypto.CanonicalReader;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -66,6 +67,30 @@ public record SealCertificate(
         Instant notBefore = now.truncatedTo(ChronoUnit.MILLIS);
         return new SealCertificate(
                 serial, issuerKeyId, subject, username, ikPublic, notBefore, notBefore.plus(VALIDITY), USAGE);
+    }
+
+    /**
+     * KEY-33 : relit un certificat depuis ses octets signés, tels que la table {@code identity_certificates} les garde.
+     * Le constructeur revérifie le format, et le réencodage doit redonner les mêmes octets : seule la forme canonique
+     * passe. Lève {@link IllegalArgumentException} sinon.
+     */
+    public static SealCertificate decode(byte[] encoded) {
+        CanonicalReader reader = CanonicalReader.of(encoded, LABEL);
+        byte[] serial = reader.bytes();
+        byte[] issuerKeyId = reader.bytes();
+        UserId subject = new UserId(reader.uuid());
+        String username = reader.text();
+        byte[] ikPublic = reader.bytes();
+        Instant notBefore = Instant.ofEpochMilli(reader.u64());
+        Instant notAfter = Instant.ofEpochMilli(reader.u64());
+        int usage = reader.u8();
+        reader.end();
+        SealCertificate certificate =
+                new SealCertificate(serial, issuerKeyId, subject, username, ikPublic, notBefore, notAfter, usage);
+        if (!Arrays.equals(certificate.encode(), encoded)) {
+            throw new IllegalArgumentException("certificat hors de la forme canonique");
+        }
+        return certificate;
     }
 
     /** Octets signés par la CA (PROTOCOL.md, section 4.2). */

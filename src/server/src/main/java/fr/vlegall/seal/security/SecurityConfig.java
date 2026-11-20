@@ -136,6 +136,9 @@ class SecurityConfig {
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         .requestMatchers(HttpMethod.PUT, "/api/v1/keys/vault")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // KEY-33, ADR 0029 (point 4) : certificat et sous-clés valides du compte, session complète.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/*/keys")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         .requestMatchers("/error")
                         .permitAll()
                         // Sonde de santé du conteneur, sur le port de gestion interne (A02).

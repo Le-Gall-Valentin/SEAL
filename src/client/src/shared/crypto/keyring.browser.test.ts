@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { generateKeyring, keyringSecrets, openVault } from './keyring'
+import { generateRecoveryKey } from './recovery'
 
 const USER_ID = '0192f7a1-ffff-7000-8000-00000000a11c'
 
 // KEY-40 : le client tourne dans Chromium, dont WebCrypto exporte et relit lui-même le PKCS#8 et le JWK du trousseau.
 describe('KEY-40 : trousseau dans Chromium', () => {
   it('KEY-33, KEY-40 : un trousseau généré se rouvre par RK, signe, et aucune clé n’est extractable', async () => {
-    const generated = await generateKeyring(USER_ID, Date.now())
-    const opened = await openVault(USER_ID, generated.vault, generated.recoveryKey)
+    const recoveryKey = generateRecoveryKey()
+    const generated = await generateKeyring(USER_ID, recoveryKey, Date.now())
+    const opened = await openVault(USER_ID, generated.vault, recoveryKey)
     const message = new TextEncoder().encode('SEAL')
     const signature = await crypto.subtle.sign(
       'Ed25519',

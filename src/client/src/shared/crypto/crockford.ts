@@ -6,6 +6,7 @@
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 const CONFUSABLE: Readonly<Record<string, string>> = { O: '0', I: '1', L: '1' }
 const SEPARATORS = /[\s-]/g
+const IN_ALPHABET = new RegExp(`^[${ALPHABET}]*$`)
 /** ADR 0027, point 15 : chiffres et lettres ASCII seulement, avant toute mise en majuscules. */
 const ASCII_ALPHANUMERIC = /^[0-9A-Za-z]*$/
 
@@ -34,13 +35,25 @@ export function encodeCrockford(bytes: Uint8Array): string {
   return text
 }
 
-export function decodeCrockford(input: string): Uint8Array<ArrayBuffer> {
+/**
+ * Saisie lue comme Crockford la prévoit : séparateurs retirés, majuscules, O lu 0, I et L lus 1. Un caractère hors de
+ * l'alphabet, ou non ASCII, lève CrockfordFormatError.
+ */
+export function normalizeCrockford(input: string): string {
   const compact = input.replace(SEPARATORS, '')
   // toUpperCase() changerait ı en I, ſ en S, ß en SS : tout caractère non ASCII est refusé avant.
   if (!ASCII_ALPHANUMERIC.test(compact)) {
     throw new CrockfordFormatError('base32 Crockford : caractère hors de l’alphabet')
   }
-  const text = compact.toUpperCase()
+  const text = compact.toUpperCase().replace(/[OIL]/g, (char) => CONFUSABLE[char] ?? char)
+  if (!IN_ALPHABET.test(text)) {
+    throw new CrockfordFormatError('base32 Crockford : caractère hors de l’alphabet')
+  }
+  return text
+}
+
+export function decodeCrockford(input: string): Uint8Array<ArrayBuffer> {
+  const text = normalizeCrockford(input)
   if ((text.length * 5) % 8 !== 0) {
     throw new CrockfordFormatError(
       'base32 Crockford : la taille doit tomber sur des octets entiers',
@@ -50,12 +63,9 @@ export function decodeCrockford(input: string): Uint8Array<ArrayBuffer> {
   let buffer = 0
   let bits = 0
   let index = 0
+  // normalizeCrockford n'a laissé que des caractères de l'alphabet.
   for (const char of text) {
-    const value = ALPHABET.indexOf(CONFUSABLE[char] ?? char)
-    if (value < 0) {
-      throw new CrockfordFormatError('base32 Crockford : caractère hors de l’alphabet')
-    }
-    buffer = (buffer << 5) | value
+    buffer = (buffer << 5) | ALPHABET.indexOf(char)
     bits += 5
     if (bits >= 8) {
       bits -= 8

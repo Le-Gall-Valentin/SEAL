@@ -33,9 +33,14 @@ function names(css: string): string[] {
 
 const TOKENS = [...new Set(names(TOKENS_CSS))]
 
+/** Jetons qui ne sont pas des couleurs : polices et ombres. */
+function isColor(name: string): boolean {
+  return name !== 'sans' && name !== 'mono' && !name.startsWith('shadow-')
+}
+
 describe('ADR 0016 : thème Tailwind sur les jetons de la maquette', () => {
   it('ADR 0016 : chaque couleur de tokens.css a ses classes, et chaque police la sienne', async () => {
-    const colors = TOKENS.filter((name) => name !== 'sans' && name !== 'mono')
+    const colors = TOKENS.filter(isColor)
     expect(colors.length).toBeGreaterThan(0)
     for (const name of colors) {
       expect(await rule(`bg-${name}`), name).toContain(`var(--${name})`)
@@ -68,11 +73,33 @@ describe('ADR 0016 : thème Tailwind sur les jetons de la maquette', () => {
 })
 
 describe('ADR 0024 : thème sombre de la maquette', () => {
-  it('ADR 0024 : chaque couleur du thème clair a sa valeur sombre, sous prefers-color-scheme', () => {
+  it('ADR 0024 : chaque couleur et chaque ombre du thème clair a sa valeur sombre, sous prefers-color-scheme', () => {
     const [light = '', dark = ''] = TOKENS_CSS.split('@media (prefers-color-scheme: dark)')
-    const colors = names(light).filter((name) => name !== 'sans' && name !== 'mono')
+    const themed = names(light).filter((name) => name !== 'sans' && name !== 'mono')
 
-    expect(colors.length).toBeGreaterThan(0)
-    expect(names(dark).toSorted()).toEqual(colors.toSorted())
+    expect(themed.length).toBeGreaterThan(0)
+    expect(names(dark).toSorted()).toEqual(themed.toSorted())
+  })
+
+  it('Dialogue-Cle-Recuperation : ombre des dialogues (--shadow-3) et anneau de focus (--focus-ring), clairs et sombres', async () => {
+    const [light = '', dark = ''] = TOKENS_CSS.split('@media (prefers-color-scheme: dark)')
+
+    expect(await rule('shadow-dialog')).toContain('var(--shadow-3)')
+    expect(await rule('outline-focus-ring')).toContain('var(--focus-ring)')
+    expect(light).toContain(
+      '--shadow-3: 0 24px 64px -16px rgba(27, 31, 20, 0.32), 0 4px 12px rgba(27, 31, 20, 0.08);',
+    )
+    expect(dark).toContain(
+      '--shadow-3: 0 24px 64px -16px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(233, 237, 223, 0.06);',
+    )
+    expect(light).toContain('--focus-ring: #66741c;')
+    expect(dark).toContain('--focus-ring: #c4d46e;')
+  })
+
+  it('ADR 0029, point 14 : halo du champ actif à 0,24 en clair, la valeur majoritaire de la maquette', () => {
+    const [light = '', dark = ''] = TOKENS_CSS.split('@media (prefers-color-scheme: dark)')
+
+    expect(light).toContain('--focus-glow: rgba(102, 116, 28, 0.24);')
+    expect(dark).toContain('--focus-glow: rgba(180, 198, 90, 0.28);')
   })
 })

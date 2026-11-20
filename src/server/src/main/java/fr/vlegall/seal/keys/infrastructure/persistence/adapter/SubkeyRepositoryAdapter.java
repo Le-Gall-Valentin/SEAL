@@ -1,10 +1,12 @@
 package fr.vlegall.seal.keys.infrastructure.persistence.adapter;
 
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.keys.domain.model.PublishedSubkey;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
 import fr.vlegall.seal.keys.domain.port.out.SubkeyRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -41,6 +43,27 @@ public class SubkeyRepositoryAdapter implements SubkeyRepository {
                 .param("at", Timestamp.from(at))
                 .query(Integer.class)
                 .single();
+    }
+
+    @Override
+    public List<PublishedSubkey> findLive(UserId user, byte[] certSerial, Instant at) {
+        return jdbc.sql("SELECT ek_id, kem, ek_public, created_at, expires_at, binding_signature FROM subkeys"
+                        + " WHERE user_id = :user AND cert_serial = :certSerial AND expires_at > :at"
+                        + " ORDER BY created_at DESC, ek_id")
+                .param("user", user.value())
+                .param("certSerial", certSerial)
+                .param("at", Timestamp.from(at))
+                .query((row, number) -> new PublishedSubkey(
+                        new SubkeyBinding(
+                                user,
+                                certSerial,
+                                row.getBytes("ek_id"),
+                                row.getString("kem"),
+                                row.getBytes("ek_public"),
+                                row.getTimestamp("created_at").toInstant(),
+                                row.getTimestamp("expires_at").toInstant()),
+                        row.getBytes("binding_signature")))
+                .list();
     }
 
     /** KEY-05 : la clé primaire {@code ek_id} refuse un ekId repris ; aucune erreur ne fait échouer la transaction. */

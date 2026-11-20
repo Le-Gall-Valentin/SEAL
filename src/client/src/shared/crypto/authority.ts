@@ -6,6 +6,7 @@
 import { fromBase64Url } from './base64url'
 import { isWeakOrNonCanonical } from './ed25519'
 import { type KeyStore, pinAuthority } from './keystore'
+import { equalBytes } from './bytes'
 
 const PUBLIC_KEY_BYTES = 32
 const KEY_ID_BYTES = 8
@@ -30,11 +31,11 @@ export async function checkAuthority(
   }
   const pinned = await store.loadAuthority()
   if (pinned !== undefined) {
-    return equal(pinned, publicKey) ? 'unchanged' : 'changed'
+    return equalBytes(pinned, publicKey) ? 'unchanged' : 'changed'
   }
   // Un autre onglet a pu épingler entre la lecture et l'écriture : la clé rendue est celle qui reste.
   const kept = await pinAuthority(store, publicKey)
-  return equal(kept, publicKey) ? 'pinned' : 'changed'
+  return equalBytes(kept, publicKey) ? 'pinned' : 'changed'
 }
 
 async function coherentKey(served: ServedAuthority): Promise<Uint8Array<ArrayBuffer> | undefined> {
@@ -50,7 +51,7 @@ async function coherentKey(served: ServedAuthority): Promise<Uint8Array<ArrayBuf
     return undefined
   }
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', publicKey))
-  if (!equal(digest.subarray(0, KEY_ID_BYTES), keyId) || hex(digest) !== served.fingerprint) {
+  if (!equalBytes(digest.subarray(0, KEY_ID_BYTES), keyId) || hex(digest) !== served.fingerprint) {
     return undefined
   }
   return publicKey
@@ -60,8 +61,4 @@ function hex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'))
     .join('')
     .toUpperCase()
-}
-
-function equal(left: Uint8Array, right: Uint8Array): boolean {
-  return left.length === right.length && left.every((byte, index) => byte === right[index])
 }

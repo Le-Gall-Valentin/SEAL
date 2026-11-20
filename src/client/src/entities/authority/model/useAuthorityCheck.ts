@@ -1,7 +1,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { type AuthorityCheck, checkAuthority } from '@/shared/crypto'
 import { useAuthorityApi } from './authorityApiPort'
-import { useKeyStore } from './keyStorePort'
+import { useKeyStore } from '@/entities/keyring/@x/authority'
 
 export const AUTHORITY_QUERY_KEY = ['authority'] as const
 

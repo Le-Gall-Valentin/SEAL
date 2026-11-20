@@ -3,11 +3,18 @@ import { createMemoryRouter, type InitialEntry, type RouteObject } from 'react-r
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { KeyStoreProvider } from '@/entities/authority'
+import { KeyStoreProvider } from '@/entities/keyring'
 import type { Account } from '@/entities/session'
 import { ApiProviders, type Apis, createQueryClient } from '../providers'
 import { freshKeyStore, servingAuthority } from '../testing/authority'
 import { routes, withRootErrorBoundary } from './routes'
+
+// KEY-02, KEY-33 : ce test porte sur le routage ; le trousseau de l'appareil est complet (routeGuards.test.tsx éprouve
+// les autres états des clés).
+vi.mock('@/entities/keyring', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/entities/keyring')>()),
+  useKeyStatus: () => ({ status: 'ready', failed: false, waiting: false, reread: () => undefined }),
+}))
 
 const ACTIVE: Account = {
   id: '0192f0c4-7b1a-7cc0-9a51-3f6f8e2d4b10',
@@ -29,6 +36,14 @@ function fakeApis(account: Account | null): Apis {
   return {
     session: { me: () => Promise.resolve(account), reloadCsrf: () => Promise.resolve() },
     authority: servingAuthority(),
+    keys: {
+      createChallenge: never,
+      publishIdentity: never,
+      publishSubkey: never,
+      readVault: never,
+      saveVault: never,
+      readOwnKeys: never,
+    },
     passwordBlocklist: { load: () => Promise.resolve([]) },
     login: { login: never },
     register: { register: never, usernameAvailability: never },

@@ -727,6 +727,12 @@ VAULT_VERSION = 1
 # EK du trousseau : clé privée d'Alice, RFC 7748, section 6.1 ; jamais une vraie clé.
 EK_PRIVATE = bytes.fromhex("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a")
 VAULT_EK_ID = bytes(range(0xA0, 0xB0))
+# Version suivante (KEY-32, PROTOCOL.md 5.5) : une seconde EK, la clé privée de Bob (RFC 7748, section 6.1), créée
+# 30 jours plus tard, et un nonceB neuf ; jamais une vraie clé.
+NEXT_EK_PRIVATE = bytes.fromhex("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb")
+NEXT_EK_ID = bytes(range(0xB0, 0xC0))
+NEXT_NONCE_B = bytes(range(0xC0, 0xCC))
+NEXT_CREATED_AT_DAYS = 30
 
 
 def pkcs8(private_key) -> bytes:
@@ -795,6 +801,43 @@ def seal_vault(user_id: str, version: int, plaintext: bytes, recovery_key: bytes
         "wrappedVdk": b64url(aesgcm(kek(recovery_key, VAULT_SALT, user_id)).encrypt(NONCE_K, VDK, kek_aad(user_id))),
         "nonceB": b64url(NONCE_B),
         "blob": b64url(aesgcm(VDK).encrypt(NONCE_B, plaintext, vault_aad(user_id, version))),
+    }
+
+
+def next_version(keyring: dict) -> dict:
+    """KEY-32, PROTOCOL.md 5.5 : le trousseau augmenté d'une sous-clé, rechiffré par la même VDK sous l'AAD de la
+    version suivante avec un nonceB neuf ; sel, nonceK et VDK enveloppée restent ceux de la version 1."""
+    lib = crypto_lib()
+    created_at = NOT_BEFORE + NEXT_CREATED_AT_DAYS * DAY_MS
+    ek = lib.x25519.X25519PrivateKey.from_private_bytes(NEXT_EK_PRIVATE)
+    document = dict(
+        keyring,
+        eks=keyring["eks"]
+        + [
+            {
+                "ekId": b64url(NEXT_EK_ID),
+                "kem": KEM,
+                "pkcs8": b64url(pkcs8(ek)),
+                "createdAt": created_at,
+                "expiresAt": created_at + SUBKEY_VALIDITY_DAYS * DAY_MS,
+            }
+        ],
+    )
+    plaintext = keyring_bytes(document)
+    version = VAULT_VERSION + 1
+    payload = dict(
+        seal_vault(USER_ID, VAULT_VERSION, keyring_bytes(keyring)),
+        vaultVersion=version,
+        nonceB=b64url(NEXT_NONCE_B),
+        blob=b64url(lib.AESGCM(VDK).encrypt(NEXT_NONCE_B, plaintext, vault_aad(USER_ID, version))),
+    )
+    if rejecting_layer(USER_ID, RECOVERY_KEY, payload) != "keyring":
+        raise SystemExit("gen_vectors.py : la version suivante du coffre ne s'ouvre pas")
+    return {
+        "vaultAad": b64url(vault_aad(USER_ID, version)),
+        "keyringBytes": b64url(plaintext),
+        "ekPublic": b64url(raw_public(ek)),
+        "payload": payload,
     }
 
 
@@ -871,6 +914,7 @@ def build_vault() -> str:
             "ek": b64url(raw_public(lib.x25519.X25519PrivateKey.from_private_bytes(EK_PRIVATE))),
         },
         "payload": payload,
+        "nextVersion": next_version(keyring),
         "forgeries": [
             vault_forgery("une autre clé de récupération (un bit)", payload, "key", recovery_key=other_key),
             vault_forgery("le coffre ouvert pour un autre compte", payload, "key", user_id=VICTIM_ID),
