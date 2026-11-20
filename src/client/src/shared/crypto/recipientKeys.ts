@@ -86,7 +86,7 @@ export async function chooseSubkey(
   }
   const subkeys = await Promise.all(
     served.subkeys.map((subkey) =>
-      verifiedSubkey(subkey, recipientId, certificate.serial, certificate.ikPublic),
+      verifiedSubkey(subkey, recipientId, certificate.serial, certificate.ikPublic, now),
     ),
   )
   const newest = subkeys.reduce<VerifiedSubkey | undefined>((latest, subkey) => {
@@ -109,12 +109,17 @@ export async function chooseSubkey(
   }
 }
 
-/** PROTOCOL.md 4.4 : liaison signée par l'IK du certificat, avec son numéro de série ; undefined si elle ne l'est pas. */
+/**
+ * PROTOCOL.md 4.4 : liaison signée par l'IK du certificat, avec son numéro de série ; undefined si elle ne l'est pas,
+ * ou si la sous-clé est datée de plus de 5 minutes après `now` : le serveur la refuse à la publication (ADR 0025,
+ * point 7), elle n'a rien à faire dans sa réponse.
+ */
 async function verifiedSubkey(
   served: ServedSubkey,
   userId: string,
   certSerial: Uint8Array,
   ikPublic: Uint8Array,
+  now: number,
 ): Promise<VerifiedSubkey | undefined> {
   let ekId: Uint8Array<ArrayBuffer>
   let ekPublic: Uint8Array<ArrayBuffer>
@@ -131,6 +136,7 @@ async function verifiedSubkey(
     ekId.length !== EK_ID_BYTES ||
     ekPublic.length !== EK_PUBLIC_BYTES ||
     !Number.isSafeInteger(served.createdAt) ||
+    served.createdAt > now + CLOCK_SKEW_MS ||
     served.expiresAt - served.createdAt !== SUBKEY_VALIDITY_MS
   ) {
     return undefined

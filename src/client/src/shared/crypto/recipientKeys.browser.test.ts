@@ -177,6 +177,30 @@ describe('KEY-20 : sous-clé d’un destinataire, vérifiée avant usage (ADR 00
     }
   })
 
+  it('ADR 0025, point 7 : une sous-clé datée de plus de 5 minutes dans le futur est une liaison invalide', async () => {
+    const ring = await keyring()
+    const [older, newer] = [await served(ring, 0), await served(ring, 1)]
+    const store = await pinnedStore()
+
+    expect(
+      await refusal(
+        chooseSubkey(
+          store,
+          await servedKeys([older, newer]),
+          RECIPIENT,
+          newer.createdAt - 6 * 60_000,
+        ),
+      ),
+    ).toBe('binding')
+    const chosen = await chooseSubkey(
+      store,
+      await servedKeys([older, newer]),
+      RECIPIENT,
+      newer.createdAt - 4 * 60_000,
+    )
+    expect(toBase64Url(chosen.ekId)).toBe(newer.ekId)
+  })
+
   it('KEY-20 : un certificat d’un autre sujet, signé par une autre Autorité ou expiré refuse le destinataire', async () => {
     const ring = await keyring()
     const subkeys = [await served(ring, 1)]

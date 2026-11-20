@@ -438,7 +438,8 @@ L'émetteur relit `GET /api/v1/users/{userId}/keys` et vérifie :
 1. le certificat : signature de l'Autorité épinglée, sujet égal au destinataire, usage, validité à cet instant avec
    5 minutes de tolérance d'horloge ;
 2. chaque liaison de sous-clé, par l'IK du certificat, sur `SubkeyBinding` avec le numéro de série de ce
-   certificat (4.4) : `kem` attendu, 45 jours exacts.
+   certificat (4.4) : `kem` attendu, 45 jours exacts, `createdAt` au plus 5 minutes après cet instant (le serveur
+   refuse une sous-clé datée dans le futur, ADR 0025, point 7).
 
 Il prend, parmi les sous-clés non expirées, celle dont `createdAt` est le plus récent. Un certificat ou une seule
 liaison invalides refusent toutes les clés du destinataire, et l'envoi est annulé (« clé indisponible ») : une
