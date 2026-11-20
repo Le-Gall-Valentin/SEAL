@@ -50,12 +50,14 @@ export function describeHpke(engine: string): void {
       const cek = crypto.getRandomValues(new Uint8Array(32))
       const { enc, wrappedCek } = await sealCek(key.publicKey, INFO, AAD, cek)
 
+      // Chaque ouverture part au moment où elle est attendue : une promesse rejetée avant d'être écoutée serait
+      // signalée comme une erreur non gérée.
       for (const attempt of [
-        openCek(key, enc, wrappedCek, new TextEncoder().encode('autre info'), AAD),
-        openCek(key, enc, wrappedCek, INFO, new TextEncoder().encode('autre en-tête')),
-        openCek(other.key, enc, wrappedCek, INFO, AAD),
+        () => openCek(key, enc, wrappedCek, new TextEncoder().encode('autre info'), AAD),
+        () => openCek(key, enc, wrappedCek, INFO, new TextEncoder().encode('autre en-tête')),
+        () => openCek(other.key, enc, wrappedCek, INFO, AAD),
       ]) {
-        await expect(attempt).rejects.toBeInstanceOf(HpkeOpenError)
+        await expect(attempt()).rejects.toBeInstanceOf(HpkeOpenError)
       }
     })
 
