@@ -34,8 +34,8 @@ export interface KeyRestore {
  * KEY-33 : Restauration-Appareil. La clé saisie ne quitte pas l'appareil : restoreKeys ouvre le coffre ici, sous le
  * verrou des clés, puis la zone du compte complète la publication (onRestored). KEY-31, KEY-40 : la clé n'entre pas
  * dans le cache des mutations (ni en variables, ni gardée après le démontage) ; elle ne vit que dans l'écran. Une seule
- * restauration à la fois (ADR 0033, point 6) : le verrou des clés rangerait un second envoi derrière le premier, qui
- * rejouerait la restauration une fois finie.
+ * restauration à la fois (ADR 0033, point 6) : sans verrou d'envoi, le verrou des clés rangerait un second envoi
+ * derrière le premier, et la restauration serait rejouée une fois finie.
  */
 export function useKeyRestore(owner: KeyOwner, onRestored: () => void): KeyRestore {
   const api = useKeysApi()
@@ -56,7 +56,6 @@ export function useKeyRestore(owner: KeyOwner, onRestored: () => void): KeyResto
     onSuccess: onRestored,
     onSettled: () => {
       submitted.current = null
-      guard.release()
     },
     gcTime: 0,
   })
@@ -71,9 +70,11 @@ export function useKeyRestore(owner: KeyOwner, onRestored: () => void): KeyResto
     },
     canSubmit: recoveryKey !== null && !restore.isPending,
     submit: () => {
-      if (recoveryKey !== null && !restore.isPending && guard.enter()) {
-        submitted.current = recoveryKey
-        restore.mutate()
+      if (recoveryKey !== null && !restore.isPending) {
+        guard.run(() => {
+          submitted.current = recoveryKey
+          return restore.mutateAsync()
+        })
       }
     },
     pending: restore.isPending,

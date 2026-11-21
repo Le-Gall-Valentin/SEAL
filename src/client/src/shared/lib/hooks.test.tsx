@@ -92,7 +92,7 @@ describe('shared/lib : crochets sans métier', () => {
     await expect.element(screen.getByText('verrouillé')).toBeVisible()
   })
 
-  it('ADR 0033 (point 6) : useSubmitGuard prend le verrou une fois, puis le rend', async () => {
+  it('ADR 0033 (point 6) : useSubmitGuard ne laisse partir qu’un envoi, et rend le verrou quand il se règle', async () => {
     let guard: SubmitGuard | undefined
     function Probe({ onReady }: { readonly onReady: (ready: SubmitGuard) => void }) {
       const submitGuard = useSubmitGuard()
@@ -109,9 +109,58 @@ describe('shared/lib : crochets sans métier', () => {
       />,
     )
 
-    expect(guard?.enter()).toBe(true)
-    expect(guard?.enter()).toBe(false)
-    guard?.release()
-    expect(guard?.enter()).toBe(true)
+    let finish: (ok: boolean) => void = () => undefined
+    const pending = () =>
+      new Promise<void>((resolve, reject) => {
+        finish = (ok) => {
+          if (ok) {
+            resolve()
+          } else {
+            reject(new Error('refus'))
+          }
+        }
+      })
+    const sent: string[] = []
+    const send = (label: string) => () => {
+      sent.push(label)
+      return pending()
+    }
+
+    // Un envoi à la fois : le second est ignoré tant que le premier n'est pas réglé.
+    expect(guard?.run(send('premier'))).toBe(true)
+    expect(guard?.run(send('second'))).toBe(false)
+    expect(sent).toEqual(['premier'])
+
+    // Rendu après une réussite, puis après un échec, sans rejet laissé sans traitement.
+    finish(true)
+    await expect.poll(() => guard?.run(send('troisième'))).toBe(true)
+    finish(false)
+    await expect.poll(() => guard?.run(send('quatrième'))).toBe(true)
+    expect(sent).toEqual(['premier', 'troisième', 'quatrième'])
+  })
+
+  it('ADR 0033 (point 6) : un envoi qui lève avant de partir rend le verrou et propage l’erreur', async () => {
+    let guard: SubmitGuard | undefined
+    function Probe({ onReady }: { readonly onReady: (ready: SubmitGuard) => void }) {
+      const submitGuard = useSubmitGuard()
+      useEffect(() => {
+        onReady(submitGuard)
+      }, [onReady, submitGuard])
+      return null
+    }
+    await render(
+      <Probe
+        onReady={(ready) => {
+          guard = ready
+        }}
+      />,
+    )
+
+    expect(() =>
+      guard?.run(() => {
+        throw new TypeError('avant l’envoi')
+      }),
+    ).toThrow('avant l’envoi')
+    expect(guard?.run(() => Promise.resolve())).toBe(true)
   })
 })

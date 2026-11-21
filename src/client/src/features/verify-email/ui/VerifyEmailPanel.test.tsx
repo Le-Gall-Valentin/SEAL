@@ -429,4 +429,49 @@ describe('AUTH-14, AUTH-17 : vérification du courriel', () => {
 
     await expect.poll(() => calls.length).toBe(2)
   })
+
+  it('AUTH-14, ADR 0033 (point 6) : après « Code incorrect. », un second code part', async () => {
+    let attempts = 0
+    const { screen, calls } = await renderPanel({
+      verify: () => {
+        attempts += 1
+        return attempts === 1 ? Promise.reject(new ApiError(422, 'INVALID_CODE')) : never()
+      },
+    })
+    await box(screen, 1).fill('503271')
+    await screen.getByRole('button', { name: 'Vérifier' }).click()
+    await expect.element(screen.getByRole('alert')).toHaveTextContent('Code incorrect.')
+
+    await box(screen, 1).fill('503272')
+    await screen.getByRole('button', { name: 'Vérifier' }).click()
+
+    await expect.poll(() => calls).toEqual(['verify 503271', 'verify 503272'])
+  })
+
+  it('AUTH-17, ADR 0033 (point 6) : après un changement de courriel en échec, le renvoi part', async () => {
+    const { screen, calls } = await renderPanel({
+      changeEmail: () => Promise.reject(new NetworkError()),
+    })
+    await screen.getByRole('button', { name: 'Modifier le courriel' }).click()
+    await screen.getByLabelText('Courriel', { exact: true }).fill('noah@uqac.ca')
+    await screen.getByRole('button', { name: 'Envoyer le code' }).click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Renvoyer le code' }).click()
+
+    await expect.poll(() => calls).toEqual(['change noah@uqac.ca', 'resend'])
+  })
+
+  it('AUTH-14, ADR 0033 (point 6) : après un renvoi réussi, « Vérifier » part', async () => {
+    const { screen, calls } = await renderPanel({})
+    await screen.getByRole('button', { name: 'Renvoyer le code' }).click()
+    await expect
+      .element(screen.getByRole('status'))
+      .toHaveTextContent('Code envoyé à valentin@uqac.ca.')
+
+    await box(screen, 1).fill('503271')
+    await screen.getByRole('button', { name: 'Vérifier' }).click()
+
+    await expect.poll(() => calls).toEqual(['resend', 'verify 503271'])
+  })
 })

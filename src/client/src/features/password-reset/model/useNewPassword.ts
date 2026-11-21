@@ -65,9 +65,6 @@ export function useNewPassword(token: string | null, linkId: number) {
         setRefusedPassword(submitted)
       }
     },
-    onSettled: () => {
-      guard.release()
-    },
   })
   const locked = useRetryAfterLock(mutation.error, mutation.reset)
 
@@ -112,8 +109,8 @@ export function useNewPassword(token: string | null, linkId: number) {
     alert: failure !== null && isFormFailure(failure) ? failure : null,
     canSubmit,
     submit: () => {
-      if (canSubmit && guard.enter()) {
-        mutation.mutate(password)
+      if (canSubmit) {
+        guard.run(() => mutation.mutateAsync(password))
       }
     },
   }

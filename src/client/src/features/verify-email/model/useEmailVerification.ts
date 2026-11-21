@@ -33,9 +33,6 @@ export function useEmailVerification(
   const [newEmailTouched, setNewEmailTouched] = useState(false)
   const [refusedEmail, setRefusedEmail] = useState<string | null>(null)
   const guard = useSubmitGuard()
-  const release = () => {
-    guard.release()
-  }
 
   const verify = useMutation({
     mutationFn: (code: string) => api.verify(code),
@@ -46,7 +43,6 @@ export function useEmailVerification(
         onCodeCleared()
       }
     },
-    onSettled: release,
   })
   const resend = useMutation({
     mutationFn: () => api.resend(),
@@ -54,7 +50,6 @@ export function useEmailVerification(
       setSentTo(email)
       await refreshSession(client)
     },
-    onSettled: release,
   })
   const change = useMutation({
     mutationFn: (address: string) => api.changeEmail(address),
@@ -71,7 +66,6 @@ export function useEmailVerification(
         setRefusedEmail(address)
       }
     },
-    onSettled: release,
   })
 
   const sendError = resend.error ?? change.error
@@ -112,17 +106,21 @@ export function useEmailVerification(
     codeLocked: verifyLocked,
     canVerify: view.canVerify,
     verify: () => {
-      if (view.canVerify && guard.enter()) {
-        start()
-        verify.mutate(cells.join(''))
+      if (view.canVerify) {
+        guard.run(() => {
+          start()
+          return verify.mutateAsync(cells.join(''))
+        })
       }
     },
     resendsRemaining: verification?.resendsRemaining ?? 0,
     canResend: view.canResend,
     resend: () => {
-      if (view.canResend && guard.enter()) {
-        start()
-        resend.mutate()
+      if (view.canResend) {
+        guard.run(() => {
+          start()
+          return resend.mutateAsync()
+        })
       }
     },
     sentTo,
@@ -144,9 +142,11 @@ export function useEmailVerification(
     newEmailInvalid: view.newEmailInvalid,
     canChange: view.canChange,
     changeEmail: () => {
-      if (view.canChange && guard.enter()) {
-        start()
-        change.mutate(newEmail)
+      if (view.canChange) {
+        guard.run(() => {
+          start()
+          return change.mutateAsync(newEmail)
+        })
       }
     },
   }

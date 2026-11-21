@@ -93,8 +93,8 @@ describe('KEY-33 : Restauration-Appareil, modèle', () => {
     result.current.enter(0, KEY)
     await expect.poll(() => result.current.canSubmit).toBe(true)
 
-    // Deux envois sans rendu entre eux : `pending` n'est relu qu'au rendu suivant. Le verrou des clés range le second
-    // derrière le premier, qui le rejouerait une fois la restauration finie.
+    // Deux envois sans rendu entre eux : `pending` n'est relu qu'au rendu suivant. Sans verrou d'envoi, le verrou des clés
+    // rangerait le second derrière le premier, et la restauration serait rejouée une fois finie.
     result.current.submit()
     result.current.submit()
 

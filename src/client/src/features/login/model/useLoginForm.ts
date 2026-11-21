@@ -25,9 +25,6 @@ export function useLoginForm() {
         setValues((current) => ({ ...current, password: '' }))
       }
     },
-    onSettled: () => {
-      guard.release()
-    },
   })
   const { error, reset } = mutation
   const locked = useRetryAfterLock(error, reset)
@@ -43,9 +40,11 @@ export function useLoginForm() {
     locked,
     canSubmit: !locked && !mutation.isPending && canSubmit(values),
     submit: () => {
-      if (!locked && !mutation.isPending && canSubmit(values) && guard.enter()) {
+      if (!locked && !mutation.isPending && canSubmit(values)) {
         // ADR 0024, point 10 : l'identifiant part sans ses espaces de début et de fin (clavier de téléphone).
-        mutation.mutate({ login: values.login.trim(), password: values.password })
+        guard.run(() =>
+          mutation.mutateAsync({ login: values.login.trim(), password: values.password }),
+        )
       }
     },
   }
