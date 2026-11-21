@@ -45,7 +45,8 @@ class ClientRoutesIT {
                 "/inscription",
                 "/verification-courriel",
                 "/mot-de-passe/oublie",
-                "/mot-de-passe/nouveau"
+                "/mot-de-passe/nouveau",
+                "/inscription/identifiant"
             })
     @DisplayName("AUTH-70, TRN-20 : chaque écran de l'authentification rend le client à un anonyme, avec la CSP")
     void auth70EachScreenAddressServesTheClient(String path) throws Exception {

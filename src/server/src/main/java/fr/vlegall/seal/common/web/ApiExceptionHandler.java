@@ -2,9 +2,9 @@ package fr.vlegall.seal.common.web;
 
 import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,17 +50,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             body.setProperty(
                     FIELDS, exception.fields().stream().distinct().sorted().toList());
         }
-        return exception
-                .retryAfter()
-                .map(delay -> ResponseEntity.status(response.getStatusCode())
-                        .header(HttpHeaders.RETRY_AFTER, Long.toString(secondsRoundedUp(delay)))
-                        .body(response.getBody()))
-                .orElse(response);
-    }
-
-    /** SEC-10 : {@code Retry-After} s'exprime en secondes entières ; on arrondit au-dessus pour ne jamais inviter trop tôt. */
-    static long secondsRoundedUp(Duration delay) {
-        return delay.toSeconds() + (delay.toNanosPart() > 0 ? 1 : 0);
+        OptionalLong retryAfter = exception.retryAfterSeconds();
+        return retryAfter.isPresent()
+                ? ResponseEntity.status(response.getStatusCode())
+                        .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfter.getAsLong()))
+                        .body(response.getBody())
+                : response;
     }
 
     /** QA-05 : sans session valide. */

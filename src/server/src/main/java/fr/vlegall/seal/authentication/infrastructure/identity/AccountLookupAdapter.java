@@ -3,6 +3,8 @@ package fr.vlegall.seal.authentication.infrastructure.identity;
 import fr.vlegall.seal.authentication.domain.model.AccountContact;
 import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
+import fr.vlegall.seal.authentication.domain.port.out.OAuthAccountLookupPort;
+import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.AccountLookupQuery;
 import java.util.Optional;
@@ -13,7 +15,7 @@ import org.springframework.stereotype.Component;
  * 0008, règle 7).
  */
 @Component
-public class AccountLookupAdapter implements AccountLookupPort, AccountContactPort {
+public class AccountLookupAdapter implements AccountLookupPort, AccountContactPort, OAuthAccountLookupPort {
 
     private final AccountLookupQuery accounts;
 
@@ -29,6 +31,16 @@ public class AccountLookupAdapter implements AccountLookupPort, AccountContactPo
     @Override
     public boolean isVerified(UserId user) {
         return accounts.isVerified(user);
+    }
+
+    @Override
+    public AccountLoginState state(UserId user) {
+        return accounts.loginState(user);
+    }
+
+    @Override
+    public boolean activeAccountOwns(String email) {
+        return accounts.activeAccountOwns(email);
     }
 
     @Override

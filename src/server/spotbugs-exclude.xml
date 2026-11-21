@@ -37,6 +37,35 @@
     </Match>
 
     <!--
+      SERVLET_PARAMETER : les paramètres code et error du retour OAuth ne sont lus que pour savoir si le code d'erreur
+      de Spring vient du navigateur ; ils ne sont ni journalisés, ni renvoyés, ni stockés. Seul un code d'une liste
+      fermée atteint le journal (SEC-20, OAuthCallbackSessionIT, OAuthAttackIT). Exclusion limitée à cette méthode (ADR
+      0011).
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.security.OAuthLoginFailureHandler"/>
+        <Method name="cause"/>
+        <Bug pattern="SERVLET_PARAMETER"/>
+    </Match>
+
+    <!--
+      SERVLET_HEADER : Fetch Metadata (ADR 0032, point 3) lit les en-têtes Sec-Fetch-* et Sec-Purpose pour écarter ce
+      que le navigateur marque comme sous-requête, départ d'une autre origine, préchargement ou prérendu. Un client qui
+      les falsifie pour imiter une navigation est compté comme toute requête sans ces en-têtes : rien n'est contourné.
+      Les valeurs ne sont que comparées à des constantes, ou leur présence lue (OAuthAttackIT). Exclusion limitée à ces
+      trois méthodes (ADR 0011).
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.security.ratelimit.OAuthNavigationRateLimitFilter"/>
+        <Or>
+            <Method name="expectedNavigation"/>
+            <Method name="isPresentAndNot"/>
+            <Method name="isSpeculative"/>
+        </Or>
+        <Bug pattern="SERVLET_HEADER"/>
+    </Match>
+
+    <!--
       SPRING_ENDPOINT n'est pas une faille : FindSecBugs l'émet sur chaque contrôleur pour qu'il soit relu
       (ADR 0011). Une entrée par contrôleur relu, avec le test qui vérifie son contrôle d'accès (QA-05) ;
       jamais d'exclusion globale.
@@ -55,6 +84,13 @@
     <!-- /api/v1/auth/login (anonyme seulement) et /logout (toute session) : LoginIT. -->
     <Match>
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.SessionController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <!-- /api/v1/auth/providers (anonyme ou session complète, AUTH-35), /oauth/pending et /oauth/complete (anonyme
+         seulement, AUTH-32) : OAuthProvidersIT, OAuthAuthorizationRequestIT, OAuthRegistrationIT,
+         WebAuthorizationConventionsIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.web.OAuthController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
     <!-- /api/v1/auth/password-reset/request, /inspect et /confirm (anonyme seulement, ADR 0022) : PasswordResetIT. -->

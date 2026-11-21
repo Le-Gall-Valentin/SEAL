@@ -37,8 +37,8 @@ class SessionEstablisherTest {
 
     private final MutableClock clock = MutableClock.fixedAt(NOW);
     private OptionalLong storedVersion = OptionalLong.of(VERSION);
-    private final SessionEstablisher sessions =
-            new SessionEstablisher(CookieCsrfTokenRepository.withHttpOnlyFalse(), clock, user -> storedVersion);
+    private final SessionEstablisher sessions = new SessionEstablisher(
+            CookieCsrfTokenRepository.withHttpOnlyFalse(), clock, user -> storedVersion, List.of());
 
     /** Authentification d'une connexion réussie d'un compte actif, telle que la rend le fournisseur. */
     private static Authentication activeLogin() {

@@ -152,4 +152,10 @@ class ArchitectureTest {
     void noCors() {
         ContextRules.noCors(ROOT).check(CLASSES);
     }
+
+    @Test
+    @DisplayName("ADR 0008, règle 15 : le domaine ne dépend pas du format des sessions (aucune classe sérialisable)")
+    void domainIsNotSerializable() {
+        ContextRules.domainIsNotSerializable(ROOT).check(CLASSES);
+    }
 }

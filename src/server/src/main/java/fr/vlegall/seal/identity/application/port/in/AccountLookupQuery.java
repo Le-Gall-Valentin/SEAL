@@ -1,5 +1,6 @@
 package fr.vlegall.seal.identity.application.port.in;
 
+import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.UserId;
 import java.util.List;
 import java.util.Optional;
@@ -7,8 +8,9 @@ import java.util.Optional;
 /**
  * Compte d'une connexion ou d'une réinitialisation, demandé par le seul contexte {@code authentication} (AUTH-20,
  * AUTH-70, ADR 0008) ; le contexte {@code keys} passe par {@link ActiveUsernameQuery}, qui ne livre que
- * l'identifiant. Appelé depuis un autre contexte : la signature ne porte que des types de la JDK, {@link UserId} et
- * l'interface {@link Contact}, rangée ici même ; son implémentation reste dans {@code identity}.
+ * l'identifiant. Appelé depuis un autre contexte : la signature ne porte que des types de la JDK, ceux de
+ * {@code common} ({@link UserId}, {@link AccountLoginState}) et l'interface {@link Contact}, rangée ici même ; son
+ * implémentation reste dans {@code identity}.
  */
 public interface AccountLookupQuery {
 
@@ -36,6 +38,15 @@ public interface AccountLookupQuery {
 
     /** Vrai si le compte est actif, donc son courriel vérifié (AUTH-16). */
     boolean isVerified(UserId user);
+
+    /** AUTH-16, AUTH-31 : l'état du compte, lu une seule fois. */
+    AccountLoginState loginState(UserId user);
+
+    /**
+     * AUTH-33 : vrai si un compte actif possède ce courriel, normalisé en NFC et comparé sans tenir compte de la casse ;
+     * faux pour toute saisie qui n'est pas un courriel.
+     */
+    boolean activeAccountOwns(String email);
 
     /**
      * AUTH-70 : coordonnées du compte actif dont le courriel vérifié est la saisie, normalisée en NFC et comparée sans

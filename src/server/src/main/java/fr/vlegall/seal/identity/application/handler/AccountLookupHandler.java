@@ -1,5 +1,6 @@
 package fr.vlegall.seal.identity.application.handler;
 
+import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.Unicode;
 import fr.vlegall.seal.common.UserId;
@@ -43,6 +44,24 @@ public class AccountLookupHandler implements AccountLookupQuery {
     @Transactional(readOnly = true)
     public boolean isVerified(UserId user) {
         return findActive(user).isPresent();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AccountLoginState loginState(UserId user) {
+        return users.findById(user)
+                .map(account -> switch (account.status()) {
+                    case ACTIVE -> AccountLoginState.ACTIVE;
+                    case PENDING_EMAIL -> AccountLoginState.PENDING_EMAIL;
+                    case DELETED -> AccountLoginState.UNUSABLE;
+                })
+                .orElse(AccountLoginState.UNUSABLE);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean activeAccountOwns(String email) {
+        return EmailAddress.parse(email).map(users::activeAccountOwns).orElse(false);
     }
 
     @Override

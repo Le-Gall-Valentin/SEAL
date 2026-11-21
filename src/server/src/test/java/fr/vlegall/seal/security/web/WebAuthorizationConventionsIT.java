@@ -50,7 +50,8 @@ class WebAuthorizationConventionsIT {
             "GET /inscription",
             "GET /verification-courriel",
             "GET /mot-de-passe/oublie",
-            "GET /mot-de-passe/nouveau");
+            "GET /mot-de-passe/nouveau",
+            "GET /inscription/identifiant");
 
     /** AUTH-53 : la déconnexion ferme la session ; essayée en dernier, elle ne fausse pas les autres routes. */
     private static final String LOGOUT = "POST /api/v1/auth/logout";

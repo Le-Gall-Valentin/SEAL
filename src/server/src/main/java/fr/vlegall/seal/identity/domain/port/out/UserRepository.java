@@ -21,6 +21,14 @@ public interface UserRepository {
      */
     UserId createPending(Username username, DisplayName displayName, EmailAddress email);
 
+    /**
+     * AUTH-32 : compte d'une inscription OAuth dont le fournisseur garantit le courriel, actif d'emblée.
+     *
+     * @throws IdentityException.UsernameTaken si l'identifiant est pris entre-temps
+     * @throws IdentityException.EmailInUse si un compte actif possède déjà ce courriel (index users_verified_email)
+     */
+    UserId createActive(Username username, DisplayName displayName, EmailAddress email, Instant verifiedAt);
+
     Optional<Account> findById(UserId id);
 
     /** Lit le compte en verrouillant sa ligne jusqu'à la fin de la transaction : les gestes concurrents attendent. */

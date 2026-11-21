@@ -68,6 +68,10 @@ server:
     include-message: never
     include-binding-errors: never
     include-exception: false
+  tomcat:
+    # TRN-02, A02 : redirections relatives, sur l'origine unique ; sinon Tomcat les rend absolues à partir de l'en-tête
+    # Host, choisi par le client (RelativeRedirectsIT).
+    use-relative-redirects: true
 
 logging:
   pattern:
@@ -110,6 +114,15 @@ seal:
   # KEY-10 : clé de l'Autorité et autres données générées par SEAL. Le Dockerfile fixe SEAL_DATA_DIR=/data (volume
   # app-data) ; en local, depuis src/server, ../data désigne src/data, hors de Git et de projet.zip.
   data-dir: ${SEAL_DATA_DIR:../data}
+  oauth:
+    # AUTH-35, OPS-03, ADR 0032 (point 5) : applications OAuth, toutes facultatives. Un fournisseur n'est proposé que
+    # si son identifiant et son secret sont renseignés ; une seule des deux valeurs arrête le démarrage.
+    google:
+      client-id: ${SEAL_OAUTH_GOOGLE_CLIENT_ID:}
+      client-secret: ${SEAL_OAUTH_GOOGLE_CLIENT_SECRET:}
+    github:
+      client-id: ${SEAL_OAUTH_GITHUB_CLIENT_ID:}
+      client-secret: ${SEAL_OAUTH_GITHUB_CLIENT_SECRET:}
   passwords:
     # AUTH-13, ADR 0026 : poivre des mots de passe, 32 octets en base64. Une valeur absente ou vide arrête le
     # démarrage avec un message qui nomme la variable (échec fermé) ; seul le lanceur de développement en tire une.

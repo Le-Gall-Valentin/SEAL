@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * Erreur métier de SEAL, convertie en Problem Details avec son {@link ErrorCode}. Sans dépendance à Spring, pour que
@@ -39,5 +40,15 @@ public class SealException extends RuntimeException {
     /** Délai avant lequel il est inutile de réessayer, renvoyé dans l'en-tête {@code Retry-After} (SEC-10). */
     public Optional<Duration> retryAfter() {
         return Optional.empty();
+    }
+
+    /**
+     * SEC-10 : la valeur de {@code Retry-After}, en secondes entières, arrondie au-dessus pour ne jamais inviter à
+     * réessayer trop tôt ; vide sans délai.
+     */
+    public final OptionalLong retryAfterSeconds() {
+        return retryAfter()
+                .map(delay -> OptionalLong.of(delay.toSeconds() + (delay.toNanosPart() > 0 ? 1 : 0)))
+                .orElseGet(OptionalLong::empty);
     }
 }

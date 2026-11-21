@@ -44,6 +44,11 @@ services:
       SEAL_TLS_PRIVATE_KEY: file:/certs/localhost-key.pem
       # AUTH-14 : serveur SMTP de Mailpit, sur le réseau interne.
       SEAL_MAIL_HOST: mail
+      # OPS-03, ADR 0032 : applications OAuth facultatives ; vides, les boutons du fournisseur sont masqués.
+      SEAL_OAUTH_GOOGLE_CLIENT_ID: ${SEAL_OAUTH_GOOGLE_CLIENT_ID:-}
+      SEAL_OAUTH_GOOGLE_CLIENT_SECRET: ${SEAL_OAUTH_GOOGLE_CLIENT_SECRET:-}
+      SEAL_OAUTH_GITHUB_CLIENT_ID: ${SEAL_OAUTH_GITHUB_CLIENT_ID:-}
+      SEAL_OAUTH_GITHUB_CLIENT_SECRET: ${SEAL_OAUTH_GITHUB_CLIENT_SECRET:-}
     ports:
       - '127.0.0.1:8443:8443'
     volumes:

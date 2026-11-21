@@ -17,6 +17,9 @@ public final class SealAuthorities {
     /** Facteur mot de passe, daté du moment où il a été obtenu (AUTH-55). */
     public static final String FACTOR_PASSWORD = FactorGrantedAuthority.PASSWORD_AUTHORITY;
 
+    /** Facteur d'une connexion OAuth, daté de même (AUTH-30, ADR 0032, point 6). */
+    public static final String FACTOR_AUTHORIZATION_CODE = FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY;
+
     static final String FACTOR_PREFIX = "FACTOR_";
 
     private SealAuthorities() {}

@@ -5,8 +5,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.OptionalLong;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -40,13 +42,19 @@ public final class SessionEstablisher {
     private final CsrfTokenRepository csrfTokens;
     private final Clock clock;
     private final CredentialVersions versions;
+    private final List<SessionOpeningCleanup> cleanups;
 
-    public SessionEstablisher(CsrfTokenRepository csrfTokens, Clock clock, CredentialVersions versions) {
+    public SessionEstablisher(
+            CsrfTokenRepository csrfTokens,
+            Clock clock,
+            CredentialVersions versions,
+            List<SessionOpeningCleanup> cleanups) {
         this.renewal = new CompositeSessionAuthenticationStrategy(
                 List.of(new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrfTokens)));
         this.csrfTokens = csrfTokens;
         this.clock = clock;
         this.versions = versions;
+        this.cleanups = List.copyOf(cleanups);
     }
 
     /**
@@ -86,6 +94,49 @@ public final class SessionEstablisher {
         SealPrincipal principal =
                 version.isPresent() ? new SealPrincipal(user, version.getAsLong()) : new SealPrincipal(user);
         return establish(principal, restrictedAuthorities(), request, response);
+    }
+
+    /**
+     * AUTH-30 : session d'une connexion OAuth, complète pour un compte actif, restreinte sinon (AUTH-16), avec le facteur
+     * {@code AUTHORIZATION_CODE} daté (ADR 0032, point 6). Le principal n'a pas de version de mot de passe : aucune n'a
+     * été vérifiée (ADR 0023).
+     */
+    public Authentication openWithAuthorizationCode(
+            UserId user, boolean active, HttpServletRequest request, HttpServletResponse response) {
+        return openWithAuthorizationCode(user, active, clock.instant(), request, response);
+    }
+
+    /**
+     * ADR 0032, point 8 : comme {@link #openWithAuthorizationCode(UserId, boolean, HttpServletRequest,
+     * HttpServletResponse)}, avec le facteur daté du retour du fournisseur, quand la session ne s'ouvre qu'au terme de
+     * l'inscription OAuth.
+     */
+    public Authentication openWithAuthorizationCode(
+            UserId user,
+            boolean active,
+            Instant factorIssuedAt,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        GrantedAuthority account = new SimpleGrantedAuthority(
+                active ? SealAuthorities.ACCOUNT_ACTIVE : SealAuthorities.ACCOUNT_PENDING_EMAIL);
+        GrantedAuthority factor = FactorGrantedAuthority.withAuthority(SealAuthorities.FACTOR_AUTHORIZATION_CODE)
+                .issuedAt(factorIssuedAt)
+                .build();
+        return establish(new SealPrincipal(user), List.of(account, factor), request, response);
+    }
+
+    /**
+     * AUTH-32 : nouvel identifiant de session sans authentification, pour l'inscription OAuth en attente : la session qui
+     * gardait la requête d'autorisation change d'identifiant (AUTH-23), l'ancien jeton CSRF est retiré (AUTH-60) et aucun
+     * contexte de sécurité n'y est écrit.
+     */
+    public void renew(HttpServletRequest request, HttpServletResponse response) {
+        Objects.requireNonNull(request.getSession(true), "session");
+        Objects.requireNonNull(request.changeSessionId(), "nouvel identifiant de session");
+        holder.clearContext();
+        // Un contexte vide retire de la session tout contexte qui s'y trouverait : l'attente reste anonyme.
+        contexts.saveContext(holder.createEmptyContext(), request, response);
+        csrfTokens.saveToken(null, request, response);
     }
 
     private List<GrantedAuthority> fullAuthorities() {
@@ -140,6 +191,8 @@ public final class SessionEstablisher {
             HttpServletResponse response) {
         Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(principal, null, authorities);
         renewal.onAuthentication(authentication, request, response);
+        // ADR 0032, point 7 : la session ouverte ne garde ni départ OAuth ni inscription en attente.
+        cleanups.forEach(cleanup -> cleanup.clean(request));
         SecurityContext context = holder.createEmptyContext();
         context.setAuthentication(authentication);
         holder.setContext(context);
