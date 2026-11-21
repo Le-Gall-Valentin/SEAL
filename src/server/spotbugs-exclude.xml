@@ -81,7 +81,8 @@
         <Class name="fr.vlegall.seal.identity.infrastructure.web.AccountController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
-    <!-- /api/v1/account/profile (session complète, ACC-03) : AccountProfileIT. -->
+    <!-- /api/v1/account : profile, email et email/confirm (session complète ; sudo pour email, ADR 0034) :
+         AccountProfileIT, EmailChangeIT. -->
     <Match>
         <Class name="fr.vlegall.seal.identity.infrastructure.web.AccountSettingsController"/>
         <Bug pattern="SPRING_ENDPOINT"/>

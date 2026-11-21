@@ -2,7 +2,9 @@ package fr.vlegall.seal.identity.infrastructure.persistence.adapter;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.domain.model.CodePolicy;
+import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.LiveCode;
+import fr.vlegall.seal.identity.domain.model.LiveEmailChange;
 import fr.vlegall.seal.identity.domain.port.out.EmailCodeRepository;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -15,9 +17,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
 
-    /** Code vivant : non consommé, non expiré, moins de 5 essais (AUTH-14, SEC-10). */
-    private static final String LIVE =
-            "user_id = :user AND consumed_at IS NULL AND expires_at > :now " + "AND attempts < :maxAttempts";
+    /** Code vivant d'un usage : non consommé, non expiré, moins de 5 essais (AUTH-14, ACC-02, SEC-10). */
+    private static final String LIVE = "user_id = :user AND purpose = :purpose AND consumed_at IS NULL "
+            + "AND expires_at > :now AND attempts < :maxAttempts";
+
+    private static final String VERIFY_EMAIL = "VERIFY_EMAIL";
+    private static final String CHANGE_EMAIL = "CHANGE_EMAIL";
 
     private final JdbcClient jdbc;
 
@@ -27,10 +32,7 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
 
     @Override
     public void renew(UserId user, byte[] codeHash, Instant issuedAt, Instant expiresAt) {
-        jdbc.sql("UPDATE email_codes SET consumed_at = :now WHERE user_id = :user AND consumed_at IS NULL")
-                .param("now", SqlSupport.utc(issuedAt))
-                .param("user", user.value())
-                .update();
+        retire(user, VERIFY_EMAIL, issuedAt);
         jdbc.sql("INSERT INTO email_codes (user_id, purpose, code_hash, expires_at) "
                         + "VALUES (:user, 'VERIFY_EMAIL', :hash, :expiresAt)")
                 .param("user", user.value())
@@ -43,6 +45,7 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
     public Optional<Instant> liveExpiry(UserId user, Instant now) {
         return jdbc.sql("SELECT expires_at FROM email_codes WHERE " + LIVE + " ORDER BY id DESC LIMIT 1")
                 .param("user", user.value())
+                .param("purpose", VERIFY_EMAIL)
                 .param("now", SqlSupport.utc(now))
                 .param("maxAttempts", CodePolicy.MAX_ATTEMPTS)
                 .query(OffsetDateTime.class)
@@ -54,10 +57,47 @@ public class EmailCodeRepositoryAdapter implements EmailCodeRepository {
     public Optional<LiveCode> findLive(UserId user, Instant now) {
         return jdbc.sql("SELECT id, code_hash FROM email_codes WHERE " + LIVE + " ORDER BY id DESC LIMIT 1")
                 .param("user", user.value())
+                .param("purpose", VERIFY_EMAIL)
                 .param("now", SqlSupport.utc(now))
                 .param("maxAttempts", CodePolicy.MAX_ATTEMPTS)
                 .query((row, number) -> new LiveCode(row.getObject("id", UUID.class), row.getBytes("code_hash")))
                 .optional();
+    }
+
+    @Override
+    public void renewChange(UserId user, EmailAddress target, byte[] codeHash, Instant issuedAt, Instant expiresAt) {
+        retire(user, CHANGE_EMAIL, issuedAt);
+        jdbc.sql("INSERT INTO email_codes (user_id, purpose, code_hash, target, expires_at) "
+                        + "VALUES (:user, 'CHANGE_EMAIL', :hash, CAST(:target AS citext), :expiresAt)")
+                .param("user", user.value())
+                .param("hash", codeHash)
+                .param("target", target.value())
+                .param("expiresAt", SqlSupport.utc(expiresAt))
+                .update();
+    }
+
+    @Override
+    public Optional<LiveEmailChange> findLiveChange(UserId user, Instant now) {
+        return jdbc.sql("SELECT id, code_hash, target FROM email_codes WHERE " + LIVE + " ORDER BY id DESC LIMIT 1")
+                .param("user", user.value())
+                .param("purpose", CHANGE_EMAIL)
+                .param("now", SqlSupport.utc(now))
+                .param("maxAttempts", CodePolicy.MAX_ATTEMPTS)
+                .query((row, number) -> new LiveEmailChange(
+                        row.getObject("id", UUID.class),
+                        row.getBytes("code_hash"),
+                        EmailAddress.parse(row.getString("target")).orElseThrow()))
+                .optional();
+    }
+
+    /** Invalide les codes vivants d'un usage ; ceux de l'autre usage ne sont pas touchés. */
+    private void retire(UserId user, String purpose, Instant now) {
+        jdbc.sql("UPDATE email_codes SET consumed_at = :now "
+                        + "WHERE user_id = :user AND purpose = :purpose AND consumed_at IS NULL")
+                .param("now", SqlSupport.utc(now))
+                .param("user", user.value())
+                .param("purpose", purpose)
+                .update();
     }
 
     @Override

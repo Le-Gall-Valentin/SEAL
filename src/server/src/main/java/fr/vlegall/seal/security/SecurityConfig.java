@@ -158,6 +158,10 @@ class SecurityConfig {
                         // ACC-01, ADR 0034 : changement du mot de passe, pour la seule session complète.
                         .requestMatchers(HttpMethod.POST, "/api/v1/account/password")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // ACC-02, ADR 0034 : changement du courriel, pour la seule session complète ; le mode sudo est
+                        // vérifié par le contrôleur et par le handler (SEC-03).
+                        .requestMatchers(HttpMethod.POST, "/api/v1/account/email", "/api/v1/account/email/confirm")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         // KEY-10, KEY-11, ADR 0025 (point 9) : clé de l'Autorité, pour la seule session complète.
                         .requestMatchers(HttpMethod.GET, "/api/v1/pki/ca")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)

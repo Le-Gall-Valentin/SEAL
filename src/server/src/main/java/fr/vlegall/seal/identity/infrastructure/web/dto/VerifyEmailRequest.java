@@ -4,7 +4,10 @@ import fr.vlegall.seal.identity.domain.model.VerificationCode;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
-/** Corps de {@code POST /api/v1/auth/verify-email} (AUTH-14). {@link #toString()} ne révèle pas le code. */
+/**
+ * Corps de {@code POST /api/v1/auth/verify-email} (AUTH-14) et de {@code POST /api/v1/account/email/confirm} (ACC-02).
+ * {@link #toString()} ne révèle pas le code.
+ */
 public record VerifyEmailRequest(
         @NotNull @Pattern(regexp = "^[0-9]{6}$") String code) {
 
