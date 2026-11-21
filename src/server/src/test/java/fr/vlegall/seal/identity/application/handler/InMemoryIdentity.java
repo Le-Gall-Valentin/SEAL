@@ -129,6 +129,12 @@ final class InMemoryIdentity {
             }
 
             @Override
+            public void changeDisplayName(UserId id, DisplayName displayName) {
+                Account account = accounts.get(id);
+                accounts.put(id, new Account(id, account.username(), displayName, account.email(), account.status()));
+            }
+
+            @Override
             public boolean activeAccountOwns(EmailAddress email) {
                 return accounts.values().stream()
                         .anyMatch(account -> account.status() == AccountStatus.ACTIVE

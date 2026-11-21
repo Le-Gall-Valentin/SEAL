@@ -121,6 +121,16 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public void changeDisplayName(UserId id, DisplayName displayName) {
+        SqlSupport.requireOneRow(
+                jdbc.sql("UPDATE users SET display_name = :displayName WHERE id = :id AND status = 'ACTIVE'")
+                        .param("displayName", displayName.value())
+                        .param("id", id.value())
+                        .update(),
+                "changement du nom affiché");
+    }
+
+    @Override
     public boolean activeAccountOwns(EmailAddress email) {
         return jdbc.sql(
                         "SELECT EXISTS (SELECT 1 FROM users WHERE email = CAST(:email AS citext) AND status = 'ACTIVE')")

@@ -149,6 +149,9 @@ class SecurityConfig {
                                 "/api/v1/auth/verify-email/resend",
                                 "/api/v1/auth/verify-email/change")
                         .hasAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL)
+                        // ACC-03, ADR 0034 : paramètres du compte, pour la seule session complète (AUTH-16).
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/account/profile")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         // KEY-10, KEY-11, ADR 0025 (point 9) : clé de l'Autorité, pour la seule session complète.
                         .requestMatchers(HttpMethod.GET, "/api/v1/pki/ca")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
