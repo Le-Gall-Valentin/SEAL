@@ -182,6 +182,28 @@ public final class SessionEstablisher {
      */
     public Authentication refreshFactor(
             String factorAuthority, HttpServletRequest request, HttpServletResponse response) {
+        FullSession session = fullSession();
+        return reestablish(session, session.principal(), factorAuthority, request, response);
+    }
+
+    /**
+     * ACC-01, ADR 0023 et 0034 : la session qui vient de changer le mot de passe le garde. Elle porte la version désormais
+     * en base, pour que le filtre des versions ne la ferme pas, et le facteur mot de passe redaté, puisque le mot de
+     * passe actuel vient d'être vérifié ; elle change d'identifiant et perd son jeton CSRF, comme {@link
+     * #refreshFactor}.
+     */
+    public Authentication passwordChanged(long version, HttpServletRequest request, HttpServletResponse response) {
+        FullSession session = fullSession();
+        return reestablish(
+                session,
+                new SealPrincipal(session.principal().userId(), version),
+                SealAuthorities.FACTOR_PASSWORD,
+                request,
+                response);
+    }
+
+    /** Session complète en cours ; toute autre situation est une erreur de programmation (échec fermé). */
+    private FullSession fullSession() {
         Authentication current = holder.getContext().getAuthentication();
         if (current == null
                 || !(current.getPrincipal() instanceof SealPrincipal principal)
@@ -189,8 +211,20 @@ public final class SessionEstablisher {
                         .noneMatch(a -> SealAuthorities.ACCOUNT_ACTIVE.equals(a.getAuthority()))) {
             throw new IllegalStateException("aucune session complète à ré-authentifier");
         }
+        return new FullSession(current, principal);
+    }
+
+    private record FullSession(Authentication authentication, SealPrincipal principal) {}
+
+    /** Garde les droits de la session complète, redate le facteur donné, puis rétablit la session. */
+    private Authentication reestablish(
+            FullSession session,
+            SealPrincipal principal,
+            String factorAuthority,
+            HttpServletRequest request,
+            HttpServletResponse response) {
         List<GrantedAuthority> authorities = new ArrayList<>();
-        current.getAuthorities().stream()
+        session.authentication().getAuthorities().stream()
                 .filter(authority -> !factorAuthority.equals(authority.getAuthority()))
                 .forEach(authorities::add);
         authorities.add(FactorGrantedAuthority.withAuthority(factorAuthority)

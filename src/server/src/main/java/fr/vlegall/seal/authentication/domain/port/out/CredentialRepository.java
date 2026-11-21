@@ -3,6 +3,7 @@ package fr.vlegall.seal.authentication.domain.port.out;
 import fr.vlegall.seal.authentication.domain.model.StoredCredential;
 import fr.vlegall.seal.common.UserId;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /** Table {@code user_credentials} : un compte uniquement OAuth n'y a pas de ligne (ADR 0009). */
 public interface CredentialRepository {
@@ -22,6 +23,16 @@ public interface CredentialRepository {
      * @return faux si le compte n'a pas de mot de passe : rien n'est écrit (ADR 0022, point 3)
      */
     boolean changeHash(UserId user, String passwordHash);
+
+    /**
+     * ACC-01, ADR 0034 : remplace le haché s'il vaut encore {@code expectedHash}, dans la transaction de l'appelant. La
+     * version n'augmente que si {@code newVersion} (option « déconnecter mes autres sessions », point 1). Un changement
+     * ou une réinitialisation passés entre-temps l'emportent.
+     *
+     * @return la version désormais en base ; vide si le haché a changé entre-temps ou si le compte n'a pas de mot de
+     *     passe : rien n'est écrit
+     */
+    OptionalLong changeHashIfUnchanged(UserId user, String expectedHash, String newHash, boolean newVersion);
 
     /**
      * AUTH-70 : verrouille la ligne du compte jusqu'à la fin de la transaction de l'appelant. L'émission d'un lien et la

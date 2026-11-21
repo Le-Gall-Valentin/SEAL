@@ -5,6 +5,8 @@ import fr.vlegall.seal.authentication.domain.model.LiveReset;
 import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.model.ResetToken;
 import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
+import fr.vlegall.seal.authentication.domain.port.out.PasswordChangeEventPort;
+import fr.vlegall.seal.authentication.domain.port.out.PasswordChangedMailPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetMailPort;
@@ -170,7 +172,23 @@ final class PasswordResetFixture {
         calls.add("courriel");
     };
 
-    final SessionRevocationPort sessions = user -> calls.add("révocation:" + user.value());
+    final SessionRevocationPort sessions = new SessionRevocationPort() {
+        @Override
+        public void revokeAll(UserId user) {
+            calls.add("révocation:" + user.value());
+        }
+
+        @Override
+        public void revokeOthers(UserId user, String keptSession) {
+            calls.add("révocation-autres:" + user.value() + ":" + keptSession);
+        }
+    };
+
+    /** Journal du changement de mot de passe (SEC-20, ACC-01). */
+    final PasswordChangeEventPort changeJournal = user -> calls.add("journal-changement:" + user.value());
+
+    /** Courriel qui prévient le titulaire du changement (ACC-01, ADR 0034, point 5). */
+    final PasswordChangedMailPort changeMail = (email, username) -> calls.add("courriel-changement:" + email);
 
     final PasswordResetEventPort journal = user -> calls.add("journal:" + user.value());
 

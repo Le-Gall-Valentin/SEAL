@@ -6,6 +6,7 @@ import fr.vlegall.seal.common.UserId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /** {@link CredentialRepository} en mémoire, partagé par les tests des cas d'usage d'{@code authentication}. */
 class InMemoryCredentials implements CredentialRepository {
@@ -31,6 +32,18 @@ class InMemoryCredentials implements CredentialRepository {
         }
         versions.merge(user, 1L, Long::sum);
         return true;
+    }
+
+    @Override
+    public OptionalLong changeHashIfUnchanged(UserId user, String expectedHash, String newHash, boolean newVersion) {
+        if (!expectedHash.equals(hashes.get(user))) {
+            return OptionalLong.empty();
+        }
+        hashes.put(user, newHash);
+        if (newVersion) {
+            versions.merge(user, 1L, Long::sum);
+        }
+        return OptionalLong.of(versions.get(user));
     }
 
     @Override

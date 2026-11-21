@@ -4,6 +4,7 @@ import fr.vlegall.seal.authentication.domain.model.StoredCredential;
 import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
 import fr.vlegall.seal.common.UserId;
 import java.util.Optional;
+import java.util.OptionalLong;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -33,6 +34,20 @@ public class CredentialRepositoryAdapter implements CredentialRepository {
                         .param("hash", passwordHash)
                         .update()
                 == 1;
+    }
+
+    @Override
+    public OptionalLong changeHashIfUnchanged(UserId user, String expectedHash, String newHash, boolean newVersion) {
+        return jdbc.sql("UPDATE user_credentials SET password_hash = :hash, version = version + :increment "
+                        + "WHERE user_id = :user AND password_hash = :expected RETURNING version")
+                .param("hash", newHash)
+                .param("increment", newVersion ? 1 : 0)
+                .param("user", user.value())
+                .param("expected", expectedHash)
+                .query(Long.class)
+                .optional()
+                .map(OptionalLong::of)
+                .orElseGet(OptionalLong::empty);
     }
 
     @Override

@@ -197,6 +197,30 @@ class SessionEstablisherTest {
     }
 
     @Test
+    @DisplayName(
+            "ACC-01, ADR 0023 : la session qui change le mot de passe porte la nouvelle version et un facteur redaté")
+    void acc01PasswordChangeRegravesTheSession() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSecure(true);
+        sessions.open(activeLogin(), request, new MockHttpServletResponse());
+        String openedId = request.getSession(false).getId();
+        request.setRequestedSessionId(openedId);
+        clock.advance(java.time.Duration.ofHours(1));
+
+        sessions.passwordChanged(VERSION + 1, request, new MockHttpServletResponse());
+
+        Authentication authentication = storedAuthentication(request);
+        assertThat(request.getSession(false).getId()).isNotEqualTo(openedId);
+        assertThat(authentication.getPrincipal()).isEqualTo(new SealPrincipal(USER, VERSION + 1));
+        assertThat(authorities(authentication)).containsExactly("ACCOUNT_ACTIVE", "FACTOR_PASSWORD");
+        assertThat(authentication.getAuthorities())
+                .filteredOn(FactorGrantedAuthority.class::isInstance)
+                .singleElement()
+                .extracting(a -> ((FactorGrantedAuthority) a).getIssuedAt())
+                .isEqualTo(NOW.plus(java.time.Duration.ofHours(1)));
+    }
+
+    @Test
     @DisplayName("AUTH-55 : sans session complète, rien n'est redaté (échec fermé)")
     void auth55ReauthenticationNeedsAFullSession() {
         MockHttpServletRequest anonymous = new MockHttpServletRequest();

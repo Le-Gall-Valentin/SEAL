@@ -18,6 +18,8 @@ public enum SecurityEventType {
     SESSION_REVOKED,
     /** SEC-20 : mot de passe réinitialisé par lien (AUTH-70). */
     PASSWORD_RESET,
+    /** SEC-20 : mot de passe changé depuis les paramètres (ACC-01). */
+    PASSWORD_CHANGED,
     /** SEC-20 : clé d'identité publiée et certifiée (KEY-04), avec le numéro de série du certificat. */
     IDENTITY_KEY_PUBLISHED,
     /** SEC-20 : sous-clé de chiffrement publiée (KEY-05), avec son ekId. */
