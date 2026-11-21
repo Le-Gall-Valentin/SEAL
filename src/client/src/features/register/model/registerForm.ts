@@ -2,10 +2,9 @@ import { z } from 'zod'
 import {
   DISPLAY_NAME_SCHEMA,
   EMAIL_SCHEMA,
-  isDisplayNameValid,
+  isDisplayNameShownInvalid,
   isEmailWellFormed,
   USERNAME_SCHEMA,
-  type UsernameRefusal,
   type UsernameStatus,
 } from '@/entities/account'
 import { canSubmitPassword, confirmMismatch, type PasswordRules } from '@/entities/password'
@@ -30,7 +29,6 @@ export interface RegisterRefusals {
   readonly email?: string
   readonly displayName?: string
   readonly password?: string
-  readonly username?: UsernameRefusal
 }
 
 /** SEC-01 : les champs du compte, validés par Zod avec les règles du serveur. */
@@ -59,9 +57,11 @@ export function registerView({
   const emailInvalid =
     (touched.email && values.email !== '' && !isEmailWellFormed(values.email)) ||
     refused.email === values.email
-  const displayNameInvalid =
-    (touched.displayName && values.displayName !== '' && !isDisplayNameValid(values.displayName)) ||
-    refused.displayName === values.displayName
+  const displayNameInvalid = isDisplayNameShownInvalid({
+    value: values.displayName,
+    touched: touched.displayName,
+    refused: refused.displayName,
+  })
   const mismatch = confirmMismatch({
     password: values.password,
     confirm: values.confirm,

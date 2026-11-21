@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { Alert } from './Alert'
 import { FailureAlert } from './FailureAlert'
-import { FormAlert } from './FormAlert'
+import { FormAlert, isFormFailure } from './FormAlert'
 import { PasswordField } from './PasswordField'
 import { PrimaryButton } from './PrimaryButton'
 import { RateLimitedAlert } from './RateLimitedAlert'
@@ -177,5 +177,12 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
     const screen = await render(<FormAlert failure={null} />)
 
     expect(screen.container.textContent).toBe('')
+  })
+
+  it('ADR 0024 (point 8) : limite, réseau et erreur inattendue relèvent de l’alerte, un refus de champ non', () => {
+    expect(isFormFailure({ kind: 'rate-limited' })).toBe(true)
+    expect(isFormFailure({ kind: 'network' })).toBe(true)
+    expect(isFormFailure({ kind: 'unexpected' })).toBe(true)
+    expect(isFormFailure({ kind: 'username' })).toBe(false)
   })
 })

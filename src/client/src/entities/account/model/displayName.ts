@@ -7,6 +7,22 @@ const FORBIDDEN = /[\p{Cc}\p{Cs}\p{Cn}\p{Zl}\p{Zp}؜‎‏‪-‮⁦-⁩]/u
 const VISIBLE = /[\p{L}\p{N}\p{S}\p{P}]/u
 const FILLERS = /[ᅟᅠㅤﾠ⠀]/gu
 
+/**
+ * ADR 0024, point 9 : le nom affiché est signalé une fois le champ quitté, et pas vide, ou tant qu'il garde la valeur que
+ * le serveur a refusée.
+ */
+export function isDisplayNameShownInvalid({
+  value,
+  touched,
+  refused,
+}: {
+  readonly value: string
+  readonly touched: boolean
+  readonly refused: string | undefined
+}): boolean {
+  return (touched && value !== '' && !isDisplayNameValid(value)) || refused === value
+}
+
 /** Comme DisplayName côté serveur : 1 à 50 points de code, rien de piégé, un caractère visible au moins. */
 export function isDisplayNameValid(raw: string): boolean {
   const name = raw.normalize('NFC')

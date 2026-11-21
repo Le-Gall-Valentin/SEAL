@@ -1,4 +1,4 @@
-import { usernameRefusalReason } from '@/entities/account'
+import { refusedAccountField, usernameRefusalReason } from '@/entities/account'
 import { ApiError, type ErrorCode, failureOf } from '@/shared/lib'
 
 /** Refus de l'inscription, rattaché à son champ quand il en a un (ADR 0024, point 9). */
@@ -18,16 +18,17 @@ const BY_CODE: ReadonlyMap<ErrorCode, RegisterFailure> = new Map<ErrorCode, Regi
 
 /** VALIDATION_FAILED : champ en erreur, sans sa valeur (ADR 0010). */
 function fieldFailure(fields: readonly string[]): RegisterFailure {
-  if (fields.includes('email')) {
-    return { kind: 'email' }
+  const field = refusedAccountField(fields)
+  switch (field) {
+    case 'email':
+      return { kind: 'email' }
+    case 'displayName':
+      return { kind: 'displayName' }
+    case 'username':
+      return { kind: 'username', reason: 'invalid' }
+    case null:
+      return { kind: 'unexpected' }
   }
-  if (fields.includes('displayName')) {
-    return { kind: 'displayName' }
-  }
-  if (fields.includes('username')) {
-    return { kind: 'username', reason: 'invalid' }
-  }
-  return { kind: 'unexpected' }
 }
 
 export function registerFailureOf(error: unknown): RegisterFailure {

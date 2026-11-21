@@ -1,4 +1,4 @@
-import { usernameRefusalReason } from '@/entities/account'
+import { refusedAccountField, usernameRefusalReason } from '@/entities/account'
 import { ApiError, type ErrorCode, failureOf } from '@/shared/lib'
 
 /** Refus de POST /api/v1/auth/oauth/complete, rattaché à son champ, ou abandon de l'inscription (ADR 0033). */
@@ -21,15 +21,18 @@ const ABANDONS: ReadonlyMap<ErrorCode, 'REQUEST_REJECTED' | 'OAUTH_EMAIL_IN_USE'
   ['OAUTH_EMAIL_IN_USE', 'OAUTH_EMAIL_IN_USE'],
 ])
 
-/** VALIDATION_FAILED : champ en erreur, sans sa valeur (ADR 0010). */
+/** VALIDATION_FAILED : champ en erreur, sans sa valeur (ADR 0010) ; la fin d'inscription n'a pas de courriel. */
 function fieldFailure(fields: readonly string[]): OAuthRegistrationFailure {
-  if (fields.includes('displayName')) {
-    return { kind: 'displayName' }
+  const field = refusedAccountField(fields)
+  switch (field) {
+    case 'displayName':
+      return { kind: 'displayName' }
+    case 'username':
+      return { kind: 'username', reason: 'invalid' }
+    case 'email':
+    case null:
+      return { kind: 'unexpected' }
   }
-  if (fields.includes('username')) {
-    return { kind: 'username', reason: 'invalid' }
-  }
-  return { kind: 'unexpected' }
 }
 
 export function oauthRegistrationFailureOf(error: unknown): OAuthRegistrationFailure {

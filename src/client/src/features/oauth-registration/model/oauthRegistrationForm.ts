@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
   DISPLAY_NAME_SCHEMA,
-  isDisplayNameValid,
+  isDisplayNameShownInvalid,
   USERNAME_SCHEMA,
   type UsernameStatus,
 } from '@/entities/account'
@@ -24,8 +24,11 @@ export function oauthRegistrationView({
   readonly refusedDisplayName: string | undefined
 }) {
   const refused = refusedDisplayName === displayName
-  const displayNameInvalid =
-    (displayNameTouched && displayName !== '' && !isDisplayNameValid(displayName)) || refused
+  const displayNameInvalid = isDisplayNameShownInvalid({
+    value: displayName,
+    touched: displayNameTouched,
+    refused: refusedDisplayName,
+  })
   const valid =
     FIELDS.safeParse({ username, displayName }).success &&
     !refused &&

@@ -1,5 +1,12 @@
 // API publique de la tranche account (ADR 0012) : règles des champs du compte, comme le serveur.
-export { DISPLAY_NAME_MAX_LENGTH, isDisplayNameValid } from './model/displayName'
+export {
+  DISPLAY_NAME_MAX_LENGTH,
+  isDisplayNameShownInvalid,
+  isDisplayNameValid,
+} from './model/displayName'
+export { refusedAccountField } from './model/refusedField'
+export type { AccountField } from './model/refusedField'
+export { useUsernameChoice } from './model/useUsernameChoice'
 export { EMAIL_MAX_LENGTH, isEmailWellFormed, localPartOf } from './model/email'
 export {
   isReservedUsername,

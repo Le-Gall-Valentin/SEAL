@@ -13,6 +13,13 @@ interface FormAlertProps {
   readonly rateLimitedHint?: string | undefined
 }
 
+/** L'échec relève de l'alerte du formulaire, et non d'un champ. */
+export function isFormFailure(failure: { readonly kind: string }): failure is FormFailure {
+  return (
+    failure.kind === 'rate-limited' || failure.kind === 'network' || failure.kind === 'unexpected'
+  )
+}
+
 /** SEC-10, ADR 0024 (point 8) : l'alerte d'un formulaire, ou rien. */
 export function FormAlert({ failure, rateLimitedHint }: FormAlertProps) {
   if (failure === null) {
