@@ -301,4 +301,17 @@ describe('AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d’inscription', ()
 
     await expect.element(screen.getByText('Adresse invalide.')).toBeVisible()
   })
+
+  it('ADR 0033 (point 6) : un double clic sur « Créer mon compte » n’envoie qu’une requête', async () => {
+    const { screen, sent } = await renderForm(() => new Promise<void>(() => undefined))
+    await fillValid(screen)
+
+    const submit = screen.getByRole('button', { name: 'Créer mon compte' })
+    await expect.element(submit).toBeEnabled()
+    await userEvent.dblClick(submit)
+
+    await expect.poll(() => sent.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(sent).toHaveLength(1)
+  })
 })

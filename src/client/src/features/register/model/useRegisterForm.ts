@@ -14,7 +14,7 @@ import {
   useUsernameAvailability,
 } from '@/entities/account'
 import { refreshSession } from '@/entities/session'
-import { useRetryAfterLock } from '@/shared/lib'
+import { useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
 import type { Registration } from '../api/IRegisterApi'
 import { type RegisterRefusals, type RegisterValues, registerView } from './registerForm'
 import { registerFailureOf } from './registerFailure'
@@ -39,6 +39,7 @@ export function useRegisterForm() {
   const [usernameEdited, setUsernameEdited] = useState(false)
   const [touched, setTouched] = useState({ email: false, displayName: false, confirm: false })
   const [refused, setRefused] = useState<RegisterRefusals>({})
+  const guard = useSubmitGuard()
 
   // AUTH-04 : tant qu'il n'est pas modifié, l'identifiant suit le courriel, et la première suggestion libre remplace
   // une base prise ou réservée (étape 5).
@@ -87,6 +88,9 @@ export function useRegisterForm() {
           return
       }
     },
+    onSettled: () => {
+      guard.release()
+    },
   })
   const locked = useRetryAfterLock(mutation.error, mutation.reset)
   const failure = mutation.error === null ? null : registerFailureOf(mutation.error)
@@ -131,7 +135,7 @@ export function useRegisterForm() {
     locked,
     canSubmit,
     submit: () => {
-      if (canSubmit) {
+      if (canSubmit && guard.enter()) {
         mutation.mutate({
           email: values.email,
           username,

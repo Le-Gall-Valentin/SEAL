@@ -11,7 +11,7 @@ import {
 } from '@/entities/account'
 import { refreshSession } from '@/entities/session'
 import { ROUTES } from '@/shared/config'
-import { useRetryAfterLock } from '@/shared/lib'
+import { useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
 import type { CompleteRegistration, PendingRegistration } from './oauthRegistration'
 import { useOAuthRegistrationApi } from './oauthRegistrationApiPort'
 import { oauthRegistrationFailureOf } from './oauthRegistrationFailure'
@@ -37,6 +37,7 @@ export function useOAuthRegistrationForm(pending: PendingRegistration) {
   const [displayName, setDisplayName] = useState(pending.displayName)
   const [displayNameTouched, setDisplayNameTouched] = useState(false)
   const [refused, setRefused] = useState<Refusals>({})
+  const guard = useSubmitGuard()
 
   const base = chosenUsername ?? usernameFromEmail(pending.email)
   const baseStatus = useUsernameAvailability(base)
@@ -76,6 +77,9 @@ export function useOAuthRegistrationForm(pending: PendingRegistration) {
           return
       }
     },
+    onSettled: () => {
+      guard.release()
+    },
   })
   const locked = useRetryAfterLock(mutation.error, mutation.reset)
   const failure = mutation.error === null ? null : oauthRegistrationFailureOf(mutation.error)
@@ -108,7 +112,7 @@ export function useOAuthRegistrationForm(pending: PendingRegistration) {
     alert,
     canSubmit,
     submit: () => {
-      if (canSubmit) {
+      if (canSubmit && guard.enter()) {
         mutation.mutate({ username, displayName })
       }
     },

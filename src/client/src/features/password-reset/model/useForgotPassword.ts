@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { isEmailWellFormed } from '@/entities/account'
-import { useRetryAfterLock } from '@/shared/lib'
+import { useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
 import { resetFailureOf } from './resetLink'
 import { usePasswordResetApi } from './passwordResetApiPort'
 
@@ -12,6 +12,7 @@ export function useForgotPassword() {
   const [touched, setTouched] = useState(false)
   const [refused, setRefused] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
+  const guard = useSubmitGuard()
   const mutation = useMutation({
     mutationFn: (address: string) => api.request(address),
     onSuccess: () => {
@@ -21,6 +22,9 @@ export function useForgotPassword() {
       if (resetFailureOf(error).kind === 'email') {
         setRefused(address)
       }
+    },
+    onSettled: () => {
+      guard.release()
     },
   })
   const locked = useRetryAfterLock(mutation.error, mutation.reset)
@@ -44,7 +48,7 @@ export function useForgotPassword() {
     sent,
     canSubmit,
     submit: () => {
-      if (canSubmit) {
+      if (canSubmit && guard.enter()) {
         setSent(false)
         mutation.mutate(email)
       }

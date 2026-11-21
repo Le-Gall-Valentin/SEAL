@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { refreshSession } from '@/entities/session'
-import { useRetryAfterLock } from '@/shared/lib'
+import { useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
 import type { Credentials } from '../api/ILoginApi'
 import { canSubmit, loginAlertOf } from './loginAlert'
 import { useLoginApi } from './loginApiPort'
@@ -14,6 +14,7 @@ export function useLoginForm() {
   const api = useLoginApi()
   const client = useQueryClient()
   const [values, setValues] = useState<Credentials>({ login: '', password: '' })
+  const guard = useSubmitGuard()
   const mutation = useMutation({
     mutationFn: (credentials: Credentials) => api.login(credentials),
     onSuccess: () => refreshSession(client),
@@ -23,6 +24,9 @@ export function useLoginForm() {
       if (kind === 'invalid-credentials' || kind === 'rate-limited') {
         setValues((current) => ({ ...current, password: '' }))
       }
+    },
+    onSettled: () => {
+      guard.release()
     },
   })
   const { error, reset } = mutation
@@ -39,7 +43,7 @@ export function useLoginForm() {
     locked,
     canSubmit: !locked && !mutation.isPending && canSubmit(values),
     submit: () => {
-      if (!locked && !mutation.isPending && canSubmit(values)) {
+      if (!locked && !mutation.isPending && canSubmit(values) && guard.enter()) {
         // ADR 0024, point 10 : l'identifiant part sans ses espaces de début et de fin (clavier de téléphone).
         mutation.mutate({ login: values.login.trim(), password: values.password })
       }

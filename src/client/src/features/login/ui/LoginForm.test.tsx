@@ -13,6 +13,7 @@ import {
 import { ApiError, NetworkError } from '@/shared/lib'
 import { LoginApiProvider } from '../model/loginApiPort'
 import { LoginForm } from './LoginForm'
+import { userEvent } from 'vitest/browser'
 
 const ACTIVE: Account = {
   id: '0192f0c4-7b1a-7cc0-9a51-3f6f8e2d4b10',
@@ -202,5 +203,16 @@ describe('AUTH-20 à AUTH-22 : formulaire de connexion', () => {
     await screen.getByRole('button', { name: 'Se connecter' }).click()
 
     await expect.poll(() => harness.sent).toEqual([{ login: 'valentin', password: 'secret' }])
+  })
+
+  it('ADR 0033 (point 6) : un double clic sur « Se connecter » n’envoie qu’une requête', async () => {
+    const { screen, harness } = await renderForm(() => new Promise<void>(() => undefined))
+    await fill(screen)
+
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Se connecter' }))
+
+    await expect.poll(() => harness.sent.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(harness.sent).toHaveLength(1)
   })
 })

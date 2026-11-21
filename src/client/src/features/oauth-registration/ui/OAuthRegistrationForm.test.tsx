@@ -15,6 +15,7 @@ import { ApiError } from '@/shared/lib'
 import type { PendingRegistration } from '../model/oauthRegistration'
 import { OAuthRegistrationApiProvider } from '../model/oauthRegistrationApiPort'
 import { OAuthRegistrationForm } from './OAuthRegistrationForm'
+import { userEvent } from 'vitest/browser'
 
 // Le test de ui/ n'importe pas api/ (ADR 0012) : le port se lit sur son fournisseur.
 type IOAuthRegistrationApi = ComponentProps<typeof OAuthRegistrationApiProvider>['api']
@@ -180,5 +181,17 @@ describe('Identifiant-OAuth : formulaire', () => {
 
     await expect.element(screen.getByRole('alert').getByText('Trop de tentatives')).toBeVisible()
     await expect.element(screen.getByRole('button', { name: 'Créer mon compte' })).toBeDisabled()
+  })
+
+  it('ADR 0033 (point 6) : un double clic sur « Créer mon compte » n’envoie qu’une requête', async () => {
+    const { screen, sent } = await renderForm(() => new Promise<void>(() => undefined))
+
+    const submit = screen.getByRole('button', { name: 'Créer mon compte' })
+    await expect.element(submit).toBeEnabled()
+    await userEvent.dblClick(submit)
+
+    await expect.poll(() => sent.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(sent).toHaveLength(1)
   })
 })
