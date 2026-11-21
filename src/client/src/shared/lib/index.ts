@@ -10,6 +10,7 @@ export {
 export type { ErrorCode } from './apiErrors'
 export { failureOf } from './failure'
 export type { Failure } from './failure'
+export { joinWithOr } from './joinWithOr'
 export { useDebouncedValue } from './useDebouncedValue'
 export { useRetryAfterLock } from './useRetryAfterLock'
 export { useSubmitGuard } from './useSubmitGuard'

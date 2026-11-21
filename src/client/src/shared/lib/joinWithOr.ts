@@ -1,6 +1,6 @@
 /**
- * ADR 0033, point 3 : « Google », « Google ou GitHub », « Microsoft, Google ou GitHub ». Le mot de liaison vient des
- * textes de l'écran.
+ * Une liste reliée par « ou » : « A », « A ou B », « A, B ou C » (ADR 0033, point 3). Le mot de liaison vient des textes
+ * de l'écran.
  */
 export function joinWithOr(names: readonly string[], or: string): string {
   if (names.length <= 1) {

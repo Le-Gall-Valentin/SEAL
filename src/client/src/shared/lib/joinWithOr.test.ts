@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { joinWithOr } from './providerList'
+import { joinWithOr } from './joinWithOr'
 
 describe('ADR 0033, point 3 : liste des fournisseurs', () => {
   it.each([

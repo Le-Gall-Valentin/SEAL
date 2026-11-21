@@ -11,7 +11,10 @@ import { FormAlert, PrimaryButton, TextField } from '@/shared/ui'
 import { registerMessages } from '../i18n'
 import { useRegisterForm } from '../model/useRegisterForm'
 
-/** AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d'Inscription-Telephone, sans OAuth (ADR 0024, point 3). */
+/**
+ * AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d'Inscription-Telephone ; les boutons des fournisseurs sont rendus
+ * par l'écran (ADR 0033).
+ */
 export function RegisterForm() {
   const t = useMessages(registerMessages)
   const form = useRegisterForm()

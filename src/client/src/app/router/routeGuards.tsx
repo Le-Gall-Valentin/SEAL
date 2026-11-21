@@ -96,7 +96,7 @@ function KeyGateFor({ owner }: { readonly owner: KeyOwner }) {
   }
 }
 
-/** Écrans réservés aux anonymes : connexion, inscription, mot de passe oublié. */
+/** Écrans réservés aux anonymes : connexion, inscription, Identifiant-OAuth, mot de passe oublié. */
 export function AnonymousRoute() {
   return useSessionGate('anonymous')
 }

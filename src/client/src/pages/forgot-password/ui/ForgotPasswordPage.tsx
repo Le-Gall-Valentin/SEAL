@@ -1,8 +1,9 @@
 import { Link } from 'react-router'
-import { joinWithOr, useOAuthProviderName, useOAuthProviders } from '@/entities/oauth-provider'
+import { useOAuthProviderName, useOAuthProviders } from '@/entities/oauth-provider'
 import { ForgotPasswordForm } from '@/features/password-reset'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
+import { joinWithOr } from '@/shared/lib'
 import { AuthLayout } from '@/widgets/auth-layout'
 import { forgotPasswordPageMessages } from '../i18n'
 
