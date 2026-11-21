@@ -314,4 +314,51 @@ class OAuthAttackIT {
                     .andExpect(header().string("Location", startsWith(fake.uri("/github/authorize"))));
         }
     }
+
+    /** Les causes des refus journalisés pour l'IP de ce client, dans l'ordre. */
+    private List<String> causes(AuthClient who) {
+        return jdbc.sql("SELECT details->>'cause' FROM security_events WHERE type = 'LOGIN_FAILED' "
+                        + "AND ip = CAST(? AS inet) ORDER BY created_at, id")
+                .param(who.ip())
+                .query(String.class)
+                .list();
+    }
+
+    @Test
+    @DisplayName("SEC-20 : un vrai code serveur garde son nom au journal, même quand le retour recopie error")
+    void sec20ServerErrorCodesKeepTheirNameEvenWithAnEchoedError() throws Exception {
+        fake.tweakIdTokens(claims -> claims.claim("nonce", "nonce-d-un-autre-depart"));
+        Started plain = oauth.start("google");
+        oauth.callback(plain, fake.authorize(plain.location(), google()));
+        Started echoed = oauth.start("google");
+        String code = fake.authorize(echoed.location(), google());
+        mvc.perform(client.from(get("/login/oauth2/code/google")
+                                .param("code", code)
+                                .param("state", echoed.state())
+                                .param("error", "invalid_nonce"))
+                        .cookie(echoed.session()))
+                .andExpect(header().string("Location", REJECTED));
+        Started unknownCode = oauth.start("google");
+        mvc.perform(client.from(get("/login/oauth2/code/google")
+                                .param("code", "code-inconnu")
+                                .param("state", unknownCode.state())
+                                .param("error", "invalid_grant"))
+                        .cookie(unknownCode.session()))
+                .andExpect(header().string("Location", REJECTED));
+
+        assertThat(causes(client)).containsExactly("invalid_nonce", "invalid_nonce", "invalid_grant");
+    }
+
+    @Test
+    @DisplayName("SEC-20 : un retour sans code ni erreur est journalisé invalid_request, levé par Spring")
+    void sec20CallbackWithoutCodeNorErrorIsInvalidRequest() throws Exception {
+        Started started = oauth.start("google");
+        mvc.perform(client.from(get("/login/oauth2/code/google")
+                                .param("error", "")
+                                .param("state", started.state()))
+                        .cookie(started.session()))
+                .andExpect(header().string("Location", REJECTED));
+
+        assertThat(causes(client)).containsExactly("invalid_request");
+    }
 }

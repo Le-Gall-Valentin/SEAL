@@ -9,7 +9,9 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.util.StringUtils;
 
 /**
  * Échec du retour OAuth : consentement refusé, {@code state} inconnu, fournisseur en erreur, jeton invalide. Le retour
@@ -39,11 +41,15 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
             "temporarily_unavailable");
 
     /**
-     * Codes que Spring Security lève lui-même, ou que rend le point {@code /token} du fournisseur, appelé par le serveur
-     * (RFC 6749, section 5.2) : ils ne viennent pas du navigateur.
+     * Codes que Spring Security lève lui-même ({@code invalid_request} pour un retour sans code ni erreur), ou que rend
+     * le point {@code /token} du fournisseur, appelé par le serveur (RFC 6749, section 5.2) : ils ne viennent pas du
+     * navigateur.
      */
     private static final Set<String> SERVER_ERRORS = Set.of(
+            "invalid_request",
             "invalid_client",
+            "unauthorized_client",
+            "invalid_scope",
             "invalid_grant",
             "unsupported_grant_type",
             "authorization_request_not_found",
@@ -91,8 +97,12 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
             return "oauth_error";
         }
         String code = oauth.getError().getErrorCode();
-        // Un code qui recopie le paramètre error vient du navigateur : seul un code de fournisseur y est cru.
-        Set<String> known = code.equals(request.getParameter("error")) ? PROVIDER_ERRORS : SERVER_ERRORS;
+        // Spring traite comme une réussite tout retour qui porte un code : l'erreur vient alors de l'échange, même si
+        // le retour porte aussi error. Sans code, Spring recopie error, venu du navigateur : seul un code de
+        // fournisseur y est cru.
+        boolean fromBrowser = !StringUtils.hasText(request.getParameter(OAuth2ParameterNames.CODE))
+                && code.equals(request.getParameter(OAuth2ParameterNames.ERROR));
+        Set<String> known = fromBrowser ? PROVIDER_ERRORS : SERVER_ERRORS;
         return known.contains(code) ? code : "oauth_error";
     }
 }
