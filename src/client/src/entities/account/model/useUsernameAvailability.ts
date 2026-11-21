@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { isReservedUsername, isUsernameWellFormed } from '@/entities/account'
 import { useDebouncedValue } from '@/shared/lib'
-import { useRegisterApi } from './registerApiPort'
+import { isReservedUsername, isUsernameWellFormed } from './username'
+import { useUsernameAvailabilityApi } from './usernameAvailabilityPort'
 
 /** État de l'identifiant affiché sous son champ (Inscription-Telephone, Identifiant-OAuth, ADR 0024). */
 export type UsernameStatus =
@@ -29,7 +29,7 @@ export const USERNAME_AVAILABILITY_KEY = ['username-availability'] as const
  * sans le serveur ; un réservé (AUTH-02) aussi, mais le serveur est interrogé pour ses suggestions libres.
  */
 export function useUsernameAvailability(username: string): UsernameStatus {
-  const api = useRegisterApi()
+  const api = useUsernameAvailabilityApi()
   const debounced = useDebouncedValue(username, AVAILABILITY_DELAY_MS)
   const wellFormed = isUsernameWellFormed(debounced)
   const query = useQuery({

@@ -135,6 +135,48 @@ describe('AUTH-70 : Mot-de-passe-oublie', () => {
     await screen.getByRole('button', { name: 'Envoyer le lien' }).click()
     await expect.element(screen.getByRole('alert')).toMatchTextContent('Réessayez dans 60 minutes.')
   })
+
+  it('AUTH-70, ADR 0033 (point 6) : un double clic sur « Envoyer le lien » n’envoie qu’une demande', async () => {
+    const { screen, calls } = await renderReset(
+      { request: () => new Promise<void>(() => undefined) },
+      { path: '/mot-de-passe/oublie' },
+    )
+    await screen.getByLabelText('Courriel', { exact: true }).fill('valentin@uqac.ca')
+    const submit = screen.getByRole('button', { name: 'Envoyer le lien' })
+    await expect.element(submit).toBeEnabled()
+
+    // Deux envois dans la même tâche, sans rendu entre eux : le pire cas d'un double clic.
+    const form = submit.element().closest('form')
+    form?.requestSubmit()
+    form?.requestSubmit()
+
+    await expect.poll(() => calls.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(calls).toEqual(['request valentin@uqac.ca'])
+  })
+
+  it('AUTH-70, ADR 0033 (point 6) : après un échec, le verrou est rendu et une nouvelle demande part', async () => {
+    let attempts = 0
+    const { screen, calls } = await renderReset(
+      {
+        request: () => {
+          attempts += 1
+          return attempts === 1
+            ? Promise.reject(new NetworkError())
+            : new Promise<void>(() => undefined)
+        },
+      },
+      { path: '/mot-de-passe/oublie' },
+    )
+    await screen.getByLabelText('Courriel', { exact: true }).fill('valentin@uqac.ca')
+    const submit = screen.getByRole('button', { name: 'Envoyer le lien' })
+
+    await submit.click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await submit.click()
+
+    await expect.poll(() => calls.length).toBe(2)
+  })
 })
 
 describe('AUTH-70, ADR 0022 : Nouveau-Mot-de-passe', () => {

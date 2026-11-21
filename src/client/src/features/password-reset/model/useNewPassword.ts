@@ -10,7 +10,7 @@ import {
   usePasswordBlocklist,
 } from '@/entities/password'
 import { ROUTES } from '@/shared/config'
-import { useClock, useRetryAfterLock } from '@/shared/lib'
+import { isFormFailure, useClock, useRetryAfterLock } from '@/shared/lib'
 import { linkState, minutesLeft, resetFailureOf } from './resetLink'
 import { usePasswordResetApi } from './passwordResetApiPort'
 
@@ -105,13 +105,7 @@ export function useNewPassword(token: string | null, linkId: number) {
     rules,
     strength: passwordStrength(password, rules),
     confirmMismatch: mismatch,
-    alert:
-      failure !== null &&
-      (failure.kind === 'rate-limited' ||
-        failure.kind === 'network' ||
-        failure.kind === 'unexpected')
-        ? failure
-        : null,
+    alert: failure !== null && isFormFailure(failure) ? failure : null,
     canSubmit,
     submit: () => {
       if (canSubmit) {

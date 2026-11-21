@@ -123,6 +123,10 @@ Il faut JDK 25 et Node.js 24 LTS (`sdk env` et `nvm use` lisent `.sdkmanrc` et `
 | Tests de bout en bout, SEAL lancé par docker compose | `src/client` | `npx playwright test` |
 | Archive de remise `projet.zip` | `src` | `./scripts/package.sh` (Windows, non testé : `scripts\package.ps1`) |
 
+Le parcours OAuth (Google, GitHub) se teste avec SEAL lancé par docker compose : le fournisseur revient sur
+`https://localhost:8443`, l'adresse de `seal.origin`, où le serveur de développement (`./mvnw spring-boot:test-run`)
+ne sert pas le client.
+
 Le serveur et les tests d'intégration ont besoin de Docker (Testcontainers), et le serveur en
 développement des certificats de `src/certs`. Lancé depuis `src/server`, il range la clé de son Autorité dans
 `src/data/ca`, hors de Git et de `projet.zip` ; les tests, dans `src/server/target/test-data`.

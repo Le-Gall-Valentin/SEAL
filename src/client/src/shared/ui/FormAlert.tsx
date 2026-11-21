@@ -1,11 +1,6 @@
+import type { FormFailure } from '@/shared/lib'
 import { FailureAlert } from './FailureAlert'
 import { RateLimitedAlert } from './RateLimitedAlert'
-
-/** Échecs communs aux formulaires : limite atteinte, serveur injoignable, erreur inattendue. */
-export type FormFailure =
-  | { readonly kind: 'rate-limited'; readonly minutes: number }
-  | { readonly kind: 'network' }
-  | { readonly kind: 'unexpected' }
 
 interface FormAlertProps {
   readonly failure: FormFailure | null

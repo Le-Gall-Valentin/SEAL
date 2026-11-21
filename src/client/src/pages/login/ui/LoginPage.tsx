@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { LoginForm } from '@/features/login'
+import { LOGIN_ERROR_PARAM, oauthLoginErrorOf } from '@/entities/oauth-provider'
+import { OAuthButtons, OAuthLoginAlert } from '@/features/oauth-login'
 import type { PasswordResetDone } from '@/features/password-reset'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
@@ -19,7 +21,7 @@ function isPasswordResetDone(state: unknown): state is PasswordResetDone {
   )
 }
 
-/** Écran Connexion (AUTH-20) ; les boutons OAuth arrivent au lot 2 (ADR 0024, point 3). */
+/** Écran Connexion (AUTH-20), avec les boutons des fournisseurs et l'alerte du retour OAuth (ADR 0033). */
 export function LoginPage() {
   const t = useMessages(loginPageMessages)
   const location = useLocation()
@@ -27,13 +29,22 @@ export function LoginPage() {
   // React Router type l'état d'historique en any : il n'est lu qu'à travers isPasswordResetDone, une seule fois.
   const historyState: unknown = location.state
   const [passwordSaved] = useState(() => isPasswordResetDone(historyState))
+  // ADR 0033 (point 1) : le code du retour OAuth, lu une fois, retiré au premier envoi du formulaire.
+  const [oauthError, setOAuthError] = useState(() => oauthLoginErrorOf(location.search))
   const mounted = useMounted()
-  // Lue, la confirmation quitte l'historique : un rechargement ou un retour ne la réaffiche pas.
+  // Lus, la confirmation quitte l'historique et le code quitte l'adresse, en une navigation : un rechargement ou un
+  // retour ne réaffiche ni l'une ni l'autre.
   useEffect(() => {
-    if (isPasswordResetDone(historyState)) {
-      void navigate(location.pathname, { replace: true, state: null })
+    const params = new URLSearchParams(location.search)
+    const confirmation = isPasswordResetDone(historyState)
+    if (confirmation || params.has(LOGIN_ERROR_PARAM)) {
+      params.delete(LOGIN_ERROR_PARAM)
+      void navigate(
+        { pathname: location.pathname, search: params.toString() },
+        { replace: true, state: confirmation ? null : historyState },
+      )
     }
-  }, [historyState, location.pathname, navigate])
+  }, [historyState, location.pathname, location.search, navigate])
   return (
     <AuthLayout variant="waving">
       <div className="flex flex-col gap-4.5 sm:gap-5">
@@ -44,7 +55,13 @@ export function LoginPage() {
         <div role="status" className="empty:hidden">
           {passwordSaved && mounted && <Notice variant="success">{t('passwordSaved')}</Notice>}
         </div>
-        <LoginForm />
+        {oauthError !== null && mounted && <OAuthLoginAlert error={oauthError} />}
+        <LoginForm
+          onSubmit={() => {
+            setOAuthError(null)
+          }}
+        />
+        <OAuthButtons />
         <p className="m-0 text-center text-[13px] text-ink-3">
           {t('noAccount')}{' '}
           <Link to={ROUTES.REGISTER} className="font-semibold no-underline">

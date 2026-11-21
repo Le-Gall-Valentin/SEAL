@@ -1,9 +1,9 @@
 import { useMessages } from '@/shared/i18n'
-import { registerMessages } from '../i18n'
+import { accountMessages } from '../i18n'
 
 /** AUTH-03 : l'identifiant est définitif, annoncé avant la création du compte (Inscription-Telephone). */
 export function FinalUsernameNotice() {
-  const t = useMessages(registerMessages)
+  const t = useMessages(accountMessages)
   return (
     <div className="flex gap-3 rounded-[14px] border border-warning-line bg-warning-soft px-3.5 py-3 text-[13px] leading-[1.35]">
       <svg

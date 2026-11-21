@@ -1,15 +1,18 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createBrowserRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
+import { usernameAvailabilityApi } from '@/entities/account'
+import { authorityApi } from '@/entities/authority'
+import { keysApi } from '@/entities/keyring'
+import { oauthProvidersApi } from '@/entities/oauth-provider'
 import { passwordBlocklist } from '@/entities/password'
 import { sessionApi } from '@/entities/session'
 import { loginApi } from '@/features/login'
 import { logoutApi } from '@/features/logout'
+import { oauthRegistrationApi } from '@/features/oauth-registration'
 import { passwordResetApi } from '@/features/password-reset'
 import { registerApi } from '@/features/register'
 import { verifyEmailApi } from '@/features/verify-email'
-import { authorityApi } from '@/entities/authority'
-import { keysApi } from '@/entities/keyring'
 import { LanguageProvider } from '@/shared/i18n'
 import {
   ApiProviders,
@@ -32,8 +35,11 @@ const apis: Apis = {
   authority: authorityApi,
   keys: keysApi,
   passwordBlocklist,
+  usernameAvailability: usernameAvailabilityApi,
+  oauthProviders: oauthProvidersApi,
   login: loginApi,
   register: registerApi,
+  oauthRegistration: oauthRegistrationApi,
   verifyEmail: verifyEmailApi,
   passwordReset: passwordResetApi,
   logout: logoutApi,

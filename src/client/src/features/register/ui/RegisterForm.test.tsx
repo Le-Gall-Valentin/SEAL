@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
+import { UsernameAvailabilityApiProvider } from '@/entities/account'
 import { PasswordBlocklistProvider } from '@/entities/password'
 import {
   type Account,
@@ -12,7 +13,7 @@ import {
   SessionApiProvider,
   useCurrentAccount,
 } from '@/entities/session'
-import { ApiError } from '@/shared/lib'
+import { ApiError, NetworkError } from '@/shared/lib'
 import { RegisterApiProvider } from '../model/registerApiPort'
 import { RegisterForm } from './RegisterForm'
 
@@ -49,7 +50,9 @@ async function renderForm(register: (registration: Registration) => Promise<void
       await register(registration)
       registered = true
     },
-    usernameAvailability: (username) => {
+  }
+  const availabilityApi = {
+    usernameAvailability: (username: string) => {
       checked.push(username)
       return Promise.resolve(
         TAKEN.has(username) || RESERVED.has(username)
@@ -82,9 +85,11 @@ async function renderForm(register: (registration: Registration) => Promise<void
     >
       <SessionApiProvider api={sessionApi}>
         <PasswordBlocklistProvider api={{ load: () => Promise.resolve(['Mailcreated5240']) }}>
-          <RegisterApiProvider api={registerApi}>
-            <RouterProvider router={router} />
-          </RegisterApiProvider>
+          <UsernameAvailabilityApiProvider api={availabilityApi}>
+            <RegisterApiProvider api={registerApi}>
+              <RouterProvider router={router} />
+            </RegisterApiProvider>
+          </UsernameAvailabilityApiProvider>
         </PasswordBlocklistProvider>
       </SessionApiProvider>
     </QueryClientProvider>,
@@ -176,6 +181,8 @@ describe('AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d’inscription', ()
     await expect.element(screen.getByText('Déjà pris.')).toBeVisible()
     await expect.element(screen.getByText('Suggestions :')).toBeVisible()
     await screen.getByRole('button', { name: 'valentin.dupont_x' }).click()
+    // WCAG 2.4.3 : le focus revient au champ après le choix d'une suggestion.
+    await expect.element(field(screen, 'Identifiant')).toHaveFocus()
 
     await expect.element(field(screen, 'Identifiant')).toHaveValue('valentin.dupont_x')
     await expect.element(screen.getByText('Disponible', { exact: true })).toBeVisible()
@@ -295,5 +302,35 @@ describe('AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d’inscription', ()
     await screen.getByRole('button', { name: 'Créer mon compte' }).click()
 
     await expect.element(screen.getByText('Adresse invalide.')).toBeVisible()
+  })
+
+  it('AUTH-10, ADR 0033 (point 6) : un double clic sur « Créer mon compte » n’envoie qu’une requête', async () => {
+    const { screen, sent } = await renderForm(() => new Promise<void>(() => undefined))
+    await fillValid(screen)
+
+    const submit = screen.getByRole('button', { name: 'Créer mon compte' })
+    await expect.element(submit).toBeEnabled()
+    await userEvent.dblClick(submit)
+
+    await expect.poll(() => sent.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(sent).toHaveLength(1)
+  })
+
+  it('AUTH-10, ADR 0033 (point 6) : après un échec, le verrou est rendu et un nouvel envoi part', async () => {
+    let calls = 0
+    const { screen, sent } = await renderForm(() => {
+      calls += 1
+      return calls === 1 ? Promise.reject(new NetworkError()) : new Promise<void>(() => undefined)
+    })
+    await fillValid(screen)
+    const submit = screen.getByRole('button', { name: 'Créer mon compte' })
+    await expect.element(submit).toBeEnabled()
+
+    await submit.click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await submit.click()
+
+    await expect.poll(() => sent.length).toBe(2)
   })
 })
