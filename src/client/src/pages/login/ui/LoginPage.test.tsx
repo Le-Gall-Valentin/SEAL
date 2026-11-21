@@ -102,7 +102,7 @@ describe('Écran Connexion', () => {
     ['RATE_LIMITED', 'Trop de tentativesRéessayez plus tard.'],
     ['REQUEST_REJECTED', 'La connexion n’a pas aboutiRéessayez.'],
   ])(
-    'ADR 0033 (point 1) : ?erreur=%s affiche l’alerte, puis quitte l’adresse',
+    'AUTH-33, SEC-10, ADR 0033 (point 1) : ?erreur=%s affiche l’alerte, puis quitte l’adresse',
     async (code, text) => {
       const screen = await renderLogin({ search: `?erreur=${code}` })
 
@@ -112,7 +112,7 @@ describe('Écran Connexion', () => {
     },
   )
 
-  it('ADR 0033 (point 1) : un code inconnu n’affiche rien, et quitte aussi l’adresse', async () => {
+  it('AUTH-35, ADR 0033 (point 1) : un code inconnu n’affiche rien, et quitte aussi l’adresse', async () => {
     const screen = await renderLogin({ search: '?erreur=INTERNAL_ERROR' })
 
     await expect.poll(() => screen.router.state.location.search).toBe('')
@@ -120,7 +120,7 @@ describe('Écran Connexion', () => {
     await expect.element(screen.getByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('ADR 0033 (point 1) : l’alerte du retour OAuth disparaît au premier envoi du formulaire', async () => {
+  it('AUTH-33, ADR 0033 (point 1) : l’alerte du retour OAuth disparaît au premier envoi du formulaire', async () => {
     const screen = await renderLogin({ search: '?erreur=OAUTH_EMAIL_IN_USE' }, [], () =>
       Promise.reject(new ApiError(401, 'INVALID_CREDENTIALS')),
     )
@@ -136,7 +136,7 @@ describe('Écran Connexion', () => {
     await expect.element(screen.getByText('Ce courriel a déjà un compte')).not.toBeInTheDocument()
   })
 
-  it('ADR 0024 (point 9), ADR 0033 : confirmation et code ensemble, l’adresse perd les deux', async () => {
+  it('AUTH-70, ADR 0024 (point 9), ADR 0033 : confirmation et code ensemble, l’adresse perd les deux', async () => {
     const screen = await renderLogin({
       state: { passwordReset: true },
       search: '?erreur=REQUEST_REJECTED',

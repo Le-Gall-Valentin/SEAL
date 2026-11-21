@@ -66,14 +66,14 @@ describe('Écran Identifiant-OAuth', () => {
     await expect.element(screen.getByRole('button', { name: 'Créer mon compte' })).toBeVisible()
   })
 
-  it('ADR 0033 (point 2) : sans inscription en attente, retour à la connexion avec REQUEST_REJECTED', async () => {
+  it('AUTH-32, ADR 0033 (point 2) : sans inscription en attente, retour à la connexion avec REQUEST_REJECTED', async () => {
     const screen = await renderPage(() => Promise.resolve(null))
 
     await expect.element(screen.getByText('Écran de connexion')).toBeVisible()
     expect(screen.router.state.location.search).toBe('?erreur=REQUEST_REJECTED')
   })
 
-  it('A10 : attente illisible (réseau), « Impossible de charger » et « Réessayer »', async () => {
+  it('AUTH-32, A10 : attente illisible (réseau), « Impossible de charger » et « Réessayer »', async () => {
     let calls = 0
     const screen = await renderPage(() => {
       calls += 1

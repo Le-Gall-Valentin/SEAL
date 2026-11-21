@@ -16,7 +16,7 @@ describe('ADR 0032 (point 2), ADR 0033 (point 1) : code d’erreur du retour OAu
     ['valeur vide', '?erreur='],
     ['deux valeurs', '?erreur=RATE_LIMITED&erreur=REQUEST_REJECTED'],
     ['autre paramètre', '?error=REQUEST_REJECTED'],
-  ])('ADR 0033 : %s, aucune alerte', (_cas, search) => {
+  ])('AUTH-35, ADR 0033 : %s, aucune alerte', (_cas, search) => {
     expect(oauthLoginErrorOf(search)).toBeNull()
   })
 })

@@ -29,7 +29,7 @@ describe('AUTH-32, ADR 0033 : refus de la fin d’inscription OAuth', () => {
     [new ApiError(404, 'NOT_FOUND'), 'REQUEST_REJECTED'],
     [new ApiError(409, 'OAUTH_ALREADY_LINKED'), 'REQUEST_REJECTED'],
     [new ApiError(409, 'OAUTH_EMAIL_IN_USE'), 'OAUTH_EMAIL_IN_USE'],
-  ])('ADR 0033 (point 2) : %o renvoie à la connexion avec %s', (error, code) => {
+  ])('AUTH-32, ADR 0033 (point 2) : %o renvoie à la connexion avec %s', (error, code) => {
     expect(oauthRegistrationFailureOf(error)).toEqual({ kind: 'abandoned', error: code })
   })
 

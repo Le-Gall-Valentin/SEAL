@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { type IOAuthProvidersApi, OAuthProvidersApiProvider } from '@/entities/oauth-provider'
 import { OAuthButtons } from './OAuthButtons'
@@ -37,23 +37,27 @@ describe('ADR 0033 : boutons « Continuer avec… »', () => {
     expect(google.element().querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
   })
 
+  // L'absence ne s'affirme qu'une fois la réponse rendue : avant, l'écran est vide de toute façon.
+  async function renderSettled(providers: IOAuthProvidersApi['providers']) {
+    const read = vi.fn(providers)
+    const screen = await render(withProviders({ providers: read }, <OAuthButtons />))
+    await expect.poll(() => read.mock.settledResults.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    return screen
+  }
+
   it('OPS-03, ADR 0024 (point 3) : sans fournisseur, ni boutons ni « ou »', async () => {
-    const screen = await render(withProviders({ providers: () => Promise.resolve([]) }, <p>fin</p>))
-    const empty = await render(
-      withProviders({ providers: () => Promise.resolve([]) }, <OAuthButtons />),
-    )
-
-    await expect.element(screen.getByText('fin')).toBeVisible()
-    await expect.element(empty.getByText('ou', { exact: true })).not.toBeInTheDocument()
-    expect(empty.container.querySelectorAll('a')).toHaveLength(0)
-  })
-
-  it('ADR 0007 (point 9) : fournisseurs illisibles, aucun bouton annoncé', async () => {
-    const screen = await render(
-      withProviders({ providers: () => Promise.reject(new Error('réseau')) }, <OAuthButtons />),
-    )
+    const screen = await renderSettled(() => Promise.resolve([]))
 
     await expect.element(screen.getByText('ou', { exact: true })).not.toBeInTheDocument()
+    expect(screen.container.querySelectorAll('a')).toHaveLength(0)
+  })
+
+  it('AUTH-35, ADR 0007 (point 9) : fournisseurs illisibles, aucun bouton annoncé', async () => {
+    const screen = await renderSettled(() => Promise.reject(new Error('réseau')))
+
+    await expect.element(screen.getByText('ou', { exact: true })).not.toBeInTheDocument()
+    expect(screen.container.querySelectorAll('a')).toHaveLength(0)
   })
 })
 

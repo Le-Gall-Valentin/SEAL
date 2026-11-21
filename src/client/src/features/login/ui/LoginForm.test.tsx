@@ -205,7 +205,7 @@ describe('AUTH-20 à AUTH-22 : formulaire de connexion', () => {
     await expect.poll(() => harness.sent).toEqual([{ login: 'valentin', password: 'secret' }])
   })
 
-  it('ADR 0033 (point 6) : un double clic sur « Se connecter » n’envoie qu’une requête', async () => {
+  it('AUTH-20, ADR 0033 (point 6) : un double clic sur « Se connecter » n’envoie qu’une requête', async () => {
     const { screen, harness } = await renderForm(() => new Promise<void>(() => undefined))
     await fill(screen)
 

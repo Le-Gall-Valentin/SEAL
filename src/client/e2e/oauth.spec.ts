@@ -32,7 +32,7 @@ test('OPS-03, AUTH-35 : Connexion et Inscription montrent exactement les fournis
   }
 })
 
-test('ADR 0033 (point 2) : Identifiant-OAuth sans inscription en attente ramène à la connexion', async ({
+test('AUTH-32, ADR 0033 (point 2) : Identifiant-OAuth sans inscription en attente ramène à la connexion', async ({
   page,
   baseURL,
 }) => {
@@ -43,7 +43,7 @@ test('ADR 0033 (point 2) : Identifiant-OAuth sans inscription en attente ramène
   await expect(page).toHaveURL(`${baseURL ?? ''}/connexion`)
 })
 
-test('ADR 0032 (point 2) : un retour OAuth refusé ramène à la connexion avec l’alerte, sans session', async ({
+test('AUTH-30, ADR 0032 (point 2) : un retour OAuth refusé ramène à la connexion avec l’alerte, sans session', async ({
   page,
   baseURL,
 }) => {

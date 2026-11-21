@@ -54,13 +54,13 @@ describe('features/oauth-registration : adaptateur de l’inscription OAuth', ()
     await expect(oauthRegistrationApi.pending()).resolves.toMatchObject({ displayName: '' })
   })
 
-  it('ADR 0033 (point 2) : aucune inscription en attente (404), null', async () => {
+  it('AUTH-32, ADR 0033 (point 2) : aucune inscription en attente (404), null', async () => {
     request.mockRejectedValue(new ApiError(404, 'NOT_FOUND'))
 
     await expect(oauthRegistrationApi.pending()).resolves.toBeNull()
   })
 
-  it('A10 : toute autre erreur remonte', async () => {
+  it('AUTH-32, A10 : toute autre erreur remonte', async () => {
     request.mockRejectedValue(new NetworkError())
 
     await expect(oauthRegistrationApi.pending()).rejects.toBeInstanceOf(NetworkError)

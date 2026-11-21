@@ -136,7 +136,7 @@ describe('AUTH-70 : Mot-de-passe-oublie', () => {
     await expect.element(screen.getByRole('alert')).toMatchTextContent('Réessayez dans 60 minutes.')
   })
 
-  it('ADR 0033 (point 6) : un double clic sur « Envoyer le lien » n’envoie qu’une demande', async () => {
+  it('AUTH-70, ADR 0033 (point 6) : un double clic sur « Envoyer le lien » n’envoie qu’une demande', async () => {
     const { screen, calls } = await renderReset(
       { request: () => new Promise<void>(() => undefined) },
       { path: '/mot-de-passe/oublie' },

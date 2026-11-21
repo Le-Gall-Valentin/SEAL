@@ -11,7 +11,7 @@ import {
   SessionApiProvider,
   useCurrentAccount,
 } from '@/entities/session'
-import { ApiError } from '@/shared/lib'
+import { ApiError, NetworkError } from '@/shared/lib'
 import type { PendingRegistration } from '../model/oauthRegistration'
 import { OAuthRegistrationApiProvider } from '../model/oauthRegistrationApiPort'
 import { OAuthRegistrationForm } from './OAuthRegistrationForm'
@@ -37,6 +37,8 @@ const ACTIVE: Account = {
 }
 
 const TAKEN = new Set(['pris'])
+// Le serveur refuse aussi les noms réservés, et propose pour eux comme pour les pris (ADR 0019).
+const RESERVED = new Set(['admin'])
 
 function Probe() {
   const account = useCurrentAccount()
@@ -54,6 +56,7 @@ async function renderForm(
   pending: PendingRegistration = PENDING,
 ) {
   const sent: Completion[] = []
+  const checked: string[] = []
   let completed = false
   const registrationApi: IOAuthRegistrationApi = {
     pending: () => Promise.resolve(pending),
@@ -64,12 +67,14 @@ async function renderForm(
     },
   }
   const availabilityApi = {
-    usernameAvailability: (username: string) =>
-      Promise.resolve(
-        TAKEN.has(username)
+    usernameAvailability: (username: string) => {
+      checked.push(username)
+      return Promise.resolve(
+        TAKEN.has(username) || RESERVED.has(username)
           ? { available: false, suggestions: [`${username}2`] }
           : { available: true, suggestions: [] },
-      ),
+      )
+    },
   }
   const sessionApi: ISessionApi = {
     me: () => Promise.resolve(completed ? ACTIVE : null),
@@ -104,7 +109,7 @@ async function renderForm(
       </SessionApiProvider>
     </QueryClientProvider>,
   )
-  return { screen, sent, router }
+  return { screen, sent, router, checked }
 }
 
 const field = (screen: Awaited<ReturnType<typeof renderForm>>['screen'], label: string) =>
@@ -167,7 +172,7 @@ describe('Identifiant-OAuth : formulaire', () => {
     [new ApiError(404, 'NOT_FOUND'), '/connexion?erreur=REQUEST_REJECTED'],
     [new ApiError(409, 'OAUTH_ALREADY_LINKED'), '/connexion?erreur=REQUEST_REJECTED'],
     [new ApiError(409, 'OAUTH_EMAIL_IN_USE'), '/connexion?erreur=OAUTH_EMAIL_IN_USE'],
-  ])('ADR 0033 (point 2) : %o renvoie à la connexion', async (error, destination) => {
+  ])('AUTH-32, ADR 0033 (point 2) : %o renvoie à la connexion', async (error, destination) => {
     const { screen } = await renderForm(() => Promise.reject(error))
 
     await screen.getByRole('button', { name: 'Créer mon compte' }).click()
@@ -187,7 +192,7 @@ describe('Identifiant-OAuth : formulaire', () => {
     await expect.element(screen.getByRole('button', { name: 'Créer mon compte' })).toBeDisabled()
   })
 
-  it('ADR 0033 (point 6) : un double clic sur « Créer mon compte » n’envoie qu’une requête', async () => {
+  it('AUTH-32, ADR 0033 (point 6) : un double clic sur « Créer mon compte » n’envoie qu’une requête', async () => {
     const { screen, sent } = await renderForm(() => new Promise<void>(() => undefined))
 
     const submit = screen.getByRole('button', { name: 'Créer mon compte' })
@@ -199,7 +204,7 @@ describe('Identifiant-OAuth : formulaire', () => {
     expect(sent).toHaveLength(1)
   })
 
-  it('A10 : un refus arrivé après le départ de l’écran ne ramène pas de force à la connexion', async () => {
+  it('AUTH-32, A10 : un refus arrivé après le départ de l’écran ne ramène pas de force à la connexion', async () => {
     let reject: (reason: unknown) => void = () => undefined
     const { screen, router } = await renderForm(
       () =>
@@ -219,5 +224,68 @@ describe('Identifiant-OAuth : formulaire', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(router.state.location.pathname).toBe('/ailleurs')
+  })
+
+  it.each([
+    ['pris', 'pris@gmail.com', 'pris2'],
+    ['réservé', 'admin@gmail.com', 'admin2'],
+  ])(
+    'AUTH-04 (étape 5) : base tirée du courriel %s, la première suggestion libre est proposée',
+    async (_cas, email, proposed) => {
+      const { screen } = await renderForm(() => Promise.resolve(), { ...PENDING, email })
+
+      await expect.element(field(screen, 'Identifiant')).toHaveValue(proposed)
+      await expect.element(screen.getByText('Disponible', { exact: true })).toBeVisible()
+      await expect.element(screen.getByText('· Proposé à partir de votre courriel.')).toBeVisible()
+    },
+  )
+
+  it('AUTH-04 : « Proposé à partir de votre courriel » disparaît dès que l’identifiant est modifié', async () => {
+    const { screen } = await renderForm(() => Promise.resolve())
+    await expect.element(screen.getByText('· Proposé à partir de votre courriel.')).toBeVisible()
+
+    await field(screen, 'Identifiant').fill('valentin')
+
+    await expect.element(screen.getByText('Disponible', { exact: true })).toBeVisible()
+    await expect
+      .element(screen.getByText('· Proposé à partir de votre courriel.'))
+      .not.toBeInTheDocument()
+  })
+
+  it('ACC-03, SEC-01 : un nom affiché refusé par le serveur (VALIDATION_FAILED) s’affiche sous son champ', async () => {
+    const { screen } = await renderForm(() =>
+      Promise.reject(new ApiError(400, 'VALIDATION_FAILED', { fields: ['displayName'] })),
+    )
+
+    await screen.getByRole('button', { name: 'Créer mon compte' }).click()
+
+    await expect
+      .element(screen.getByText('1 à 50 caractères, dont un visible au moins.'))
+      .toBeVisible()
+    await expect.element(screen.getByRole('button', { name: 'Créer mon compte' })).toBeDisabled()
+  })
+
+  it('AUTH-05 : un identifiant pris au retour du serveur fait relire les disponibilités', async () => {
+    const { screen, checked } = await renderForm(() =>
+      Promise.reject(new ApiError(409, 'USERNAME_TAKEN')),
+    )
+    await expect.element(screen.getByText('Disponible', { exact: true })).toBeVisible()
+    const before = checked.length
+
+    await screen.getByRole('button', { name: 'Créer mon compte' }).click()
+
+    await expect.element(screen.getByText('Déjà pris.')).toBeVisible()
+    await expect.poll(() => checked.length).toBeGreaterThan(before)
+  })
+
+  it.each([
+    [new NetworkError(), 'Connexion impossible. Vérifiez votre réseau puis réessayez.'],
+    [new ApiError(403, 'FORBIDDEN'), 'Une erreur inattendue est survenue. Réessayez.'],
+  ])('AUTH-32, A10 : %o s’affiche en alerte au-dessus du formulaire', async (error, text) => {
+    const { screen } = await renderForm(() => Promise.reject(error))
+
+    await screen.getByRole('button', { name: 'Créer mon compte' }).click()
+
+    await expect.element(screen.getByRole('alert')).toHaveTextContent(text)
   })
 })

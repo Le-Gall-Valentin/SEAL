@@ -82,7 +82,7 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
     await expect.element(alert.getByText('Réessayez plus tard.', { exact: true })).toBeVisible()
   })
 
-  it('ADR 0033 (point 1) : une alerte titrée prend l’espacement de « Trop de tentatives », une alerte simple garde le sien', async () => {
+  it('AUTH-33, ADR 0033 (point 1) : une alerte titrée prend l’espacement de « Trop de tentatives », une alerte simple garde le sien', async () => {
     const screen = await render(
       <>
         <Alert variant="error" title="Ce courriel a déjà un compte">
@@ -196,7 +196,7 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
     expect(screen.container.textContent).toBe('')
   })
 
-  it('ADR 0024 (point 8) : limite, réseau et erreur inattendue relèvent de l’alerte, un refus de champ non', () => {
+  it('SEC-10, ADR 0024 (point 8) : limite, réseau et erreur inattendue relèvent de l’alerte, un refus de champ non', () => {
     expect(isFormFailure({ kind: 'rate-limited' })).toBe(true)
     expect(isFormFailure({ kind: 'network' })).toBe(true)
     expect(isFormFailure({ kind: 'unexpected' })).toBe(true)

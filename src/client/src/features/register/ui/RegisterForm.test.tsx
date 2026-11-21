@@ -304,7 +304,7 @@ describe('AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d’inscription', ()
     await expect.element(screen.getByText('Adresse invalide.')).toBeVisible()
   })
 
-  it('ADR 0033 (point 6) : un double clic sur « Créer mon compte » n’envoie qu’une requête', async () => {
+  it('AUTH-10, ADR 0033 (point 6) : un double clic sur « Créer mon compte » n’envoie qu’une requête', async () => {
     const { screen, sent } = await renderForm(() => new Promise<void>(() => undefined))
     await fillValid(screen)
 

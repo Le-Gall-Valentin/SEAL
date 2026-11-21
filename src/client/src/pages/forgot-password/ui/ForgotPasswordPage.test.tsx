@@ -67,7 +67,7 @@ describe('Écran Mot-de-passe-oublie', () => {
       'Vous vous connectez avec Google ? Ce compte n’a pas de mot de passe SEAL : utilisez le bouton du fournisseur.',
     ],
   ] as const)(
-    'ADR 0033 (point 3) : %o, la phrase ne nomme que les fournisseurs configurés',
+    'AUTH-70, ADR 0033 (point 3) : %o, la phrase ne nomme que les fournisseurs configurés',
     async (providers, text) => {
       const screen = await renderForgot(providers)
 

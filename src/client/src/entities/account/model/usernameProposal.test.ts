@@ -67,7 +67,7 @@ describe('AUTH-05 : motif du refus de l’identifiant', () => {
     ['USERNAME_INVALID', 'invalid'],
     ['USERNAME_RESERVED', 'reserved'],
     ['PASSWORD_TOO_WEAK', null],
-  ] as const)('CDC 14.6 : %s donne %s', (code, reason) => {
+  ] as const)('AUTH-05, CDC 14.6 : %s donne %s', (code, reason) => {
     expect(usernameRefusalReason(code)).toBe(reason)
   })
 })

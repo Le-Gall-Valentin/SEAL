@@ -30,6 +30,9 @@ const PENDING: Account = {
   verification: { codeExpiresAt: null, resendsRemaining: 3 },
 }
 
+// Appels de GET /api/v1/auth/oauth/pending : une session ouverte n'en fait aucun (AUTH-16).
+const pendingCalls: string[] = []
+
 // Doublures de tous les ports, comme la racine de composition les assemble ; seul /me varie.
 function fakeApis(account: Account | null): Apis {
   const never = () => Promise.reject(new Error('non attendu'))
@@ -49,7 +52,13 @@ function fakeApis(account: Account | null): Apis {
     usernameAvailability: { usernameAvailability: never },
     oauthProviders: { providers: () => Promise.resolve([]) },
     register: { register: never },
-    oauthRegistration: { pending: never, complete: never },
+    oauthRegistration: {
+      pending: () => {
+        pendingCalls.push(account?.status ?? 'anonyme')
+        return Promise.resolve(null)
+      },
+      complete: never,
+    },
     verifyEmail: { verify: never, resend: never, changeEmail: never },
     passwordReset: { request: never, inspect: never, confirm: never },
     logout: { logout: () => Promise.resolve() },
@@ -60,12 +69,13 @@ async function renderAt(
   entry: InitialEntry,
   tree: RouteObject[] = routes,
   account: Account | null = ACTIVE,
+  apis: Apis = fakeApis(account),
 ) {
   const router = createMemoryRouter(tree, { initialEntries: [entry] })
   const store = await freshKeyStore()
   const screen = await render(
     <QueryClientProvider client={createQueryClient()}>
-      <ApiProviders apis={fakeApis(account)}>
+      <ApiProviders apis={apis}>
         <KeyStoreProvider api={store}>
           <RouterProvider router={router} />
         </KeyStoreProvider>
@@ -87,6 +97,7 @@ function FlakyPage() {
 describe('ADR 0012 : routeur de la couche app', () => {
   afterEach(() => {
     broken = true
+    pendingCalls.length = 0
     vi.restoreAllMocks()
   })
 
@@ -113,6 +124,10 @@ describe('ADR 0012 : routeur de la couche app', () => {
     ['/', PENDING, '/verification-courriel', 'Vérifiez votre courriel'],
     ['/inscription', ACTIVE, '/', null],
     ['/verification-courriel', ACTIVE, '/', null],
+    // AUTH-32, ADR 0033 (point 2) : sans inscription en attente, Identifiant-OAuth ramène à la connexion.
+    ['/inscription/identifiant', null, '/connexion', 'Connexion'],
+    ['/inscription/identifiant', ACTIVE, '/', null],
+    ['/inscription/identifiant', PENDING, '/verification-courriel', 'Vérifiez votre courriel'],
   ] as const)(
     'ADR 0024, point 5 : %s, compte %o → %s',
     async (path, account, expected, heading) => {
@@ -189,5 +204,51 @@ describe('ADR 0012 : routeur de la couche app', () => {
 
     await expect.element(screen.getByText('Rétabli')).toBeVisible()
     expect(router.state.location.pathname).toBe('/')
+  })
+
+  it.each([ACTIVE, PENDING])(
+    'AUTH-16, AUTH-32 : une session ouverte (%o) ne lit jamais l’inscription OAuth en attente',
+    async (account) => {
+      const { router } = await renderAt('/inscription/identifiant', routes, account)
+
+      await expect.poll(() => router.state.location.pathname).not.toBe('/inscription/identifiant')
+      expect(pendingCalls).toEqual([])
+    },
+  )
+
+  it('AUTH-32, ADR 0032 (point 1) : « Créer mon compte » pour un courriel non garanti mène à la vérification', async () => {
+    let completed = false
+    const apis: Apis = {
+      ...fakeApis(null),
+      session: {
+        me: () => Promise.resolve(completed ? PENDING : null),
+        reloadCsrf: () => Promise.resolve(),
+      },
+      usernameAvailability: {
+        usernameAvailability: () => Promise.resolve({ available: true, suggestions: [] }),
+      },
+      oauthRegistration: {
+        pending: () =>
+          Promise.resolve({
+            provider: 'github',
+            email: 'valentin@uqac.ca',
+            displayName: 'Valentin',
+          }),
+        complete: () => {
+          completed = true
+          return Promise.resolve()
+        },
+      },
+    }
+    const { router, screen } = await renderAt('/inscription/identifiant', routes, null, apis)
+
+    const submit = screen.getByRole('button', { name: 'Créer mon compte' })
+    await expect.element(submit).toBeEnabled()
+    await submit.click()
+
+    await expect
+      .element(screen.getByRole('heading', { level: 1, name: 'Vérifiez votre courriel' }))
+      .toBeVisible()
+    expect(router.state.location.pathname).toBe('/verification-courriel')
   })
 })
