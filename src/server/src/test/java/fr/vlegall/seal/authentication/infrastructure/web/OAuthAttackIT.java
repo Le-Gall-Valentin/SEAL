@@ -32,6 +32,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
  * AUTH-30, SEC-10, section 16.1 : retours OAuth forgés et départs en rafale. Chaque retour forgé finit sur
@@ -233,5 +234,84 @@ class OAuthAttackIT {
         mvc.perform(burst.from(get("/oauth2/authorization/google")))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", startsWith(fake.uri("/google/authorize"))));
+    }
+
+    /** Une sous-requête qu'une page tierce émet depuis le navigateur de la victime : une balise img, sans cookie. */
+    private static MockHttpServletRequestBuilder crossSiteImage(MockHttpServletRequestBuilder request) {
+        return request.header("Sec-Fetch-Site", "cross-site")
+                .header("Sec-Fetch-Mode", "no-cors")
+                .header("Sec-Fetch-Dest", "image");
+    }
+
+    @Test
+    @DisplayName(
+            "SEC-10, ADR 0032 : des sous-requêtes intersites n'épuisent pas les limites OAuth de l'IP de la victime")
+    void sec10CrossSiteSubrequestsDoNotSpendTheLimits() throws Exception {
+        AuthClient victim = new AuthClient(mvc, mail);
+        for (int i = 0; i < 25; i++) {
+            for (MockHttpServletRequestBuilder request : List.of(
+                    get("/oauth2/authorization/google"),
+                    get("/login/oauth2/code/google").param("code", "c" + i).param("state", "s" + i))) {
+                MvcResult refused = mvc.perform(victim.from(crossSiteImage(request)))
+                        .andExpect(status().isFound())
+                        .andExpect(header().string("Location", REJECTED))
+                        .andReturn();
+                assertThat(refused.getResponse().getCookie(AuthClient.SESSION_COOKIE))
+                        .as("aucune session créée")
+                        .isNull();
+            }
+        }
+
+        assertThat(jdbc.sql("SELECT count(*) FROM security_events WHERE ip = CAST(? AS inet)")
+                        .param(victim.ip())
+                        .query(Long.class)
+                        .single())
+                .as("rien n'est journalisé")
+                .isZero();
+        mvc.perform(victim.from(get("/oauth2/authorization/google")
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .header("Sec-Fetch-Mode", "navigate")
+                        .header("Sec-Fetch-Dest", "document")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", startsWith(fake.uri("/google/authorize"))));
+        mvc.perform(victim.from(get("/login/oauth2/code/google")
+                        .param("code", "c")
+                        .param("state", "s")
+                        .header("Sec-Fetch-Site", "cross-site")
+                        .header("Sec-Fetch-Mode", "navigate")
+                        .header("Sec-Fetch-Dest", "document")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", REJECTED));
+        assertThat(jdbc.sql("SELECT count(*) FROM security_events WHERE ip = CAST(? AS inet) AND type = 'LOGIN_FAILED'")
+                        .param(victim.ip())
+                        .query(Long.class)
+                        .single())
+                .as("le retour du fournisseur, navigation intersite, est traité")
+                .isOne();
+    }
+
+    @Test
+    @DisplayName(
+            "SEC-10, TRN-02 : un départ OAuth venu d'une autre origine est refusé, sans session ; depuis SEAL, il part")
+    void sec10StartFromAnotherOriginIsRejected() throws Exception {
+        for (String site : List.of("cross-site", "same-site")) {
+            MvcResult refused = mvc.perform(client.from(get("/oauth2/authorization/github")
+                            .header("Sec-Fetch-Site", site)
+                            .header("Sec-Fetch-Mode", "navigate")
+                            .header("Sec-Fetch-Dest", "document")))
+                    .andExpect(status().isFound())
+                    .andExpect(header().string("Location", REJECTED))
+                    .andReturn();
+            assertThat(refused.getResponse().getCookie(AuthClient.SESSION_COOKIE))
+                    .isNull();
+        }
+        for (String site : List.of("same-origin", "none")) {
+            mvc.perform(client.from(get("/oauth2/authorization/github")
+                            .header("Sec-Fetch-Site", site)
+                            .header("Sec-Fetch-Mode", "navigate")
+                            .header("Sec-Fetch-Dest", "document")))
+                    .andExpect(status().isFound())
+                    .andExpect(header().string("Location", startsWith(fake.uri("/github/authorize"))));
+        }
     }
 }

@@ -48,6 +48,22 @@
     </Match>
 
     <!--
+      SERVLET_HEADER : Fetch Metadata (ADR 0032, point 3) lit les en-têtes Sec-Fetch-* pour écarter ce que le navigateur
+      marque comme sous-requête ou comme départ d'une autre origine. Un client qui les falsifie pour imiter une
+      navigation est compté comme toute requête sans ces en-têtes : rien n'est contourné. Les valeurs ne sont que
+      comparées à des constantes (OAuthAttackIT.sec10CrossSiteSubrequestsDoNotSpendTheLimits). Exclusion limitée à ces
+      deux méthodes.
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.security.ratelimit.OAuthNavigationRateLimitFilter"/>
+        <Or>
+            <Method name="expectedNavigation"/>
+            <Method name="isPresentAndNot"/>
+        </Or>
+        <Bug pattern="SERVLET_HEADER"/>
+    </Match>
+
+    <!--
       SPRING_ENDPOINT n'est pas une faille : FindSecBugs l'émet sur chaque contrôleur pour qu'il soit relu
       (ADR 0011). Une entrée par contrôleur relu, avec le test qui vérifie son contrôle d'accès (QA-05) ;
       jamais d'exclusion globale.
