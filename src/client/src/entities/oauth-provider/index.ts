@@ -1,0 +1,9 @@
+// API publique de la tranche oauth-provider (ADR 0012, ADR 0033) : fournisseurs OAuth configurés, noms et logos.
+export { OAUTH_PROVIDER_IDS } from './api/IOAuthProvidersApi'
+export type { IOAuthProvidersApi, OAuthProviderId } from './api/IOAuthProvidersApi'
+export { oauthProvidersApi } from './api/oauthProvidersApi'
+export { OAuthProvidersApiProvider } from './model/oauthProvidersPort'
+export { joinWithOr } from './model/providerList'
+export { useOAuthProviderName } from './model/useOAuthProviderName'
+export { useOAuthProviders } from './model/useOAuthProviders'
+export { ProviderLogo } from './ui/ProviderLogo'

@@ -1,9 +1,28 @@
 import { Link } from 'react-router'
+import { joinWithOr, useOAuthProviderName, useOAuthProviders } from '@/entities/oauth-provider'
 import { ForgotPasswordForm } from '@/features/password-reset'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { AuthLayout } from '@/widgets/auth-layout'
 import { forgotPasswordPageMessages } from '../i18n'
+
+/** ADR 0033 (point 3) : la phrase sur OAuth, seulement avec un fournisseur configuré, et ne nommant que ceux-là. */
+function OAuthAccountsNote() {
+  const t = useMessages(forgotPasswordPageMessages)
+  const providers = useOAuthProviders()
+  const name = useOAuthProviderName()
+  const [first] = providers
+  if (first === undefined) {
+    return null
+  }
+  return (
+    <p className="m-0 text-[13px] leading-[1.4] text-ink-3">
+      {providers.length === 1
+        ? t('oauthOne', { provider: name(first) })
+        : t('oauthMany', { providers: joinWithOr(providers.map(name), t('or')) })}
+    </p>
+  )
+}
 
 /** Écran Mot-de-passe-oublie (AUTH-70), réservé aux anonymes. */
 export function ForgotPasswordPage() {
@@ -18,6 +37,7 @@ export function ForgotPasswordPage() {
           <p className="m-0 leading-[1.45] text-ink-3">{t('subtitle')}</p>
         </header>
         <ForgotPasswordForm />
+        <OAuthAccountsNote />
         <p className="m-0 text-center text-[13px]">
           <Link to={ROUTES.LOGIN} className="font-semibold no-underline">
             {t('back')}

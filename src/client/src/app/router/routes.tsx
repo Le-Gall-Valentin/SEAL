@@ -1,4 +1,5 @@
 import { Navigate, type RouteObject } from 'react-router'
+import { ChooseUsernamePage } from '@/pages/choose-username'
 import { ForgotPasswordPage } from '@/pages/forgot-password'
 import { HomePage } from '@/pages/home'
 import { LoginPage } from '@/pages/login'
@@ -24,6 +25,8 @@ export const routes = withRootErrorBoundary([
       { path: ROUTES.LOGIN, element: <LoginPage /> },
       { path: ROUTES.REGISTER, element: <RegisterPage /> },
       { path: ROUTES.FORGOT_PASSWORD, element: <ForgotPasswordPage /> },
+      // AUTH-32 : Identifiant-OAuth, dans la session anonyme de l'inscription en attente (ADR 0032).
+      { path: ROUTES.CHOOSE_USERNAME, element: <ChooseUsernamePage /> },
     ],
   },
   // ADR 0024, point 9 : sans garde, pour qu'un navigateur connecté se déconnecte sans perdre le lien.

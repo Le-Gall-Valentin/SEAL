@@ -1,11 +1,15 @@
 import { Link } from 'react-router'
+import { OAuthButtons } from '@/features/oauth-login'
 import { RegisterForm } from '@/features/register'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { AuthLayout } from '@/widgets/auth-layout'
 import { registerPageMessages } from '../i18n'
 
-/** Écran Inscription (AUTH-10), mise en page de la connexion sur ordinateur et tablette (ADR 0007, point 7). */
+/**
+ * Écran Inscription (AUTH-10), mise en page de la connexion sur ordinateur et tablette (ADR 0007, point 7), avec les
+ * boutons des fournisseurs (ADR 0033).
+ */
 export function RegisterPage() {
   const t = useMessages(registerPageMessages)
   return (
@@ -16,6 +20,7 @@ export function RegisterPage() {
           <p className="m-0 text-ink-3">{t('subtitle')}</p>
         </header>
         <RegisterForm />
+        <OAuthButtons />
         <p className="m-0 text-center text-[13px] text-ink-3">
           {t('haveAccount')}{' '}
           <Link to={ROUTES.LOGIN} className="font-semibold no-underline">

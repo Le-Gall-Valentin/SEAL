@@ -7,4 +7,6 @@ export const ROUTES = {
   FORGOT_PASSWORD: '/mot-de-passe/oublie',
   // ADR 0022 : adresse du lien envoyé par courriel.
   RESET_PASSWORD: '/mot-de-passe/nouveau',
+  // AUTH-32, ADR 0032 (point 4) : Identifiant-OAuth, où le serveur renvoie après un premier passage.
+  CHOOSE_USERNAME: '/inscription/identifiant',
 } as const
