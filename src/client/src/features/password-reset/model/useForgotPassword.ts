@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { isEmailWellFormed } from '@/entities/account'
-import { useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
+import { isFormFailure, useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
 import { resetFailureOf } from './resetLink'
 import { usePasswordResetApi } from './passwordResetApiPort'
 
@@ -38,13 +38,7 @@ export function useForgotPassword() {
       setTouched(true)
     },
     emailInvalid: (touched && email !== '' && !isEmailWellFormed(email)) || refused === email,
-    alert:
-      failure !== null &&
-      (failure.kind === 'rate-limited' ||
-        failure.kind === 'network' ||
-        failure.kind === 'unexpected')
-        ? failure
-        : null,
+    alert: failure !== null && isFormFailure(failure) ? failure : null,
     sent,
     canSubmit,
     submit: () => {

@@ -5,7 +5,6 @@ export {
   isDisplayNameValid,
 } from './model/displayName'
 export { refusedAccountField } from './model/refusedField'
-export type { AccountField } from './model/refusedField'
 export { useUsernameChoice } from './model/useUsernameChoice'
 export { EMAIL_MAX_LENGTH, isEmailWellFormed, localPartOf } from './model/email'
 export {
@@ -18,15 +17,8 @@ export { DISPLAY_NAME_SCHEMA, EMAIL_SCHEMA, USERNAME_SCHEMA } from './model/sche
 export type { IUsernameAvailabilityApi, UsernameAvailability } from './api/IUsernameAvailabilityApi'
 export { usernameAvailabilityApi } from './api/usernameAvailabilityApi'
 export { UsernameAvailabilityApiProvider } from './model/usernameAvailabilityPort'
-export { USERNAME_AVAILABILITY_KEY, useUsernameAvailability } from './model/useUsernameAvailability'
 export type { UsernameStatus } from './model/useUsernameAvailability'
-export {
-  proposeUsername,
-  statusAfterRefusal,
-  usernameFromEmail,
-  usernameRefusalReason,
-} from './model/usernameProposal'
-export type { UsernameRefusal } from './model/usernameProposal'
+export { isUsernameSubmittable, usernameRefusalReason } from './model/usernameProposal'
 export { DisplayNameField } from './ui/DisplayNameField'
 export { FinalUsernameNotice } from './ui/FinalUsernameNotice'
 export { UsernameField } from './ui/UsernameField'

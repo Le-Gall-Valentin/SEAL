@@ -27,7 +27,9 @@ export function useUsernameChoice(email: string) {
     status: statusAfterRefusal(proposal.status, refusal, proposal.username),
     /** L'identifiant suit encore la suggestion tirée du courriel. */
     fromEmail: chosen === null,
-    choose: setChosen,
+    choose: (value: string) => {
+      setChosen(value)
+    },
     refuse: (value: string, reason: UsernameRefusal['reason']) => {
       setRefusal({ value, reason })
       if (reason === 'taken') {

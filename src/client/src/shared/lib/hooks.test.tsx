@@ -94,11 +94,20 @@ describe('shared/lib : crochets sans métier', () => {
 
   it('ADR 0033 (point 6) : useSubmitGuard prend le verrou une fois, puis le rend', async () => {
     let guard: SubmitGuard | undefined
-    function Probe() {
-      guard = useSubmitGuard()
+    function Probe({ onReady }: { readonly onReady: (ready: SubmitGuard) => void }) {
+      const submitGuard = useSubmitGuard()
+      useEffect(() => {
+        onReady(submitGuard)
+      }, [onReady, submitGuard])
       return null
     }
-    await render(<Probe />)
+    await render(
+      <Probe
+        onReady={(ready) => {
+          guard = ready
+        }}
+      />,
+    )
 
     expect(guard?.enter()).toBe(true)
     expect(guard?.enter()).toBe(false)

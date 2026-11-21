@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   DISPLAY_NAME_SCHEMA,
   isDisplayNameShownInvalid,
+  isUsernameSubmittable,
   USERNAME_SCHEMA,
   type UsernameStatus,
 } from '@/entities/account'
@@ -30,9 +31,6 @@ export function oauthRegistrationView({
     refused: refusedDisplayName,
   })
   const valid =
-    FIELDS.safeParse({ username, displayName }).success &&
-    !refused &&
-    // AUTH-05 : une disponibilité inconnue (réseau, 429) laisse le serveur trancher à l'envoi.
-    (status.kind === 'available' || status.kind === 'unknown')
+    FIELDS.safeParse({ username, displayName }).success && !refused && isUsernameSubmittable(status)
   return { displayNameInvalid, valid }
 }

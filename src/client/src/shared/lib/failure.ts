@@ -7,6 +7,18 @@ export type Failure =
   | { readonly kind: 'refused'; readonly code: ErrorCode }
   | { readonly kind: 'unexpected' }
 
+/** Échecs communs aux formulaires, affichés en alerte au-dessus du formulaire et non sous un champ. */
+export type FormFailure = Exclude<Failure, { readonly kind: 'refused' }>
+
+/** L'échec d'un formulaire relève de son alerte : limite atteinte, serveur injoignable, erreur inattendue. */
+export function isFormFailure<F extends { readonly kind: string }>(
+  failure: F,
+): failure is Extract<F, FormFailure> {
+  return (
+    failure.kind === 'rate-limited' || failure.kind === 'network' || failure.kind === 'unexpected'
+  )
+}
+
 /** SEC-10 : un 429 sans Retry-After lisible attend au moins une minute. */
 const DEFAULT_RETRY_AFTER_SECONDS = 60
 

@@ -61,3 +61,8 @@ export function statusAfterRefusal(
       return { kind: 'invalid' }
   }
 }
+
+/** AUTH-05 : l'identifiant peut partir ; une disponibilité inconnue (réseau, 429) laisse le serveur trancher à l'envoi. */
+export function isUsernameSubmittable(status: UsernameStatus): boolean {
+  return status.kind === 'available' || status.kind === 'unknown'
+}

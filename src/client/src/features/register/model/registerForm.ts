@@ -3,6 +3,7 @@ import {
   DISPLAY_NAME_SCHEMA,
   EMAIL_SCHEMA,
   isDisplayNameShownInvalid,
+  isUsernameSubmittable,
   isEmailWellFormed,
   USERNAME_SCHEMA,
   type UsernameStatus,
@@ -75,8 +76,7 @@ export function registerView({
     }).success &&
     refused.email !== values.email &&
     refused.displayName !== values.displayName &&
-    // AUTH-05 : une disponibilité inconnue (réseau, 429) laisse le serveur trancher à l'envoi.
-    (status.kind === 'available' || status.kind === 'unknown') &&
+    isUsernameSubmittable(status) &&
     canSubmitPassword(rules) &&
     values.confirm === values.password
   return { emailInvalid, displayNameInvalid, confirmMismatch: mismatch, valid }

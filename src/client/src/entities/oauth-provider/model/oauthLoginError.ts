@@ -1,12 +1,12 @@
 import { ROUTES } from '@/shared/config'
 
+/** Nom du paramètre de /connexion qui porte le code. */
+export const LOGIN_ERROR_PARAM = 'erreur'
+
 /**
  * ADR 0032 (point 2), ADR 0033 : les seuls codes de /connexion?erreur=, qu'ajoutent le serveur après un départ ou un
  * retour refusé, et le client quand une inscription OAuth ne peut plus aboutir.
  */
-/** Nom du paramètre de /connexion qui porte le code. */
-export const LOGIN_ERROR_PARAM = 'erreur'
-
 const OAUTH_LOGIN_ERRORS = ['OAUTH_EMAIL_IN_USE', 'RATE_LIMITED', 'REQUEST_REJECTED'] as const
 
 export type OAuthLoginError = (typeof OAUTH_LOGIN_ERRORS)[number]
