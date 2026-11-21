@@ -10,6 +10,7 @@ import fr.vlegall.seal.authentication.domain.port.out.PasswordResetEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetMailPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetTokenRepository;
 import fr.vlegall.seal.authentication.domain.port.out.RandomBytes;
+import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.SessionRevocationPort;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.support.MutableClock;
@@ -25,8 +26,8 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Doublures en mémoire du parcours « mot de passe oublié » (AUTH-70) : chaque effet s'inscrit dans {@link #calls}, dans
- * l'ordre, pour que les tests vérifient aussi la séquence.
+ * Doublures en mémoire des gestes sur le mot de passe : oubli (AUTH-70), ré-authentification (AUTH-55) et changement
+ * (ACC-01). Chaque effet s'inscrit dans {@link #calls}, dans l'ordre, pour que les tests vérifient aussi la séquence.
  */
 final class PasswordResetFixture {
 
@@ -149,7 +150,8 @@ final class PasswordResetFixture {
 
         @Override
         public boolean matches(Password password, String encoded) {
-            throw new UnsupportedOperationException();
+            calls.add("vérification");
+            return encoded.equals("hash(" + password.value() + ")");
         }
 
         @Override
@@ -159,7 +161,7 @@ final class PasswordResetFixture {
 
         @Override
         public void verifyDecoy(Password password) {
-            throw new UnsupportedOperationException();
+            calls.add("leurre");
         }
     };
 
@@ -171,6 +173,24 @@ final class PasswordResetFixture {
     final SessionRevocationPort sessions = user -> calls.add("révocation:" + user.value());
 
     final PasswordResetEventPort journal = user -> calls.add("journal:" + user.value());
+
+    /** Journal des connexions (SEC-20) : seuls les échecs y entrent ici (ADR 0034, point 4). */
+    final SecurityEventPort loginJournal = new SecurityEventPort() {
+        @Override
+        public void loginSucceeded(UserId user) {
+            calls.add("connexion:" + user.value());
+        }
+
+        @Override
+        public void loginFailed(@Nullable UserId user) {
+            calls.add("échec:" + (user == null ? "aucun" : user.value()));
+        }
+
+        @Override
+        public void loggedOut(UserId user) {
+            calls.add("sortie:" + user.value());
+        }
+    };
 
     /** Octets prévisibles et tous différents : 1, puis 2, puis 3… */
     RandomBytes random() {

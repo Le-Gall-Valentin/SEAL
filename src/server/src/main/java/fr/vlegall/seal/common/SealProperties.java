@@ -75,14 +75,21 @@ public record SealProperties(URI origin, Security security, Session session, Mai
         }
     }
 
-    /** @param absoluteTimeout durée de vie maximale d'une session depuis sa création : 12 heures (AUTH-52) */
-    public record Session(Duration absoluteTimeout) {
+    /**
+     * @param absoluteTimeout durée de vie maximale d'une session depuis sa création : 12 heures (AUTH-52)
+     * @param sudoWindow âge maximal du facteur qui ouvre le mode sudo : 10 minutes (AUTH-55, ADR 0034)
+     */
+    public record Session(Duration absoluteTimeout, Duration sudoWindow) {
 
         public Session {
             Objects.requireNonNull(absoluteTimeout, "seal.session.absolute-timeout est obligatoire");
+            Objects.requireNonNull(sudoWindow, "seal.session.sudo-window est obligatoire");
             if (absoluteTimeout.isNegative() || absoluteTimeout.isZero()) {
                 throw new IllegalArgumentException(
                         "seal.session.absolute-timeout doit être positive : " + absoluteTimeout);
+            }
+            if (sudoWindow.isNegative() || sudoWindow.isZero()) {
+                throw new IllegalArgumentException("seal.session.sudo-window doit être positive : " + sudoWindow);
             }
         }
     }

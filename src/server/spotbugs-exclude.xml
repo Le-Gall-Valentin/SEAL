@@ -86,6 +86,11 @@
         <Class name="fr.vlegall.seal.identity.infrastructure.web.AccountSettingsController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- /api/v1/auth/reauth (session complète, ADR 0034) : ReauthenticationIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.web.ReauthenticationController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /api/v1/auth/login (anonyme seulement) et /logout (toute session) : LoginIT. -->
     <Match>
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.SessionController"/>

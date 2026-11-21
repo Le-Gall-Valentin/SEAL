@@ -15,7 +15,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 class SealPropertiesTest {
 
     private static final SealProperties.Security SECURITY = new SealProperties.Security(Duration.ofSeconds(300));
-    private static final SealProperties.Session SESSION = new SealProperties.Session(Duration.ofHours(12));
+    private static final SealProperties.Session SESSION =
+            new SealProperties.Session(Duration.ofHours(12), Duration.ofMinutes(10));
     private static final SealProperties.Mail MAIL = new SealProperties.Mail("SEAL <noreply@seal.localhost>");
     private static final Path DATA = Path.of("data");
 
@@ -65,14 +66,26 @@ class SealPropertiesTest {
         assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, null, SESSION, MAIL, DATA));
         assertThatNullPointerException().isThrownBy(() -> new SealProperties.Security(null));
         assertThatNullPointerException().isThrownBy(() -> new SealProperties(origin, SECURITY, null, MAIL, DATA));
-        assertThatNullPointerException().isThrownBy(() -> new SealProperties.Session(null));
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties.Session(null, Duration.ofMinutes(10)));
     }
 
     @Test
     @DisplayName("AUTH-52 : la durée de vie absolue d'une session doit être positive")
     void auth52RejectsANonPositiveAbsoluteTimeout() {
-        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties.Session(Duration.ZERO));
-        assertThatIllegalArgumentException().isThrownBy(() -> new SealProperties.Session(Duration.ofHours(-1)));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new SealProperties.Session(Duration.ZERO, Duration.ofMinutes(10)));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new SealProperties.Session(Duration.ofHours(-1), Duration.ofMinutes(10)));
+    }
+
+    @Test
+    @DisplayName("AUTH-55 : la durée du mode sudo est obligatoire et positive")
+    void auth55RejectsAMissingOrNonPositiveSudoWindow() {
+        assertThatNullPointerException().isThrownBy(() -> new SealProperties.Session(Duration.ofHours(12), null));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new SealProperties.Session(Duration.ofHours(12), Duration.ZERO));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new SealProperties.Session(Duration.ofHours(12), Duration.ofMinutes(-1)));
     }
 
     @Test

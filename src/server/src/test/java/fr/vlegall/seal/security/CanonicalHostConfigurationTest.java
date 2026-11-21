@@ -18,7 +18,7 @@ class CanonicalHostConfigurationTest {
         SealProperties properties = new SealProperties(
                 URI.create(origin),
                 new SealProperties.Security(Duration.ofMinutes(5)),
-                new SealProperties.Session(Duration.ofHours(12)),
+                new SealProperties.Session(Duration.ofHours(12), Duration.ofMinutes(10)),
                 new SealProperties.Mail("SEAL <noreply@seal.localhost>"),
                 Path.of("data"));
         Connector connector = new Connector();

@@ -146,6 +146,74 @@ class SessionEstablisherTest {
     }
 
     @Test
+    @DisplayName(
+            "AUTH-55 : la ré-authentification redate le facteur, sous un nouvel identifiant et sans l'ancien jeton CSRF")
+    void auth55ReauthenticationRedatesTheFactor() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSecure(true);
+        sessions.open(activeLogin(), request, new MockHttpServletResponse());
+        String openedId = request.getSession(false).getId();
+        request.setRequestedSessionId(openedId);
+        request.setCookies(new Cookie("XSRF-TOKEN", "ancien-jeton"));
+        clock.advance(java.time.Duration.ofHours(2));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        sessions.refreshFactor(SealAuthorities.FACTOR_PASSWORD, request, response);
+
+        Authentication authentication = storedAuthentication(request);
+        assertThat(request.getSession(false).getId()).isNotEqualTo(openedId);
+        assertThat(authentication.getPrincipal()).isEqualTo(new SealPrincipal(USER, VERSION));
+        assertThat(authorities(authentication)).containsExactly("ACCOUNT_ACTIVE", "FACTOR_PASSWORD");
+        assertThat(authentication.getAuthorities())
+                .filteredOn(FactorGrantedAuthority.class::isInstance)
+                .singleElement()
+                .extracting(a -> ((FactorGrantedAuthority) a).getIssuedAt())
+                .isEqualTo(NOW.plus(java.time.Duration.ofHours(2)));
+        assertThat(response.getCookie("XSRF-TOKEN"))
+                .isNotNull()
+                .extracting(Cookie::getMaxAge)
+                .isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("AUTH-55 : la ré-authentification OAuth redate son facteur et garde les autres tels quels")
+    void auth55ReauthenticationKeepsTheOtherFactors() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSecure(true);
+        sessions.openWithAuthorizationCode(USER, true, request, new MockHttpServletResponse());
+        request.setRequestedSessionId(request.getSession(false).getId());
+        clock.advance(java.time.Duration.ofMinutes(30));
+
+        sessions.refreshFactor(SealAuthorities.FACTOR_AUTHORIZATION_CODE, request, new MockHttpServletResponse());
+
+        Authentication authentication = storedAuthentication(request);
+        assertThat(authentication.getPrincipal()).isEqualTo(new SealPrincipal(USER));
+        assertThat(authorities(authentication)).containsExactly("ACCOUNT_ACTIVE", "FACTOR_AUTHORIZATION_CODE");
+        assertThat(authentication.getAuthorities())
+                .filteredOn(FactorGrantedAuthority.class::isInstance)
+                .singleElement()
+                .extracting(a -> ((FactorGrantedAuthority) a).getIssuedAt())
+                .isEqualTo(NOW.plus(java.time.Duration.ofMinutes(30)));
+    }
+
+    @Test
+    @DisplayName("AUTH-55 : sans session complète, rien n'est redaté (échec fermé)")
+    void auth55ReauthenticationNeedsAFullSession() {
+        MockHttpServletRequest anonymous = new MockHttpServletRequest();
+        anonymous.setSecure(true);
+        assertThatIllegalStateException()
+                .isThrownBy(() -> sessions.refreshFactor(
+                        SealAuthorities.FACTOR_PASSWORD, anonymous, new MockHttpServletResponse()));
+
+        MockHttpServletRequest restricted = new MockHttpServletRequest();
+        restricted.setSecure(true);
+        sessions.openRestricted(USER, restricted, new MockHttpServletResponse());
+        assertThatIllegalStateException()
+                .isThrownBy(() -> sessions.refreshFactor(
+                        SealAuthorities.FACTOR_PASSWORD, restricted, new MockHttpServletResponse()));
+    }
+
+    @Test
     @DisplayName("AUTH-20 : la connexion d'un compte actif ouvre une session complète, sous un nouvel identifiant")
     void auth20FullSessionCarriesActiveStatusAndPasswordFactor() {
         MockHttpSession anonymous = new MockHttpSession(null, "session-anonyme");

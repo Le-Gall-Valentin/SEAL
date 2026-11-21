@@ -174,6 +174,31 @@ public final class SessionEstablisher {
         return establish(principal, authorities, request, response);
     }
 
+    /**
+     * AUTH-55, ADR 0034 : ré-authentification d'une session complète. Le facteur donné est redaté à maintenant (ajouté
+     * s'il manquait) ; le compte, la version du mot de passe et les autres facteurs restent tels quels. Comme à chaque
+     * élévation, la session change d'identifiant et perd son jeton CSRF (AUTH-23, AUTH-60) : un cookie copié avant ne
+     * profite pas du mode sudo. Sans session complète, rien n'est redaté (échec fermé).
+     */
+    public Authentication refreshFactor(
+            String factorAuthority, HttpServletRequest request, HttpServletResponse response) {
+        Authentication current = holder.getContext().getAuthentication();
+        if (current == null
+                || !(current.getPrincipal() instanceof SealPrincipal principal)
+                || current.getAuthorities().stream()
+                        .noneMatch(a -> SealAuthorities.ACCOUNT_ACTIVE.equals(a.getAuthority()))) {
+            throw new IllegalStateException("aucune session complète à ré-authentifier");
+        }
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        current.getAuthorities().stream()
+                .filter(authority -> !factorAuthority.equals(authority.getAuthority()))
+                .forEach(authorities::add);
+        authorities.add(FactorGrantedAuthority.withAuthority(factorAuthority)
+                .issuedAt(clock.instant())
+                .build());
+        return establish(principal, authorities, request, response);
+    }
+
     /** Facteurs obtenus par la session, sans leur préfixe : {@code ["PASSWORD"]} au lot 1 ({@code GET /me}). */
     public List<String> factors(Authentication authentication) {
         return authentication.getAuthorities().stream()
