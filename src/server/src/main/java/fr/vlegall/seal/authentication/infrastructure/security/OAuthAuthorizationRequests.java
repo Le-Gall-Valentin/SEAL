@@ -5,16 +5,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
-import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.stereotype.Component;
 
 /**
@@ -38,9 +32,6 @@ public final class OAuthAuthorizationRequests implements AuthorizationRequestRep
 
     private final HttpSessionOAuth2AuthorizationRequestRepository sessions =
             new HttpSessionOAuth2AuthorizationRequestRepository();
-    private final SecurityContextHolderStrategy holder = SecurityContextHolder.getContextHolderStrategy();
-    private final RequestMatcher callback =
-            PathPatternRequestMatcher.withDefaults().matcher("/login/oauth2/code/{registrationId}");
 
     @Override
     public @Nullable OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
@@ -77,22 +68,15 @@ public final class OAuthAuthorizationRequests implements AuthorizationRequestRep
         }
         String startedWith = stored.getAttribute(OAuth2ParameterNames.REGISTRATION_ID);
         request.setAttribute(STARTED_WITH, startedWith);
-        if (signedIn()) {
+        if (OAuthRequests.signedIn()) {
             request.setAttribute(REJECTION, "session_signed_in");
             return null;
         }
-        RequestMatcher.MatchResult match = callback.matcher(request);
-        if (match.isMatch() && !Objects.equals(match.getVariables().get("registrationId"), startedWith)) {
+        String callbackProvider = OAuthRequests.callbackRegistrationId(request);
+        if (callbackProvider != null && !Objects.equals(callbackProvider, startedWith)) {
             request.setAttribute(REJECTION, "provider_mismatch");
             return null;
         }
         return stored;
-    }
-
-    private boolean signedIn() {
-        Authentication authentication = holder.getContext().getAuthentication();
-        return authentication != null
-                && authentication.isAuthenticated()
-                && !(authentication instanceof AnonymousAuthenticationToken);
     }
 }

@@ -69,8 +69,8 @@ server:
     include-binding-errors: never
     include-exception: false
   tomcat:
-    # A02, ADR 0032 : redirections relatives ; sinon Tomcat les rend absolues à partir de l'en-tête Host, choisi par le
-    # client (RelativeRedirectsIT).
+    # TRN-02, A02 : redirections relatives, sur l'origine unique ; sinon Tomcat les rend absolues à partir de l'en-tête
+    # Host, choisi par le client (RelativeRedirectsIT).
     use-relative-redirects: true
 
 logging:

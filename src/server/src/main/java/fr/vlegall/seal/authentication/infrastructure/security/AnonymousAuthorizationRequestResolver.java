@@ -3,10 +3,6 @@ package fr.vlegall.seal.authentication.infrastructure.security;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
@@ -25,7 +21,6 @@ final class AnonymousAuthorizationRequestResolver implements OAuth2Authorization
 
     static final String AUTHORIZATION_BASE = "/oauth2/authorization";
 
-    private final SecurityContextHolderStrategy holder = SecurityContextHolder.getContextHolderStrategy();
     private final PathPatternRequestMatcher start =
             PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, AUTHORIZATION_BASE + "/{registrationId}");
     private final ClientRegistrationRepository registrations;
@@ -50,16 +45,9 @@ final class AnonymousAuthorizationRequestResolver implements OAuth2Authorization
             HttpServletRequest request, @Nullable String clientRegistrationId) {
         if (clientRegistrationId == null
                 || registrations.findByRegistrationId(clientRegistrationId) == null
-                || signedIn()) {
+                || OAuthRequests.signedIn()) {
             return null;
         }
         return resolver.resolve(request, clientRegistrationId);
-    }
-
-    private boolean signedIn() {
-        Authentication authentication = holder.getContext().getAuthentication();
-        return authentication != null
-                && authentication.isAuthenticated()
-                && !(authentication instanceof AnonymousAuthenticationToken);
     }
 }

@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
-import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
+import fr.vlegall.seal.authentication.domain.port.out.OAuthAccountLookupPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthIdentityRepository;
 import fr.vlegall.seal.common.AccountLoginState;
@@ -46,17 +46,7 @@ class OAuthLoginHandlerTest {
         }
     };
 
-    private final AccountLookupPort accounts = new AccountLookupPort() {
-        @Override
-        public Optional<UserId> findForLogin(String login) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean isVerified(UserId user) {
-            throw new UnsupportedOperationException("l'état se lit en une question");
-        }
-
+    private final OAuthAccountLookupPort accounts = new OAuthAccountLookupPort() {
         @Override
         public AccountLoginState state(UserId user) {
             if (active.contains(user)) {

@@ -10,8 +10,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
-import org.springframework.security.web.util.matcher.RequestMatcher;
 
 /**
  * Échec du retour OAuth : consentement refusé, {@code state} inconnu, fournisseur en erreur, jeton invalide. Le retour
@@ -54,8 +52,6 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
             "missing_user_info_uri",
             "missing_user_name_attribute");
 
-    private final RequestMatcher callback =
-            PathPatternRequestMatcher.withDefaults().matcher("/login/oauth2/code/{registrationId}");
     private final OAuthLoginUseCase login;
 
     OAuthLoginFailureHandler(OAuthLoginUseCase login) {
@@ -75,11 +71,10 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
         if (request.getAttribute(OAuthAuthorizationRequests.STARTED_WITH) instanceof String startedWith) {
             return OAuthProvider.fromRegistrationId(startedWith).orElse(null);
         }
-        RequestMatcher.MatchResult match = callback.matcher(request);
-        String registrationId = match.getVariables().get("registrationId");
-        return match.isMatch() && registrationId != null
-                ? OAuthProvider.fromRegistrationId(registrationId).orElse(null)
-                : null;
+        String registrationId = OAuthRequests.callbackRegistrationId(request);
+        return registrationId == null
+                ? null
+                : OAuthProvider.fromRegistrationId(registrationId).orElse(null);
     }
 
     private static String cause(HttpServletRequest request, AuthenticationException exception) {

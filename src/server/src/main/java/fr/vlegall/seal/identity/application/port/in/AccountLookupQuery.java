@@ -8,8 +8,9 @@ import java.util.Optional;
 /**
  * Compte d'une connexion ou d'une réinitialisation, demandé par le seul contexte {@code authentication} (AUTH-20,
  * AUTH-70, ADR 0008) ; le contexte {@code keys} passe par {@link ActiveUsernameQuery}, qui ne livre que
- * l'identifiant. Appelé depuis un autre contexte : la signature ne porte que des types de la JDK, {@link UserId} et
- * l'interface {@link Contact}, rangée ici même ; son implémentation reste dans {@code identity}.
+ * l'identifiant. Appelé depuis un autre contexte : la signature ne porte que des types de la JDK, ceux de
+ * {@code common} ({@link UserId}, {@link AccountLoginState}) et l'interface {@link Contact}, rangée ici même ; son
+ * implémentation reste dans {@code identity}.
  */
 public interface AccountLookupQuery {
 

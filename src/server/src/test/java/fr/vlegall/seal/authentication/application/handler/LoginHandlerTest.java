@@ -7,7 +7,6 @@ import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
 import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
-import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.UserId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,16 +37,6 @@ class LoginHandlerTest {
         @Override
         public boolean isVerified(UserId user) {
             return verified.contains(user);
-        }
-
-        @Override
-        public AccountLoginState state(UserId user) {
-            throw new UnsupportedOperationException("la connexion par mot de passe ne lit pas l'état OAuth");
-        }
-
-        @Override
-        public boolean activeAccountOwns(String email) {
-            throw new UnsupportedOperationException("la connexion par mot de passe ne cherche pas de courriel");
         }
     };
     private final InMemoryCredentials credentials = new InMemoryCredentials();

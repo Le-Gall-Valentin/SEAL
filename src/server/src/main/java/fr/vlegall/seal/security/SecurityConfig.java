@@ -109,7 +109,9 @@ class SecurityConfig {
                                 AuthenticatedAuthorizationManager.anonymous(),
                                 AuthorityAuthorizationManager.hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)))
                         // AUTH-30 : départ et retour OAuth, réservés aux anonymes (ADR 0032). Les filtres de Spring
-                        // passent avant cette règle : le départ d'une session ouverte n'est pas résolu, et tombe ici.
+                        // passent avant cette règle : le départ d'une session ouverte n'est pas résolu et tombe ici ;
+                        // le
+                        // retour d'une session ouverte est refusé par le dépôt des requêtes d'autorisation (point 7).
                         .requestMatchers(HttpMethod.GET, "/oauth2/authorization/*", "/login/oauth2/code/*")
                         .anonymous()
                         // AUTH-32 : inscription OAuth en attente, dans une session non authentifiée (ADR 0032).

@@ -4,7 +4,7 @@ import fr.vlegall.seal.authentication.application.port.in.OAuthLoginUseCase;
 import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
-import fr.vlegall.seal.authentication.domain.port.out.AccountLookupPort;
+import fr.vlegall.seal.authentication.domain.port.out.OAuthAccountLookupPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthIdentityRepository;
 import fr.vlegall.seal.common.AccountLoginState;
@@ -21,10 +21,11 @@ import org.jspecify.annotations.Nullable;
 public class OAuthLoginHandler implements OAuthLoginUseCase {
 
     private final OAuthIdentityRepository identities;
-    private final AccountLookupPort accounts;
+    private final OAuthAccountLookupPort accounts;
     private final OAuthEventPort journal;
 
-    public OAuthLoginHandler(OAuthIdentityRepository identities, AccountLookupPort accounts, OAuthEventPort journal) {
+    public OAuthLoginHandler(
+            OAuthIdentityRepository identities, OAuthAccountLookupPort accounts, OAuthEventPort journal) {
         this.identities = identities;
         this.accounts = accounts;
         this.journal = journal;
