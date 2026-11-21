@@ -1,5 +1,6 @@
 package fr.vlegall.seal.security.ratelimit;
 
+import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.web.ClientAddress;
 import fr.vlegall.seal.security.web.ClientRoutesController;
 import fr.vlegall.seal.security.web.OAuthRoutes;
@@ -10,6 +11,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -43,6 +46,21 @@ public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
         return limit(request) == null;
     }
 
+    /** Contextes de sécurité tels que la session les garde (ADR 0007, point 2). */
+    private static final HttpSessionSecurityContextRepository SESSIONS = new HttpSessionSecurityContextRepository();
+
+    /** Session complète : son départ ou son retour est une ré-authentification (AUTH-55, ADR 0034). */
+    private static boolean fullSession(HttpServletRequest request) {
+        if (request.getSession(false) == null) {
+            return false;
+        }
+        Authentication authentication =
+                SESSIONS.loadDeferredContext(request).get().getAuthentication();
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                        .anyMatch(a -> SealAuthorities.ACCOUNT_ACTIVE.equals(a.getAuthority()));
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
@@ -54,8 +72,12 @@ public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 return;
             }
+            boolean signedIn = fullSession(request);
             if (!expectedNavigation(request)) {
-                response.sendRedirect(ClientRoutesController.LOGIN_REQUEST_REJECTED);
+                response.sendRedirect(
+                        signedIn
+                                ? ClientRoutesController.SETTINGS_REQUEST_REJECTED
+                                : ClientRoutesController.LOGIN_REQUEST_REJECTED);
                 return;
             }
             try {
@@ -63,7 +85,11 @@ public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
             } catch (RateLimitExceededException e) {
                 e.retryAfterSeconds()
                         .ifPresent(seconds -> response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(seconds)));
-                response.sendRedirect(ClientRoutesController.LOGIN_RATE_LIMITED);
+                // ADR 0034 : une ré-authentification revient aux paramètres, où sa session est restée ouverte.
+                response.sendRedirect(
+                        signedIn
+                                ? ClientRoutesController.SETTINGS_RATE_LIMITED
+                                : ClientRoutesController.LOGIN_RATE_LIMITED);
                 return;
             }
         }

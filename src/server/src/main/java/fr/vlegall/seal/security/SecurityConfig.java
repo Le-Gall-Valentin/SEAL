@@ -109,12 +109,15 @@ class SecurityConfig {
                         .access(AuthorizationManagers.anyOf(
                                 AuthenticatedAuthorizationManager.anonymous(),
                                 AuthorityAuthorizationManager.hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)))
-                        // AUTH-30 : départ et retour OAuth, réservés aux anonymes (ADR 0032). Les filtres de Spring
-                        // passent avant cette règle : le départ d'une session ouverte n'est pas résolu et tombe ici,
-                        // et le dépôt des requêtes d'autorisation refuse le retour d'une session ouverte (point 7).
+                        // AUTH-30 : départ et retour OAuth, pour l'anonyme (connexion, ADR 0032) ou la session complète
+                        // (ré-authentification, AUTH-55, ADR 0034). Les filtres de Spring passent avant cette règle :
+                        // le départ d'une session restreinte n'est pas résolu et tombe ici, et le dépôt des requêtes
+                        // d'autorisation ne rend un retour qu'à la session qui l'a demandé (point 7).
                         .requestMatchers(
                                 HttpMethod.GET, OAuthRoutes.AUTHORIZATION_BASE + "/*", OAuthRoutes.CALLBACK_BASE + "/*")
-                        .anonymous()
+                        .access(AuthorizationManagers.anyOf(
+                                AuthenticatedAuthorizationManager.anonymous(),
+                                AuthorityAuthorizationManager.hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)))
                         // AUTH-32 : inscription OAuth en attente, dans une session non authentifiée (ADR 0032).
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/pending")
                         .anonymous()

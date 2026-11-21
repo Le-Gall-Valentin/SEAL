@@ -13,15 +13,25 @@ import org.springframework.stereotype.Component;
 
 /**
  * AUTH-30, ADR 0032 (point 7) : requêtes d'autorisation gardées dans la session, comme le fait Spring, mais rendues au
- * retour seulement à une session anonyme et pour le fournisseur du départ (défense contre le mix-up, RFC 9700). Le
+ * retour seulement à une session anonyme et pour le fournisseur du départ (défense contre le mix-up, RFC 9700) ; celle
+ * d'une ré-authentification, seulement à la session complète du compte qui l'a demandée (AUTH-55, ADR 0034). Le
  * filtre du retour passe avant les règles d'accès : c'est ici que le retour d'une session ouverte est refusé. La cause
  * d'un refus et le fournisseur du départ sont laissés dans la requête pour le journal.
  */
 @Component
 public final class OAuthAuthorizationRequests implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
 
-    /** Cause d'un retour refusé ici ({@code session_signed_in}, {@code provider_mismatch}), en attribut de requête. */
+    /**
+     * Cause d'un retour refusé ici ({@code session_signed_in}, {@code reauth_session_mismatch}, {@code
+     * provider_mismatch}), en attribut de requête.
+     */
     static final String REJECTION = OAuthAuthorizationRequests.class.getName() + ".REJECTION";
+
+    /**
+     * AUTH-55, ADR 0034 : compte de la session complète qui a demandé une ré-authentification, en attribut de la
+     * requête d'autorisation, puis, au retour accepté, en attribut de la requête HTTP.
+     */
+    static final String REAUTHENTICATED_USER = OAuthAuthorizationRequests.class.getName() + ".REAUTHENTICATED_USER";
 
     /** {@code registrationId} du départ dont le retour arrive, en attribut de requête. */
     static final String STARTED_WITH = OAuthAuthorizationRequests.class.getName() + ".STARTED_WITH";
@@ -68,7 +78,17 @@ public final class OAuthAuthorizationRequests implements AuthorizationRequestRep
         }
         String startedWith = stored.getAttribute(OAuth2ParameterNames.REGISTRATION_ID);
         request.setAttribute(STARTED_WITH, startedWith);
-        if (OAuthRequests.signedIn()) {
+        String reauthenticated = stored.getAttribute(REAUTHENTICATED_USER);
+        if (reauthenticated != null) {
+            // ADR 0034 : une ré-authentification ne revient qu'à la session complète du compte qui l'a demandée.
+            request.setAttribute(REAUTHENTICATED_USER, reauthenticated);
+            if (!OAuthRequests.fullSessionUser()
+                    .map(user -> user.toString().equals(reauthenticated))
+                    .orElse(false)) {
+                request.setAttribute(REJECTION, "reauth_session_mismatch");
+                return null;
+            }
+        } else if (OAuthRequests.signedIn()) {
             request.setAttribute(REJECTION, "session_signed_in");
             return null;
         }

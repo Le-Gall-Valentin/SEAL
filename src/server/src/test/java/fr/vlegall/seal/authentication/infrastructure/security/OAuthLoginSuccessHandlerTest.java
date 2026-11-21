@@ -54,6 +54,10 @@ class OAuthLoginSuccessHandlerTest {
     private final MutableClock clock = MutableClock.fixedAt(NOW);
     private final OAuthLoginSuccessHandler handler = new OAuthLoginSuccessHandler(
             login,
+            // Un retour de connexion ne passe jamais par la ré-authentification (ADR 0034).
+            (user, identity) -> {
+                throw new AssertionError("ré-authentification inattendue");
+            },
             new SessionEstablisher(
                     CookieCsrfTokenRepository.withHttpOnlyFalse(), clock, user -> OptionalLong.empty(), List.of()),
             new PendingOAuthSession(clock));

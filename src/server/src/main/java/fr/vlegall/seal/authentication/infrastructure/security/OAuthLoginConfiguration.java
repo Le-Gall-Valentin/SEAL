@@ -1,6 +1,7 @@
 package fr.vlegall.seal.authentication.infrastructure.security;
 
 import fr.vlegall.seal.authentication.application.port.in.OAuthLoginUseCase;
+import fr.vlegall.seal.authentication.application.port.in.OAuthReauthenticateUseCase;
 import fr.vlegall.seal.common.OAuthClientProperties;
 import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.session.SessionEstablisher;
@@ -35,6 +36,7 @@ class OAuthLoginConfiguration {
     Customizer<OAuth2LoginConfigurer<HttpSecurity>> oauthLogin(
             OAuthClientRegistrations registrations,
             OAuthLoginUseCase login,
+            OAuthReauthenticateUseCase reauthentication,
             SessionEstablisher sessions,
             PendingOAuthSession pending,
             OAuthAuthorizationRequests requests) {
@@ -44,12 +46,12 @@ class OAuthLoginConfiguration {
                 // ADR 0032, point 7 : même dépôt pour le départ et le retour (Spring le partage entre les deux
                 // filtres).
                 .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(
-                                new AnonymousAuthorizationRequestResolver(registrations))
+                                new OAuthAuthorizationRequestResolver(registrations))
                         .authorizationRequestRepository(requests))
                 .tokenEndpoint(token -> token.accessTokenResponseClient(ProviderHttp.tokenClient()))
                 .userInfoEndpoint(userInfo ->
                         userInfo.userService(new GitHubUserService()).oidcUserService(new GoogleUserService()))
-                .successHandler(new OAuthLoginSuccessHandler(login, sessions, pending))
+                .successHandler(new OAuthLoginSuccessHandler(login, reauthentication, sessions, pending))
                 .failureHandler(new OAuthLoginFailureHandler(login));
     }
 }

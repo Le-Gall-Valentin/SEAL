@@ -127,11 +127,13 @@ class OAuthAuthorizationRequestIT {
     }
 
     @Test
-    @DisplayName("AUTH-30 : une session ouverte ne repart pas vers un fournisseur : 403 FORBIDDEN, sans redirection")
-    void auth30SignedInSessionCannotStart() throws Exception {
+    @DisplayName(
+            "AUTH-16 : une session restreinte ne part pas vers un fournisseur : 403 FORBIDDEN, sans redirection ; la session"
+                    + " complète, elle, part en ré-authentification (ADR 0034, OAuthReauthenticationIT)")
+    void auth16RestrictedSessionCannotStart() throws Exception {
         String name = "oa" + UUID.randomUUID().toString().substring(0, 8);
         Registered account = client.register(name + "@exemple.ca", name);
-        Cookie session = client.verify(account);
+        Cookie session = account.session();
 
         mvc.perform(client.from(get("/oauth2/authorization/google")).cookie(session))
                 .andExpect(status().isForbidden())

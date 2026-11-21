@@ -16,8 +16,8 @@ import org.springframework.util.StringUtils;
 
 /**
  * Échec du retour OAuth : consentement refusé, {@code state} inconnu, fournisseur en erreur, jeton invalide. Le retour
- * est une navigation : il renvoie vers {@code /connexion} avec le seul code {@code REQUEST_REJECTED}, sans détail
- * (ADR 0032, point 2). Le journal note le fournisseur et le code d'erreur OAuth (SEC-20).
+ * est une navigation : il renvoie vers {@code /connexion}, ou vers {@code /parametres} pour une ré-authentification
+ * (ADR 0034), avec le seul code {@code REQUEST_REJECTED}, sans détail (ADR 0032, point 2). Le journal note le fournisseur et le code d'erreur OAuth (SEC-20).
  */
 final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
 
@@ -70,7 +70,14 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
             HttpServletRequest request, HttpServletResponse response, AuthenticationException exception)
             throws IOException {
         login.rejected(provider(request), cause(request, exception));
-        response.sendRedirect(ClientRoutesController.LOGIN_REQUEST_REJECTED);
+        // ADR 0034 : une ré-authentification refusée ramène aux paramètres, où la session complète est restée ouverte.
+        // Un
+        // retour de connexion refusé ramène à la connexion, même si une session s'est ouverte entre-temps (ADR 0032).
+        boolean reauthenticating = request.getAttribute(OAuthAuthorizationRequests.REAUTHENTICATED_USER) != null;
+        response.sendRedirect(
+                reauthenticating
+                        ? ClientRoutesController.SETTINGS_REQUEST_REJECTED
+                        : ClientRoutesController.LOGIN_REQUEST_REJECTED);
     }
 
     /** Le fournisseur du départ s'il est connu, sinon celui de l'adresse de retour. */

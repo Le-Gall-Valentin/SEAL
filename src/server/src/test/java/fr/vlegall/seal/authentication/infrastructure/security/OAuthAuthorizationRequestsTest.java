@@ -2,7 +2,11 @@ package fr.vlegall.seal.authentication.infrastructure.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.security.session.SealAuthorities;
+import fr.vlegall.seal.security.session.SealPrincipal;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,6 +14,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
@@ -43,6 +48,30 @@ class OAuthAuthorizationRequestsTest {
                 .attributes(attributes -> attributes.put(OAuth2ParameterNames.REGISTRATION_ID, "google"))
                 .build();
         requests.saveAuthorizationRequest(request, start, new MockHttpServletResponse());
+    }
+
+    /** Le départ Google d'une ré-authentification, pour ce compte (AUTH-55, ADR 0034). */
+    private void startGoogleReauthentication(UUID user) {
+        MockHttpServletRequest start = new MockHttpServletRequest("GET", "/oauth2/authorization/google");
+        start.setSession(session);
+        OAuth2AuthorizationRequest request = OAuth2AuthorizationRequest.authorizationCode()
+                .authorizationUri("https://fournisseur.exemple/authorize")
+                .clientId("client")
+                .redirectUri("https://localhost:8443/login/oauth2/code/google")
+                .state(STATE)
+                .attributes(attributes -> {
+                    attributes.put(OAuth2ParameterNames.REGISTRATION_ID, "google");
+                    attributes.put(OAuthAuthorizationRequests.REAUTHENTICATED_USER, user.toString());
+                })
+                .build();
+        requests.saveAuthorizationRequest(request, start, new MockHttpServletResponse());
+    }
+
+    /** Session SEAL du compte, complète ou restreinte, chargée avant les filtres OAuth. */
+    private static void signedIn(UUID user, String status) {
+        SecurityContextHolder.getContext()
+                .setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                        new SealPrincipal(new UserId(user)), null, List.of(new SimpleGrantedAuthority(status))));
     }
 
     private MockHttpServletRequest callback(String registrationId) {
@@ -103,5 +132,42 @@ class OAuthAuthorizationRequestsTest {
 
         assertThat(session.getAttribute(OAuthAuthorizationRequests.SESSION_ATTRIBUTE))
                 .isNull();
+    }
+
+    @Test
+    @DisplayName("AUTH-55, ADR 0034 : la session complète du compte qui l'a demandée récupère sa ré-authentification")
+    void auth55SameAccountGetsItsReauthentication() {
+        UUID user = UUID.randomUUID();
+        startGoogleReauthentication(user);
+        signedIn(user, SealAuthorities.ACCOUNT_ACTIVE);
+        MockHttpServletRequest callback = callback("google");
+
+        assertThat(requests.removeAuthorizationRequest(callback, new MockHttpServletResponse()))
+                .isNotNull();
+        assertThat(callback.getAttribute(OAuthAuthorizationRequests.REJECTION)).isNull();
+        assertThat(callback.getAttribute(OAuthAuthorizationRequests.REAUTHENTICATED_USER))
+                .isEqualTo(user.toString());
+    }
+
+    @Test
+    @DisplayName(
+            "AUTH-55, ADR 0034 : un autre compte, une session restreinte ou anonyme ne récupère pas la ré-authentification")
+    void auth55OtherSessionsGetNothing() {
+        UUID user = UUID.randomUUID();
+        List<Runnable> others = List.of(
+                () -> signedIn(UUID.randomUUID(), SealAuthorities.ACCOUNT_ACTIVE),
+                () -> signedIn(user, SealAuthorities.ACCOUNT_PENDING_EMAIL),
+                SecurityContextHolder::clearContext);
+        for (Runnable other : others) {
+            startGoogleReauthentication(user);
+            other.run();
+            MockHttpServletRequest callback = callback("google");
+
+            assertThat(requests.removeAuthorizationRequest(callback, new MockHttpServletResponse()))
+                    .isNull();
+            assertThat(callback.getAttribute(OAuthAuthorizationRequests.REJECTION))
+                    .isEqualTo("reauth_session_mismatch");
+            SecurityContextHolder.clearContext();
+        }
     }
 }
