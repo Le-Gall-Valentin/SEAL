@@ -157,6 +157,8 @@ describe('Identifiant-OAuth : formulaire', () => {
     await expect.element(screen.getByText('Déjà pris.')).toBeVisible()
     await screen.getByRole('button', { name: 'pris2' }).click()
     await expect.element(field(screen, 'Identifiant')).toHaveValue('pris2')
+    // WCAG 2.4.3 : la suggestion choisie disparaît ; le focus revient au champ, pas à la page.
+    await expect.element(field(screen, 'Identifiant')).toHaveFocus()
   })
 
   it.each([

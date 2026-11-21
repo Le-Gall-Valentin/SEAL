@@ -181,6 +181,8 @@ describe('AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d’inscription', ()
     await expect.element(screen.getByText('Déjà pris.')).toBeVisible()
     await expect.element(screen.getByText('Suggestions :')).toBeVisible()
     await screen.getByRole('button', { name: 'valentin.dupont_x' }).click()
+    // WCAG 2.4.3 : le focus revient au champ après le choix d'une suggestion.
+    await expect.element(field(screen, 'Identifiant')).toHaveFocus()
 
     await expect.element(field(screen, 'Identifiant')).toHaveValue('valentin.dupont_x')
     await expect.element(screen.getByText('Disponible', { exact: true })).toBeVisible()

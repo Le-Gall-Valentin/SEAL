@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useRef } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { ErrorText, FieldLabel, Sceau } from '@/shared/ui'
 import { accountMessages } from '../i18n'
@@ -75,6 +75,7 @@ export function UsernameField({
 }: UsernameFieldProps) {
   const t = useMessages(accountMessages)
   const id = useId()
+  const input = useRef<HTMLInputElement>(null)
   const hintId = `${id}-etat`
   const refused = status.kind === 'taken' || status.kind === 'invalid' || status.kind === 'reserved'
   return (
@@ -85,6 +86,7 @@ export function UsernameField({
           @
         </span>
         <input
+          ref={input}
           id={id}
           value={value}
           autoComplete="username"
@@ -118,6 +120,8 @@ export function UsernameField({
                   className="min-h-11 max-w-full rounded-full bg-accent-soft px-3 font-mono text-[13px] wrap-anywhere text-accent-text"
                   onClick={() => {
                     onChange(suggestion)
+                    // WCAG 2.4.3 : le bouton choisi disparaît avec la vérification ; le focus revient au champ.
+                    input.current?.focus()
                   }}
                 >
                   {suggestion}
