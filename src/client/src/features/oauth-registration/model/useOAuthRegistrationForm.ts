@@ -2,8 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useUsernameChoice } from '@/entities/account'
+import { loginPathWithError } from '@/entities/oauth-provider'
 import { refreshSession } from '@/entities/session'
-import { ROUTES } from '@/shared/config'
 import { useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
 import { isFormFailure } from '@/shared/ui'
 import type { CompleteRegistration, PendingRegistration } from './oauthRegistration'
@@ -43,7 +43,7 @@ export function useOAuthRegistrationForm(pending: PendingRegistration) {
           setRefusedDisplayName(submitted.displayName)
           return
         case 'abandoned':
-          void navigate(`${ROUTES.LOGIN}?erreur=${failure.error}`, { replace: true })
+          void navigate(loginPathWithError(failure.error), { replace: true })
           return
         case 'rate-limited':
         case 'network':

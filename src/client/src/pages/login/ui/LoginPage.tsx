@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { LoginForm } from '@/features/login'
-import { OAuthButtons, OAuthLoginAlert, oauthLoginErrorOf } from '@/features/oauth-login'
+import { LOGIN_ERROR_PARAM, oauthLoginErrorOf } from '@/entities/oauth-provider'
+import { OAuthButtons, OAuthLoginAlert } from '@/features/oauth-login'
 import type { PasswordResetDone } from '@/features/password-reset'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
@@ -40,8 +41,8 @@ export function LoginPage() {
   // Lu, le code quitte l'adresse : un rechargement ne réaffiche pas l'alerte.
   useEffect(() => {
     const params = new URLSearchParams(location.search)
-    if (params.has('erreur')) {
-      params.delete('erreur')
+    if (params.has(LOGIN_ERROR_PARAM)) {
+      params.delete(LOGIN_ERROR_PARAM)
       void navigate(
         { pathname: location.pathname, search: params.toString() },
         { replace: true, state: historyState },

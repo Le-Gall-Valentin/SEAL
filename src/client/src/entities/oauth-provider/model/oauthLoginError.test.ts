@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { oauthLoginErrorOf } from './oauthLoginError'
+import { loginPathWithError, oauthLoginErrorOf } from './oauthLoginError'
 
 describe('ADR 0032 (point 2), ADR 0033 (point 1) : code d’erreur du retour OAuth', () => {
   it.each(['OAUTH_EMAIL_IN_USE', 'RATE_LIMITED', 'REQUEST_REJECTED'] as const)(
@@ -19,4 +19,16 @@ describe('ADR 0032 (point 2), ADR 0033 (point 1) : code d’erreur du retour OAu
   ])('ADR 0033 : %s, aucune alerte', (_cas, search) => {
     expect(oauthLoginErrorOf(search)).toBeNull()
   })
+})
+
+describe('ADR 0033 (point 2) : adresse de Connexion avec un code', () => {
+  it.each(['OAUTH_EMAIL_IN_USE', 'RATE_LIMITED', 'REQUEST_REJECTED'] as const)(
+    'AUTH-32 : %s, une adresse que la connexion relit',
+    (code) => {
+      const path = loginPathWithError(code)
+
+      expect(path).toBe(`/connexion?erreur=${code}`)
+      expect(oauthLoginErrorOf(path.slice(path.indexOf('?')))).toBe(code)
+    },
+  )
 })

@@ -1,7 +1,6 @@
 import { Navigate } from 'react-router'
-import { useOAuthProviderName } from '@/entities/oauth-provider'
+import { loginPathWithError, useOAuthProviderName } from '@/entities/oauth-provider'
 import { OAuthRegistrationForm, usePendingRegistration } from '@/features/oauth-registration'
-import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { LoadErrorState } from '@/shared/ui'
 import { AuthLayout } from '@/widgets/auth-layout'
@@ -31,7 +30,7 @@ export function ChooseUsernamePage() {
     )
   }
   if (pending.data === null) {
-    return <Navigate to={`${ROUTES.LOGIN}?erreur=REQUEST_REJECTED`} replace />
+    return <Navigate to={loginPathWithError('REQUEST_REJECTED')} replace />
   }
   return (
     <AuthLayout variant="waving">

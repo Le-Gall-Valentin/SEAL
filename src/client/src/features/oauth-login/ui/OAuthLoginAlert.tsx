@@ -1,7 +1,7 @@
+import type { OAuthLoginError } from '@/entities/oauth-provider'
 import { useMessages } from '@/shared/i18n'
 import { Alert } from '@/shared/ui'
 import { oauthLoginMessages } from '../i18n'
-import type { OAuthLoginError } from '../model/oauthLoginError'
 
 /** ADR 0033 (point 1) : l'alerte d'un départ ou d'un retour OAuth refusé, comme « Trop de tentatives ». */
 export function OAuthLoginAlert({ error }: { readonly error: OAuthLoginError }) {
