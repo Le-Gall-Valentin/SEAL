@@ -7,6 +7,7 @@ import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.security.session.SessionEstablisher;
+import fr.vlegall.seal.security.web.ClientRoutesController;
 import fr.vlegall.seal.support.MutableClock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -77,7 +78,7 @@ class OAuthLoginSuccessHandlerTest {
         MockHttpServletResponse response =
                 handle(UsernamePasswordAuthenticationToken.authenticated("x", null, List.of()));
 
-        assertThat(response.getRedirectedUrl()).isEqualTo(OAuthLoginFailureHandler.REJECTED);
+        assertThat(response.getRedirectedUrl()).isEqualTo(ClientRoutesController.LOGIN_REQUEST_REJECTED);
         assertThat(rejections).containsExactly("null:invalid_user_info");
     }
 
@@ -86,7 +87,7 @@ class OAuthLoginSuccessHandlerTest {
     void auth30UnknownProviderRejected() throws Exception {
         MockHttpServletResponse response = handle(token("okta", Map.of("id", 1)));
 
-        assertThat(response.getRedirectedUrl()).isEqualTo(OAuthLoginFailureHandler.REJECTED);
+        assertThat(response.getRedirectedUrl()).isEqualTo(ClientRoutesController.LOGIN_REQUEST_REJECTED);
         assertThat(rejections).containsExactly("null:invalid_user_info");
     }
 
@@ -95,7 +96,7 @@ class OAuthLoginSuccessHandlerTest {
     void auth31UnreadableIdentityRejected() throws Exception {
         MockHttpServletResponse response = handle(token("github", Map.of("id", 7, "login", "octo")));
 
-        assertThat(response.getRedirectedUrl()).isEqualTo(OAuthLoginFailureHandler.REJECTED);
+        assertThat(response.getRedirectedUrl()).isEqualTo(ClientRoutesController.LOGIN_REQUEST_REJECTED);
         assertThat(rejections).containsExactly("GITHUB:invalid_user_info");
     }
 
@@ -116,7 +117,7 @@ class OAuthLoginSuccessHandlerTest {
                         GitHubUserService.PRIMARY_EMAIL_VERIFIED,
                         true)));
 
-        assertThat(response.getRedirectedUrl()).isEqualTo(OAuthLoginFailureHandler.REJECTED);
+        assertThat(response.getRedirectedUrl()).isEqualTo(ClientRoutesController.LOGIN_REQUEST_REJECTED);
         assertThat(response.getCookies()).isEmpty();
     }
 }

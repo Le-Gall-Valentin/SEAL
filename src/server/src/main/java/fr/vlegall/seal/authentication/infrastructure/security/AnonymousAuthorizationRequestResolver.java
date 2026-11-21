@@ -1,5 +1,6 @@
 package fr.vlegall.seal.authentication.infrastructure.security;
 
+import fr.vlegall.seal.security.web.OAuthRoutes;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
@@ -19,16 +20,14 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  */
 final class AnonymousAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
 
-    static final String AUTHORIZATION_BASE = "/oauth2/authorization";
-
-    private final PathPatternRequestMatcher start =
-            PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, AUTHORIZATION_BASE + "/{registrationId}");
+    private final PathPatternRequestMatcher start = PathPatternRequestMatcher.withDefaults()
+            .matcher(HttpMethod.GET, OAuthRoutes.AUTHORIZATION_BASE + "/{registrationId}");
     private final ClientRegistrationRepository registrations;
     private final DefaultOAuth2AuthorizationRequestResolver resolver;
 
     AnonymousAuthorizationRequestResolver(ClientRegistrationRepository registrations) {
         this.registrations = registrations;
-        this.resolver = new DefaultOAuth2AuthorizationRequestResolver(registrations, AUTHORIZATION_BASE);
+        this.resolver = new DefaultOAuth2AuthorizationRequestResolver(registrations, OAuthRoutes.AUTHORIZATION_BASE);
     }
 
     @Override

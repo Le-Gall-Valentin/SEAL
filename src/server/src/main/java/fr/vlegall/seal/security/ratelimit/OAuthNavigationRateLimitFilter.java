@@ -1,6 +1,8 @@
 package fr.vlegall.seal.security.ratelimit;
 
 import fr.vlegall.seal.security.web.ClientAddress;
+import fr.vlegall.seal.security.web.ClientRoutesController;
+import fr.vlegall.seal.security.web.OAuthRoutes;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,16 +28,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
 
-    /** Retour vers l'écran de connexion (ADR 0024, point 5), avec un code de la section 14.6 du CDC. */
-    static final String RATE_LIMITED = "/connexion?erreur=RATE_LIMITED";
-
-    /** Retour vers l'écran de connexion pour une requête écartée par Fetch Metadata, sans détail. */
-    static final String REQUEST_REJECTED = "/connexion?erreur=REQUEST_REJECTED";
-
     private final RequestMatcher start =
-            PathPatternRequestMatcher.withDefaults().matcher("/oauth2/authorization/*");
+            PathPatternRequestMatcher.withDefaults().matcher(OAuthRoutes.AUTHORIZATION_BASE + "/*");
     private final RequestMatcher callback =
-            PathPatternRequestMatcher.withDefaults().matcher("/login/oauth2/code/*");
+            PathPatternRequestMatcher.withDefaults().matcher(OAuthRoutes.CALLBACK_BASE + "/*");
     private final RateLimiter limiter;
 
     public OAuthNavigationRateLimitFilter(RateLimiter limiter) {
@@ -59,7 +55,7 @@ public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
                 return;
             }
             if (!expectedNavigation(request)) {
-                response.sendRedirect(REQUEST_REJECTED);
+                response.sendRedirect(ClientRoutesController.LOGIN_REQUEST_REJECTED);
                 return;
             }
             try {
@@ -67,7 +63,7 @@ public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
             } catch (RateLimitExceededException e) {
                 e.retryAfterSeconds()
                         .ifPresent(seconds -> response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(seconds)));
-                response.sendRedirect(RATE_LIMITED);
+                response.sendRedirect(ClientRoutesController.LOGIN_RATE_LIMITED);
                 return;
             }
         }

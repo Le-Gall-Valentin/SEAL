@@ -5,6 +5,7 @@ import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.security.session.SessionEstablisher;
+import fr.vlegall.seal.security.web.ClientRoutesController;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -26,9 +27,6 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 final class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
 
     static final String HOME = "/";
-    static final String VERIFY_EMAIL = "/verification-courriel";
-    static final String CHOOSE_USERNAME = "/inscription/identifiant";
-    static final String EMAIL_IN_USE = "/connexion?erreur=OAUTH_EMAIL_IN_USE";
 
     private final SecurityContextHolderStrategy holder = SecurityContextHolder.getContextHolderStrategy();
     private final OAuthLoginUseCase login;
@@ -74,21 +72,23 @@ final class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
                 if (signedIn.active()) {
                     response.sendRedirect(HOME);
                 } else {
-                    response.sendRedirect(VERIFY_EMAIL);
+                    response.sendRedirect(ClientRoutesController.VERIFY_EMAIL);
                 }
             }
-            case OAuthLoginOutcome.EmailInUse emailInUse -> response.sendRedirect(EMAIL_IN_USE);
+            case OAuthLoginOutcome.EmailInUse emailInUse ->
+                response.sendRedirect(ClientRoutesController.LOGIN_OAUTH_EMAIL_IN_USE);
             case OAuthLoginOutcome.Unlinked unlinked -> {
                 sessions.renew(request, response);
                 pending.remember(request, unlinked.identity());
-                response.sendRedirect(CHOOSE_USERNAME);
+                response.sendRedirect(ClientRoutesController.CHOOSE_USERNAME);
             }
-            case OAuthLoginOutcome.Rejected rejected -> response.sendRedirect(OAuthLoginFailureHandler.REJECTED);
+            case OAuthLoginOutcome.Rejected rejected ->
+                response.sendRedirect(ClientRoutesController.LOGIN_REQUEST_REJECTED);
         }
     }
 
     private void reject(HttpServletResponse response, @Nullable OAuthProvider provider) throws IOException {
         login.rejected(provider, "invalid_user_info");
-        response.sendRedirect(OAuthLoginFailureHandler.REJECTED);
+        response.sendRedirect(ClientRoutesController.LOGIN_REQUEST_REJECTED);
     }
 }

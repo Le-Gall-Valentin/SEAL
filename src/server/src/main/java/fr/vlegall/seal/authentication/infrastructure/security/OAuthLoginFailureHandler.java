@@ -2,6 +2,7 @@ package fr.vlegall.seal.authentication.infrastructure.security;
 
 import fr.vlegall.seal.authentication.application.port.in.OAuthLoginUseCase;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
+import fr.vlegall.seal.security.web.ClientRoutesController;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -19,12 +20,6 @@ import org.springframework.util.StringUtils;
  * (ADR 0032, point 2). Le journal note le fournisseur et le code d'erreur OAuth (SEC-20).
  */
 final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
-
-    /**
-     * Retour vers l'écran de connexion (ADR 0024, point 5) avec un code de la section 14.6 du CDC. Les adresses de retour
-     * sont des constantes : aucune ne dépend de la requête.
-     */
-    static final String REJECTED = "/connexion?erreur=REQUEST_REJECTED";
 
     /**
      * Codes qu'un fournisseur peut renvoyer dans le paramètre {@code error} du retour (RFC 6749, section 4.1.2.1). Ce
@@ -75,7 +70,7 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
             HttpServletRequest request, HttpServletResponse response, AuthenticationException exception)
             throws IOException {
         login.rejected(provider(request), cause(request, exception));
-        response.sendRedirect(REJECTED);
+        response.sendRedirect(ClientRoutesController.LOGIN_REQUEST_REJECTED);
     }
 
     /** Le fournisseur du départ s'il est connu, sinon celui de l'adresse de retour. */

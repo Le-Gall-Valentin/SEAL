@@ -4,6 +4,7 @@ import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.authentication.domain.port.out.ConfiguredProviders;
 import fr.vlegall.seal.common.OAuthClientProperties;
 import fr.vlegall.seal.common.OAuthClientProperties.Client;
+import fr.vlegall.seal.security.web.OAuthRoutes;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -70,7 +71,7 @@ public final class OAuthClientRegistrations implements ClientRegistrationReposit
                 .clientId(client.clientId())
                 .clientSecret(client.clientSecret())
                 .scope(scopes(provider))
-                .redirectUri(origin + "/login/oauth2/code/" + provider.registrationId())
+                .redirectUri(origin + OAuthRoutes.CALLBACK_BASE + "/" + provider.registrationId())
                 .clientSettings(ClientRegistration.ClientSettings.builder()
                         .requireProofKey(true)
                         .build());

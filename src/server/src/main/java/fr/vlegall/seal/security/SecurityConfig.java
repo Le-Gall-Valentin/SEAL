@@ -8,6 +8,7 @@ import fr.vlegall.seal.security.session.CredentialVersionFilter;
 import fr.vlegall.seal.security.session.CredentialVersions;
 import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.web.ClientRoutesController;
+import fr.vlegall.seal.security.web.OAuthRoutes;
 import fr.vlegall.seal.security.web.ProblemDetailsSecurityHandler;
 import fr.vlegall.seal.security.web.RequestBodyLimitFilter;
 import jakarta.servlet.DispatcherType;
@@ -109,10 +110,10 @@ class SecurityConfig {
                                 AuthenticatedAuthorizationManager.anonymous(),
                                 AuthorityAuthorizationManager.hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)))
                         // AUTH-30 : départ et retour OAuth, réservés aux anonymes (ADR 0032). Les filtres de Spring
-                        // passent avant cette règle : le départ d'une session ouverte n'est pas résolu et tombe ici ;
-                        // le
-                        // retour d'une session ouverte est refusé par le dépôt des requêtes d'autorisation (point 7).
-                        .requestMatchers(HttpMethod.GET, "/oauth2/authorization/*", "/login/oauth2/code/*")
+                        // passent avant cette règle : le départ d'une session ouverte n'est pas résolu et tombe ici,
+                        // et le dépôt des requêtes d'autorisation refuse le retour d'une session ouverte (point 7).
+                        .requestMatchers(
+                                HttpMethod.GET, OAuthRoutes.AUTHORIZATION_BASE + "/*", OAuthRoutes.CALLBACK_BASE + "/*")
                         .anonymous()
                         // AUTH-32 : inscription OAuth en attente, dans une session non authentifiée (ADR 0032).
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/pending")

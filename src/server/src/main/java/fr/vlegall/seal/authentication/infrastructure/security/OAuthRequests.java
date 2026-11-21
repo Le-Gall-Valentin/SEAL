@@ -1,5 +1,6 @@
 package fr.vlegall.seal.authentication.infrastructure.security;
 
+import fr.vlegall.seal.security.web.OAuthRoutes;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -13,7 +14,7 @@ final class OAuthRequests {
 
     /** Adresse du retour OAuth (AUTH-35). */
     private static final RequestMatcher CALLBACK =
-            PathPatternRequestMatcher.withDefaults().matcher("/login/oauth2/code/{registrationId}");
+            PathPatternRequestMatcher.withDefaults().matcher(OAuthRoutes.CALLBACK_BASE + "/{registrationId}");
 
     private OAuthRequests() {}
 
