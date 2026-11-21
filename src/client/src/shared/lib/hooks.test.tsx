@@ -4,6 +4,7 @@ import { render } from 'vitest-browser-react'
 import { ApiError } from './apiErrors'
 import { useDebouncedValue } from './useDebouncedValue'
 import { useRetryAfterLock } from './useRetryAfterLock'
+import { type SubmitGuard, useSubmitGuard } from './useSubmitGuard'
 
 function Debounced() {
   const [value, setValue] = useState('')
@@ -89,5 +90,19 @@ describe('shared/lib : crochets sans métier', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 300))
     await expect.element(screen.getByText('verrouillé')).toBeVisible()
+  })
+
+  it('ADR 0033 (point 6) : useSubmitGuard prend le verrou une fois, puis le rend', async () => {
+    let guard: SubmitGuard | undefined
+    function Probe() {
+      guard = useSubmitGuard()
+      return null
+    }
+    await render(<Probe />)
+
+    expect(guard?.enter()).toBe(true)
+    expect(guard?.enter()).toBe(false)
+    guard?.release()
+    expect(guard?.enter()).toBe(true)
   })
 })

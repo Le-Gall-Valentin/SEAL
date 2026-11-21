@@ -154,6 +154,29 @@ describe('AUTH-70 : Mot-de-passe-oublie', () => {
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(calls).toEqual(['request valentin@uqac.ca'])
   })
+
+  it('AUTH-70, ADR 0033 (point 6) : après un échec, le verrou est rendu et une nouvelle demande part', async () => {
+    let attempts = 0
+    const { screen, calls } = await renderReset(
+      {
+        request: () => {
+          attempts += 1
+          return attempts === 1
+            ? Promise.reject(new NetworkError())
+            : new Promise<void>(() => undefined)
+        },
+      },
+      { path: '/mot-de-passe/oublie' },
+    )
+    await screen.getByLabelText('Courriel', { exact: true }).fill('valentin@uqac.ca')
+    const submit = screen.getByRole('button', { name: 'Envoyer le lien' })
+
+    await submit.click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await submit.click()
+
+    await expect.poll(() => calls.length).toBe(2)
+  })
 })
 
 describe('AUTH-70, ADR 0022 : Nouveau-Mot-de-passe', () => {

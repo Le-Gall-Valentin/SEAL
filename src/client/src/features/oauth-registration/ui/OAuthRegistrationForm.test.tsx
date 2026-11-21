@@ -288,4 +288,20 @@ describe('Identifiant-OAuth : formulaire', () => {
 
     await expect.element(screen.getByRole('alert')).toHaveTextContent(text)
   })
+
+  it('AUTH-32, ADR 0033 (point 6) : après un échec, le verrou est rendu et un nouvel envoi part', async () => {
+    let calls = 0
+    const { screen, sent } = await renderForm(() => {
+      calls += 1
+      return calls === 1 ? Promise.reject(new NetworkError()) : new Promise<void>(() => undefined)
+    })
+    const submit = screen.getByRole('button', { name: 'Créer mon compte' })
+    await expect.element(submit).toBeEnabled()
+
+    await submit.click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await submit.click()
+
+    await expect.poll(() => sent.length).toBe(2)
+  })
 })

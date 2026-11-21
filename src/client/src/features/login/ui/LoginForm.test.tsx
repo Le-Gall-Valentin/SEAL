@@ -215,4 +215,20 @@ describe('AUTH-20 à AUTH-22 : formulaire de connexion', () => {
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(harness.sent).toHaveLength(1)
   })
+
+  it('AUTH-20, ADR 0033 (point 6) : après un échec, le verrou est rendu et un nouvel envoi part', async () => {
+    let calls = 0
+    const { screen, harness } = await renderForm(() => {
+      calls += 1
+      return calls === 1 ? Promise.reject(new NetworkError()) : new Promise<void>(() => undefined)
+    })
+    await fill(screen)
+    const submit = screen.getByRole('button', { name: 'Se connecter' })
+
+    await submit.click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await submit.click()
+
+    await expect.poll(() => harness.sent.length).toBe(2)
+  })
 })

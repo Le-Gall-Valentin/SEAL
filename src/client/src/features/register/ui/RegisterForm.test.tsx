@@ -13,7 +13,7 @@ import {
   SessionApiProvider,
   useCurrentAccount,
 } from '@/entities/session'
-import { ApiError } from '@/shared/lib'
+import { ApiError, NetworkError } from '@/shared/lib'
 import { RegisterApiProvider } from '../model/registerApiPort'
 import { RegisterForm } from './RegisterForm'
 
@@ -315,5 +315,22 @@ describe('AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d’inscription', ()
     await expect.poll(() => sent.length).toBe(1)
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(sent).toHaveLength(1)
+  })
+
+  it('AUTH-10, ADR 0033 (point 6) : après un échec, le verrou est rendu et un nouvel envoi part', async () => {
+    let calls = 0
+    const { screen, sent } = await renderForm(() => {
+      calls += 1
+      return calls === 1 ? Promise.reject(new NetworkError()) : new Promise<void>(() => undefined)
+    })
+    await fillValid(screen)
+    const submit = screen.getByRole('button', { name: 'Créer mon compte' })
+    await expect.element(submit).toBeEnabled()
+
+    await submit.click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await submit.click()
+
+    await expect.poll(() => sent.length).toBe(2)
   })
 })
