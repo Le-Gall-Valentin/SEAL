@@ -90,11 +90,18 @@ export function useEmailVerification(
     refusedEmail,
   })
 
-  /** Une action efface l'erreur et la confirmation de la précédente. */
+  /**
+   * Une action efface l'erreur et la confirmation de la précédente, sauf un 429 : il suspend son action jusqu'à la fin
+   * de Retry-After (SEC-10).
+   */
   const start = () => {
-    verify.reset()
-    resend.reset()
-    change.reset()
+    if (!verifyLocked) {
+      verify.reset()
+    }
+    if (!sendLocked) {
+      resend.reset()
+      change.reset()
+    }
     setSentTo(null)
   }
 
@@ -132,7 +139,11 @@ export function useEmailVerification(
       setChanging(false)
       setNewEmail('')
       setNewEmailTouched(false)
-      change.reset()
+      // Une requête partie n'est pas abandonnée : les actions attendent son issue, qui s'affiche (ADR 0033, point 6). Un
+      // 429 garde son verrou jusqu'à la fin de Retry-After (SEC-10).
+      if (!change.isPending && !sendLocked) {
+        change.reset()
+      }
     },
     newEmail,
     setNewEmail,
