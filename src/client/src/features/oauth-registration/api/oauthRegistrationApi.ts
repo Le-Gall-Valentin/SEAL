@@ -6,13 +6,15 @@ import { ApiError } from '@/shared/lib'
 import type { IOAuthRegistrationApi } from './IOAuthRegistrationApi'
 
 /**
- * SEC-01 : réponse de GET /api/v1/auth/oauth/pending (ADR 0032), validée avec les règles du serveur : un courriel bien
- * formé, un nom proposé vide ou conforme à ACC-03. Une réponse hors de ces règles n'est pas affichée.
+ * SEC-01 : réponse de GET /api/v1/auth/oauth/pending (ADR 0032), validée avec les règles du serveur. Un courriel mal
+ * formé refuse la réponse. Un nom proposé hors de la règle d'ACC-03 devient vide, comme le serveur le fait
+ * (AUTH-30 : le nom ne refuse jamais l'identité) : une table Unicode plus ancienne dans le navigateur ne bloque pas
+ * l'inscription, l'utilisateur saisit son nom.
  */
 const PENDING = z.object({
   provider: z.enum(OAUTH_PROVIDER_IDS),
   email: EMAIL_SCHEMA,
-  displayName: z.union([z.literal(''), DISPLAY_NAME_SCHEMA]),
+  displayName: z.union([z.literal(''), DISPLAY_NAME_SCHEMA]).catch(''),
   expiresAt: z.iso.datetime(),
 })
 

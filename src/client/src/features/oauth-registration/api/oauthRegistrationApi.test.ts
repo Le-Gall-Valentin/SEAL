@@ -72,14 +72,24 @@ describe('features/oauth-registration : adaptateur de l’inscription OAuth', ()
     ['échéance absente', { ...PENDING, expiresAt: undefined }],
     ['courriel mal formé', { ...PENDING, email: 'pas-un-courriel' }],
     ['courriel sur deux lignes', { ...PENDING, email: 'valentin@gmail.com\nbcc@evil.example' }],
-    ['nom avec un caractère de direction', { ...PENDING, displayName: 'Valentin\u202eenilav' }],
-    ['nom de 51 caractères', { ...PENDING, displayName: 'n'.repeat(51) }],
   ])(
     'SEC-01, ACC-03 : %s, réponse refusée comme le serveur la refuserait',
     async (_cas, response) => {
       request.mockResolvedValue(response)
 
       await expect(oauthRegistrationApi.pending()).rejects.toThrow()
+    },
+  )
+
+  it.each([
+    ['avec un caractère de direction', 'Valentin\u202eenilav'],
+    ['de 51 caractères', 'n'.repeat(51)],
+  ])(
+    'ACC-03, AUTH-30 : un nom proposé %s est vidé, comme le serveur le ferait, sans refuser l’attente',
+    async (_cas, displayName) => {
+      request.mockResolvedValue({ ...PENDING, displayName })
+
+      await expect(oauthRegistrationApi.pending()).resolves.toMatchObject({ displayName: '' })
     },
   )
 
