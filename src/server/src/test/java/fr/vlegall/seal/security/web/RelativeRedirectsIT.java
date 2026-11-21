@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Optional;
@@ -34,11 +35,11 @@ class RelativeRedirectsIT {
     @LocalServerPort
     private int port;
 
-    /** L'en-tête {@code Location} de la réponse à une requête GET envoyée avec cet en-tête {@code Host}. */
-    private Optional<String> location(String path, String host) throws Exception {
+    /** L'en-tête {@code Location} de la réponse à une requête GET envoyée avec cette version et cet en-tête {@code Host}. */
+    private Optional<String> location(String version, String path, String host) throws Exception {
         try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), port)) {
             OutputStream out = socket.getOutputStream();
-            out.write(("GET " + path + " HTTP/1.1\r\nHost: " + host + "\r\nConnection: close\r\n\r\n")
+            out.write(("GET " + path + " " + version + "\r\nHost: " + host + "\r\nConnection: close\r\n\r\n")
                     .getBytes(StandardCharsets.US_ASCII));
             out.flush();
             BufferedReader in =
@@ -55,7 +56,20 @@ class RelativeRedirectsIT {
     @Test
     @DisplayName("TRN-02, A02 : un retour OAuth refusé renvoie vers /connexion, sans l'hôte de l'en-tête Host")
     void a02OAuthRedirectIgnoresTheHostHeader() throws Exception {
-        assertThat(location("/login/oauth2/code/google?code=a&state=b", "evil.example"))
+        assertThat(location("HTTP/1.1", "/login/oauth2/code/google?code=a&state=b", "evil.example"))
                 .contains("/connexion?erreur=REQUEST_REJECTED");
+    }
+
+    @Test
+    @DisplayName("TRN-02, A02 : en HTTP/1.0, où Tomcat rend la redirection absolue, l'hôte reste celui de seal.origin")
+    void a02Http10RedirectKeepsTheCanonicalHost() throws Exception {
+        assertThat(location("HTTP/1.0", "/login/oauth2/code/google?code=a&state=b", "evil.example"))
+                .hasValueSatisfying(location -> assertThat(URI.create(location))
+                        .hasHost("localhost")
+                        .hasPort(8443)
+                        .hasPath("/connexion")
+                        .hasQuery("erreur=REQUEST_REJECTED"));
+        assertThat(location("HTTP/1.0", "http://evil.example/login/oauth2/code/google?code=a&state=b", "evil.example"))
+                .hasValueSatisfying(location -> assertThat(URI.create(location)).hasHost("localhost"));
     }
 }
