@@ -20,8 +20,13 @@ function LoginAlertView({ alert }: { readonly alert: LoginAlert }) {
   }
 }
 
-/** AUTH-20 à AUTH-22 : formulaire de connexion, sans OAuth au lot 1 (ADR 0024, point 3). */
-export function LoginForm() {
+interface LoginFormProps {
+  /** Appelé à chaque envoi : l'écran retire alors l'alerte d'un retour OAuth, périmée (ADR 0033, point 1). */
+  readonly onSubmit?: () => void
+}
+
+/** AUTH-20 à AUTH-22 : formulaire de connexion ; les boutons des fournisseurs sont rendus par l'écran (ADR 0033). */
+export function LoginForm({ onSubmit }: LoginFormProps = {}) {
   const t = useMessages(loginMessages)
   const form = useLoginForm()
   return (
@@ -32,6 +37,7 @@ export function LoginForm() {
         noValidate
         onSubmit={(event) => {
           event.preventDefault()
+          onSubmit?.()
           form.submit()
         }}
       >

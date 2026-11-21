@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react'
 
 interface AlertProps {
-  /** « error » : refus simple (Connexion-Tablette) ; « rate-limited » : limite atteinte (Connexion-Telephone). */
+  /**
+   * « error » : refus (Connexion-Tablette) ; « rate-limited » : limite atteinte (Connexion-Telephone). Avec un titre,
+   * l'alerte prend l'espacement de « Trop de tentatives » (ADR 0033, point 1).
+   */
   readonly variant: 'error' | 'rate-limited'
   readonly title?: string
   readonly children: ReactNode
@@ -12,8 +15,9 @@ export function Alert({ variant, title, children }: AlertProps) {
   return (
     <div
       role="alert"
-      className="flex gap-2.5 rounded-[14px] border border-danger-line bg-danger-soft px-3.5 py-3 text-[13px] leading-[1.4] data-[variant=rate-limited]:gap-3 data-[variant=rate-limited]:leading-[1.35]"
+      className="flex gap-2.5 rounded-[14px] border border-danger-line bg-danger-soft px-3.5 py-3 text-[13px] leading-[1.4] data-[titled=true]:gap-3 data-[titled=true]:leading-[1.35]"
       data-variant={variant}
+      data-titled={title !== undefined}
     >
       <svg
         width="18"

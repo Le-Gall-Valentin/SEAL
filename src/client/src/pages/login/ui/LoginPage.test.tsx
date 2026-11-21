@@ -6,6 +6,7 @@ import { render } from 'vitest-browser-react'
 import { OAuthProvidersApiProvider, type OAuthProviderId } from '@/entities/oauth-provider'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
 import { type ILoginApi, LoginApiProvider } from '@/features/login'
+import { ApiError } from '@/shared/lib'
 import { LoginPage } from './LoginPage'
 
 interface Entry {
@@ -13,12 +14,16 @@ interface Entry {
   readonly search?: string
 }
 
-async function renderLogin(entry: Entry = {}, providers: readonly OAuthProviderId[] = []) {
+async function renderLogin(
+  entry: Entry = {},
+  providers: readonly OAuthProviderId[] = [],
+  login: ILoginApi['login'] = () => Promise.resolve(),
+) {
   const sessionApi: ISessionApi = {
     me: () => Promise.resolve(null),
     reloadCsrf: () => Promise.resolve(),
   }
-  const loginApi: ILoginApi = { login: () => Promise.resolve() }
+  const loginApi: ILoginApi = { login }
   const router = createMemoryRouter([{ path: '/connexion', element: <LoginPage /> }], {
     initialEntries: [{ pathname: '/connexion', search: entry.search ?? '', state: entry.state }],
   })
@@ -113,5 +118,32 @@ describe('Écran Connexion', () => {
     await expect.poll(() => screen.router.state.location.search).toBe('')
     await expect.element(screen.getByRole('heading', { level: 1, name: 'Connexion' })).toBeVisible()
     await expect.element(screen.getByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('ADR 0033 (point 1) : l’alerte du retour OAuth disparaît au premier envoi du formulaire', async () => {
+    const screen = await renderLogin({ search: '?erreur=OAUTH_EMAIL_IN_USE' }, [], () =>
+      Promise.reject(new ApiError(401, 'INVALID_CREDENTIALS')),
+    )
+    await expect.element(screen.getByText('Ce courriel a déjà un compte')).toBeVisible()
+
+    await screen.getByLabelText('Identifiant ou courriel').fill('valentin')
+    await screen.getByLabelText('Mot de passe', { exact: true }).fill('secret')
+    await screen.getByRole('button', { name: 'Se connecter' }).click()
+
+    await expect
+      .element(screen.getByRole('alert'))
+      .toMatchTextContent('Identifiant ou mot de passe incorrect')
+    await expect.element(screen.getByText('Ce courriel a déjà un compte')).not.toBeInTheDocument()
+  })
+
+  it('ADR 0024 (point 9), ADR 0033 : confirmation et code ensemble, l’adresse perd les deux', async () => {
+    const screen = await renderLogin({
+      state: { passwordReset: true },
+      search: '?erreur=REQUEST_REJECTED',
+    })
+
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await expect.poll(() => screen.router.state.location.search).toBe('')
+    await expect.poll((): unknown => screen.router.state.location.state).toBeNull()
   })
 })

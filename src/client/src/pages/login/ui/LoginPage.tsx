@@ -29,23 +29,19 @@ export function LoginPage() {
   // React Router type l'état d'historique en any : il n'est lu qu'à travers isPasswordResetDone, une seule fois.
   const historyState: unknown = location.state
   const [passwordSaved] = useState(() => isPasswordResetDone(historyState))
-  // ADR 0033 (point 1) : le code du retour OAuth, lu une fois.
-  const [oauthError] = useState(() => oauthLoginErrorOf(location.search))
+  // ADR 0033 (point 1) : le code du retour OAuth, lu une fois, retiré au premier envoi du formulaire.
+  const [oauthError, setOAuthError] = useState(() => oauthLoginErrorOf(location.search))
   const mounted = useMounted()
-  // Lue, la confirmation quitte l'historique : un rechargement ou un retour ne la réaffiche pas.
-  useEffect(() => {
-    if (isPasswordResetDone(historyState)) {
-      void navigate(location.pathname, { replace: true, state: null })
-    }
-  }, [historyState, location.pathname, navigate])
-  // Lu, le code quitte l'adresse : un rechargement ne réaffiche pas l'alerte.
+  // Lus, la confirmation quitte l'historique et le code quitte l'adresse, en une navigation : un rechargement ou un
+  // retour ne réaffiche ni l'une ni l'autre.
   useEffect(() => {
     const params = new URLSearchParams(location.search)
-    if (params.has(LOGIN_ERROR_PARAM)) {
+    const confirmation = isPasswordResetDone(historyState)
+    if (confirmation || params.has(LOGIN_ERROR_PARAM)) {
       params.delete(LOGIN_ERROR_PARAM)
       void navigate(
         { pathname: location.pathname, search: params.toString() },
-        { replace: true, state: historyState },
+        { replace: true, state: confirmation ? null : historyState },
       )
     }
   }, [historyState, location.pathname, location.search, navigate])
@@ -60,7 +56,11 @@ export function LoginPage() {
           {passwordSaved && mounted && <Notice variant="success">{t('passwordSaved')}</Notice>}
         </div>
         {oauthError !== null && mounted && <OAuthLoginAlert error={oauthError} />}
-        <LoginForm />
+        <LoginForm
+          onSubmit={() => {
+            setOAuthError(null)
+          }}
+        />
         <OAuthButtons />
         <p className="m-0 text-center text-[13px] text-ink-3">
           {t('noAccount')}{' '}

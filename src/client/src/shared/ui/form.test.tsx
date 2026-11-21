@@ -82,6 +82,23 @@ describe('Champs, alertes et bouton des formulaires (maquette des écrans d’au
     await expect.element(alert.getByText('Réessayez plus tard.', { exact: true })).toBeVisible()
   })
 
+  it('ADR 0033 (point 1) : une alerte titrée prend l’espacement de « Trop de tentatives », une alerte simple garde le sien', async () => {
+    const screen = await render(
+      <>
+        <Alert variant="error" title="Ce courriel a déjà un compte">
+          Connectez-vous avec votre méthode habituelle.
+        </Alert>
+        <Alert variant="error">Identifiant ou mot de passe incorrect.</Alert>
+      </>,
+    )
+
+    const [titled, plain] = screen.getByRole('alert').elements()
+    expect(titled && getComputedStyle(titled).columnGap).toBe('12px')
+    expect(titled && getComputedStyle(titled).lineHeight).toBe('17.55px')
+    expect(plain && getComputedStyle(plain).columnGap).toBe('10px')
+    expect(plain && getComputedStyle(plain).lineHeight).toBe('18.2px')
+  })
+
   it.each([
     ['network', 'Connexion impossible. Vérifiez votre réseau puis réessayez.'],
     ['unexpected', 'Une erreur inattendue est survenue. Réessayez.'],
