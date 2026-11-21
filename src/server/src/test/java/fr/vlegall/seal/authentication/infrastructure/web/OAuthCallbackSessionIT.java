@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 import org.springframework.session.Session;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,6 +48,11 @@ import org.springframework.test.web.servlet.MvcResult;
 class OAuthCallbackSessionIT {
 
     private static final String REJECTED = "/connexion?erreur=REQUEST_REJECTED";
+
+    /** Attribut de session où Spring range la requête d'autorisation. */
+    private static final String AUTHORIZATION_REQUEST =
+            HttpSessionOAuth2AuthorizationRequestRepository.class.getName() + ".AUTHORIZATION_REQUEST";
+
     private static final AtomicLong GITHUB_IDS = new AtomicLong(9_500_000);
 
     @Autowired
@@ -138,6 +144,86 @@ class OAuthCallbackSessionIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(alice.id().toString()))
                 .andExpect(jsonPath("$.factors[0]").value("PASSWORD"));
+    }
+
+    /**
+     * Copie en base l'attribut d'une session dans une autre : ce que laisse une course entre un départ et une ouverture
+     * de session, Spring Session JDBC enregistrant les attributs par différence.
+     */
+    private void copyAttribute(Cookie from, Cookie to, String name) {
+        int copied = jdbc.sql(
+                        "INSERT INTO spring_session_attributes (session_primary_id, attribute_name, attribute_bytes)"
+                                + " SELECT (SELECT primary_id FROM spring_session WHERE session_id = :to), a.attribute_name,"
+                                + " a.attribute_bytes FROM spring_session_attributes a JOIN spring_session s"
+                                + " ON a.session_primary_id = s.primary_id WHERE s.session_id = :from AND a.attribute_name = :name")
+                .param("to", sessionId(to))
+                .param("from", sessionId(from))
+                .param("name", name)
+                .update();
+        assertThat(copied).isOne();
+    }
+
+    private static String sessionId(Cookie cookie) {
+        return new String(Base64.getDecoder().decode(cookie.getValue()), StandardCharsets.UTF_8);
+    }
+
+    @Test
+    @DisplayName(
+            "AUTH-30, ADR 0032 : une session ouverte qui garde une requête d'autorisation (course) refuse le retour")
+    void auth30SignedInSessionKeepingARequestRejectsTheCallback() throws Exception {
+        Registered alice = active(unique("ak"));
+        Registered bob = active(unique("bk"));
+        String bobSubject = googleSubject();
+        identities.link(
+                new UserId(bob.id()),
+                ExternalIdentity.of(OAuthProvider.GOOGLE, bobSubject, bob.email(), true, "Bob"),
+                Instant.now());
+        Started started = oauth.start("google");
+        Cookie aliceSession = passwordLogin(null, alice);
+        copyAttribute(started.session(), aliceSession, AUTHORIZATION_REQUEST);
+
+        MvcResult callback = oauth.callback(
+                started,
+                fake.authorize(started.location(), GoogleAccount.verified(bobSubject, "bob@gmail.com")),
+                started.state(),
+                aliceSession);
+
+        assertThat(callback.getResponse().getHeader("Location")).isEqualTo(REJECTED);
+        Cookie session = after(callback, aliceSession);
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(alice.id().toString()))
+                .andExpect(jsonPath("$.factors[0]").value("PASSWORD"));
+        assertThat(stored(session).getAttributeNames()).doesNotContain(AUTHORIZATION_REQUEST);
+        assertThat(jdbc.sql("SELECT details->>'provider' || ':' || (details->>'cause') FROM security_events "
+                                + "WHERE type = 'LOGIN_FAILED' AND ip = CAST(? AS inet)")
+                        .param(client.ip())
+                        .query(String.class)
+                        .list())
+                .containsExactly("google:session_signed_in");
+    }
+
+    @Test
+    @DisplayName(
+            "AUTH-30, AUTH-16 : une session restreinte qui garde une requête d'autorisation refuse aussi le retour")
+    void auth30RestrictedSessionKeepingARequestRejectsTheCallback() throws Exception {
+        AuthClient other = new AuthClient(mvc, mail);
+        Registered carol = other.register(unique("ck") + "@exemple.ca", unique("ck"));
+        Started started = oauth.start("github");
+        copyAttribute(started.session(), carol.session(), AUTHORIZATION_REQUEST);
+        long id = GITHUB_IDS.incrementAndGet();
+
+        MvcResult callback = oauth.callback(
+                started,
+                fake.authorize(started.location(), GitHubAccount.verified(id, unique("k") + "@exemple.ca")),
+                started.state(),
+                carol.session());
+
+        assertThat(callback.getResponse().getHeader("Location")).isEqualTo(REJECTED);
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(after(callback, carol.session())))
+                .andExpect(jsonPath("$.id").value(carol.id().toString()))
+                .andExpect(jsonPath("$.status").value("PENDING_EMAIL"));
+        assertThat(identities.findUser(OAuthProvider.GITHUB, Long.toString(id))).isEmpty();
     }
 
     @Test
