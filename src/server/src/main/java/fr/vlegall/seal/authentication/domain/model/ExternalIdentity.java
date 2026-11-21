@@ -23,6 +23,13 @@ public record ExternalIdentity(
     /** Longueur maximale d'un identifiant stable. */
     public static final int SUBJECT_MAX_LENGTH = 255;
 
+    /**
+     * SEC-01, A06 : longueur, en caractères UTF-16, au-delà de laquelle un nom ou un courriel du fournisseur n'est pas
+     * normalisé. La normalisation NFC coûte un temps quadratique sur une longue suite de marques combinantes, et la
+     * réponse du fournisseur n'a pas de taille maximale. Aucun nom ni courriel légitime n'en approche.
+     */
+    static final int RAW_MAX_LENGTH = 1024;
+
     public ExternalIdentity {
         Objects.requireNonNull(provider, "provider");
         Objects.requireNonNull(subject, "subject");
@@ -45,6 +52,9 @@ public record ExternalIdentity(
     /** L'identité lue chez le fournisseur : courriel ramené en NFC, nom nettoyé. */
     public static ExternalIdentity of(
             OAuthProvider provider, String subject, String email, boolean emailVerified, @Nullable String name) {
+        if (email.length() > RAW_MAX_LENGTH) {
+            throw new IllegalArgumentException("courriel du fournisseur invalide");
+        }
         return new ExternalIdentity(provider, subject, Unicode.nfc(email), emailVerified, suggestedName(name));
     }
 
@@ -53,10 +63,11 @@ public record ExternalIdentity(
      * direction), puis normalisé en NFC, sans espace autour et tronqué à 50 points de code. Le nettoyage précède la
      * normalisation : retirer un caractère après coup pourrait rapprocher une lettre et un accent, et le nom ne serait
      * plus en NFC. Un nom qui ne respecte pas la règle donne un nom vide : ce n'est qu'une proposition, que
-     * l'utilisateur complète ; elle ne refuse jamais l'identité.
+     * l'utilisateur complète ; elle ne refuse jamais l'identité. Un nom de plus de {@link #RAW_MAX_LENGTH} caractères
+     * n'est pas même lu.
      */
     static String suggestedName(@Nullable String name) {
-        if (name == null) {
+        if (name == null || name.length() > RAW_MAX_LENGTH) {
             return "";
         }
         StringBuilder kept = new StringBuilder();

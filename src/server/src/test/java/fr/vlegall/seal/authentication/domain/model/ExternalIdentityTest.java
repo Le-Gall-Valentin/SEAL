@@ -2,7 +2,9 @@ package fr.vlegall.seal.authentication.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -103,5 +105,33 @@ class ExternalIdentityTest {
     @DisplayName("SEC-21 : toString masque le courriel")
     void sec21EmailMaskedInToString() {
         assertThat(google("1", "valentin@exemple.ca", "Valentin").toString()).doesNotContain("valentin@exemple.ca");
+    }
+
+    /** Une longue suite de marques combinantes de classes alternées : le pire cas de la normalisation NFC. */
+    private static String combiningMarks(int pairs) {
+        return (Character.toString(0x0301) + Character.toString(0x0316)).repeat(pairs);
+    }
+
+    @Test
+    @DisplayName("SEC-01, A06 : un nom du fournisseur de plus de 1 024 caractères ne donne aucune proposition")
+    void sec01OverlongNameGivesNoSuggestion() {
+        assertThat(ExternalIdentity.suggestedName("a".repeat(ExternalIdentity.RAW_MAX_LENGTH)))
+                .isEqualTo("a".repeat(50));
+        assertThat(ExternalIdentity.suggestedName("a".repeat(ExternalIdentity.RAW_MAX_LENGTH + 1)))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("SEC-01, A06 : un nom ou un courriel hostile du fournisseur est écarté sans être normalisé")
+    void sec01HostileInputIsBoundedBeforeNormalization() {
+        String hostile = "a" + combiningMarks(100_000);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(1), () -> {
+            assertThat(ExternalIdentity.suggestedName(hostile)).isEmpty();
+            assertThatThrownBy(
+                            () -> ExternalIdentity.of(OAuthProvider.GITHUB, "42", hostile + "@exemple.ca", true, "Nom"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("courriel du fournisseur invalide");
+        });
     }
 }
