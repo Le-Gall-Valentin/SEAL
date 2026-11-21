@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { type Account, refreshSession } from '@/entities/session'
-import { ApiError, useRetryAfterLock } from '@/shared/lib'
+import { ApiError, useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
 import { CODE_LENGTH, verifyFailureOf } from './code'
 import { useSecondsLeft } from './useSecondsLeft'
 import { verificationView } from './verificationView'
@@ -15,10 +15,10 @@ interface VerificationProps {
 }
 
 /**
- * AUTH-14, AUTH-17 : vérification du code, renvoi et changement du courriel en attente. Une seule action à la fois
- * affiche son erreur. Le renvoi et le changement partagent leur limite : un 429 de l'un suspend les deux, jamais la
- * vérification du code en cours. Chaque réussite relit /me : le compte à rebours et les renvois restants en viennent,
- * et la garde mène à l'accueil une fois le compte actif.
+ * AUTH-14, AUTH-17 : vérification du code, renvoi et changement du courriel en attente. Une seule action à la fois part
+ * (un verrou synchrone partagé, ADR 0033, point 6) et affiche son erreur. Le renvoi et le changement partagent leur
+ * limite : un 429 de l'un suspend les deux, jamais la vérification du code en cours. Chaque réussite relit /me : le
+ * compte à rebours et les renvois restants en viennent, et la garde mène à l'accueil une fois le compte actif.
  */
 export function useEmailVerification(
   { email, verification }: VerificationProps,
@@ -32,6 +32,10 @@ export function useEmailVerification(
   const [newEmail, setNewEmail] = useState('')
   const [newEmailTouched, setNewEmailTouched] = useState(false)
   const [refusedEmail, setRefusedEmail] = useState<string | null>(null)
+  const guard = useSubmitGuard()
+  const release = () => {
+    guard.release()
+  }
 
   const verify = useMutation({
     mutationFn: (code: string) => api.verify(code),
@@ -42,6 +46,7 @@ export function useEmailVerification(
         onCodeCleared()
       }
     },
+    onSettled: release,
   })
   const resend = useMutation({
     mutationFn: () => api.resend(),
@@ -49,6 +54,7 @@ export function useEmailVerification(
       setSentTo(email)
       await refreshSession(client)
     },
+    onSettled: release,
   })
   const change = useMutation({
     mutationFn: (address: string) => api.changeEmail(address),
@@ -65,6 +71,7 @@ export function useEmailVerification(
         setRefusedEmail(address)
       }
     },
+    onSettled: release,
   })
 
   const sendError = resend.error ?? change.error
@@ -105,7 +112,7 @@ export function useEmailVerification(
     codeLocked: verifyLocked,
     canVerify: view.canVerify,
     verify: () => {
-      if (view.canVerify) {
+      if (view.canVerify && guard.enter()) {
         start()
         verify.mutate(cells.join(''))
       }
@@ -113,7 +120,7 @@ export function useEmailVerification(
     resendsRemaining: verification?.resendsRemaining ?? 0,
     canResend: view.canResend,
     resend: () => {
-      if (view.canResend) {
+      if (view.canResend && guard.enter()) {
         start()
         resend.mutate()
       }
@@ -137,7 +144,7 @@ export function useEmailVerification(
     newEmailInvalid: view.newEmailInvalid,
     canChange: view.canChange,
     changeEmail: () => {
-      if (view.canChange) {
+      if (view.canChange && guard.enter()) {
         start()
         change.mutate(newEmail)
       }
