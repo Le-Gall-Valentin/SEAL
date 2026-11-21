@@ -27,6 +27,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -360,5 +362,73 @@ class OAuthAttackIT {
                 .andExpect(header().string("Location", REJECTED));
 
         assertThat(causes(client)).containsExactly("invalid_request");
+    }
+
+    /** Nombre d'événements du journal pour l'IP de ce client. */
+    private long events(AuthClient who) {
+        return jdbc.sql("SELECT count(*) FROM security_events WHERE ip = CAST(? AS inet)")
+                .param(who.ip())
+                .query(Long.class)
+                .single();
+    }
+
+    @ParameterizedTest(name = "Sec-Fetch-Dest: \"{0}\", Sec-Fetch-Mode: \"{1}\"")
+    @CsvSource({"iframe, navigate", "document, no-cors", "document, cors", "'', navigate", "document, ''"})
+    @DisplayName("SEC-10, ADR 0032 : chaque règle de Fetch Metadata écarte seule un retour, sans le compter")
+    void sec10EachFetchMetadataRuleRejectsAlone(String dest, String mode) throws Exception {
+        AuthClient victim = new AuthClient(mvc, mail);
+        for (int i = 0; i < 21; i++) {
+            mvc.perform(victim.from(get("/login/oauth2/code/google")
+                            .param("code", "c" + i)
+                            .param("state", "s" + i)
+                            .header("Sec-Fetch-Site", "cross-site")
+                            .header("Sec-Fetch-Dest", dest)
+                            .header("Sec-Fetch-Mode", mode)))
+                    .andExpect(status().isFound())
+                    .andExpect(header().string("Location", REJECTED));
+        }
+
+        assertThat(events(victim)).as("ni journal ni dépassement").isZero();
+    }
+
+    @Test
+    @DisplayName(
+            "SEC-10, ADR 0032 : un préchargement ou un prérendu est refusé par un 403 sans corps, sans être compté")
+    void sec10SpeculativeRequestsAreRefusedUncounted() throws Exception {
+        AuthClient victim = new AuthClient(mvc, mail);
+        for (int i = 0; i < 25; i++) {
+            for (MockHttpServletRequestBuilder request : List.of(
+                    get("/login/oauth2/code/google")
+                            .param("code", "c" + i)
+                            .param("state", "s" + i)
+                            .header("Sec-Fetch-Site", "cross-site")
+                            .header("Sec-Purpose", "prefetch"),
+                    get("/oauth2/authorization/google")
+                            .header("Sec-Fetch-Site", "same-origin")
+                            .header("Sec-Purpose", "prefetch;prerender"))) {
+                MvcResult refused = mvc.perform(victim.from(
+                                request.header("Sec-Fetch-Mode", "navigate").header("Sec-Fetch-Dest", "document")))
+                        .andExpect(status().isForbidden())
+                        .andExpect(header().doesNotExist("Location"))
+                        .andReturn();
+                assertThat(refused.getResponse().getContentAsByteArray()).isEmpty();
+                assertThat(refused.getResponse().getCookie(AuthClient.SESSION_COOKIE))
+                        .isNull();
+            }
+        }
+
+        assertThat(events(victim)).isZero();
+        mvc.perform(victim.from(get("/login/oauth2/code/google")
+                        .param("code", "c")
+                        .param("state", "s")
+                        .header("Sec-Fetch-Site", "cross-site")
+                        .header("Sec-Fetch-Mode", "navigate")
+                        .header("Sec-Fetch-Dest", "document")))
+                .andExpect(header().string("Location", REJECTED));
+        mvc.perform(victim.from(get("/oauth2/authorization/google")
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .header("Sec-Fetch-Mode", "navigate")
+                        .header("Sec-Fetch-Dest", "document")))
+                .andExpect(header().string("Location", startsWith(fake.uri("/google/authorize"))));
     }
 }

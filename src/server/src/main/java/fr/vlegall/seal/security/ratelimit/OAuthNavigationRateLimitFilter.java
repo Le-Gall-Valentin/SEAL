@@ -20,8 +20,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * qu'aucun écran n'afficherait.
  *
  * <p>Avant de compter, le filtre écarte ce qu'aucune navigation de SEAL n'émet, mais qu'un site tiers peut émettre en
- * masse depuis le navigateur de la victime pour épuiser ses limites (Fetch Metadata) : une sous-requête, et un départ
- * venu d'une autre origine. Une requête sans ces en-têtes (navigateur ancien, outil) reste comptée.
+ * masse depuis le navigateur de la victime pour épuiser ses limites (Fetch Metadata) : une sous-requête, un départ venu
+ * d'une autre origine, et un préchargement ou un prérendu. Une requête sans ces en-têtes (navigateur ancien, outil)
+ * reste comptée.
  */
 public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
 
@@ -51,6 +52,12 @@ public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         RateLimit limit = limit(request);
         if (limit != null) {
+            if (isSpeculative(request)) {
+                // 403 sans corps : le navigateur abandonne le préchargement et refait la vraie navigation au clic ; une
+                // redirection serait servie à l'activation d'un prérendu.
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                return;
+            }
             if (!expectedNavigation(request)) {
                 response.sendRedirect(REQUEST_REJECTED);
                 return;
@@ -79,6 +86,11 @@ public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
         }
         String site = request.getHeader("Sec-Fetch-Site");
         return !start.matches(request) || site == null || "same-origin".equals(site) || "none".equals(site);
+    }
+
+    /** ADR 0032 (point 3) : préchargement ou prérendu, que le navigateur annonce par {@code Sec-Purpose}. */
+    private static boolean isSpeculative(HttpServletRequest request) {
+        return request.getHeader("Sec-Purpose") != null;
     }
 
     private static boolean isPresentAndNot(HttpServletRequest request, String header, String expected) {

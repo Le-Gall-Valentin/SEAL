@@ -37,9 +37,10 @@
     </Match>
 
     <!--
-      SERVLET_PARAMETER : le paramètre error du retour OAuth n'est lu que pour savoir si le code d'erreur de Spring le
-      recopie ; il n'est ni journalisé, ni renvoyé, ni stocké. Seul un code d'une liste fermée atteint le journal (SEC-20,
-      OAuthCallbackSessionIT.sec20UnknownProviderErrorCodeIsNotJournaledAsIs). Exclusion limitée à cette méthode.
+      SERVLET_PARAMETER : les paramètres code et error du retour OAuth ne sont lus que pour savoir si le code d'erreur
+      de Spring vient du navigateur ; ils ne sont ni journalisés, ni renvoyés, ni stockés. Seul un code d'une liste
+      fermée atteint le journal (SEC-20, OAuthCallbackSessionIT, OAuthAttackIT). Exclusion limitée à cette méthode (ADR
+      0011).
     -->
     <Match>
         <Class name="fr.vlegall.seal.authentication.infrastructure.security.OAuthLoginFailureHandler"/>
@@ -48,17 +49,18 @@
     </Match>
 
     <!--
-      SERVLET_HEADER : Fetch Metadata (ADR 0032, point 3) lit les en-têtes Sec-Fetch-* pour écarter ce que le navigateur
-      marque comme sous-requête ou comme départ d'une autre origine. Un client qui les falsifie pour imiter une
-      navigation est compté comme toute requête sans ces en-têtes : rien n'est contourné. Les valeurs ne sont que
-      comparées à des constantes (OAuthAttackIT.sec10CrossSiteSubrequestsDoNotSpendTheLimits). Exclusion limitée à ces
-      deux méthodes.
+      SERVLET_HEADER : Fetch Metadata (ADR 0032, point 3) lit les en-têtes Sec-Fetch-* et Sec-Purpose pour écarter ce
+      que le navigateur marque comme sous-requête, départ d'une autre origine, préchargement ou prérendu. Un client qui
+      les falsifie pour imiter une navigation est compté comme toute requête sans ces en-têtes : rien n'est contourné.
+      Les valeurs ne sont que comparées à des constantes, ou leur présence lue (OAuthAttackIT). Exclusion limitée à ces
+      trois méthodes (ADR 0011).
     -->
     <Match>
         <Class name="fr.vlegall.seal.security.ratelimit.OAuthNavigationRateLimitFilter"/>
         <Or>
             <Method name="expectedNavigation"/>
             <Method name="isPresentAndNot"/>
+            <Method name="isSpeculative"/>
         </Or>
         <Bug pattern="SERVLET_HEADER"/>
     </Match>
