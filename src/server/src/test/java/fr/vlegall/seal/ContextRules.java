@@ -13,6 +13,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import fr.vlegall.seal.common.ApplicationService;
 import jakarta.persistence.Entity;
+import java.io.Serializable;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -362,6 +363,21 @@ final class ContextRules {
                 .orShould()
                 .dependOnClassesThat()
                 .belongToAnyOf(CrossOrigin.class);
+    }
+
+    // Règle 15 (mise à jour du 2026-11-20 de l'ADR 0008) : le domaine ne dépend pas du format des sessions ; ce qui s'y
+    // garde est un instantané d'infrastructure (ADR 0032). Exceptions et énumérations sont sérialisables par nature.
+    static ArchRule domainIsNotSerializable(String root) {
+        return noClasses()
+                .that()
+                .resideInAPackage(root + "..domain..")
+                .and()
+                .areNotAssignableTo(Throwable.class)
+                .and()
+                .areNotEnums()
+                .should()
+                .beAssignableTo(Serializable.class)
+                .because("une session garde un instantané d'infrastructure, jamais un objet du domaine (ADR 0032)");
     }
 
     private static DescribedPredicate<JavaClass> belongToAContext(String root) {

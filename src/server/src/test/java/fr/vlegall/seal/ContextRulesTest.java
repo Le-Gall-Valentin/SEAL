@@ -8,6 +8,8 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import fr.vlegall.archfixture.alpha.application.handler.AlphaHandler;
 import fr.vlegall.archfixture.alpha.application.port.in.AlphaUseCase;
+import fr.vlegall.archfixture.alpha.domain.model.AlphaException;
+import fr.vlegall.archfixture.alpha.domain.model.AlphaKind;
 import fr.vlegall.archfixture.alpha.domain.model.AlphaThing;
 import fr.vlegall.archfixture.alpha.domain.port.out.AlphaStore;
 import fr.vlegall.archfixture.alpha.infrastructure.beta.BetaAdapter;
@@ -222,5 +224,13 @@ class ContextRulesTest {
     void rule14OnlyCommonMailSendsMail() {
         expectViolations(ContextRules.onlyCommonMailSendsMail(ROOT), "DirectMailer");
         expectAllowed(ContextRules.onlyCommonMailSendsMail(ROOT), FixtureMailer.class, AlphaThing.class);
+    }
+
+    @Test
+    @DisplayName("ADR 0008, règle 15 : aucune classe du domaine n'est sérialisable, hors exceptions et énumérations")
+    void rule15DomainIsNotSerializable() {
+        expectViolations(ContextRules.domainIsNotSerializable(ROOT), "SerializableThing");
+        expectAllowed(
+                ContextRules.domainIsNotSerializable(ROOT), AlphaThing.class, AlphaKind.class, AlphaException.class);
     }
 }
