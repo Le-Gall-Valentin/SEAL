@@ -1,7 +1,10 @@
 package fr.vlegall.seal.authentication.infrastructure.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -178,15 +181,9 @@ class OAuthAttackIT {
     @Test
     @DisplayName("SEC-10, A06 : un départ OAuth autre que GET ne redirige pas et ne crée aucune session")
     void sec10NonGetStartCreatesNoSession() throws Exception {
-        MvcResult head = mvc.perform(
-                        client.from(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head(
-                                "/oauth2/authorization/google")))
-                .andReturn();
-        MvcResult post = mvc.perform(client.unsafe(
-                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                                "/oauth2/authorization/google"),
-                        null,
-                        null))
+        MvcResult head =
+                mvc.perform(client.from(head("/oauth2/authorization/google"))).andReturn();
+        MvcResult post = mvc.perform(client.unsafe(post("/oauth2/authorization/google"), null, null))
                 .andReturn();
 
         for (MvcResult result : List.of(head, post)) {
@@ -202,8 +199,7 @@ class OAuthAttackIT {
     void sec10LimitCountsEveryMethod() throws Exception {
         AuthClient burst = new AuthClient(mvc, mail);
         for (int i = 0; i < 20; i++) {
-            mvc.perform(burst.from(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head(
-                    "/oauth2/authorization/google")));
+            mvc.perform(burst.from(head("/oauth2/authorization/google")));
         }
 
         mvc.perform(burst.from(get("/oauth2/authorization/google")))
@@ -236,7 +232,6 @@ class OAuthAttackIT {
                 .containsExactlyInAnyOrder("LOGIN_FAILED=20", "RATE_LIMIT_EXCEEDED=1");
         mvc.perform(burst.from(get("/oauth2/authorization/google")))
                 .andExpect(status().isFound())
-                .andExpect(
-                        header().string("Location", org.hamcrest.Matchers.startsWith(fake.uri("/google/authorize"))));
+                .andExpect(header().string("Location", startsWith(fake.uri("/google/authorize"))));
     }
 }

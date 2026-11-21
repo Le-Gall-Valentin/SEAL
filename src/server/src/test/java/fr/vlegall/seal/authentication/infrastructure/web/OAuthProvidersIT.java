@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import jakarta.servlet.http.Cookie;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -91,8 +93,8 @@ class OAuthProvidersIT {
     @Test
     @DisplayName("AUTH-35, QA-05 : une session complète lit aussi les fournisseurs (paramètres, liaison au P1)")
     void auth35FullSessionReadsProviders() throws Exception {
-        String name = "pr" + java.util.UUID.randomUUID().toString().substring(0, 8);
-        jakarta.servlet.http.Cookie session = client.verify(client.register(name + "@exemple.ca", name));
+        String name = "pr" + UUID.randomUUID().toString().substring(0, 8);
+        Cookie session = client.verify(client.register(name + "@exemple.ca", name));
 
         mvc.perform(client.from(get("/api/v1/auth/providers")).cookie(session))
                 .andExpect(status().isOk())

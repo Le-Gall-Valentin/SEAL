@@ -1,6 +1,7 @@
 package fr.vlegall.seal.authentication.infrastructure.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthIdentityRepository;
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.identity.application.port.in.CreateOAuthAccountUseCase;
 import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.AuthClient.Registered;
 import fr.vlegall.seal.support.FakeOAuthProvider;
@@ -24,6 +26,7 @@ import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,10 +41,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.session.Session;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.IllegalTransactionStateException;
 
 /** AUTH-32 : choix de l'identifiant après un premier passage OAuth, puis création et liaison du compte (ADR 0032). */
 @SealIntegrationTest
@@ -69,7 +76,7 @@ class OAuthRegistrationIT {
     private MutableClock clock;
 
     @Autowired
-    private fr.vlegall.seal.identity.application.port.in.CreateOAuthAccountUseCase createOAuthAccount;
+    private CreateOAuthAccountUseCase createOAuthAccount;
 
     @Autowired
     private JdbcIndexedSessionRepository sessions;
@@ -284,8 +291,10 @@ class OAuthRegistrationIT {
     @Test
     @DisplayName("AUTH-32, A06 : deux complete simultanés de la même attente ne créent qu'un compte")
     void a06ConcurrentCompletesCreateOneAccount() throws Exception {
-        String subject = googleSubject();
-        Cookie session = pendingGoogle(subject, unique("r") + "@gmail.com");
+        long id = GITHUB_IDS.incrementAndGet();
+        String email = unique("r") + "@exemple.ca";
+        Cookie session = AuthClient.sessionOf(oauth.signIn(
+                "github", new GitHubAccount(id, "octo", null, List.of(new GitHubEmail(email, true, false)))));
         String token = client.csrfToken(session);
 
         List<Integer> statuses = Race.run(
@@ -301,17 +310,12 @@ class OAuthRegistrationIT {
 
         assertThat(statuses).containsOnlyOnce(204);
         assertThat(statuses).anyMatch(status -> status == 404 || status == 409);
-        assertThat(identities.findUser(OAuthProvider.GOOGLE, subject)).isPresent();
-        UserId user = identities.findUser(OAuthProvider.GOOGLE, subject).orElseThrow();
-        String email = jdbc.sql("SELECT email FROM users WHERE id = ?")
-                .param(user.value())
-                .query(String.class)
-                .single();
+        assertThat(identities.findUser(OAuthProvider.GITHUB, Long.toString(id))).isPresent();
         assertThat(jdbc.sql("SELECT count(*) FROM users WHERE email = CAST(? AS citext)")
                         .param(email)
                         .query(Long.class)
                         .single())
-                .as("un seul compte pour ce courriel")
+                .as("un seul compte, même en attente : l'index des courriels vérifiés ne protège pas ce cas")
                 .isOne();
     }
 
@@ -391,11 +395,12 @@ class OAuthRegistrationIT {
     }
 
     @Test
-    @DisplayName("ADR 0032, point 8 : après complete, le facteur est daté du retour du fournisseur, pas de la création")
+    @DisplayName(
+            "AUTH-55, ADR 0032 (point 8) : après complete, le facteur est daté du retour du fournisseur, pas de la création")
     void adr0032FactorDatedFromTheProviderReturn() throws Exception {
         String username = unique("f");
         Cookie session = pendingGoogle(googleSubject(), username + "@gmail.com");
-        java.time.Instant returned = clock.instant();
+        Instant returned = clock.instant();
         clock.advance(Duration.ofMinutes(5));
 
         MvcResult result = complete(session, choice(username, "Nom"));
@@ -403,24 +408,19 @@ class OAuthRegistrationIT {
         Cookie opened = AuthClient.sessionOf(result);
         String openedId = new String(Base64.getDecoder().decode(opened.getValue()), StandardCharsets.UTF_8);
         Session stored = sessions.findById(openedId);
-        org.springframework.security.core.context.SecurityContext context = stored.getAttribute(
-                org.springframework.security.web.context.HttpSessionSecurityContextRepository
-                        .SPRING_SECURITY_CONTEXT_KEY);
+        SecurityContext context = stored.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
         assertThat(context.getAuthentication().getAuthorities())
-                .filteredOn(org.springframework.security.core.authority.FactorGrantedAuthority.class::isInstance)
+                .filteredOn(FactorGrantedAuthority.class::isInstance)
                 .singleElement()
-                .satisfies(factor -> assertThat(
-                                ((org.springframework.security.core.authority.FactorGrantedAuthority) factor)
-                                        .getIssuedAt())
+                .satisfies(factor -> assertThat(((FactorGrantedAuthority) factor).getIssuedAt())
                         .isBetween(returned.minusSeconds(1), returned.plusSeconds(60)));
     }
 
     @Test
     @DisplayName("AUTH-32 : le compte d'une inscription OAuth ne se crée que dans la transaction qui le lie")
     void auth32AccountCreationRequiresTheLinkingTransaction() {
-        org.assertj.core.api.Assertions.assertThatThrownBy(
-                        () -> createOAuthAccount.create(unique("t"), "Nom", unique("t") + "@exemple.ca", true))
-                .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+        assertThatThrownBy(() -> createOAuthAccount.create(unique("t"), "Nom", unique("t") + "@exemple.ca", true))
+                .isInstanceOf(IllegalTransactionStateException.class);
     }
 
     @Test

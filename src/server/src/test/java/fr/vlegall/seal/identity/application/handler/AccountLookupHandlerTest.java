@@ -169,7 +169,7 @@ class AccountLookupHandlerTest {
         assertThat(handler.loginState(active.id())).isEqualTo(AccountLoginState.ACTIVE);
         assertThat(handler.loginState(pending.id())).isEqualTo(AccountLoginState.PENDING_EMAIL);
         assertThat(handler.loginState(deleted.id())).isEqualTo(AccountLoginState.UNUSABLE);
-        assertThat(handler.loginState(new UserId(java.util.UUID.randomUUID()))).isEqualTo(AccountLoginState.UNUSABLE);
+        assertThat(handler.loginState(new UserId(UUID.randomUUID()))).isEqualTo(AccountLoginState.UNUSABLE);
     }
 
     @Test

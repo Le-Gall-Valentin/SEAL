@@ -21,10 +21,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * A02, ADR 0032 : les redirections de SEAL restent relatives, quel que soit l'en-tête {@code Host}. Tomcat les rend
- * sinon absolues à partir de cet en-tête, que choisit le client. MockMvc ne le montre pas : ce test démarre le vrai
- * serveur, sans TLS (profil test), et envoie la requête brute, puisque le client HTTP du JDK interdit de fixer
- * {@code Host}.
+ * TRN-02, A02 : les redirections de SEAL restent relatives, sur l'origine unique, quel que soit l'en-tête
+ * {@code Host}. Tomcat les rend sinon absolues à partir de cet en-tête, que choisit le client. MockMvc ne le montre
+ * pas : ce test démarre le vrai serveur, sans TLS (profil test), et envoie la requête brute, puisque le client HTTP du
+ * JDK interdit de fixer {@code Host}.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -53,7 +53,7 @@ class RelativeRedirectsIT {
     }
 
     @Test
-    @DisplayName("A02, ADR 0032 : un retour OAuth refusé renvoie vers /connexion, sans l'hôte de l'en-tête Host")
+    @DisplayName("TRN-02, A02 : un retour OAuth refusé renvoie vers /connexion, sans l'hôte de l'en-tête Host")
     void a02OAuthRedirectIgnoresTheHostHeader() throws Exception {
         assertThat(location("/login/oauth2/code/google?code=a&state=b", "evil.example"))
                 .contains("/connexion?erreur=REQUEST_REJECTED");

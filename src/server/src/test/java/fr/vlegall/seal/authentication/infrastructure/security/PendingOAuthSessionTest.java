@@ -5,11 +5,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.support.MutableClock;
+import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 
@@ -76,7 +81,54 @@ class PendingOAuthSessionTest {
         pending.remember(requestWith(session), IDENTITY);
 
         Object stored = session.getAttribute(PendingOAuthSession.ATTRIBUTE);
-        assertThat(stored).isInstanceOf(java.io.Serializable.class);
+        assertThat(stored).isInstanceOf(Serializable.class);
         assertThat(stored.getClass().getPackageName()).doesNotContain("domain");
+    }
+
+    /** Instantanés qu'aucune identité valide ne décrit : relus d'une session ancienne ou altérée. */
+    static List<Object> invalidAttributes() {
+        return List.of(
+                new PendingOAuthSession.Snapshot("OKTA", "42", "octo@exemple.ca", false, "Octo", NOW),
+                new PendingOAuthSession.Snapshot("GITHUB", null, "octo@exemple.ca", false, "Octo", NOW),
+                new PendingOAuthSession.Snapshot("GITHUB", "42", "octo@exemple.ca", false, "Octo", null),
+                new PendingOAuthSession.Snapshot(
+                        "GITHUB", "42", "octo@exemple.ca", false, "Octo" + (char) 0x202E + "x", NOW),
+                "une autre valeur");
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidAttributes")
+    @DisplayName("AUTH-32, ADR 0008 : un instantané invalide ou d'un autre type n'est pas relu, et quitte la session")
+    void auth32InvalidSnapshotIsDropped(Object stored) {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(PendingOAuthSession.ATTRIBUTE, stored);
+
+        assertThat(pending.find(requestWith(session))).isEmpty();
+        assertThat(session.getAttribute(PendingOAuthSession.ATTRIBUTE)).isNull();
+    }
+
+    @Test
+    @DisplayName("AUTH-32 : lire ou oublier une attente absente n'écrit rien dans la session (Spring Session JDBC)")
+    void auth32ReadingNothingWritesNothing() {
+        List<String> writes = new ArrayList<>();
+        MockHttpSession session = new MockHttpSession() {
+            @Override
+            public void setAttribute(String name, Object value) {
+                writes.add("set " + name);
+                super.setAttribute(name, value);
+            }
+
+            @Override
+            public void removeAttribute(String name) {
+                writes.add("remove " + name);
+                super.removeAttribute(name);
+            }
+        };
+        MockHttpServletRequest request = requestWith(session);
+
+        assertThat(pending.find(request)).isEmpty();
+        pending.forget(request);
+
+        assertThat(writes).isEmpty();
     }
 }
