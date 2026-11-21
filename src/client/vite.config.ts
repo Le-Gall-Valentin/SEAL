@@ -40,6 +40,10 @@ export default defineConfig({
     proxy: {
       '/api': { target: springBoot, secure: false },
       '/ws': { target: springBoot, ws: true, secure: false },
+      // ADR 0033 : le départ et le retour OAuth, gérés par Spring ; sans ce relais, le départ serait same-site, donc
+      // refusé par Fetch Metadata (ADR 0032, point 3).
+      '/oauth2': { target: springBoot, secure: false },
+      '/login/oauth2': { target: springBoot, secure: false },
     },
   },
 })
