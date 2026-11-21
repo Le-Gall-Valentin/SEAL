@@ -8,6 +8,7 @@ import { logoutApi } from '@/features/logout'
 import { passwordResetApi } from '@/features/password-reset'
 import { registerApi } from '@/features/register'
 import { verifyEmailApi } from '@/features/verify-email'
+import { usernameAvailabilityApi } from '@/entities/account'
 import { authorityApi } from '@/entities/authority'
 import { keysApi } from '@/entities/keyring'
 import { LanguageProvider } from '@/shared/i18n'
@@ -32,6 +33,7 @@ const apis: Apis = {
   authority: authorityApi,
   keys: keysApi,
   passwordBlocklist,
+  usernameAvailability: usernameAvailabilityApi,
   login: loginApi,
   register: registerApi,
   verifyEmail: verifyEmailApi,

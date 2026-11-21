@@ -6,20 +6,19 @@ import {
   rulesAfterRefusal,
   usePasswordBlocklist,
 } from '@/entities/password'
+import {
+  proposeUsername,
+  statusAfterRefusal,
+  USERNAME_AVAILABILITY_KEY,
+  usernameFromEmail,
+  useUsernameAvailability,
+} from '@/entities/account'
 import { refreshSession } from '@/entities/session'
 import { useRetryAfterLock } from '@/shared/lib'
 import type { Registration } from '../api/IRegisterApi'
-import {
-  proposeUsername,
-  type RegisterRefusals,
-  type RegisterValues,
-  registerView,
-  statusAfterRefusal,
-  usernameFromEmail,
-} from './registerForm'
+import { type RegisterRefusals, type RegisterValues, registerView } from './registerForm'
 import { registerFailureOf } from './registerFailure'
 import { useRegisterApi } from './registerApiPort'
-import { USERNAME_AVAILABILITY_KEY, useUsernameAvailability } from './useUsernameAvailability'
 
 interface Values extends RegisterValues {
   readonly username: string

@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
+import { UsernameAvailabilityApiProvider } from '@/entities/account'
 import { PasswordBlocklistProvider } from '@/entities/password'
 import {
   type Account,
@@ -49,7 +50,9 @@ async function renderForm(register: (registration: Registration) => Promise<void
       await register(registration)
       registered = true
     },
-    usernameAvailability: (username) => {
+  }
+  const availabilityApi = {
+    usernameAvailability: (username: string) => {
       checked.push(username)
       return Promise.resolve(
         TAKEN.has(username) || RESERVED.has(username)
@@ -82,9 +85,11 @@ async function renderForm(register: (registration: Registration) => Promise<void
     >
       <SessionApiProvider api={sessionApi}>
         <PasswordBlocklistProvider api={{ load: () => Promise.resolve(['Mailcreated5240']) }}>
-          <RegisterApiProvider api={registerApi}>
-            <RouterProvider router={router} />
-          </RegisterApiProvider>
+          <UsernameAvailabilityApiProvider api={availabilityApi}>
+            <RegisterApiProvider api={registerApi}>
+              <RouterProvider router={router} />
+            </RegisterApiProvider>
+          </UsernameAvailabilityApiProvider>
         </PasswordBlocklistProvider>
       </SessionApiProvider>
     </QueryClientProvider>,

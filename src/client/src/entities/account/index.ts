@@ -8,3 +8,12 @@ export {
   usernameSuggestionFrom,
 } from './model/username'
 export { DISPLAY_NAME_SCHEMA, EMAIL_SCHEMA, USERNAME_SCHEMA } from './model/schemas'
+export type { IUsernameAvailabilityApi, UsernameAvailability } from './api/IUsernameAvailabilityApi'
+export { usernameAvailabilityApi } from './api/usernameAvailabilityApi'
+export { UsernameAvailabilityApiProvider } from './model/usernameAvailabilityPort'
+export { USERNAME_AVAILABILITY_KEY, useUsernameAvailability } from './model/useUsernameAvailability'
+export type { UsernameStatus } from './model/useUsernameAvailability'
+export { proposeUsername, statusAfterRefusal, usernameFromEmail } from './model/usernameProposal'
+export type { UsernameRefusal } from './model/usernameProposal'
+export { FinalUsernameNotice } from './ui/FinalUsernameNotice'
+export { UsernameField } from './ui/UsernameField'

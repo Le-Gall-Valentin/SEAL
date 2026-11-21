@@ -3,6 +3,7 @@ import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
+import { UsernameAvailabilityApiProvider } from '@/entities/account'
 import { PasswordBlocklistProvider } from '@/entities/password'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
 import { type IRegisterApi, RegisterApiProvider } from '@/features/register'
@@ -16,6 +17,8 @@ describe('Écran Inscription', () => {
     }
     const registerApi: IRegisterApi = {
       register: () => Promise.resolve(),
+    }
+    const availabilityApi = {
       usernameAvailability: () => Promise.resolve({ available: true, suggestions: [] }),
     }
     const router = createMemoryRouter([{ path: '/inscription', element: <RegisterPage /> }], {
@@ -25,9 +28,11 @@ describe('Écran Inscription', () => {
       <QueryClientProvider client={new QueryClient()}>
         <SessionApiProvider api={sessionApi}>
           <PasswordBlocklistProvider api={{ load: () => Promise.resolve([]) }}>
-            <RegisterApiProvider api={registerApi}>
-              <RouterProvider router={router} />
-            </RegisterApiProvider>
+            <UsernameAvailabilityApiProvider api={availabilityApi}>
+              <RegisterApiProvider api={registerApi}>
+                <RouterProvider router={router} />
+              </RegisterApiProvider>
+            </UsernameAvailabilityApiProvider>
           </PasswordBlocklistProvider>
         </SessionApiProvider>
       </QueryClientProvider>,

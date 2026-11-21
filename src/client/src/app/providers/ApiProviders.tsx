@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { type IUsernameAvailabilityApi, UsernameAvailabilityApiProvider } from '@/entities/account'
 import { AuthorityApiProvider, type IAuthorityApi } from '@/entities/authority'
 import { type IKeysApi, KeysApiProvider } from '@/entities/keyring'
 import { type IPasswordBlocklist, PasswordBlocklistProvider } from '@/entities/password'
@@ -15,6 +16,7 @@ export interface Apis {
   readonly authority: IAuthorityApi
   readonly keys: IKeysApi
   readonly passwordBlocklist: IPasswordBlocklist
+  readonly usernameAvailability: IUsernameAvailabilityApi
   readonly login: ILoginApi
   readonly register: IRegisterApi
   readonly verifyEmail: IVerifyEmailApi
@@ -34,15 +36,17 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
       <AuthorityApiProvider api={apis.authority}>
         <KeysApiProvider api={apis.keys}>
           <PasswordBlocklistProvider api={apis.passwordBlocklist}>
-            <LoginApiProvider api={apis.login}>
-              <RegisterApiProvider api={apis.register}>
-                <VerifyEmailApiProvider api={apis.verifyEmail}>
-                  <PasswordResetApiProvider api={apis.passwordReset}>
-                    <LogoutApiProvider api={apis.logout}>{children}</LogoutApiProvider>
-                  </PasswordResetApiProvider>
-                </VerifyEmailApiProvider>
-              </RegisterApiProvider>
-            </LoginApiProvider>
+            <UsernameAvailabilityApiProvider api={apis.usernameAvailability}>
+              <LoginApiProvider api={apis.login}>
+                <RegisterApiProvider api={apis.register}>
+                  <VerifyEmailApiProvider api={apis.verifyEmail}>
+                    <PasswordResetApiProvider api={apis.passwordReset}>
+                      <LogoutApiProvider api={apis.logout}>{children}</LogoutApiProvider>
+                    </PasswordResetApiProvider>
+                  </VerifyEmailApiProvider>
+                </RegisterApiProvider>
+              </LoginApiProvider>
+            </UsernameAvailabilityApiProvider>
           </PasswordBlocklistProvider>
         </KeysApiProvider>
       </AuthorityApiProvider>

@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { ErrorText, FieldLabel, Sceau } from '@/shared/ui'
-import { registerMessages } from '../i18n'
+import { accountMessages } from '../i18n'
 import type { UsernameStatus } from '../model/useUsernameAvailability'
 
 interface UsernameFieldProps {
@@ -43,7 +43,7 @@ function StatusIcon({ status }: { readonly status: UsernameStatus }) {
 }
 
 function StatusText({ status, fromEmail }: Pick<UsernameFieldProps, 'status' | 'fromEmail'>) {
-  const t = useMessages(registerMessages)
+  const t = useMessages(accountMessages)
   switch (status.kind) {
     case 'available':
       return (
@@ -73,7 +73,7 @@ export function UsernameField({
   fromEmail,
   maxLength,
 }: UsernameFieldProps) {
-  const t = useMessages(registerMessages)
+  const t = useMessages(accountMessages)
   const id = useId()
   const hintId = `${id}-etat`
   const refused = status.kind === 'taken' || status.kind === 'invalid' || status.kind === 'reserved'

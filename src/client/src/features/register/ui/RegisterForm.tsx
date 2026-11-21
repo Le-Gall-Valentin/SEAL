@@ -1,11 +1,15 @@
-import { DISPLAY_NAME_MAX_LENGTH, EMAIL_MAX_LENGTH, USERNAME_MAX_LENGTH } from '@/entities/account'
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  EMAIL_MAX_LENGTH,
+  FinalUsernameNotice,
+  USERNAME_MAX_LENGTH,
+  UsernameField,
+} from '@/entities/account'
 import { CompositionNote, NewPasswordFields } from '@/entities/password'
 import { useMessages } from '@/shared/i18n'
 import { FormAlert, PrimaryButton, TextField } from '@/shared/ui'
 import { registerMessages } from '../i18n'
 import { useRegisterForm } from '../model/useRegisterForm'
-import { FinalUsernameNotice } from './FinalUsernameNotice'
-import { UsernameField } from './UsernameField'
 
 /** SEC-01 : bornes de RegisterRequest côté serveur, avant normalisation (ADR 0019). */
 const DISPLAY_NAME_INPUT_MAX = DISPLAY_NAME_MAX_LENGTH * 4
