@@ -1,3 +1,4 @@
+import type { ErrorCode } from '@/shared/lib'
 import { localPartOf } from './email'
 import { usernameSuggestionFrom } from './username'
 import type { UsernameStatus } from './useUsernameAvailability'
@@ -6,6 +7,18 @@ import type { UsernameStatus } from './useUsernameAvailability'
 export interface UsernameRefusal {
   readonly value: string
   readonly reason: 'taken' | 'invalid' | 'reserved'
+}
+
+/** AUTH-01, AUTH-02, AUTH-05 : refus de l'identifiant par le serveur (CDC, section 14.6). */
+const REFUSAL_REASONS: ReadonlyMap<ErrorCode, UsernameRefusal['reason']> = new Map([
+  ['USERNAME_TAKEN', 'taken'],
+  ['USERNAME_INVALID', 'invalid'],
+  ['USERNAME_RESERVED', 'reserved'],
+])
+
+/** Motif d'un refus de l'identifiant, ou null pour tout autre code. */
+export function usernameRefusalReason(code: ErrorCode): UsernameRefusal['reason'] | null {
+  return REFUSAL_REASONS.get(code) ?? null
 }
 
 /** AUTH-04, étapes 1 à 4 : identifiant tiré du courriel, dès qu'il a une partie locale. */

@@ -1,5 +1,5 @@
 import {
-  DISPLAY_NAME_MAX_LENGTH,
+  DisplayNameField,
   EMAIL_MAX_LENGTH,
   FinalUsernameNotice,
   USERNAME_MAX_LENGTH,
@@ -10,9 +10,6 @@ import { useMessages } from '@/shared/i18n'
 import { FormAlert, PrimaryButton, TextField } from '@/shared/ui'
 import { registerMessages } from '../i18n'
 import { useRegisterForm } from '../model/useRegisterForm'
-
-/** SEC-01 : bornes de RegisterRequest côté serveur, avant normalisation (ADR 0019). */
-const DISPLAY_NAME_INPUT_MAX = DISPLAY_NAME_MAX_LENGTH * 4
 
 /** AUTH-03 à AUTH-05, AUTH-10, AUTH-11 : formulaire d'Inscription-Telephone, sans OAuth (ADR 0024, point 3). */
 export function RegisterForm() {
@@ -49,15 +46,11 @@ export function RegisterForm() {
           />
           <FinalUsernameNotice />
         </div>
-        <TextField
-          label={t('displayName')}
-          autoComplete="name"
-          maxLength={DISPLAY_NAME_INPUT_MAX}
+        <DisplayNameField
           value={form.values.displayName}
           onChange={form.setDisplayName}
           onBlur={form.touchDisplayName}
-          hint={t('displayNameHint')}
-          error={form.displayNameInvalid ? t('invalidDisplayName') : null}
+          invalid={form.displayNameInvalid}
         />
         <NewPasswordFields
           passwordLabel={t('password')}

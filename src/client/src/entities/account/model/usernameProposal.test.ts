@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { proposeUsername, statusAfterRefusal, usernameFromEmail } from './usernameProposal'
+import {
+  proposeUsername,
+  statusAfterRefusal,
+  usernameFromEmail,
+  usernameRefusalReason,
+} from './usernameProposal'
 
 describe('AUTH-04 : identifiant proposé à partir du courriel', () => {
   it('AUTH-04 : aucune proposition tant que le courriel n’a pas de partie locale', () => {
@@ -53,5 +58,16 @@ describe('AUTH-05 : refus de l’identifiant au retour du serveur', () => {
     expect(statusAfterRefusal(confirmed, { value: 'valentin', reason: 'taken' }, 'valentin')).toBe(
       confirmed,
     )
+  })
+})
+
+describe('AUTH-05 : motif du refus de l’identifiant', () => {
+  it.each([
+    ['USERNAME_TAKEN', 'taken'],
+    ['USERNAME_INVALID', 'invalid'],
+    ['USERNAME_RESERVED', 'reserved'],
+    ['PASSWORD_TOO_WEAK', null],
+  ] as const)('CDC 14.6 : %s donne %s', (code, reason) => {
+    expect(usernameRefusalReason(code)).toBe(reason)
   })
 })

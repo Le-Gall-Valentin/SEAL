@@ -13,7 +13,13 @@ export { usernameAvailabilityApi } from './api/usernameAvailabilityApi'
 export { UsernameAvailabilityApiProvider } from './model/usernameAvailabilityPort'
 export { USERNAME_AVAILABILITY_KEY, useUsernameAvailability } from './model/useUsernameAvailability'
 export type { UsernameStatus } from './model/useUsernameAvailability'
-export { proposeUsername, statusAfterRefusal, usernameFromEmail } from './model/usernameProposal'
+export {
+  proposeUsername,
+  statusAfterRefusal,
+  usernameFromEmail,
+  usernameRefusalReason,
+} from './model/usernameProposal'
 export type { UsernameRefusal } from './model/usernameProposal'
+export { DisplayNameField } from './ui/DisplayNameField'
 export { FinalUsernameNotice } from './ui/FinalUsernameNotice'
 export { UsernameField } from './ui/UsernameField'

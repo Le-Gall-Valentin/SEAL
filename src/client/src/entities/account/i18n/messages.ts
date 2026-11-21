@@ -1,7 +1,7 @@
 import { defineMessages } from '@/shared/i18n'
 
-// Inscription-Telephone et Identifiant-OAuth : champ de l'identifiant, « Déjà pris. », suggestions et avertissement
-// « Identifiant définitif. » (ADR 0024, point 9 ; ADR 0033).
+// Inscription-Telephone et Identifiant-OAuth : champs de l'identifiant et du nom affiché, « Déjà pris. », suggestions
+// et avertissement « Identifiant définitif. » (ADR 0024, point 9 ; ADR 0033).
 export const accountMessages = defineMessages({
   fr: {
     username: 'Identifiant',
@@ -13,5 +13,8 @@ export const accountMessages = defineMessages({
     suggestions: 'Suggestions :',
     finalTitle: 'Identifiant définitif.',
     finalBody: 'Il ne pourra plus être modifié après la création du compte.',
+    displayName: 'Nom affiché',
+    displayNameHint: 'Visible par vos amis. Modifiable à tout moment.',
+    invalidDisplayName: '1 à 50 caractères, dont un visible au moins.',
   },
 })
