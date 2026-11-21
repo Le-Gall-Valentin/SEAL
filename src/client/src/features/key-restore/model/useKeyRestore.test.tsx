@@ -86,6 +86,25 @@ describe('KEY-33 : Restauration-Appareil, modèle', () => {
     await expect.poll(() => onRestored.mock.calls.length).toBe(1)
   })
 
+  it('KEY-33, ADR 0033 (point 6) : un double clic sur « Restaurer » ne lance qu’une restauration', async () => {
+    vi.mocked(restoreKeys).mockResolvedValue(undefined)
+    const onRestored = vi.fn()
+    const { result } = await renderRestore(onRestored)
+    result.current.enter(0, KEY)
+    await expect.poll(() => result.current.canSubmit).toBe(true)
+
+    // Deux envois sans rendu entre eux : `pending` n'est relu qu'au rendu suivant. Le verrou des clés range le second
+    // derrière le premier, qui le rejouerait une fois la restauration finie.
+    result.current.submit()
+    result.current.submit()
+
+    await expect.poll(() => onRestored.mock.calls.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(restoreKeys).toHaveBeenCalledTimes(1)
+    expect(onRestored).toHaveBeenCalledTimes(1)
+  })
+
+  // Le verrou rendu après un échec est vérifié par le test suivant : chaque refus est suivi d'un nouvel envoi.
   it('ADR 0029, point 5 : clé fausse, coffre invalide et réseau donnent chacun leur refus ; une saisie l’efface', async () => {
     const { result } = await renderRestore()
     result.current.enter(0, KEY)
