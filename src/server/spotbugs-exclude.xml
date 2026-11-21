@@ -37,6 +37,17 @@
     </Match>
 
     <!--
+      SERVLET_PARAMETER : le paramètre error du retour OAuth n'est lu que pour savoir si le code d'erreur de Spring le
+      recopie ; il n'est ni journalisé, ni renvoyé, ni stocké. Seul un code d'une liste fermée atteint le journal (SEC-20,
+      OAuthCallbackSessionIT.sec20UnknownProviderErrorCodeIsNotJournaledAsIs). Exclusion limitée à cette méthode.
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.security.OAuthLoginFailureHandler"/>
+        <Method name="cause"/>
+        <Bug pattern="SERVLET_PARAMETER"/>
+    </Match>
+
+    <!--
       SPRING_ENDPOINT n'est pas une faille : FindSecBugs l'émet sur chaque contrôleur pour qu'il soit relu
       (ADR 0011). Une entrée par contrôleur relu, avec le test qui vérifie son contrôle d'accès (QA-05) ;
       jamais d'exclusion globale.

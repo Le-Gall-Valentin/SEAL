@@ -207,21 +207,23 @@ class OAuthCallbackSessionIT {
     }
 
     @Test
-    @DisplayName("SEC-20 : un code d'erreur du fournisseur hors de la RFC 6749 est journalisé oauth_error")
+    @DisplayName(
+            "SEC-20 : un code d'erreur du retour hors de la RFC 6749 (4.1.2.1), même interne, est journalisé oauth_error")
     void sec20UnknownProviderErrorCodeIsNotJournaledAsIs() throws Exception {
-        Started started = oauth.start("google");
-
-        mvc.perform(client.from(get("/login/oauth2/code/google")
-                                .param("error", "account_unusable")
-                                .param("state", started.state()))
-                        .cookie(started.session()))
-                .andExpect(status().isFound());
+        for (String forged : new String[] {"account_unusable", "invalid_nonce"}) {
+            Started started = oauth.start("google");
+            mvc.perform(client.from(get("/login/oauth2/code/google")
+                                    .param("error", forged)
+                                    .param("state", started.state()))
+                            .cookie(started.session()))
+                    .andExpect(status().isFound());
+        }
 
         assertThat(jdbc.sql("SELECT details->>'cause' FROM security_events WHERE type = 'LOGIN_FAILED' "
                                 + "AND ip = CAST(? AS inet)")
                         .param(client.ip())
                         .query(String.class)
                         .list())
-                .containsExactly("oauth_error");
+                .containsExactly("oauth_error", "oauth_error");
     }
 }

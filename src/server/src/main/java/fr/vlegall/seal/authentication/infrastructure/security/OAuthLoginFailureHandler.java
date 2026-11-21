@@ -25,18 +25,24 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
     static final String REJECTED = "/connexion?erreur=REQUEST_REJECTED";
 
     /**
-     * Codes d'erreur journalisables tels quels : ceux de la RFC 6749 (sections 4.1.2.1 et 5.2) et ceux de Spring
-     * Security. Le paramètre {@code error} d'un retour vient du navigateur, donc de n'importe qui : tout autre texte,
-     * comme une cause propre à SEAL ({@code email_in_use}), est journalisé {@code oauth_error} (SEC-21, A09).
+     * Codes qu'un fournisseur peut renvoyer dans le paramètre {@code error} du retour (RFC 6749, section 4.1.2.1). Ce
+     * paramètre vient du navigateur, donc de n'importe qui : tout autre texte est journalisé {@code oauth_error}, pour
+     * qu'aucun retour forgé n'imite une cause interne ({@code invalid_nonce}, {@code email_in_use}) (SEC-21, A09).
      */
-    private static final Set<String> KNOWN_ERRORS = Set.of(
+    private static final Set<String> PROVIDER_ERRORS = Set.of(
             "invalid_request",
             "unauthorized_client",
             "access_denied",
             "unsupported_response_type",
             "invalid_scope",
             "server_error",
-            "temporarily_unavailable",
+            "temporarily_unavailable");
+
+    /**
+     * Codes que Spring Security lève lui-même, ou que rend le point {@code /token} du fournisseur, appelé par le serveur
+     * (RFC 6749, section 5.2) : ils ne viennent pas du navigateur.
+     */
+    private static final Set<String> SERVER_ERRORS = Set.of(
             "invalid_client",
             "invalid_grant",
             "unsupported_grant_type",
@@ -81,10 +87,12 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
         if (request.getAttribute(OAuthAuthorizationRequests.REJECTION) instanceof String rejection) {
             return rejection;
         }
-        if (exception instanceof OAuth2AuthenticationException oauth
-                && KNOWN_ERRORS.contains(oauth.getError().getErrorCode())) {
-            return oauth.getError().getErrorCode();
+        if (!(exception instanceof OAuth2AuthenticationException oauth)) {
+            return "oauth_error";
         }
-        return "oauth_error";
+        String code = oauth.getError().getErrorCode();
+        // Un code qui recopie le paramètre error vient du navigateur : seul un code de fournisseur y est cru.
+        Set<String> known = code.equals(request.getParameter("error")) ? PROVIDER_ERRORS : SERVER_ERRORS;
+        return known.contains(code) ? code : "oauth_error";
     }
 }
