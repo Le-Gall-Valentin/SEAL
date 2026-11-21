@@ -1,14 +1,18 @@
 import { z } from 'zod'
+import { DISPLAY_NAME_SCHEMA, EMAIL_SCHEMA } from '@/entities/account'
 import { OAUTH_PROVIDER_IDS } from '@/entities/oauth-provider'
 import { reloadCsrf, request, requestNoContent } from '@/shared/api'
 import { ApiError } from '@/shared/lib'
 import type { IOAuthRegistrationApi } from './IOAuthRegistrationApi'
 
-/** SEC-01 : réponse de GET /api/v1/auth/oauth/pending (ADR 0032). */
+/**
+ * SEC-01 : réponse de GET /api/v1/auth/oauth/pending (ADR 0032), validée avec les règles du serveur : un courriel bien
+ * formé, un nom proposé vide ou conforme à ACC-03. Une réponse hors de ces règles n'est pas affichée.
+ */
 const PENDING = z.object({
   provider: z.enum(OAUTH_PROVIDER_IDS),
-  email: z.string().min(3).max(254),
-  displayName: z.string().max(200),
+  email: EMAIL_SCHEMA,
+  displayName: z.union([z.literal(''), DISPLAY_NAME_SCHEMA]),
   expiresAt: z.iso.datetime(),
 })
 

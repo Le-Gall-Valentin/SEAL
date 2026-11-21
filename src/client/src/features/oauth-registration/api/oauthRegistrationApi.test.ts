@@ -70,11 +70,18 @@ describe('features/oauth-registration : adaptateur de l’inscription OAuth', ()
     ['fournisseur inconnu', { ...PENDING, provider: 'okta' }],
     ['courriel absent', { ...PENDING, email: undefined }],
     ['échéance absente', { ...PENDING, expiresAt: undefined }],
-  ])('SEC-01 : %s, réponse refusée', async (_cas, response) => {
-    request.mockResolvedValue(response)
+    ['courriel mal formé', { ...PENDING, email: 'pas-un-courriel' }],
+    ['courriel sur deux lignes', { ...PENDING, email: 'valentin@gmail.com\nbcc@evil.example' }],
+    ['nom avec un caractère de direction', { ...PENDING, displayName: 'Valentin\u202eenilav' }],
+    ['nom de 51 caractères', { ...PENDING, displayName: 'n'.repeat(51) }],
+  ])(
+    'SEC-01, ACC-03 : %s, réponse refusée comme le serveur la refuserait',
+    async (_cas, response) => {
+      request.mockResolvedValue(response)
 
-    await expect(oauthRegistrationApi.pending()).rejects.toThrow()
-  })
+      await expect(oauthRegistrationApi.pending()).rejects.toThrow()
+    },
+  )
 
   it('AUTH-32, AUTH-60 : complete envoie les deux champs, puis recharge le jeton CSRF', async () => {
     requestNoContent.mockResolvedValue(undefined)

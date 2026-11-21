@@ -43,7 +43,7 @@ export function useOAuthRegistrationForm(pending: PendingRegistration) {
           setRefusedDisplayName(submitted.displayName)
           return
         case 'abandoned':
-          void navigate(loginPathWithError(failure.error), { replace: true })
+          // Navigation portée par l'envoi (submit) : elle n'a lieu que si l'écran est encore affiché.
           return
         case 'rate-limited':
         case 'network':
@@ -84,7 +84,17 @@ export function useOAuthRegistrationForm(pending: PendingRegistration) {
     canSubmit,
     submit: () => {
       if (canSubmit && guard.enter()) {
-        mutation.mutate({ username, displayName })
+        mutation.mutate(
+          { username, displayName },
+          {
+            onError: (error) => {
+              const failure = oauthRegistrationFailureOf(error)
+              if (failure.kind === 'abandoned') {
+                void navigate(loginPathWithError(failure.error), { replace: true })
+              }
+            },
+          },
+        )
       }
     },
   }

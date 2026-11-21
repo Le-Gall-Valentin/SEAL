@@ -78,7 +78,7 @@ async function renderForm(
   const router = createMemoryRouter(
     [
       {
-        path: '*',
+        path: '/inscription/identifiant',
         element: (
           <>
             <Probe />
@@ -86,6 +86,8 @@ async function renderForm(
           </>
         ),
       },
+      // Toute autre adresse démonte le formulaire.
+      { path: '*', element: <Probe /> },
     ],
     { initialEntries: ['/inscription/identifiant'] },
   )
@@ -102,7 +104,7 @@ async function renderForm(
       </SessionApiProvider>
     </QueryClientProvider>,
   )
-  return { screen, sent }
+  return { screen, sent, router }
 }
 
 const field = (screen: Awaited<ReturnType<typeof renderForm>>['screen'], label: string) =>
@@ -195,5 +197,27 @@ describe('Identifiant-OAuth : formulaire', () => {
     await expect.poll(() => sent.length).toBe(1)
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(sent).toHaveLength(1)
+  })
+
+  it('A10 : un refus arrivé après le départ de l’écran ne ramène pas de force à la connexion', async () => {
+    let reject: (reason: unknown) => void = () => undefined
+    const { screen, router } = await renderForm(
+      () =>
+        new Promise<void>((_resolve, fail) => {
+          reject = fail
+        }),
+    )
+    const submit = screen.getByRole('button', { name: 'Créer mon compte' })
+    await expect.element(submit).toBeEnabled()
+    await submit.click()
+
+    await router.navigate('/ailleurs')
+    await expect
+      .element(screen.getByRole('button', { name: 'Créer mon compte' }))
+      .not.toBeInTheDocument()
+    reject(new ApiError(404, 'NOT_FOUND'))
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(router.state.location.pathname).toBe('/ailleurs')
   })
 })
