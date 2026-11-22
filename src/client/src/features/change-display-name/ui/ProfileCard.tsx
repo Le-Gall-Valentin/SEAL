@@ -2,29 +2,9 @@ import { useId } from 'react'
 import { DisplayNameField, initialsOf } from '@/entities/account'
 import type { Account } from '@/entities/session'
 import { useMessages } from '@/shared/i18n'
-import { FormAlert } from '@/shared/ui'
+import { FormAlert, LockIcon } from '@/shared/ui'
 import { displayNameMessages } from '../i18n'
 import { useDisplayNameForm } from '../model/useDisplayNameForm'
-
-function LockIcon({ size }: { readonly size: 14 | 18 }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={size === 14 ? 1.9 : 1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="flex-none"
-    >
-      <rect x="5" y="10.5" width="14" height="10" rx="2.5" />
-      <path d="M8 10.5v-3a4 4 0 0 1 8 0v3" />
-    </svg>
-  )
-}
 
 /**
  * ACC-03 : carte Profil de Parametres-Ordinateur : l'avatar à initiales, « Nom affiché », l'identifiant définitif en

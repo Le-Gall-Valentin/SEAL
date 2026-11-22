@@ -15,9 +15,10 @@ import {
 } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { useMediaQuery, WIDE_SCREEN } from '@/shared/lib'
+import { LockIcon } from '@/shared/ui'
 import { settingsMessages } from '../i18n'
 import { useOAuthReturnError } from '../model/useOAuthReturnError'
-import { AccountIcon, ChevronLeft, ChevronRight, LockIcon } from './icons'
+import { AccountIcon, ChevronLeft, ChevronRight } from './icons'
 
 /**
  * Paramètres (ACC-01 à ACC-03, ADR 0035). Ordinateur et tablette : navigation des sections à gauche, section Compte à
@@ -199,7 +200,7 @@ function PhoneList({
           </span>
           <span className="flex min-w-0 items-center gap-1.25 font-mono text-[13px] text-ink-3">
             <span className="truncate">@{account.username}</span>
-            <LockIcon label={t('usernameFinal')} />
+            <LockIcon size={13} label={t('usernameFinal')} />
           </span>
         </span>
         <ChevronRight />

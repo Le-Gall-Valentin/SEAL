@@ -1,12 +1,5 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useId } from 'react'
-import { useLoginMethods } from '@/entities/account'
-import {
-  OrSeparator,
-  ProviderLinks,
-  retryFailedOAuthProviders,
-  useOAuthProviders,
-} from '@/entities/oauth-provider'
+import { useId } from 'react'
+import { OrSeparator, ProviderLinks } from '@/entities/oauth-provider'
 import { PASSWORD_INPUT_MAX_LENGTH } from '@/entities/password'
 import { useMessages } from '@/shared/i18n'
 import {
@@ -21,6 +14,7 @@ import {
 import { reauthMessages } from '../i18n'
 import type { ReauthReturnError } from '../model/oauthReturn'
 import { useReauthentication } from '../model/useReauthentication'
+import { useReauthMethods } from '../model/useReauthMethods'
 
 interface ReauthDialogProps {
   readonly open: boolean
@@ -38,24 +32,9 @@ interface ReauthDialogProps {
 export function ReauthDialog({ open, onReauthenticated, onCancel }: ReauthDialogProps) {
   const t = useMessages(reauthMessages)
   const descriptionId = useId()
-  const methods = useLoginMethods()
-  const configured = useOAuthProviders()
+  const methods = useReauthMethods(open)
   const reauth = useReauthentication(onReauthenticated)
-  const client = useQueryClient()
-  const { isError: methodsFailed, refetch: refetchMethods } = methods
-  // Une lecture ratée (sans nouvel essai automatique) est refaite à chaque ouverture : le dialogue a toujours une issue.
-  useEffect(() => {
-    if (open) {
-      if (methodsFailed) {
-        void refetchMethods()
-      }
-      void retryFailedOAuthProviders(client)
-    }
-  }, [open, methodsFailed, refetchMethods, client])
-  const passwordSet = methods.data?.passwordSet === true
-  const providers = (methods.data?.providers ?? []).filter((provider) =>
-    configured.includes(provider),
-  )
+  const { passwordSet, providers } = methods
   const cancel = () => {
     reauth.clear()
     onCancel()
@@ -67,7 +46,7 @@ export function ReauthDialog({ open, onReauthenticated, onCancel }: ReauthDialog
       closable={!reauth.pending}
       title={t('title')}
       subtitle={t('subtitle')}
-      describedBy={methods.data === undefined ? undefined : descriptionId}
+      describedBy={methods.loaded ? descriptionId : undefined}
     >
       <form
         noValidate
@@ -77,10 +56,8 @@ export function ReauthDialog({ open, onReauthenticated, onCancel }: ReauthDialog
         }}
       >
         <DialogBody>
-          {methods.isError && methods.data === undefined && (
-            <FailureAlert failure={{ kind: 'unexpected' }} />
-          )}
-          {methods.data !== undefined && (
+          {methods.failed && <FailureAlert failure={{ kind: 'unexpected' }} />}
+          {methods.loaded && (
             <p id={descriptionId} className="m-0 text-[14.5px] leading-[1.45] text-ink-2">
               {passwordSet ? t('passwordIntro') : t('providerIntro')}
             </p>

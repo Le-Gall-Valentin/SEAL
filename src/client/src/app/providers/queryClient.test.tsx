@@ -59,7 +59,7 @@ describe('Racine de composition : client TanStack Query', () => {
     },
   )
 
-  it('CDC 3, ADR 0035 : une mutation qu’aucun écran ne suit plus quitte le cache, et ses variables avec elle', async () => {
+  it('AUTH-55, ACC-01, CDC 3 : une mutation qu’aucun écran ne suit plus quitte le cache, et ses variables avec elle', async () => {
     const client = createQueryClient()
     const observer = new MutationObserver(client, {
       mutationFn: (password: string) => Promise.resolve(password.length),
