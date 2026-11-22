@@ -66,6 +66,7 @@ function fakeApis(account: Account | null): Apis {
       loginMethods: () => Promise.resolve({ passwordSet: true, providers: [] }),
     },
     reauth: { reauthenticate: never },
+    profile: { changeDisplayName: never },
   }
 }
 

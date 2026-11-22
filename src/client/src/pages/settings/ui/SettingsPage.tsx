@@ -2,9 +2,11 @@ import type { ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { type Account, useCurrentAccount } from '@/entities/session'
 import { initialsOf } from '@/entities/account'
+import { ProfileCard } from '@/features/change-display-name'
 import { LogoutButton } from '@/features/logout'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
+import { useMediaQuery, WIDE_SCREEN } from '@/shared/lib'
 import { settingsMessages } from '../i18n'
 import { SECTION_PARAM, sectionOf } from '../model/section'
 import { AccountIcon, ChevronLeft, ChevronRight } from './icons'
@@ -18,34 +20,41 @@ const ACCOUNT_SECTION = `${ROUTES.SETTINGS}?${SECTION_PARAM}=compte`
  */
 export function SettingsPage() {
   const account = useCurrentAccount().data
+  const wide = useMediaQuery(WIDE_SCREEN)
   const [params] = useSearchParams()
   if (account == null) {
     return null
   }
-  const content = <AccountContent />
-  return (
-    <div className="flex min-h-0 flex-1">
-      <SectionsNav />
-      <main className="hidden min-w-0 flex-1 sm:block">
-        <div className="flex flex-col gap-4 px-6 pt-6 pb-10 lg:max-w-176 lg:gap-5 lg:px-12 lg:pt-9 lg:pb-16">
-          <SectionTitle level={2} />
-          {content}
-        </div>
-      </main>
-      <div className="flex min-w-0 flex-1 flex-col sm:hidden">
-        {sectionOf(params) === 'compte' ? (
-          <PhoneSubpage>{content}</PhoneSubpage>
-        ) : (
-          <PhoneList account={account} />
-        )}
+  // Une seule disposition montée à la fois : les formulaires de la section n'existent qu'une fois.
+  if (wide) {
+    return (
+      <div className="flex min-h-0 flex-1">
+        <SectionsNav />
+        <main className="min-w-0 flex-1">
+          <div className="flex flex-col gap-4 px-6 pt-6 pb-10 lg:max-w-176 lg:gap-5 lg:px-12 lg:pt-9 lg:pb-16">
+            <SectionTitle level={2} />
+            <AccountContent account={account} />
+          </div>
+        </main>
       </div>
-    </div>
+    )
+  }
+  return sectionOf(params) === 'compte' ? (
+    <PhoneSubpage>
+      <AccountContent account={account} />
+    </PhoneSubpage>
+  ) : (
+    <PhoneList account={account} />
   )
 }
 
-/** Contenu de la section Compte, rempli par les tâches suivantes. */
-function AccountContent() {
-  return <div className="flex flex-col gap-4 lg:gap-5" />
+/** Section Compte : Profil, Courriel, Mot de passe (ADR 0035, point 4 : « Comptes liés » attend ACC-04). */
+function AccountContent({ account }: { readonly account: Account }) {
+  return (
+    <div className="flex flex-col gap-4 lg:gap-5">
+      <ProfileCard account={account} />
+    </div>
+  )
 }
 
 function SectionTitle({ level }: { readonly level: 1 | 2 }) {
@@ -66,7 +75,7 @@ function SectionsNav() {
   return (
     <nav
       aria-label={t('sections')}
-      className="hidden w-58 flex-none flex-col gap-3 border-r border-line bg-surface px-3 pt-6 pb-5 sm:flex lg:w-70 lg:px-4 lg:py-8"
+      className="flex w-58 flex-none flex-col gap-3 border-r border-line bg-surface px-3 pt-6 pb-5 lg:w-70 lg:px-4 lg:py-8"
     >
       <h1 className="m-0 flex min-h-11 items-center px-2 text-[20px] font-bold tracking-[-0.025em] lg:min-h-0">
         {t('title')}

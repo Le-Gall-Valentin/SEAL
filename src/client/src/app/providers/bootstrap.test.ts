@@ -26,6 +26,7 @@ function apisWith(reloadCsrf: () => Promise<void>): Apis {
     logout: { logout: never },
     loginMethods: { loginMethods: never },
     reauth: { reauthenticate: never },
+    profile: { changeDisplayName: never },
   }
 }
 

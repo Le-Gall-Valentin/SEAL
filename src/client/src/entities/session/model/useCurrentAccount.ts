@@ -1,5 +1,6 @@
 import { hashKey, type QueryClient, useQuery } from '@tanstack/react-query'
 import { useSessionApi } from './sessionApiPort'
+import type { Account } from '../api/ISessionApi'
 
 /** Clé du compte courant : /me est la seule source de la session (ADR 0024, point 7). */
 export const SESSION_QUERY_KEY = ['session', 'me'] as const
@@ -33,4 +34,12 @@ export function endSession(client: QueryClient): void {
 /** AUTH-16 : après une connexion ou une vérification, /me est relu ; les gardes de route mènent à l'écran suivant. */
 export function refreshSession(client: QueryClient): Promise<void> {
   return client.invalidateQueries({ queryKey: SESSION_QUERY_KEY })
+}
+
+/**
+ * ACC-02, ACC-03 : une route du compte a rendu le compte courant ; il remplace celui du cache, sans relire /me
+ * (ADR 0035).
+ */
+export function replaceSessionAccount(client: QueryClient, account: Account): void {
+  client.setQueryData(SESSION_QUERY_KEY, account)
 }
