@@ -161,6 +161,11 @@ class AccountIdentitiesIT {
     void auth55ReadableOutsideSudo() throws Exception {
         Cookie full = client.verify(client.register("horsudo" + run + "@exemple.ca", "horsudo" + run));
         clock.advance(Duration.ofMinutes(11));
+        // Le mode sudo est bien fermé : une action protégée le dit.
+        mvc.perform(client.unsafe(
+                        post("/api/v1/account/email"), full, Map.of("email", "neuve.horsudo" + run + "@exemple.ca")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("REAUTH_REQUIRED"));
 
         mvc.perform(client.from(get(IDENTITIES)).cookie(full))
                 .andExpect(status().isOk())

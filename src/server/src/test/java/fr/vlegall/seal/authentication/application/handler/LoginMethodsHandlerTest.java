@@ -23,6 +23,11 @@ class LoginMethodsHandlerTest {
 
     private final InMemoryCredentials credentials = new InMemoryCredentials();
     private final InMemoryOAuthIdentities identities = new InMemoryOAuthIdentities();
+
+    {
+        identities.forbidLinks("la lecture des méthodes ne lie rien");
+    }
+
     private final Map<UserId, AccountLoginState> states = new HashMap<>();
 
     private final OAuthAccountLookupPort accounts = new OAuthAccountLookupPort() {

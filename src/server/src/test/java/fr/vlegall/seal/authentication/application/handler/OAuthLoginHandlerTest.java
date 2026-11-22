@@ -32,6 +32,10 @@ class OAuthLoginHandlerTest {
 
     private final InMemoryOAuthIdentities identities = new InMemoryOAuthIdentities();
 
+    {
+        identities.forbidLinks("le retour OAuth ne lie rien : la liaison suit l'inscription (AUTH-32)");
+    }
+
     private final OAuthAccountLookupPort accounts = new OAuthAccountLookupPort() {
         @Override
         public AccountLoginState state(UserId user) {

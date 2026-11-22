@@ -22,6 +22,7 @@ class InMemoryOAuthIdentities implements OAuthIdentityRepository {
     private final Map<String, UserId> bySubject = new HashMap<>();
     private Consumer<String> linkListener = step -> {};
     private boolean refuseLinks;
+    private String forbiddenLinks;
 
     private static String key(OAuthProvider provider, String subject) {
         return provider + ":" + subject;
@@ -40,6 +41,11 @@ class InMemoryOAuthIdentities implements OAuthIdentityRepository {
     /** Les liaisons suivantes échouent comme sur une contrainte d'unicité. */
     void refuseLinks() {
         refuseLinks = true;
+    }
+
+    /** Le cas d'usage testé ne doit rien lier : toute liaison fait échouer le test, avec cette raison. */
+    void forbidLinks(String reason) {
+        forbiddenLinks = reason;
     }
 
     @Override
@@ -63,6 +69,9 @@ class InMemoryOAuthIdentities implements OAuthIdentityRepository {
 
     @Override
     public void link(UserId user, ExternalIdentity identity, Instant linkedAt) {
+        if (forbiddenLinks != null) {
+            throw new UnsupportedOperationException(forbiddenLinks);
+        }
         String key = key(identity.provider(), identity.subject());
         if (refuseLinks || bySubject.containsKey(key) || isLinked(user, identity.provider())) {
             throw new OAuthException.AlreadyLinked();

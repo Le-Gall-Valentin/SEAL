@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Comptes liés, en lecture seule (14.1 du CDC, avancée par l'ADR 0035, point 2). La règle d'accès est dans
+ * Comptes liés, en lecture seule (14.2 du CDC, avancée par l'ADR 0035, point 2). La règle d'accès est dans
  * {@code SecurityConfig} : session complète seulement. Le contexte {@code authentication} possède le mot de passe et
  * les liaisons OAuth (ADR 0008).
  */

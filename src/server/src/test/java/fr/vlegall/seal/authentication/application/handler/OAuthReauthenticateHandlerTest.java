@@ -26,6 +26,10 @@ class OAuthReauthenticateHandlerTest {
 
     private final InMemoryOAuthIdentities identities = new InMemoryOAuthIdentities();
 
+    {
+        identities.forbidLinks("la ré-authentification ne lie rien (ACC-04, P1)");
+    }
+
     private final OAuthAccountLookupPort accounts = new OAuthAccountLookupPort() {
         @Override
         public AccountLoginState state(UserId user) {
