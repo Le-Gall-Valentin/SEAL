@@ -38,11 +38,15 @@ final class PasswordResetFixture {
 
     final MutableClock clock = MutableClock.fixedAt(NOW);
     final List<String> calls = new ArrayList<>();
+    /** Exécuté pendant l'attente du verrou du compte : simule ce qu'une autre transaction valide entre-temps. */
+    Runnable duringLock = () -> {};
+
     /** Inscrit aussi chaque verrou du compte dans {@link #calls} (ADR 0022, point 4). */
     final InMemoryCredentials credentials = new InMemoryCredentials() {
         @Override
         public boolean lock(UserId user) {
             calls.add("verrou");
+            duringLock.run();
             return super.lock(user);
         }
     };

@@ -36,6 +36,21 @@ class RequestPasswordResetHandlerTest {
     }
 
     @Test
+    @DisplayName("ACC-02, ADR 0034 : une adresse remplacée pendant l'attente du verrou ne reçoit aucun lien")
+    void acc02AddressChangedWhileWaitingGetsNothing() {
+        AccountContact valentin = fixture.active("valentin", true);
+        fixture.duringLock = () -> fixture.contacts.put(
+                valentin.user(),
+                new AccountContact(valentin.user(), "valentin", "neuve@exemple.ca", valentin.personalWords()));
+
+        handler.request("valentin@exemple.ca");
+
+        assertThat(fixture.mails).isEmpty();
+        assertThat(fixture.rows).isEmpty();
+        assertThat(fixture.calls).containsExactly("verrou");
+    }
+
+    @Test
     @DisplayName("AUTH-70 : un courriel inconnu ou d'un compte sans mot de passe ne déclenche rien, sans erreur")
     void auth70UnknownOrPasswordlessAccountGetsNothing() {
         fixture.active("oauth", false);
