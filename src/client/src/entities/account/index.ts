@@ -7,6 +7,7 @@ export {
 export { refusedAccountField } from './model/refusedField'
 export { useUsernameChoice } from './model/useUsernameChoice'
 export { EMAIL_MAX_LENGTH, isEmailWellFormed, localPartOf } from './model/email'
+export { initialsOf } from './model/initials'
 export {
   isReservedUsername,
   isUsernameWellFormed,

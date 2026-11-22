@@ -20,6 +20,8 @@
   --accent-hover: #525e15;
   --accent-soft: #eef1e2;
   --accent-soft-2: #e5ead3;
+  /* Avatar à initiales (Parametres-*, ADR 0035). */
+  --av-moss: #e5ead3;
   --accent-text: #525e15;
   --accent-line: rgba(102, 116, 28, 0.28);
   --danger: #b3261e;
@@ -61,6 +63,7 @@
     --accent-hover: #c4d46e;
     --accent-soft: #1e2611;
     --accent-soft-2: #26301a;
+    --av-moss: #232c16;
     --accent-text: #c2d26a;
     --accent-line: rgba(180, 198, 90, 0.3);
     --danger: #f2867a;

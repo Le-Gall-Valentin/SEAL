@@ -9,4 +9,6 @@ export const ROUTES = {
   RESET_PASSWORD: '/mot-de-passe/nouveau',
   // AUTH-32, ADR 0032 (point 4) : Identifiant-OAuth, où le serveur renvoie après un premier passage.
   CHOOSE_USERNAME: '/inscription/identifiant',
+  // ACC-01 à ACC-03, ADR 0034 et 0035 : Paramètres, où revient aussi une ré-authentification OAuth.
+  SETTINGS: '/parametres',
 } as const

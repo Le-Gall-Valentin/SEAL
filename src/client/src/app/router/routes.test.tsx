@@ -108,6 +108,17 @@ describe('ADR 0012 : routeur de la couche app', () => {
     await expect.element(screen.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
   })
 
+  it('ADR 0035 : /parametres, réservée au compte actif, affiche Paramètres dans la navigation principale', async () => {
+    const { screen } = await renderAt('/parametres')
+
+    await expect
+      .element(screen.getByRole('heading', { level: 1, name: 'Paramètres' }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('navigation', { name: 'Navigation principale' }))
+      .toBeVisible()
+  })
+
   it('ADR 0012 : une adresse inconnue ramène à la racine, sans écran nouveau', async () => {
     const { router, screen } = await renderAt('/adresse/inconnue')
 
@@ -128,6 +139,9 @@ describe('ADR 0012 : routeur de la couche app', () => {
     ['/inscription/identifiant', null, '/connexion', 'Connexion'],
     ['/inscription/identifiant', ACTIVE, '/', null],
     ['/inscription/identifiant', PENDING, '/verification-courriel', 'Vérifiez votre courriel'],
+    // ADR 0035 : Paramètres, réservé au compte actif.
+    ['/parametres', null, '/connexion', 'Connexion'],
+    ['/parametres', PENDING, '/verification-courriel', 'Vérifiez votre courriel'],
   ] as const)(
     'ADR 0024, point 5 : %s, compte %o → %s',
     async (path, account, expected, heading) => {
