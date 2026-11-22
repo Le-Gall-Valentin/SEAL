@@ -13,6 +13,9 @@ public interface OAuthIdentityRepository {
     /** Le compte lié à ce sujet chez ce fournisseur ; jamais une recherche par courriel. */
     Optional<UserId> findUser(OAuthProvider provider, String subject);
 
+    /** AUTH-55, ADR 0034 : vrai si le compte a une identité liée chez ce fournisseur. */
+    boolean isLinked(UserId user, OAuthProvider provider);
+
     /**
      * Lie l'identité au compte, dans la transaction en cours, avec le courriel vu chez le fournisseur.
      *

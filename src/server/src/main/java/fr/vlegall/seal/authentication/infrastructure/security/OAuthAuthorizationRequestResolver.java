@@ -1,7 +1,12 @@
 package fr.vlegall.seal.authentication.infrastructure.security;
 
+import fr.vlegall.seal.authentication.application.port.in.OAuthReauthenticateUseCase;
+import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
+import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.web.OAuthRoutes;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Optional;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -22,9 +27,11 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  *       session, que le retour devra retrouver ({@link OAuthAuthorizationRequests}).
  * </ul>
  *
- * <p>Le filtre de Spring passe avant les règles d'accès : ce résolveur ne rend rien pour une session restreinte ou pour
- * un fournisseur non configuré, et la requête suit alors son cours jusqu'au refus (403) ou à l'absence de route (404),
- * au lieu de l'erreur 500 de Spring (OPS-03). Le reste (state, nonce, PKCE) est celui de Spring.
+ * <p>Le filtre de Spring passe avant les règles d'accès : ce résolveur ne rend rien pour une session restreinte, pour
+ * un fournisseur non configuré, ou, pour une session complète, vers un fournisseur que son compte n'a pas lié. La
+ * requête suit alors son cours jusqu'au refus (403), au retour vers les paramètres ({@code OAuthStartController}) ou à
+ * l'absence de route (404), au lieu de l'erreur 500 de Spring (OPS-03). Le reste (state, nonce, PKCE) est celui de
+ * Spring.
  */
 final class OAuthAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
 
@@ -34,11 +41,14 @@ final class OAuthAuthorizationRequestResolver implements OAuth2AuthorizationRequ
     private final PathPatternRequestMatcher start = PathPatternRequestMatcher.withDefaults()
             .matcher(HttpMethod.GET, OAuthRoutes.AUTHORIZATION_BASE + "/{registrationId}");
     private final ClientRegistrationRepository registrations;
+    private final OAuthReauthenticateUseCase reauthenticated;
     private final DefaultOAuth2AuthorizationRequestResolver login;
     private final DefaultOAuth2AuthorizationRequestResolver reauthentication;
 
-    OAuthAuthorizationRequestResolver(ClientRegistrationRepository registrations) {
+    OAuthAuthorizationRequestResolver(
+            ClientRegistrationRepository registrations, OAuthReauthenticateUseCase reauthenticated) {
         this.registrations = registrations;
+        this.reauthenticated = reauthenticated;
         this.login = new DefaultOAuth2AuthorizationRequestResolver(registrations, OAuthRoutes.AUTHORIZATION_BASE);
         this.reauthentication =
                 new DefaultOAuth2AuthorizationRequestResolver(registrations, OAuthRoutes.AUTHORIZATION_BASE);
@@ -64,7 +74,15 @@ final class OAuthAuthorizationRequestResolver implements OAuth2AuthorizationRequ
         if (clientRegistrationId == null || registrations.findByRegistrationId(clientRegistrationId) == null) {
             return null;
         }
-        if (OAuthRequests.fullSessionUser().isPresent()) {
+        Optional<UUID> fullSession = OAuthRequests.fullSessionUser();
+        if (fullSession.isPresent()) {
+            // ADR 0034 : pas d'aller-retour vers un fournisseur que le compte n'a pas lié ; OAuthStartController
+            // renvoie
+            // alors aux paramètres.
+            Optional<OAuthProvider> provider = OAuthProvider.fromRegistrationId(clientRegistrationId);
+            if (provider.isEmpty() || !reauthenticated.canStart(new UserId(fullSession.get()), provider.get())) {
+                return null;
+            }
             return reauthentication.resolve(request, clientRegistrationId);
         }
         if (OAuthRequests.signedIn()) {

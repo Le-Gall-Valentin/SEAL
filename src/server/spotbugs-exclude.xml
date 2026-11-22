@@ -92,6 +92,12 @@
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.ReauthenticationController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- GET /oauth2/authorization/{id} non résolu par Spring : 404 pour l'anonyme, retour aux paramètres pour la session
+         complète (ADR 0034, point 2), adresses constantes : OAuthReauthenticationIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.web.OAuthStartController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /api/v1/account/password (session complète, ACC-01) : PasswordChangeIT. -->
     <Match>
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.AccountPasswordController"/>

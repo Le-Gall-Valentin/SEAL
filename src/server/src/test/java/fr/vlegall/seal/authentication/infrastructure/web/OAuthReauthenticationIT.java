@@ -227,4 +227,52 @@ class OAuthReauthenticationIT {
         assertThat(refused.getResponse().getHeader("Location")).isEqualTo("/parametres?erreur=RATE_LIMITED");
         assertThat(refused.getResponse().getHeader("Retry-After")).isNotNull();
     }
+
+    @Test
+    @DisplayName("AUTH-55 : l'identité Google liée à un autre compte n'ouvre pas le sudo de cette session")
+    void auth55IdentityOfAnotherAccountIsRefused() throws Exception {
+        String other = googleSubject();
+        staleSessionLinkedTo("autrecpt", other);
+        Cookie stale = staleSessionLinkedTo("victime", googleSubject());
+
+        Started started = oauth.start("google", stale);
+        MvcResult result = oauth.callback(
+                started, fake.authorize(started.location(), GoogleAccount.verified(other, "autre@gmail.com")));
+
+        assertThat(result.getResponse().getHeader("Location")).isEqualTo("/parametres?erreur=REQUEST_REJECTED");
+        Cookie after = result.getResponse().getCookie(AuthClient.SESSION_COOKIE) == null
+                ? stale
+                : AuthClient.sessionOf(result);
+        assertThat(emailChangeStatus(after)).isEqualTo(403);
+        assertThat(causes(idOf("victime"))).contains("reauth_identity_mismatch");
+    }
+
+    @Test
+    @DisplayName(
+            "ADR 0034 : un départ vers un fournisseur que le compte n'a pas lié revient aux paramètres sans aller-retour")
+    void adr0034StartToAnUnlinkedProviderGoesBackToSettings() throws Exception {
+        Cookie stale = staleSessionLinkedTo("nonlie", googleSubject());
+
+        MvcResult result = mvc.perform(
+                        client.from(get("/oauth2/authorization/github")).cookie(stale))
+                .andReturn();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(302);
+        assertThat(result.getResponse().getHeader("Location")).isEqualTo("/parametres?erreur=REQUEST_REJECTED");
+    }
+
+    @Test
+    @DisplayName(
+            "OPS-03 : un fournisseur inconnu reste introuvable pour l'anonyme, et ramène la session complète aux paramètres")
+    void ops03UnknownProvider() throws Exception {
+        mvc.perform(client.from(get("/oauth2/authorization/inconnu")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        Cookie stale = staleSessionLinkedTo("inconnu", googleSubject());
+        MvcResult result = mvc.perform(
+                        client.from(get("/oauth2/authorization/inconnu")).cookie(stale))
+                .andReturn();
+        assertThat(result.getResponse().getHeader("Location")).isEqualTo("/parametres?erreur=REQUEST_REJECTED");
+    }
 }

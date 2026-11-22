@@ -46,7 +46,7 @@ class OAuthLoginConfiguration {
                 // ADR 0032, point 7 : même dépôt pour le départ et le retour (Spring le partage entre les deux
                 // filtres).
                 .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(
-                                new OAuthAuthorizationRequestResolver(registrations))
+                                new OAuthAuthorizationRequestResolver(registrations, reauthentication))
                         .authorizationRequestRepository(requests))
                 .tokenEndpoint(token -> token.accessTokenResponseClient(ProviderHttp.tokenClient()))
                 .userInfoEndpoint(userInfo ->
