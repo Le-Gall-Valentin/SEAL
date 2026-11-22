@@ -56,6 +56,7 @@ test('ACC-03, ACC-02, ACC-01, AUTH-53 : nom affiché, courriel par code, mot de 
   const dialog = page.getByRole('dialog', { name: 'Changer le mot de passe' })
   await dialog.getByLabel('Mot de passe actuel', { exact: true }).fill(PASSWORD)
   await dialog.getByLabel('Nouveau mot de passe', { exact: true }).fill(NEW_PASSWORD)
+  await dialog.getByLabel('Confirmer le mot de passe', { exact: true }).fill(NEW_PASSWORD)
   await dialog.getByRole('button', { name: 'Changer le mot de passe' }).click()
   await expect(dialog).toBeHidden()
   await expect(page.getByText('Mot de passe changé.')).toBeVisible()

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { PasswordBlocklistProvider } from '@/entities/password'
 import type { Account } from '@/entities/session'
@@ -23,9 +23,17 @@ interface PasswordChange {
   readonly signOutOtherSessions: boolean
 }
 
-async function renderCard(changePassword: (change: PasswordChange) => Promise<void>) {
+// Comme le client de l'application (app/providers/queryClient) : une mutation sans écran qui la suit est oubliée.
+function queryClient() {
+  return new QueryClient({ defaultOptions: { mutations: { gcTime: 0 } } })
+}
+
+async function renderCard(
+  changePassword: (change: PasswordChange) => Promise<void>,
+  client: QueryClient = queryClient(),
+) {
   const screen = await render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <PasswordBlocklistProvider api={{ load: () => Promise.resolve(['motdepassetropcourant']) }}>
         <PasswordChangeApiProvider api={{ changePassword }}>
           <PasswordCard account={ACCOUNT} />
@@ -52,6 +60,7 @@ describe('ACC-01 : « Changer le mot de passe »', () => {
     await expect.element(submit).toBeDisabled()
     await dialog.getByLabelText('Mot de passe actuel').fill('ancienne phrase')
     await dialog.getByLabelText('Nouveau mot de passe').fill(STRONG)
+    await dialog.getByLabelText('Confirmer le mot de passe').fill(STRONG)
     await submit.click()
 
     await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument()
@@ -71,6 +80,7 @@ describe('ACC-01 : « Changer le mot de passe »', () => {
     await screen.getByRole('switch', { name: 'Déconnecter mes autres sessions' }).click()
     await screen.getByLabelText('Mot de passe actuel').fill('ancienne phrase')
     await screen.getByLabelText('Nouveau mot de passe').fill(STRONG)
+    await screen.getByLabelText('Confirmer le mot de passe').fill(STRONG)
     await screen
       .getByRole('dialog')
       .getByRole('button', { name: 'Changer le mot de passe' })
@@ -97,6 +107,7 @@ describe('ACC-01 : « Changer le mot de passe »', () => {
     const current = screen.getByLabelText('Mot de passe actuel')
     await current.fill('mauvaise phrase')
     await screen.getByLabelText('Nouveau mot de passe').fill(STRONG)
+    await screen.getByLabelText('Confirmer le mot de passe').fill(STRONG)
     await screen
       .getByRole('dialog')
       .getByRole('button', { name: 'Changer le mot de passe' })
@@ -112,6 +123,7 @@ describe('ACC-01 : « Changer le mot de passe »', () => {
 
     await screen.getByLabelText('Mot de passe actuel').fill('ancienne phrase')
     await screen.getByLabelText('Nouveau mot de passe').fill(STRONG)
+    await screen.getByLabelText('Confirmer le mot de passe').fill(STRONG)
     const submit = screen
       .getByRole('dialog')
       .getByRole('button', { name: 'Changer le mot de passe' })
@@ -119,6 +131,7 @@ describe('ACC-01 : « Changer le mot de passe »', () => {
 
     await expect.element(submit).toBeDisabled()
     await screen.getByLabelText('Nouveau mot de passe').fill(`${STRONG}-bis`)
+    await screen.getByLabelText('Confirmer le mot de passe').fill(`${STRONG}-bis`)
     await expect.element(submit).toBeEnabled()
   })
 
@@ -127,6 +140,7 @@ describe('ACC-01 : « Changer le mot de passe »', () => {
 
     await screen.getByLabelText('Mot de passe actuel').fill('ancienne phrase')
     await screen.getByLabelText('Nouveau mot de passe').fill(STRONG)
+    await screen.getByLabelText('Confirmer le mot de passe').fill(STRONG)
     await screen.getByRole('switch', { name: 'Déconnecter mes autres sessions' }).click()
     await screen.getByRole('button', { name: 'Annuler' }).click()
     await screen.getByRole('button', { name: 'Changer le mot de passe' }).click()
@@ -136,5 +150,63 @@ describe('ACC-01 : « Changer le mot de passe »', () => {
     await expect
       .element(screen.getByRole('switch', { name: 'Déconnecter mes autres sessions' }))
       .toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('ACC-01, AUTH-11 : la confirmation doit être identique ; la note « Aucune règle de composition » est là', async () => {
+    const screen = await renderCard(() => Promise.reject(new Error('non attendu')))
+
+    await expect.element(screen.getByText(/Aucune règle de composition/)).toBeVisible()
+    await screen.getByLabelText('Mot de passe actuel').fill('ancienne phrase')
+    await screen.getByLabelText('Nouveau mot de passe').fill(STRONG)
+    await screen.getByLabelText('Confirmer le mot de passe').fill(`${STRONG}x`)
+
+    await expect.element(screen.getByText('Les mots de passe ne correspondent pas.')).toBeVisible()
+    await expect
+      .element(screen.getByRole('dialog').getByRole('button', { name: 'Changer le mot de passe' }))
+      .toBeDisabled()
+  })
+
+  it('CDC 3 : après la réussite comme après « Annuler », aucun mot de passe ne reste dans le cache des mutations', async () => {
+    const client = queryClient()
+    const secrets = () =>
+      JSON.stringify(
+        client
+          .getMutationCache()
+          .getAll()
+          .map((mutation) => mutation.state.variables),
+      )
+    let refuse = true
+    const screen = await renderCard(
+      () => (refuse ? Promise.reject(new ApiError(401, 'INVALID_CREDENTIALS')) : Promise.resolve()),
+      client,
+    )
+
+    await screen.getByLabelText('Mot de passe actuel').fill('presque bonne phrase')
+    await screen.getByLabelText('Nouveau mot de passe').fill(STRONG)
+    await screen.getByLabelText('Confirmer le mot de passe').fill(STRONG)
+    await screen
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Changer le mot de passe' })
+      .click()
+    await expect.element(screen.getByText('Mot de passe actuel incorrect.')).toBeVisible()
+    await screen.getByRole('button', { name: 'Annuler' }).click()
+    await vi.waitFor(() => {
+      expect(secrets()).not.toContain('presque bonne phrase')
+    })
+
+    refuse = false
+    await screen.getByRole('button', { name: 'Changer le mot de passe' }).click()
+    await screen.getByLabelText('Mot de passe actuel').fill('ancienne phrase')
+    await screen.getByLabelText('Nouveau mot de passe').fill(STRONG)
+    await screen.getByLabelText('Confirmer le mot de passe').fill(STRONG)
+    await screen
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Changer le mot de passe' })
+      .click()
+    await expect.element(screen.getByRole('status')).toHaveTextContent('Mot de passe changé.')
+    await vi.waitFor(() => {
+      expect(secrets()).not.toContain('ancienne phrase')
+      expect(secrets()).not.toContain(STRONG)
+    })
   })
 })

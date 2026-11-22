@@ -18,6 +18,7 @@ interface NewPasswordFieldsProps {
   readonly confirmMismatch: boolean
   readonly rules: PasswordRules
   readonly strength: PasswordStrength
+  readonly disabled?: boolean
   /** Lignes ajoutées après les règles, propres à l'écran. */
   readonly children?: ReactNode
 }
@@ -36,6 +37,7 @@ export function NewPasswordFields({
   confirmMismatch,
   rules,
   strength,
+  disabled = false,
   children,
 }: NewPasswordFieldsProps) {
   const t = useMessages(passwordMessages)
@@ -47,6 +49,7 @@ export function NewPasswordFields({
         onChange={onPasswordChange}
         rules={rules}
         strength={strength}
+        disabled={disabled}
       >
         {children}
       </NewPasswordField>
@@ -57,6 +60,7 @@ export function NewPasswordFields({
         value={confirm}
         onChange={onConfirmChange}
         onBlur={onConfirmBlur}
+        disabled={disabled}
         error={confirmMismatch ? t('mismatch') : null}
       />
     </>

@@ -13,7 +13,6 @@ export { confirmMismatch, PASSWORD_INPUT_MAX_LENGTH, rulesAfterRefusal } from '.
 export { passwordStrength } from './model/passwordStrength'
 export type { PasswordStrength } from './model/passwordStrength'
 export { usePasswordBlocklist } from './model/usePasswordBlocklist'
-export { NewPasswordField } from './ui/NewPasswordField'
 export { NewPasswordFields } from './ui/NewPasswordFields'
 export { CompositionNote, PasswordRulesList } from './ui/PasswordRulesList'
 export { StrengthMeter } from './ui/StrengthMeter'

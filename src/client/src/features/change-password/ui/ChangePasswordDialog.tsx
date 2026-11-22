@@ -1,4 +1,4 @@
-import { NewPasswordField, PASSWORD_INPUT_MAX_LENGTH } from '@/entities/password'
+import { CompositionNote, NewPasswordFields, PASSWORD_INPUT_MAX_LENGTH } from '@/entities/password'
 import type { Account } from '@/entities/session'
 import { useMessages } from '@/shared/i18n'
 import {
@@ -52,14 +52,20 @@ export function ChangePasswordDialog({
             disabled={form.locked}
             error={form.currentRefused ? t('invalidCurrent') : null}
           />
-          <NewPasswordField
-            label={t('next')}
-            value={form.next}
-            onChange={form.setNext}
+          <NewPasswordFields
+            passwordLabel={t('next')}
+            password={form.next}
+            confirm={form.confirm}
+            onPasswordChange={form.setNext}
+            onConfirmChange={form.setConfirm}
+            onConfirmBlur={form.touchConfirm}
+            confirmMismatch={form.confirmMismatch}
             rules={form.rules}
             strength={form.strength}
             disabled={form.locked}
-          />
+          >
+            <CompositionNote />
+          </NewPasswordFields>
           <Switch
             label={t('signOut')}
             checked={form.signOut}

@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import {
   canSubmitPassword,
+  confirmMismatch,
   evaluatePassword,
   PASSWORD_INPUT_MAX_LENGTH,
   passwordStrength,
@@ -23,6 +24,8 @@ export function usePasswordChange(account: Account, onChanged: () => void) {
   const blocklist = usePasswordBlocklist()
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [confirmTouched, setConfirmTouched] = useState(false)
   const [signOut, setSignOut] = useState(true)
   const [refusedNext, setRefusedNext] = useState<string | null>(null)
   const guard = useSubmitGuard()
@@ -35,6 +38,8 @@ export function usePasswordChange(account: Account, onChanged: () => void) {
     onSuccess: () => {
       setCurrent('')
       setNext('')
+      setConfirm('')
+      setConfirmTouched(false)
       setSignOut(true)
       setRefusedNext(null)
       onChanged()
@@ -58,12 +63,21 @@ export function usePasswordChange(account: Account, onChanged: () => void) {
   const rules = rulesAfterRefusal(evaluated, refusedNext, next)
   const failure = error === null ? null : passwordChangeFailureOf(error)
   const ready =
-    current !== '' && current.length <= PASSWORD_INPUT_MAX_LENGTH && canSubmitPassword(rules)
+    current !== '' &&
+    current.length <= PASSWORD_INPUT_MAX_LENGTH &&
+    canSubmitPassword(rules) &&
+    confirm === next
   return {
     current,
     setCurrent,
     next,
     setNext,
+    confirm,
+    setConfirm,
+    touchConfirm: () => {
+      setConfirmTouched(true)
+    },
+    confirmMismatch: confirmMismatch({ password: next, confirm, confirmTouched }),
     signOut,
     setSignOut,
     rules,
@@ -75,19 +89,26 @@ export function usePasswordChange(account: Account, onChanged: () => void) {
     canSubmit: !locked && !mutation.isPending && ready,
     submit: () => {
       if (!locked && !mutation.isPending && ready) {
-        guard.run(() =>
-          mutation.mutateAsync({
+        guard.run(async () => {
+          await mutation.mutateAsync({
             currentPassword: current,
             newPassword: next,
             signOutOtherSessions: signOut,
-          }),
-        )
+          })
+          // CDC 3 : la mutation, et les deux mots de passe qu'elle porte, quittent le cache dès la réussite.
+          mutation.reset()
+        })
       }
     },
-    /** Fermeture du dialogue : aucun mot de passe ne reste en mémoire pour la prochaine ouverture. */
+    /**
+     * Fermeture du dialogue : aucun mot de passe ne reste pour la prochaine ouverture, et la mutation quitte le cache ;
+     * sous un 429, elle reste jusqu'à la fin de Retry-After, qui tient le blocage.
+     */
     clear: () => {
       setCurrent('')
       setNext('')
+      setConfirm('')
+      setConfirmTouched(false)
       setSignOut(true)
       setRefusedNext(null)
       if (!locked) {
