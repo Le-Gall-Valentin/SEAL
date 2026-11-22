@@ -17,6 +17,7 @@ import {
   OAuthRegistrationApiProvider,
 } from '@/features/oauth-registration'
 import { type IPasswordResetApi, PasswordResetApiProvider } from '@/features/password-reset'
+import { type IReauthApi, ReauthApiProvider } from '@/features/reauthenticate'
 import { type IRegisterApi, RegisterApiProvider } from '@/features/register'
 import { type IVerifyEmailApi, VerifyEmailApiProvider } from '@/features/verify-email'
 
@@ -35,6 +36,7 @@ export interface Apis {
   readonly passwordReset: IPasswordResetApi
   readonly logout: ILogoutApi
   readonly loginMethods: ILoginMethodsApi
+  readonly reauth: IReauthApi
 }
 
 interface ApiProvidersProps {
@@ -74,6 +76,7 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
     ),
     (inner) => <LogoutApiProvider api={apis.logout}>{inner}</LogoutApiProvider>,
     (inner) => <LoginMethodsApiProvider api={apis.loginMethods}>{inner}</LoginMethodsApiProvider>,
+    (inner) => <ReauthApiProvider api={apis.reauth}>{inner}</ReauthApiProvider>,
   ]
   return layers.reduceRight<ReactNode>((inner, layer) => layer(inner), children)
 }

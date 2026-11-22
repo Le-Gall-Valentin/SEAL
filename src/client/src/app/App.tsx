@@ -11,6 +11,7 @@ import { loginApi } from '@/features/login'
 import { logoutApi } from '@/features/logout'
 import { oauthRegistrationApi } from '@/features/oauth-registration'
 import { passwordResetApi } from '@/features/password-reset'
+import { reauthApi } from '@/features/reauthenticate'
 import { registerApi } from '@/features/register'
 import { verifyEmailApi } from '@/features/verify-email'
 import { LanguageProvider } from '@/shared/i18n'
@@ -44,6 +45,7 @@ const apis: Apis = {
   passwordReset: passwordResetApi,
   logout: logoutApi,
   loginMethods: loginMethodsApi,
+  reauth: reauthApi,
 }
 
 // KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un

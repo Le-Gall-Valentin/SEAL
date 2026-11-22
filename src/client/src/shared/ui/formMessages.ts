@@ -5,6 +5,9 @@ import { defineMessages } from '@/shared/i18n'
 export const formMessages = defineMessages({
   fr: {
     showPassword: 'Afficher le mot de passe',
+    // Dialogue-Suppression et Dialogue-2FA (ADR 0035, point 1).
+    close: 'Fermer',
+    cancel: 'Annuler',
     network: 'Connexion impossible. Vérifiez votre réseau puis réessayez.',
     unexpected: 'Une erreur inattendue est survenue. Réessayez.',
     rateLimitedTitle: 'Trop de tentatives',
