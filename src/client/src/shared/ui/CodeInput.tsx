@@ -1,9 +1,11 @@
 import type { RefObject } from 'react'
-import { useMessages } from '@/shared/i18n'
-import { verifyEmailMessages } from '../i18n'
-import { enterDigits } from '../model/code'
+import { enterDigits } from '@/shared/lib'
 
 interface CodeInputProps {
+  /** Nom du groupe des six cases, annoncé par les lecteurs d'écran. */
+  readonly label: string
+  /** Nom de la case de rang index (1 à 6). */
+  readonly boxLabel: (index: number) => string
   readonly cells: readonly string[]
   readonly onChange: (cells: readonly string[]) => void
   readonly disabled: boolean
@@ -12,17 +14,16 @@ interface CodeInputProps {
 }
 
 /**
- * AUTH-14 : six cases d'un chiffre (Verification-Courriel). Le clavier numérique du système remplace celui que dessine
+ * AUTH-14, ACC-02 : six cases d'un chiffre (Verification-Courriel, Dialogue-2FA ; ADR 0035). Le clavier numérique du système remplace celui que dessine
  * la maquette (inputmode="numeric") ; un code collé ou proposé par le système remplit les cases suivantes. ADR 0024,
  * point 11 : 48 px par case au plus, et toutes rétrécissent ensemble sur un téléphone de moins de 376 px.
  */
-export function CodeInput({ cells, onChange, disabled, boxes }: CodeInputProps) {
-  const t = useMessages(verifyEmailMessages)
+export function CodeInput({ label, boxLabel, cells, onChange, disabled, boxes }: CodeInputProps) {
   const focus = (index: number) => {
     boxes.current[index]?.focus()
   }
   return (
-    <div role="group" aria-label={t('code')} className="flex gap-2">
+    <div role="group" aria-label={label} className="flex gap-2">
       {cells.map((cell, index) => (
         <input
           // Les six cases sont fixes et ordonnées : leur rang est leur identité.
@@ -30,7 +31,7 @@ export function CodeInput({ cells, onChange, disabled, boxes }: CodeInputProps) 
           ref={(element) => {
             boxes.current[index] = element
           }}
-          aria-label={t('codeBox', { index: index + 1 })}
+          aria-label={boxLabel(index + 1)}
           inputMode="numeric"
           autoComplete={index === 0 ? 'one-time-code' : 'off'}
           value={cell}

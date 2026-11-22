@@ -1,5 +1,6 @@
 // API publique du segment shared/ui (ADR 0012) : composants d'interface sans métier.
 export { Alert } from './Alert'
+export { CodeInput } from './CodeInput'
 export { Dialog } from './Dialog'
 export { FailureAlert } from './FailureAlert'
 export { ErrorText, FieldError, FieldLabel } from './Field'
