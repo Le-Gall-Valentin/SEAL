@@ -19,8 +19,8 @@ describe('KEY-02, KEY-33, ADR 0029 (point 3) : verrou entre les onglets (Web Loc
       steps.push('second')
       return Promise.resolve(2)
     })
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(steps).toEqual(['premier : début'])
+    // Le verrou est accordé quand le navigateur le décide : on attend la première tâche, sans délai fixe.
+    await expect.poll(() => steps).toEqual(['premier : début'])
     release()
 
     await expect(Promise.all([first, second])).resolves.toEqual([1, 2])

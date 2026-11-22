@@ -41,5 +41,7 @@ export function refreshSession(client: QueryClient): Promise<void> {
  * (ADR 0035).
  */
 export function replaceSessionAccount(client: QueryClient, account: Account): void {
+  // Une relecture de /me partie avant le changement répondrait l'ancien compte : elle est annulée d'abord.
+  void client.cancelQueries({ queryKey: SESSION_QUERY_KEY, exact: true })
   client.setQueryData(SESSION_QUERY_KEY, account)
 }
