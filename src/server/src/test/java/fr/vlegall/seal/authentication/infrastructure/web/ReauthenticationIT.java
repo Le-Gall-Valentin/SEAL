@@ -164,7 +164,8 @@ class ReauthenticationIT {
                         .cookie(full)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"password\":\"" + PASSWORD + "\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         mvc.perform(client.unsafe(post(REAUTH), full, Map.of("password", PASSWORD, "login", name("acces"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));

@@ -249,7 +249,8 @@ class PasswordChangeIT {
                         .cookie(full)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currentPassword\":\"" + PASSWORD + "\",\"newPassword\":\"" + NEW_PASSWORD + "\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         Map<String, Object> unknown = body(PASSWORD, NEW_PASSWORD, true);
         unknown.put("username", "autre");
         mvc.perform(client.unsafe(post(CHANGE), full, unknown))

@@ -292,6 +292,21 @@ class EmailChangeIT {
     }
 
     @Test
+    @DisplayName("ACC-02, ADR 0034 : une demande refusée sans rien envoyer ne consomme aucun des 3 envois de l'heure")
+    void acc02RefusedRequestSpendsNoSend() throws Exception {
+        Cookie full = active(email("rendu"), name("rendu"));
+
+        for (int i = 0; i < 3; i++) {
+            mvc.perform(client.unsafe(post(REQUEST), full, Map.of("email", email("rendu"))))
+                    .andExpect(status().isBadRequest());
+        }
+        for (int i = 0; i < 3; i++) {
+            mvc.perform(client.unsafe(post(REQUEST), full, Map.of("email", email("cible" + i))))
+                    .andExpect(status().isNoContent());
+        }
+    }
+
+    @Test
     @DisplayName("ACC-02 : l'adresse actuelle n'est pas un changement, 400 VALIDATION_FAILED")
     void acc02SameAddressIsRefused() throws Exception {
         Cookie full = active(email("meme"), name("meme"));
@@ -322,11 +337,15 @@ class EmailChangeIT {
         }
 
         Cookie full = client.verify(pending);
-        mvc.perform(client.from(post(REQUEST))
-                        .cookie(full)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"x@exemple.ca\"}"))
-                .andExpect(status().isForbidden());
+        for (String path : List.of(REQUEST, CONFIRM)) {
+            String body = path.equals(REQUEST) ? "{\"email\":\"x@exemple.ca\"}" : "{\"code\":\"123456\"}";
+            mvc.perform(client.from(post(path))
+                            .cookie(full)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
         for (Map<String, String> invalid : List.of(
                 Map.of("email", "pas-un-courriel"),
                 Map.of("email", "x@exemple.ca", "username", "autre"),
@@ -335,8 +354,12 @@ class EmailChangeIT {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
-        for (Map<String, String> invalid :
-                List.<Map<String, String>>of(Map.of("code", "12345"), Map.of("code", "abcdef"), Map.of())) {
+        for (Map<String, String> invalid : List.<Map<String, String>>of(
+                Map.of("code", "12345"),
+                Map.of("code", "1234567"),
+                Map.of("code", "abcdef"),
+                Map.of("code", "123456", "email", "x@exemple.ca"),
+                Map.of())) {
             mvc.perform(client.unsafe(post(CONFIRM), full, invalid))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));

@@ -130,7 +130,8 @@ class AccountProfileIT {
                         .cookie(full)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"displayName\":\"Sans jeton\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         assertThat(storedDisplayName(name("restreint"))).isEqualTo("Valentin");
     }
 }

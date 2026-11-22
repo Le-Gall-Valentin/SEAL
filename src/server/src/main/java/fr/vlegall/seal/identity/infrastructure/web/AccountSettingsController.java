@@ -1,5 +1,6 @@
 package fr.vlegall.seal.identity.infrastructure.web;
 
+import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.application.port.in.ConfirmEmailChangeUseCase;
 import fr.vlegall.seal.identity.application.port.in.CurrentAccountQuery;
@@ -70,8 +71,8 @@ public class AccountSettingsController {
 
     /**
      * ACC-02 : 204 que l'adresse soit prise ou non (ADR 0034, point 3). Le mode sudo est vérifié avant de prendre un
-     * jeton des 3 envois par heure (point 4) : une demande refusée faute de ré-authentification n'en consomme pas. Le
-     * handler le vérifie de nouveau (SEC-03).
+     * jeton des 3 envois par heure (point 4), et le handler le vérifie de nouveau (SEC-03) : une demande refusée, sans
+     * rien envoyer, n'en consomme aucun.
      */
     @PostMapping("/email")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -79,7 +80,14 @@ public class AccountSettingsController {
             @CurrentUser UserId user, @Valid @RequestBody ChangeEmailRequest body, Authentication authentication) {
         sudo.require(authentication);
         limiter.consume(RateLimit.EMAIL_CODE_RESENDS_PER_USER, user);
-        emailChange.request(user, body.toEmail());
+        try {
+            emailChange.request(user, body.toEmail());
+        } catch (SealException refused) {
+            // Refus du handler (adresse actuelle, compte qui n'est plus actif, sudo échu entre-temps) : rien n'est
+            // parti, l'envoi est rendu (ADR 0034, point 4).
+            limiter.refund(RateLimit.EMAIL_CODE_RESENDS_PER_USER, user);
+            throw refused;
+        }
     }
 
     /** ACC-02 : rend le compte courant, comme {@code GET /api/v1/auth/me}. */
