@@ -45,12 +45,14 @@ async function renderDialog(
   methods: LoginMethods,
   api: FakeReauthApi,
   configured: readonly OAuthProviderId[] = ['google', 'github'],
+  // Comme le client de l'application (app/providers/queryClient) : une mutation sans écran qui la suit est oubliée.
+  client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { gcTime: 0 } },
+  }),
 ) {
   const onReauthenticated = vi.fn()
   const screen = await render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
+    <QueryClientProvider client={client}>
       <PasswordBlocklistProvider api={{ load: () => Promise.resolve([]) }}>
         <LoginMethodsApiProvider api={{ loginMethods: () => Promise.resolve(methods) }}>
           <OAuthProvidersApiProvider api={{ providers: () => Promise.resolve(configured) }}>
@@ -186,5 +188,45 @@ describe('AUTH-55, ADR 0035 : « Confirmez votre identité »', () => {
     await expect.element(screen.getByText('ou', { exact: true })).toBeVisible()
     await expect.element(screen.getByRole('link', { name: 'Continuer avec GitHub' })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Continuer avec Google' }).elements()).toHaveLength(0)
+  })
+
+  it('CDC 3 : après la réussite comme après « Annuler », le mot de passe ne reste pas dans le cache des mutations', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { gcTime: 0 } },
+    })
+    const secrets = () =>
+      JSON.stringify(
+        client
+          .getMutationCache()
+          .getAll()
+          .map((mutation) => mutation.state.variables),
+      )
+    let refuse = true
+    const { screen } = await renderDialog(
+      PASSWORD_ONLY,
+      {
+        reauthenticate: () =>
+          refuse ? Promise.reject(new ApiError(401, 'INVALID_CREDENTIALS')) : Promise.resolve(),
+      },
+      ['google', 'github'],
+      client,
+    )
+
+    await screen.getByLabelText('Mot de passe', { exact: true }).fill('presque bonne phrase')
+    await screen.getByRole('button', { name: 'Confirmer' }).click()
+    await expect.element(screen.getByText('Mot de passe incorrect.')).toBeVisible()
+    await screen.getByRole('button', { name: 'Annuler' }).click()
+    await vi.waitFor(() => {
+      expect(secrets()).not.toContain('presque bonne phrase')
+    })
+
+    refuse = false
+    await screen.getByRole('button', { name: 'Rouvrir' }).click()
+    await screen.getByLabelText('Mot de passe', { exact: true }).fill('phrase secrète')
+    await screen.getByRole('button', { name: 'Confirmer' }).click()
+    await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument()
+    await vi.waitFor(() => {
+      expect(secrets()).not.toContain('phrase secrète')
+    })
   })
 })

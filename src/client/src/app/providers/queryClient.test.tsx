@@ -1,6 +1,6 @@
 // Dans Chromium : sous Node, TanStack Query se croit côté serveur et ne rejoue jamais rien.
 import { MutationObserver, QueryObserver } from '@tanstack/react-query'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { SESSION_QUERY_KEY } from '@/entities/session'
 import { ApiError } from '@/shared/lib'
 import { createQueryClient } from './queryClient'
@@ -58,4 +58,19 @@ describe('Racine de composition : client TanStack Query', () => {
       expect(client.getQueryData(SESSION_QUERY_KEY)).toBe(expected)
     },
   )
+
+  it('CDC 3, ADR 0035 : une mutation qu’aucun écran ne suit plus quitte le cache, et ses variables avec elle', async () => {
+    const client = createQueryClient()
+    const observer = new MutationObserver(client, {
+      mutationFn: (password: string) => Promise.resolve(password.length),
+    })
+
+    await observer.mutate('phrase secrète')
+    expect(client.getMutationCache().getAll()).toHaveLength(1)
+    observer.reset()
+
+    await vi.waitFor(() => {
+      expect(client.getMutationCache().getAll()).toHaveLength(0)
+    })
+  })
 })

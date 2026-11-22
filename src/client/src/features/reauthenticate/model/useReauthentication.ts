@@ -38,10 +38,17 @@ export function useReauthentication(onReauthenticated: () => void) {
     canSubmit: !locked && !mutation.isPending && ready,
     submit: () => {
       if (!locked && !mutation.isPending && ready) {
-        guard.run(() => mutation.mutateAsync(password))
+        guard.run(async () => {
+          await mutation.mutateAsync(password)
+          // CDC 3 : la mutation, et le mot de passe qu'elle porte, quittent le cache dès la réussite.
+          mutation.reset()
+        })
       }
     },
-    /** Fermeture du dialogue : rien de la saisie ni du refus ne reste pour la prochaine ouverture. */
+    /**
+     * Fermeture du dialogue : rien de la saisie ni du refus ne reste pour la prochaine ouverture, et la mutation quitte
+     * le cache ; sous un 429, elle reste jusqu'à la fin de Retry-After, qui tient le blocage.
+     */
     clear: () => {
       setPassword('')
       if (!locked) {

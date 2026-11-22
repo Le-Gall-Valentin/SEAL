@@ -21,7 +21,8 @@ interface ModalDialogProps {
 /**
  * Fenêtre modale au-dessus d'un écran (Dialogue-Suppression, Dialogue-2FA ; ADR 0035, point 1) : élément `dialog`
  * natif, qui rend le reste de la page inerte, et rend le focus à l'élément d'origine à la fermeture. 500 px au plus,
- * rayon 18, fond --raised, ombre --shadow-3, voile --overlay.
+ * rayon 18, fond --raised, ombre --shadow-3, voile --overlay. Plus haute que la fenêtre (téléphone en paysage), elle
+ * défile : le navigateur borne sa hauteur.
  */
 export function ModalDialog({
   open,
@@ -43,6 +44,8 @@ export function ModalDialog({
     }
     if (open && !dialog.open) {
       dialog.showModal()
+      // showModal place le focus sur « Fermer », premier élément focalisable : le premier champ le prend.
+      dialog.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled])')?.focus()
     } else if (!open && dialog.open) {
       dialog.close()
     }
@@ -52,7 +55,7 @@ export function ModalDialog({
       ref={ref}
       aria-labelledby={titleId}
       aria-describedby={describedBy}
-      className="m-auto mt-10 w-[calc(100%-32px)] max-w-[500px] overflow-hidden rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay"
+      className="m-auto mt-10 w-[calc(100%-32px)] max-w-[500px] overflow-y-auto rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay"
       onCancel={(event) => {
         // Échap : la fenêtre ne se ferme que si l'écran le permet, et par lui.
         event.preventDefault()
