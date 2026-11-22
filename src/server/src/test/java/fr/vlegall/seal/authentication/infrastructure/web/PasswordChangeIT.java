@@ -193,6 +193,21 @@ class PasswordChangeIT {
     }
 
     @Test
+    @DisplayName(
+            "SEC-10, ADR 0034 : un nouveau mot de passe trop faible, avec le bon mot de passe actuel, ne compte pas comme un échec")
+    void sec10WeakNewPasswordIsNotAFailure() throws Exception {
+        Cookie current = client.verify(client.register(email("faibles"), name("faibles")));
+
+        for (int i = 0; i < 6; i++) {
+            mvc.perform(client.unsafe(post(CHANGE), current, body(PASSWORD, "faible", true)))
+                    .andExpect(status().isUnprocessableContent())
+                    .andExpect(jsonPath("$.code").value("PASSWORD_TOO_WEAK"));
+        }
+        mvc.perform(client.unsafe(post(CHANGE), current, body(PASSWORD, NEW_PASSWORD, false)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     @DisplayName("ACC-01, ADR 0034 : un lien de réinitialisation envoyé avant le changement ne sert plus")
     void acc01ChangeKillsLiveResetLinks() throws Exception {
         Cookie current = client.verify(client.register(email("lien"), name("lien")));

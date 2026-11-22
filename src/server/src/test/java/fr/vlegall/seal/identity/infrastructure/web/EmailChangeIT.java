@@ -12,6 +12,7 @@ import fr.vlegall.seal.identity.domain.model.VerificationCode;
 import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.AuthClient.Registered;
 import fr.vlegall.seal.support.MutableClock;
+import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
@@ -304,6 +305,28 @@ class EmailChangeIT {
             mvc.perform(client.unsafe(post(REQUEST), full, Map.of("email", email("cible" + i))))
                     .andExpect(status().isNoContent());
         }
+    }
+
+    @Test
+    @DisplayName("ACC-02, A06 : deux confirmations simultanées du bon code, une seule change l'adresse")
+    void acc02ConcurrentConfirmationsSucceedOnce() throws Exception {
+        Cookie full = active(email("double"), name("double"));
+        mvc.perform(client.unsafe(post(REQUEST), full, Map.of("email", email("doublecible"))))
+                .andExpect(status().isNoContent());
+        String code = codeSentTo(email("doublecible"));
+        var first = client.unsafe(post(CONFIRM), full, Map.of("code", code));
+        var second = client.unsafe(post(CONFIRM), full, Map.of("code", code));
+
+        List<Integer> statuses = Race.run(
+                2,
+                index -> mvc.perform(index == 0 ? first : second)
+                        .andReturn()
+                        .getResponse()
+                        .getStatus());
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 422);
+        assertThat(journal(idOf(name("double"))).stream().filter("EMAIL_CHANGED"::equals))
+                .hasSize(1);
     }
 
     @Test
