@@ -1,7 +1,10 @@
 package fr.vlegall.seal.authentication.infrastructure.security;
 
+import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.security.session.FullSessions;
 import fr.vlegall.seal.security.web.OAuthRoutes;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,6 +28,15 @@ final class OAuthRequests {
         return authentication != null
                 && authentication.isAuthenticated()
                 && !(authentication instanceof AnonymousAuthenticationToken);
+    }
+
+    /**
+     * AUTH-55, ADR 0034 : le compte de la session complète portée par la requête, chargée avant les filtres OAuth ; vide
+     * pour l'anonyme et pour la session restreinte (AUTH-16).
+     */
+    static Optional<UserId> fullSessionUser() {
+        return FullSessions.user(
+                SecurityContextHolder.getContextHolderStrategy().getContext().getAuthentication());
     }
 
     /** Le {@code registrationId} de l'adresse de retour, s'il s'agit d'un retour OAuth. */

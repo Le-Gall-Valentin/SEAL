@@ -3,6 +3,7 @@ package fr.vlegall.seal.authentication.infrastructure.security;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthLinkEventPort;
+import fr.vlegall.seal.authentication.domain.port.out.PasswordChangeEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.PasswordResetEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.common.UserId;
@@ -21,7 +22,11 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class AuthenticationJournalAdapter
-        implements SecurityEventPort, PasswordResetEventPort, OAuthEventPort, OAuthLinkEventPort {
+        implements SecurityEventPort,
+                PasswordResetEventPort,
+                PasswordChangeEventPort,
+                OAuthEventPort,
+                OAuthLinkEventPort {
 
     private final SecurityJournal journal;
 
@@ -79,5 +84,11 @@ public class AuthenticationJournalAdapter
     @Override
     public void passwordReset(UserId user) {
         journal.recordInTransaction(new SecurityEvent(SecurityEventType.PASSWORD_RESET, user, Map.of()));
+    }
+
+    /** SEC-20, SEC-21 : dans la transaction qui remplace le haché ; seul le compte est noté (ACC-01). */
+    @Override
+    public void passwordChanged(UserId user) {
+        journal.recordInTransaction(new SecurityEvent(SecurityEventType.PASSWORD_CHANGED, user, Map.of()));
     }
 }

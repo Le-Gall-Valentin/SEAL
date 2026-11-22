@@ -81,6 +81,28 @@
         <Class name="fr.vlegall.seal.identity.infrastructure.web.AccountController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- /api/v1/account : profile, email et email/confirm (session complète ; sudo pour email, ADR 0034) :
+         AccountProfileIT, EmailChangeIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.identity.infrastructure.web.AccountSettingsController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <!-- /api/v1/auth/reauth (session complète, ADR 0034) : ReauthenticationIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.web.ReauthenticationController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <!-- GET /oauth2/authorization/{id} non résolu par Spring : 404 pour l'anonyme, retour aux paramètres pour la session
+         complète (ADR 0034, point 2), adresses constantes : OAuthReauthenticationIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.web.OAuthStartController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+    <!-- /api/v1/account/password (session complète, ACC-01) : PasswordChangeIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.web.AccountPasswordController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /api/v1/auth/login (anonyme seulement) et /logout (toute session) : LoginIT. -->
     <Match>
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.SessionController"/>

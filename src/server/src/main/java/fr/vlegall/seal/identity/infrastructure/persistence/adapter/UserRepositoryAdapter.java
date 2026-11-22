@@ -121,6 +121,35 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public void changeActiveEmail(UserId id, EmailAddress email, Instant verifiedAt) {
+        try {
+            SqlSupport.requireOneRow(
+                    jdbc.sql("UPDATE users SET email = CAST(:email AS citext), email_verified_at = :verifiedAt "
+                                    + "WHERE id = :id AND status = 'ACTIVE'")
+                            .param("email", email.value())
+                            .param("verifiedAt", SqlSupport.utc(verifiedAt))
+                            .param("id", id.value())
+                            .update(),
+                    "changement du courriel d'un compte actif");
+        } catch (DuplicateKeyException e) {
+            if (SqlSupport.violates(e, VERIFIED_EMAIL_INDEX)) {
+                throw new IdentityException.CodeExpired();
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public void changeDisplayName(UserId id, DisplayName displayName) {
+        SqlSupport.requireOneRow(
+                jdbc.sql("UPDATE users SET display_name = :displayName WHERE id = :id AND status = 'ACTIVE'")
+                        .param("displayName", displayName.value())
+                        .param("id", id.value())
+                        .update(),
+                "changement du nom affiché");
+    }
+
+    @Override
     public boolean activeAccountOwns(EmailAddress email) {
         return jdbc.sql(
                         "SELECT EXISTS (SELECT 1 FROM users WHERE email = CAST(:email AS citext) AND status = 'ACTIVE')")

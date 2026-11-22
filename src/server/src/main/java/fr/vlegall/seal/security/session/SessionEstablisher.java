@@ -66,8 +66,7 @@ public final class SessionEstablisher {
         if (!(authenticated.getPrincipal() instanceof SealPrincipal principal)) {
             throw new IllegalStateException("authentification sans compte SEAL");
         }
-        boolean active = authenticated.getAuthorities().stream()
-                .anyMatch(authority -> SealAuthorities.ACCOUNT_ACTIVE.equals(authority.getAuthority()));
+        boolean active = FullSessions.user(authenticated).isPresent();
         return establish(principal, active ? fullAuthorities() : restrictedAuthorities(), request, response);
     }
 
@@ -171,6 +170,64 @@ public final class SessionEstablisher {
         current.getAuthorities().stream()
                 .filter(FactorGrantedAuthority.class::isInstance)
                 .forEach(authorities::add);
+        return establish(principal, authorities, request, response);
+    }
+
+    /**
+     * AUTH-55, ADR 0034 : ré-authentification d'une session complète. Le facteur donné est redaté à maintenant (ajouté
+     * s'il manquait) ; le compte, la version du mot de passe et les autres facteurs restent tels quels. Comme à chaque
+     * élévation, la session change d'identifiant et perd son jeton CSRF (AUTH-23, AUTH-60) : un cookie copié avant ne
+     * profite pas du mode sudo. Sans session complète, rien n'est redaté (échec fermé).
+     */
+    public Authentication refreshFactor(
+            String factorAuthority, HttpServletRequest request, HttpServletResponse response) {
+        FullSession session = fullSession();
+        return reestablish(session, session.principal(), factorAuthority, request, response);
+    }
+
+    /**
+     * ACC-01, ADR 0023 et 0034 : la session qui vient de changer le mot de passe le garde. Elle porte la version désormais
+     * en base, pour que le filtre des versions ne la ferme pas, et le facteur mot de passe redaté, puisque le mot de
+     * passe actuel vient d'être vérifié ; elle change d'identifiant et perd son jeton CSRF, comme {@link
+     * #refreshFactor}.
+     */
+    public Authentication passwordChanged(long version, HttpServletRequest request, HttpServletResponse response) {
+        FullSession session = fullSession();
+        return reestablish(
+                session,
+                new SealPrincipal(session.principal().userId(), version),
+                SealAuthorities.FACTOR_PASSWORD,
+                request,
+                response);
+    }
+
+    /** Session complète en cours ; toute autre situation est une erreur de programmation (échec fermé). */
+    private FullSession fullSession() {
+        Authentication current = holder.getContext().getAuthentication();
+        if (FullSessions.user(current).isEmpty()
+                || current == null
+                || !(current.getPrincipal() instanceof SealPrincipal principal)) {
+            throw new IllegalStateException("aucune session complète à ré-authentifier");
+        }
+        return new FullSession(current, principal);
+    }
+
+    private record FullSession(Authentication authentication, SealPrincipal principal) {}
+
+    /** Garde les droits de la session complète, redate le facteur donné, puis rétablit la session. */
+    private Authentication reestablish(
+            FullSession session,
+            SealPrincipal principal,
+            String factorAuthority,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        session.authentication().getAuthorities().stream()
+                .filter(authority -> !factorAuthority.equals(authority.getAuthority()))
+                .forEach(authorities::add);
+        authorities.add(FactorGrantedAuthority.withAuthority(factorAuthority)
+                .issuedAt(clock.instant())
+                .build());
         return establish(principal, authorities, request, response);
     }
 

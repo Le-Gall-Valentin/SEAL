@@ -3,9 +3,11 @@ package fr.vlegall.seal.authentication.infrastructure.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.authentication.application.port.in.OAuthLoginUseCase;
+import fr.vlegall.seal.authentication.application.port.in.OAuthReauthenticateUseCase;
 import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
+import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.session.SessionEstablisher;
 import fr.vlegall.seal.security.web.ClientRoutesController;
 import fr.vlegall.seal.support.MutableClock;
@@ -54,6 +56,18 @@ class OAuthLoginSuccessHandlerTest {
     private final MutableClock clock = MutableClock.fixedAt(NOW);
     private final OAuthLoginSuccessHandler handler = new OAuthLoginSuccessHandler(
             login,
+            // Un retour de connexion ne passe jamais par la ré-authentification (ADR 0034).
+            new OAuthReauthenticateUseCase() {
+                @Override
+                public boolean canStart(UserId user, OAuthProvider provider) {
+                    throw new AssertionError("ré-authentification inattendue");
+                }
+
+                @Override
+                public boolean reauthenticate(UserId user, ExternalIdentity identity) {
+                    throw new AssertionError("ré-authentification inattendue");
+                }
+            },
             new SessionEstablisher(
                     CookieCsrfTokenRepository.withHttpOnlyFalse(), clock, user -> OptionalLong.empty(), List.of()),
             new PendingOAuthSession(clock));

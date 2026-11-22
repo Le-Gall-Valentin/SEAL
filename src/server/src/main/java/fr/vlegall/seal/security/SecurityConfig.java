@@ -40,6 +40,7 @@ import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHe
 import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
 
 /**
  * Chaîne de filtres de Spring Security : tout est refusé par défaut et ouvert route par route (A01), et chaque réponse
@@ -51,7 +52,10 @@ class SecurityConfig {
 
     static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
 
-    /** SEC-01, A06 : 16 Kio au plus pour un corps sous {@code /api/v1/auth/} (ADR 0019, point 5). */
+    /**
+     * SEC-01, A06 : 16 Kio au plus pour un corps sous {@code /api/v1/auth/} (ADR 0019, point 5) et sous
+     * {@code /api/v1/account/}, qui reçoit aussi des mots de passe (ADR 0034).
+     */
     static final int AUTH_BODY_LIMIT = 16 * 1024;
 
     /** SEC-01, A06 : 64 Kio au plus pour un corps sous {@code /api/v1/keys/}, coffre compris (ADR 0025, point 6). */
@@ -109,12 +113,15 @@ class SecurityConfig {
                         .access(AuthorizationManagers.anyOf(
                                 AuthenticatedAuthorizationManager.anonymous(),
                                 AuthorityAuthorizationManager.hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)))
-                        // AUTH-30 : départ et retour OAuth, réservés aux anonymes (ADR 0032). Les filtres de Spring
-                        // passent avant cette règle : le départ d'une session ouverte n'est pas résolu et tombe ici,
-                        // et le dépôt des requêtes d'autorisation refuse le retour d'une session ouverte (point 7).
+                        // AUTH-30 : départ et retour OAuth, pour l'anonyme (connexion, ADR 0032) ou la session complète
+                        // (ré-authentification, AUTH-55, ADR 0034). Les filtres de Spring passent avant cette règle :
+                        // le départ d'une session restreinte n'est pas résolu et tombe ici, et le dépôt des requêtes
+                        // d'autorisation ne rend un retour qu'à la session qui l'a demandé (point 7).
                         .requestMatchers(
                                 HttpMethod.GET, OAuthRoutes.AUTHORIZATION_BASE + "/*", OAuthRoutes.CALLBACK_BASE + "/*")
-                        .anonymous()
+                        .access(AuthorizationManagers.anyOf(
+                                AuthenticatedAuthorizationManager.anonymous(),
+                                AuthorityAuthorizationManager.hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)))
                         // AUTH-32 : inscription OAuth en attente, dans une session non authentifiée (ADR 0032).
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/pending")
                         .anonymous()
@@ -149,6 +156,19 @@ class SecurityConfig {
                                 "/api/v1/auth/verify-email/resend",
                                 "/api/v1/auth/verify-email/change")
                         .hasAuthority(SealAuthorities.ACCOUNT_PENDING_EMAIL)
+                        // AUTH-55, ADR 0034 : ré-authentification, pour la seule session complète (AUTH-16).
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/reauth")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // ACC-03, ADR 0034 : paramètres du compte, pour la seule session complète (AUTH-16).
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/account/profile")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // ACC-01, ADR 0034 : changement du mot de passe, pour la seule session complète.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/account/password")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // ACC-02, ADR 0034 : changement du courriel, pour la seule session complète ; le mode sudo est
+                        // vérifié par le contrôleur et par le handler (SEC-03).
+                        .requestMatchers(HttpMethod.POST, "/api/v1/account/email", "/api/v1/account/email/confirm")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         // KEY-10, KEY-11, ADR 0025 (point 9) : clé de l'Autorité, pour la seule session complète.
                         .requestMatchers(HttpMethod.GET, "/api/v1/pki/ca")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
@@ -213,7 +233,9 @@ class SecurityConfig {
                 // en-têtes, que le refus porte aussi. FormContentFilter, placé avant, est désactivé (application.yaml).
                 .addFilterAfter(
                         new RequestBodyLimitFilter(
-                                PathPatternRequestMatcher.withDefaults().matcher("/api/v1/auth/**"),
+                                new OrRequestMatcher(
+                                        PathPatternRequestMatcher.withDefaults().matcher("/api/v1/auth/**"),
+                                        PathPatternRequestMatcher.withDefaults().matcher("/api/v1/account/**")),
                                 AUTH_BODY_LIMIT,
                                 problemDetails::rejectTooLarge),
                         HeaderWriterFilter.class)

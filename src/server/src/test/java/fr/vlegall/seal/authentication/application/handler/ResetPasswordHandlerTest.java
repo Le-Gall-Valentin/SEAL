@@ -1,6 +1,6 @@
 package fr.vlegall.seal.authentication.application.handler;
 
-import static fr.vlegall.seal.authentication.application.handler.PasswordResetFixture.NOW;
+import static fr.vlegall.seal.authentication.application.handler.PasswordFixture.NOW;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.authentication.domain.model.AccountContact;
@@ -18,7 +18,7 @@ class ResetPasswordHandlerTest {
 
     private static final String NEW_PASSWORD = "nouvelle-phrase-de-passe";
 
-    private final PasswordResetFixture fixture = new PasswordResetFixture();
+    private final PasswordFixture fixture = new PasswordFixture();
     private final ResetPasswordHandler handler = new ResetPasswordHandler(
             fixture.tokens,
             fixture.accounts,
@@ -54,7 +54,7 @@ class ResetPasswordHandlerTest {
         AccountContact valentin = fixture.active("valentin", true);
         ResetToken token = fixture.issue(valentin.user());
         byte[] other = ResetToken.of(fixture.random().next(ResetToken.BYTES)).hash();
-        fixture.rows.add(new PasswordResetFixture.Row(
+        fixture.rows.add(new PasswordFixture.Row(
                 UUID.randomUUID(), valentin.user(), other, NOW.plus(Duration.ofMinutes(30)), null));
 
         handler.reset(token.value(), NEW_PASSWORD);

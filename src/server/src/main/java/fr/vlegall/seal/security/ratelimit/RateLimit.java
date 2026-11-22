@@ -16,10 +16,15 @@ public enum RateLimit {
      * déclencherait autant de calculs Argon2id et de sessions qu'on voudrait.
      */
     LOGIN_ATTEMPTS_PER_IP(60, Duration.ofMinutes(15), RateLimitKind.IP),
+    /**
+     * ADR 0034, point 4 : 5 échecs par 15 minutes et par compte pour le mot de passe vérifié dans une session (AUTH-55,
+     * ACC-01), comme ceux de la connexion. La session connaît le compte : la clé est le compte, pas la saisie.
+     */
+    PASSWORD_CHECK_FAILURES_PER_USER(5, Duration.ofMinutes(15), RateLimitKind.USER),
     REGISTRATIONS_PER_IP(5, Duration.ofHours(1), RateLimitKind.IP),
     /** AUTH-05. */
     USERNAME_CHECKS_PER_IP(30, Duration.ofMinutes(1), RateLimitKind.IP),
-    /** AUTH-14 : 3 renvois du code par heure. */
+    /** AUTH-14, AUTH-17, ACC-02 : 3 envois de code par heure, renvois et changements de courriel (ADR 0034). */
     EMAIL_CODE_RESENDS_PER_USER(3, Duration.ofHours(1), RateLimitKind.USER),
     PASSWORD_RESETS_PER_EMAIL(3, Duration.ofHours(1), RateLimitKind.EMAIL),
     PASSWORD_RESETS_PER_IP(3, Duration.ofHours(1), RateLimitKind.IP),

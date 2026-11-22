@@ -108,6 +108,8 @@ seal:
   session:
     # AUTH-52 : une session expire 12 heures après sa création, même active (AbsoluteSessionTimeoutFilter).
     absolute-timeout: 12h
+    # AUTH-55, ADR 0034 : changer le courriel exige un facteur obtenu il y a moins de 10 minutes (SudoMode).
+    sudo-window: 10m
   mail:
     # ADR 0019, point 8 : valeur fixe, rien à régler.
     from: "SEAL <noreply@seal.localhost>"

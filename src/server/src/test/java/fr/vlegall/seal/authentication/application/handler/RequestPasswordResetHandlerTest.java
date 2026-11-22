@@ -1,6 +1,6 @@
 package fr.vlegall.seal.authentication.application.handler;
 
-import static fr.vlegall.seal.authentication.application.handler.PasswordResetFixture.NOW;
+import static fr.vlegall.seal.authentication.application.handler.PasswordFixture.NOW;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.authentication.domain.model.AccountContact;
@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 class RequestPasswordResetHandlerTest {
 
-    private final PasswordResetFixture fixture = new PasswordResetFixture();
+    private final PasswordFixture fixture = new PasswordFixture();
     private final RequestPasswordResetHandler handler = new RequestPasswordResetHandler(
             fixture.accounts, fixture.credentials, fixture.tokens, fixture.mail, fixture.random(), fixture.clock);
 
@@ -33,6 +33,21 @@ class RequestPasswordResetHandlerTest {
         assertThat(fixture.calls)
                 .as("le verrou du compte d'abord (ADR 0022, point 4)")
                 .containsExactly("verrou", "émission", "courriel");
+    }
+
+    @Test
+    @DisplayName("ACC-02, ADR 0034 : une adresse remplacée pendant l'attente du verrou ne reçoit aucun lien")
+    void acc02AddressChangedWhileWaitingGetsNothing() {
+        AccountContact valentin = fixture.active("valentin", true);
+        fixture.duringLock = () -> fixture.contacts.put(
+                valentin.user(),
+                new AccountContact(valentin.user(), "valentin", "neuve@exemple.ca", valentin.personalWords()));
+
+        handler.request("valentin@exemple.ca");
+
+        assertThat(fixture.mails).isEmpty();
+        assertThat(fixture.rows).isEmpty();
+        assertThat(fixture.calls).containsExactly("verrou");
     }
 
     @Test

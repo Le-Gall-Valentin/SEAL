@@ -35,11 +35,23 @@ public final class OAuthFlow {
     public Started start(String provider) throws Exception {
         MvcResult result = mvc.perform(client.from(get("/oauth2/authorization/" + provider)))
                 .andReturn();
+        return started(provider, result, AuthClient.sessionOf(result));
+    }
+
+    /** Un départ depuis une session SEAL ouverte : la ré-authentification (AUTH-55, ADR 0034). */
+    public Started start(String provider, Cookie session) throws Exception {
+        MvcResult result = mvc.perform(
+                        client.from(get("/oauth2/authorization/" + provider)).cookie(session))
+                .andReturn();
+        // La session existe déjà : le départ ne pose pas de nouveau cookie.
+        return started(provider, result, session);
+    }
+
+    private static Started started(String provider, MvcResult result, Cookie session) {
         assertThat(result.getResponse().getStatus())
                 .as("départ vers " + provider)
                 .isEqualTo(302);
-        return new Started(
-                provider, AuthClient.sessionOf(result), result.getResponse().getHeader("Location"));
+        return new Started(provider, session, result.getResponse().getHeader("Location"));
     }
 
     /** Le retour du navigateur, avec ce code et le {@code state} du départ. */

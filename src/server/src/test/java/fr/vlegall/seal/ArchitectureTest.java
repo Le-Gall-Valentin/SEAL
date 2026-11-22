@@ -158,4 +158,10 @@ class ArchitectureTest {
     void domainIsNotSerializable() {
         ContextRules.domainIsNotSerializable(ROOT).check(CLASSES);
     }
+
+    @Test
+    @DisplayName("ADR 0007, ADR 0034, règle 16 : seul security.session écrit le contexte de sécurité dans la session")
+    void onlySecuritySessionStoresTheSecurityContext() {
+        ContextRules.onlySecuritySessionStoresTheSecurityContext(ROOT).check(CLASSES);
+    }
 }

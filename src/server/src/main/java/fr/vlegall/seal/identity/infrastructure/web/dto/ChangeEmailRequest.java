@@ -5,7 +5,10 @@ import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/** Corps de {@code POST /api/v1/auth/verify-email/change} (AUTH-17). {@link #toString()} ne révèle pas l'adresse. */
+/**
+ * Corps de {@code POST /api/v1/auth/verify-email/change} (AUTH-17) et de {@code POST /api/v1/account/email} (ACC-02).
+ * {@link #toString()} ne révèle pas l'adresse.
+ */
 public record ChangeEmailRequest(
         @NotNull @Size(max = 254) @ValidEmail String email) {
 

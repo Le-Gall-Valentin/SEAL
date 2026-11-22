@@ -8,6 +8,8 @@ public enum ErrorCode {
     VALIDATION_FAILED(400),
     UNAUTHENTICATED(401),
     FORBIDDEN(403),
+    /** AUTH-55, ADR 0034 : l'action exige un facteur obtenu il y a moins de 10 minutes (mode sudo). */
+    REAUTH_REQUIRED(403),
     NOT_FOUND(404),
     RATE_LIMITED(429),
     INTERNAL_ERROR(500),

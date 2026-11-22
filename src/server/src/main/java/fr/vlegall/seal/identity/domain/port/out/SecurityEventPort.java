@@ -8,6 +8,6 @@ public interface SecurityEventPort {
 
     void accountRegistered(UserId user, EmailAddress email);
 
-    /** AUTH-17. */
+    /** AUTH-17, ACC-02 : courriel remplacé, journalisé masqué (SEC-21). */
     void emailChanged(UserId user, EmailAddress newEmail);
 }

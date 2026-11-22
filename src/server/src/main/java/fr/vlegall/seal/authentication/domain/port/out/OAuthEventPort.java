@@ -13,6 +13,7 @@ public interface OAuthEventPort {
     /**
      * SEC-20, SEC-21 : retour OAuth refusé. Ni courriel, ni code, ni jeton : le fournisseur, s'il est connu, et une cause
      * courte : {@code email_in_use}, {@code account_unusable}, {@code session_signed_in}, {@code provider_mismatch},
+     * {@code reauth_session_mismatch} et {@code reauth_identity_mismatch} (ADR 0034),
      * {@code invalid_user_info}, un code d'erreur OAuth connu, ou {@code oauth_error} pour tout autre.
      *
      * @param user compte lié à l'identité, s'il existe

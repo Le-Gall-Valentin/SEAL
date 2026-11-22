@@ -33,6 +33,16 @@ public class OAuthIdentityRepositoryAdapter implements OAuthIdentityRepository {
                 .map(UserId::new);
     }
 
+    @Override
+    public boolean isLinked(UserId user, OAuthProvider provider) {
+        return Boolean.TRUE.equals(jdbc.sql("SELECT EXISTS (SELECT 1 FROM oauth_identities "
+                        + "WHERE user_id = :user AND provider = :provider)")
+                .param("user", user.value())
+                .param("provider", provider.name())
+                .query(Boolean.class)
+                .single());
+    }
+
     /**
      * Les deux contraintes d'unicité, {@code (provider, subject)} et {@code (user_id, provider)}, signifient la même
      * chose pour l'appelant : {@code ON CONFLICT DO NOTHING} les couvre sans lire le message de PostgreSQL.

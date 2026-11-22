@@ -7,7 +7,10 @@ import fr.vlegall.seal.identity.domain.model.Account;
 import fr.vlegall.seal.identity.domain.model.AccountStatus;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
 
-/** Verrou du compte de la session, partagé par les gestes de la vérification (A06 : gestes concurrents sérialisés). */
+/**
+ * Verrou du compte de la session, partagé par les gestes de la vérification et des paramètres du compte (A06 : gestes
+ * concurrents sérialisés).
+ */
 final class AccountLocks {
 
     private AccountLocks() {}
@@ -23,6 +26,15 @@ final class AccountLocks {
     static Account lockPending(UserRepository users, UserId user) {
         Account account = lock(users, user);
         if (account.status() != AccountStatus.PENDING_EMAIL) {
+            throw new SealException(ErrorCode.FORBIDDEN);
+        }
+        return account;
+    }
+
+    /** SEC-03 : les gestes des paramètres (ACC-02, ACC-03) ne valent que pour un compte actif, en plus de l'URL. */
+    static Account lockActive(UserRepository users, UserId user) {
+        Account account = lock(users, user);
+        if (account.status() != AccountStatus.ACTIVE) {
             throw new SealException(ErrorCode.FORBIDDEN);
         }
         return account;

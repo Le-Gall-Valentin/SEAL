@@ -1,5 +1,6 @@
 package fr.vlegall.seal.security.ratelimit;
 
+import fr.vlegall.seal.security.session.FullSessions;
 import fr.vlegall.seal.security.web.ClientAddress;
 import fr.vlegall.seal.security.web.ClientRoutesController;
 import fr.vlegall.seal.security.web.OAuthRoutes;
@@ -18,8 +19,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * SEC-10, ADR 0032 (point 3) : départs et retours OAuth limités par IP, avant les filtres de Spring. Un départ refusé ne
  * crée donc aucune session, un retour refusé n'écrit rien au journal. Ce sont des routes de Spring Security, pas des
  * contrôleurs : {@code @RateLimited} ne les atteint pas. Toute méthode compte. Ce sont aussi des navigations : un refus
- * renvoie vers l'écran de connexion avec {@code RATE_LIMITED}, et {@code Retry-After}, plutôt qu'un 429 en JSON
- * qu'aucun écran n'afficherait.
+ * renvoie vers l'écran de connexion, ou vers les paramètres pour la ré-authentification d'une session complète (ADR
+ * 0034), avec {@code RATE_LIMITED} et {@code Retry-After}, plutôt qu'un 429 en JSON qu'aucun écran n'afficherait.
  *
  * <p>Avant de compter, le filtre écarte ce qu'aucune navigation de SEAL n'émet, mais qu'un site tiers peut émettre en
  * masse depuis le navigateur de la victime pour épuiser ses limites (Fetch Metadata) : une sous-requête, un départ venu
@@ -54,8 +55,9 @@ public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 return;
             }
+            boolean signedIn = FullSessions.storedUser(request).isPresent();
             if (!expectedNavigation(request)) {
-                response.sendRedirect(ClientRoutesController.LOGIN_REQUEST_REJECTED);
+                response.sendRedirect(ClientRoutesController.rejectedTo(signedIn));
                 return;
             }
             try {
@@ -63,7 +65,8 @@ public final class OAuthNavigationRateLimitFilter extends OncePerRequestFilter {
             } catch (RateLimitExceededException e) {
                 e.retryAfterSeconds()
                         .ifPresent(seconds -> response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(seconds)));
-                response.sendRedirect(ClientRoutesController.LOGIN_RATE_LIMITED);
+                // ADR 0034 : une ré-authentification revient aux paramètres, où sa session est restée ouverte.
+                response.sendRedirect(ClientRoutesController.rateLimitedTo(signedIn));
                 return;
             }
         }

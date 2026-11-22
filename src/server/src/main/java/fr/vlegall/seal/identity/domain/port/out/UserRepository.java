@@ -44,6 +44,17 @@ public interface UserRepository {
     /** AUTH-17 : nouveau courriel d'un compte en attente. */
     void changeEmail(UserId id, EmailAddress email);
 
+    /**
+     * ACC-02 : nouveau courriel, vérifié, d'un compte actif.
+     *
+     * @throws IdentityException.CodeExpired si un autre compte actif vient d'obtenir l'adresse (index
+     *     users_verified_email)
+     */
+    void changeActiveEmail(UserId id, EmailAddress email, Instant verifiedAt);
+
+    /** ACC-03 : nouveau nom affiché d'un compte actif. */
+    void changeDisplayName(UserId id, DisplayName displayName);
+
     /** AUTH-15 : vrai si un compte actif possède cette adresse, sans tenir compte de la casse. */
     boolean activeAccountOwns(EmailAddress email);
 

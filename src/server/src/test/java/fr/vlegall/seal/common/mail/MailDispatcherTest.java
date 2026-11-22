@@ -40,7 +40,7 @@ class MailDispatcherTest {
         SealProperties properties = new SealProperties(
                 URI.create("https://localhost:8443"),
                 new SealProperties.Security(Duration.ofMinutes(5)),
-                new SealProperties.Session(Duration.ofHours(12)),
+                new SealProperties.Session(Duration.ofHours(12), Duration.ofMinutes(10)),
                 new SealProperties.Mail("SEAL <noreply@seal.localhost>"),
                 Path.of("data"));
         return new MailDispatcher(sender, properties, background);

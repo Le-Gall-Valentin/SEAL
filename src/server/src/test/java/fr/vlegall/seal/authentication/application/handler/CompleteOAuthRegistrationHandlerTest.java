@@ -42,6 +42,11 @@ class CompleteOAuthRegistrationHandlerTest {
         }
 
         @Override
+        public boolean isLinked(UserId user, OAuthProvider provider) {
+            throw new UnsupportedOperationException("réservé à la ré-authentification (ADR 0034)");
+        }
+
+        @Override
         public void link(UserId user, ExternalIdentity identity, Instant linkedAt) {
             if (alreadyLinked) {
                 throw new OAuthException.AlreadyLinked();

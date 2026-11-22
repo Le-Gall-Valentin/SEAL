@@ -5,7 +5,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.session.SessionRevocation;
 import org.springframework.stereotype.Component;
 
-/** Révoque les sessions d'un compte par {@code security} (AUTH-50, AUTH-70). */
+/** Révoque les sessions d'un compte par {@code security} (AUTH-50, AUTH-70, ACC-01). */
 @Component
 public class SessionRevocationAdapter implements SessionRevocationPort {
 
@@ -18,5 +18,10 @@ public class SessionRevocationAdapter implements SessionRevocationPort {
     @Override
     public void revokeAll(UserId user) {
         revocation.revokeAll(user);
+    }
+
+    @Override
+    public void revokeOthers(UserId user, String keptSession) {
+        revocation.revokeOthers(user, keptSession);
     }
 }

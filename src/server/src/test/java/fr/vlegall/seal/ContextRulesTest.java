@@ -28,6 +28,7 @@ import fr.vlegall.archfixture.common.TimeConfiguration;
 import fr.vlegall.archfixture.common.mail.FixtureMailer;
 import fr.vlegall.archfixture.crypto.PureCrypto;
 import fr.vlegall.archfixture.security.FixtureJournal;
+import fr.vlegall.archfixture.security.session.FixtureSessionWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -232,5 +233,18 @@ class ContextRulesTest {
         expectViolations(ContextRules.domainIsNotSerializable(ROOT), "SerializableThing");
         expectAllowed(
                 ContextRules.domainIsNotSerializable(ROOT), AlphaThing.class, AlphaKind.class, AlphaException.class);
+    }
+
+    @Test
+    @DisplayName("ADR 0007, ADR 0034, règle 16 : seul security.session écrit le contexte de sécurité dans la session")
+    void rule16OnlySecuritySessionStoresTheSecurityContext() {
+        expectViolations(
+                ContextRules.onlySecuritySessionStoresTheSecurityContext(ROOT),
+                "ContextWriter",
+                "ContextWriterByReference");
+        expectAllowed(
+                ContextRules.onlySecuritySessionStoresTheSecurityContext(ROOT),
+                FixtureSessionWriter.class,
+                AlphaThing.class);
     }
 }
