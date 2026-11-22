@@ -15,6 +15,16 @@ export const ROUTES = {
 
 /**
  * ADR 0035 : sous-page des paramètres ouverte sur téléphone (`/parametres?section=compte`), que le serveur ignore ; la
- * navigation principale s'y retire, comme dans Parametres-Telephone-Preferences.
+ * navigation principale s'y retire, comme dans Parametres-Telephone-Preferences. Seule « Compte » existe en P0.
  */
 export const SETTINGS_SECTION_PARAM = 'section'
+
+export type SettingsSection = 'compte'
+
+/** La sous-page de l'adresse, une règle pour la coque et pour la page : toute autre valeur, ou aucune, n'en est pas. */
+export function settingsSectionOf(params: URLSearchParams): SettingsSection | null {
+  return params.get(SETTINGS_SECTION_PARAM) === 'compte' ? 'compte' : null
+}
+
+/** L'adresse de la sous-page Compte. */
+export const SETTINGS_ACCOUNT = `/parametres?${SETTINGS_SECTION_PARAM}=compte`

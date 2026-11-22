@@ -41,12 +41,12 @@ async function renderAt(path: string, width: number, height: number) {
   return { router, screen }
 }
 
-describe('ADR 0035, point 3 : navigation principale', () => {
+describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
   afterEach(async () => {
     await page.viewport(1280, 800)
   })
 
-  it('ADR 0035 : ordinateur, rail de 88 px avec libellés ; Paramètres est la page courante ; ni Amis ni pastille', async () => {
+  it('ACC-03, ADR 0035 : ordinateur, rail de 88 px avec libellés ; Paramètres est la page courante ; ni Amis ni pastille', async () => {
     const { screen } = await renderAt('/parametres', 1440, 900)
 
     const nav = screen.getByRole('navigation', { name: 'Navigation principale' })
@@ -64,7 +64,7 @@ describe('ADR 0035, point 3 : navigation principale', () => {
     await expect.element(screen.getByText('Écran des paramètres')).toBeVisible()
   })
 
-  it('ADR 0035 : « Mon profil » montre les initiales du nom affiché et mène aux paramètres', async () => {
+  it('ACC-03, ADR 0035 : « Mon profil » montre les initiales du nom affiché et mène aux paramètres', async () => {
     const { router, screen } = await renderAt('/', 1440, 900)
 
     const profile = screen.getByRole('link', { name: 'Mon profil' })
@@ -73,7 +73,7 @@ describe('ADR 0035, point 3 : navigation principale', () => {
     expect(router.state.location.pathname).toBe('/parametres')
   })
 
-  it('ADR 0035 : tablette, rail de 72 px sans libellés visibles, mais nommés', async () => {
+  it('ACC-03, ADR 0035 : tablette, rail de 72 px sans libellés visibles, mais nommés', async () => {
     const { screen } = await renderAt('/', 820, 1180)
 
     const nav = screen.getByRole('navigation', { name: 'Navigation principale' })
@@ -84,7 +84,7 @@ describe('ADR 0035, point 3 : navigation principale', () => {
     await expect.element(nav.getByText('Conversations', { exact: true })).not.toBeVisible()
   })
 
-  it('ADR 0035 : téléphone, barre du bas en deux colonnes ; aller aux paramètres', async () => {
+  it('ACC-03, ADR 0035 : téléphone, barre du bas en deux colonnes ; aller aux paramètres', async () => {
     const { router, screen } = await renderAt('/', 390, 844)
 
     const nav = screen.getByRole('navigation', { name: 'Navigation principale' })
@@ -99,12 +99,21 @@ describe('ADR 0035, point 3 : navigation principale', () => {
       .toHaveAttribute('aria-current', 'page')
   })
 
-  it('ADR 0035 : téléphone, une sous-page des paramètres retire la barre du bas', async () => {
+  it('ACC-03, ADR 0035 : téléphone, une sous-page des paramètres retire la barre du bas', async () => {
     const { screen } = await renderAt('/parametres?section=compte', 390, 844)
 
     await expect.element(screen.getByText('Écran des paramètres')).toBeVisible()
     expect(
       screen.getByRole('navigation', { name: 'Navigation principale' }).elements(),
     ).toHaveLength(0)
+  })
+
+  it('ACC-03, ADR 0035 : une valeur de section inconnue n’est pas une sous-page ; la barre du bas reste', async () => {
+    const { screen } = await renderAt('/parametres?section=inconnue', 390, 844)
+
+    await expect.element(screen.getByText('Écran des paramètres')).toBeVisible()
+    await expect
+      .element(screen.getByRole('navigation', { name: 'Navigation principale' }))
+      .toBeVisible()
   })
 })

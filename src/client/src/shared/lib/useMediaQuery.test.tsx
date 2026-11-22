@@ -7,12 +7,12 @@ function Probe() {
   return <p>{useMediaQuery(WIDE_SCREEN) ? 'large' : 'étroit'}</p>
 }
 
-describe('ADR 0035 : largeur de l’écran', () => {
+describe('ACC-03, ADR 0035 : largeur de l’écran', () => {
   afterEach(async () => {
     await page.viewport(1280, 800)
   })
 
-  it('ADR 0035 : suit la largeur en direct, téléphone sous 640 px', async () => {
+  it('ACC-03, ADR 0035 : suit la largeur en direct, téléphone sous 640 px', async () => {
     await page.viewport(390, 844)
     const screen = await render(<Probe />)
     await expect.element(screen.getByText('étroit')).toBeVisible()

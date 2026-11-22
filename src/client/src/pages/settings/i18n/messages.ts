@@ -6,7 +6,9 @@ export const settingsMessages = defineMessages({
     title: 'Paramètres',
     sections: 'Sections des paramètres',
     account: 'Compte',
-    accountSummary: 'Profil, courriel, mot de passe, comptes liés',
+    // ADR 0035 : « comptes liés » revient avec ACC-04 (P1) ; SEAL n'annonce pas une fonction absente.
+    accountSummary: 'Profil, courriel, mot de passe',
+    usernameFinal: 'Identifiant définitif',
     back: 'Paramètres',
   },
 })

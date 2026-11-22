@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { initialsOf } from '@/entities/account'
 import { useCurrentAccount } from '@/entities/session'
-import { ROUTES, SETTINGS_SECTION_PARAM } from '@/shared/config'
+import { ROUTES, settingsSectionOf } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { PhoqueHead } from '@/shared/ui'
 import { appShellMessages } from '../i18n'
@@ -18,7 +18,7 @@ export function AppShell() {
   // Parametres-Telephone-Preferences : une sous-page des paramètres occupe tout l'écran, sans la barre du bas.
   const settingsSubpage =
     location.pathname === ROUTES.SETTINGS &&
-    new URLSearchParams(location.search).has(SETTINGS_SECTION_PARAM)
+    settingsSectionOf(new URLSearchParams(location.search)) !== null
   return (
     <div className="flex min-h-screen flex-col bg-bg font-sans text-ink sm:flex-row">
       <Rail />
@@ -80,9 +80,7 @@ function RailLink({ to, label, icon, end }: DestinationProps) {
       aria-label={label}
       className={({ isActive }) =>
         `grid size-13 place-items-center rounded-[14px] no-underline lg:flex lg:h-auto lg:min-h-15 lg:w-19 lg:flex-col lg:items-center lg:justify-center lg:gap-1 lg:text-[10.5px] lg:font-semibold ${
-          isActive
-            ? 'bg-accent-soft-2 text-accent-text lg:bg-accent-soft'
-            : 'text-ink-3 hover:text-ink-2'
+          isActive ? 'bg-accent-soft-2 text-accent-text lg:bg-accent-soft' : 'text-ink-3'
         }`
       }
     >

@@ -1,108 +1,119 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { type Account, useCurrentAccount } from '@/entities/session'
 import { initialsOf, useLoginMethods } from '@/entities/account'
+import { type Account, useCurrentAccount } from '@/entities/session'
 import { ProfileCard } from '@/features/change-display-name'
 import { EmailCard } from '@/features/change-email'
 import { PasswordCard } from '@/features/change-password'
 import { LogoutButton } from '@/features/logout'
+import { ReauthDialog, type ReauthReturnError, ReauthReturnAlert } from '@/features/reauthenticate'
 import {
-  REAUTH_ERROR_PARAM,
-  ReauthDialog,
-  type ReauthReturnError,
-  ReauthReturnAlert,
-  reauthReturnErrorOf,
-} from '@/features/reauthenticate'
-import { ROUTES } from '@/shared/config'
+  ROUTES,
+  SETTINGS_ACCOUNT,
+  SETTINGS_SECTION_PARAM,
+  settingsSectionOf,
+} from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { useMediaQuery, WIDE_SCREEN } from '@/shared/lib'
 import { settingsMessages } from '../i18n'
-import { SECTION_PARAM, sectionOf } from '../model/section'
-import { AccountIcon, ChevronLeft, ChevronRight } from './icons'
-
-const ACCOUNT_SECTION = `${ROUTES.SETTINGS}?${SECTION_PARAM}=compte`
+import { useOAuthReturnError } from '../model/useOAuthReturnError'
+import { AccountIcon, ChevronLeft, ChevronRight, LockIcon } from './icons'
 
 /**
  * Paramètres (ACC-01 à ACC-03, ADR 0035). Ordinateur et tablette : navigation des sections à gauche, section Compte à
  * droite. Téléphone : la liste des sections, puis la sous-page Compte en plein écran (Parametres-Telephone-Preferences).
  * Seule la section Compte existe en P0 (point 4).
+ *
+ * La section Compte garde la même place dans l'arbre d'une disposition à l'autre : tourner un téléphone (390 ↔ 844 px)
+ * ne ferme ni un dialogue ni une saisie. Passer sous 640 px en regardant Compte ouvre sa sous-page, pas la liste.
  */
 export function SettingsPage() {
   const account = useCurrentAccount().data
   const wide = useMediaQuery(WIDE_SCREEN)
   const [params, setParams] = useSearchParams()
-  const returnError = useOAuthReturnError(params, setParams)
-  if (account == null) {
-    return null
+  const returnError = useOAuthReturnError()
+  const subpage = settingsSectionOf(params) !== null
+  // Largeur du rendu précédent ; passer sous 640 px en regardant Compte garde Compte le temps que l'adresse prenne
+  // ?section=compte (réglage d'état pendant le rendu, comme le recommande React).
+  const [lastWide, setLastWide] = useState(wide)
+  const [keepAccount, setKeepAccount] = useState(false)
+  if (lastWide !== wide) {
+    setLastWide(wide)
+    if (lastWide && !subpage) {
+      setKeepAccount(true)
+    }
   }
-  // Une seule disposition montée à la fois : les formulaires de la section n'existent qu'une fois.
-  if (wide) {
-    return (
-      <div className="flex min-h-0 flex-1">
-        <SectionsNav />
-        <main className="min-w-0 flex-1">
-          <div className="flex flex-col gap-4 px-6 pt-6 pb-10 lg:max-w-176 lg:gap-5 lg:px-12 lg:pt-9 lg:pb-16">
-            <SectionTitle level={2} />
-            {returnError !== null && <ReauthReturnAlert error={returnError} />}
-            <AccountContent account={account} />
-          </div>
-        </main>
-      </div>
-    )
+  if (keepAccount && subpage) {
+    setKeepAccount(false)
   }
-  return sectionOf(params) === 'compte' ? (
-    <PhoneSubpage>
-      {returnError !== null && <ReauthReturnAlert error={returnError} />}
-      <AccountContent account={account} />
-    </PhoneSubpage>
-  ) : (
-    <PhoneList account={account} returnError={returnError} />
-  )
-}
-
-/**
- * AUTH-55, ADR 0034 : refus d'une ré-authentification OAuth, lu une fois dans `?erreur=`, puis retiré de l'adresse pour
- * qu'un rechargement ne le montre pas de nouveau.
- */
-function useOAuthReturnError(
-  params: URLSearchParams,
-  setParams: ReturnType<typeof useSearchParams>[1],
-): ReauthReturnError | null {
-  const [error] = useState(() => reauthReturnErrorOf(`?${params.toString()}`))
-  const present = params.has(REAUTH_ERROR_PARAM)
   useEffect(() => {
-    if (present) {
+    if (keepAccount && !subpage) {
       setParams(
         (current) => {
           const next = new URLSearchParams(current)
-          next.delete(REAUTH_ERROR_PARAM)
+          next.set(SETTINGS_SECTION_PARAM, 'compte')
           return next
         },
         { replace: true },
       )
     }
-  }, [present, setParams])
-  return error
+  }, [keepAccount, subpage, setParams])
+  if (account == null) {
+    return null
+  }
+  if (!wide && !subpage && !keepAccount) {
+    return <PhoneList account={account} returnError={returnError} />
+  }
+  return (
+    <div className="flex min-h-0 flex-1">
+      {wide && <SectionsNav />}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {!wide && <BackLink />}
+        <main className="min-w-0 flex-1">
+          <div
+            className={
+              wide
+                ? 'flex flex-col gap-4 px-6 pt-6 pb-10 lg:max-w-176 lg:gap-5 lg:px-12 lg:pt-9 lg:pb-16'
+                : 'flex flex-col gap-3.5 px-4 pt-1 pb-6'
+            }
+          >
+            <SectionTitle level={wide ? 2 : 1} />
+            {returnError !== null && <ReauthReturnAlert error={returnError} />}
+            <AccountContent account={account} headingLevel={wide ? 3 : 2} />
+          </div>
+        </main>
+      </div>
+    </div>
+  )
 }
 
 /**
  * Section Compte : Profil, Courriel, Mot de passe (ADR 0035, point 4 : « Comptes liés » attend ACC-04 ; un compte
  * sans mot de passe, ou dont les méthodes ne sont pas encore lues, ne voit pas la carte Mot de passe).
  */
-function AccountContent({ account }: { readonly account: Account }) {
+function AccountContent({
+  account,
+  headingLevel,
+}: {
+  readonly account: Account
+  readonly headingLevel: 2 | 3
+}) {
   const methods = useLoginMethods()
   // AUTH-55, ADR 0035 : l'action refusée faute de mode sudo, relancée après un mot de passe accepté.
   const [pendingRetry, setPendingRetry] = useState<{ readonly retry: () => void } | null>(null)
   return (
     <div className="flex flex-col gap-4 lg:gap-5">
-      <ProfileCard account={account} />
+      <ProfileCard account={account} headingLevel={headingLevel} />
       <EmailCard
         account={account}
+        headingLevel={headingLevel}
         onReauthRequired={(retry) => {
           setPendingRetry({ retry })
         }}
       />
-      {methods.data?.passwordSet === true && <PasswordCard account={account} />}
+      {methods.data?.passwordSet === true && (
+        <PasswordCard account={account} headingLevel={headingLevel} />
+      )}
       <ReauthDialog
         open={pendingRetry !== null}
         onReauthenticated={() => {
@@ -173,7 +184,7 @@ function PhoneList({
       </header>
       {returnError !== null && <ReauthReturnAlert error={returnError} />}
       <Link
-        to={ACCOUNT_SECTION}
+        to={SETTINGS_ACCOUNT}
         className="flex items-center gap-3.5 rounded-[18px] bg-surface py-3.5 pr-2.5 pl-3.5 text-ink no-underline inset-ring inset-ring-line"
       >
         <span
@@ -186,7 +197,10 @@ function PhoneList({
           <span className="truncate text-[17px] font-bold tracking-[-0.01em]">
             {account.displayName}
           </span>
-          <span className="truncate font-mono text-[13px] text-ink-3">@{account.username}</span>
+          <span className="flex min-w-0 items-center gap-1.25 font-mono text-[13px] text-ink-3">
+            <span className="truncate">@{account.username}</span>
+            <LockIcon label={t('usernameFinal')} />
+          </span>
         </span>
         <ChevronRight />
       </Link>
@@ -194,7 +208,7 @@ function PhoneList({
         <ul className="m-0 list-none rounded-[18px] bg-surface p-0 inset-ring inset-ring-line">
           <li>
             <Link
-              to={ACCOUNT_SECTION}
+              to={SETTINGS_ACCOUNT}
               className="flex min-h-16 items-center gap-3 py-2.5 pr-2.5 pl-3.5 text-ink no-underline"
             >
               <span
@@ -217,24 +231,18 @@ function PhoneList({
   )
 }
 
-/** Téléphone : sous-page en plein écran (la coque y retire la barre du bas), avec le retour « Paramètres ». */
-function PhoneSubpage({ children }: { readonly children: ReactNode }) {
+/** Téléphone : retour « Paramètres » de la sous-page (la coque y retire la barre du bas). */
+function BackLink() {
   const t = useMessages(settingsMessages)
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex h-13 flex-none items-center px-2 py-1">
-        <Link
-          to={ROUTES.SETTINGS}
-          className="inline-flex min-h-11 items-center gap-1 rounded-[10px] pr-3 pl-1.5 text-[15px] font-semibold text-accent-text no-underline"
-        >
-          <ChevronLeft />
-          {t('back')}
-        </Link>
-      </div>
-      <main className="flex flex-col gap-3.5 px-4 pt-1 pb-6">
-        <SectionTitle level={1} />
-        {children}
-      </main>
+    <div className="flex h-13 flex-none items-center px-2 py-1">
+      <Link
+        to={ROUTES.SETTINGS}
+        className="inline-flex min-h-11 items-center gap-1 rounded-[10px] pr-3 pl-1.5 text-[15px] font-semibold text-accent-text no-underline"
+      >
+        <ChevronLeft />
+        {t('back')}
+      </Link>
     </div>
   )
 }

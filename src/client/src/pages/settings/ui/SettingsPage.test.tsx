@@ -89,7 +89,7 @@ describe('ACC-01 à ACC-03, ADR 0035 : écran Paramètres', () => {
     await page.viewport(1280, 800)
   })
 
-  it('Parametres-Ordinateur : navigation des sections (Compte seule), puis Profil, Courriel et Mot de passe', async () => {
+  it('ACC-03, Parametres-Ordinateur : navigation des sections (Compte seule), puis Profil, Courriel et Mot de passe', async () => {
     const { screen } = await renderAt('/parametres', 1440, 1100)
 
     const sections = screen.getByRole('navigation', { name: 'Sections des paramètres' })
@@ -110,7 +110,7 @@ describe('ACC-01 à ACC-03, ADR 0035 : écran Paramètres', () => {
     expect(screen.getByRole('heading', { name: 'Comptes liés' }).elements()).toHaveLength(0)
   })
 
-  it('ADR 0035, point 4 : un compte sans mot de passe ne voit pas la carte Mot de passe', async () => {
+  it('ACC-01, ADR 0035 (point 4) : un compte sans mot de passe ne voit pas la carte Mot de passe', async () => {
     const { screen } = await renderAt('/parametres', 1440, 1100, {
       methods: { passwordSet: false, providers: ['google'] },
     })
@@ -191,7 +191,7 @@ describe('ACC-01 à ACC-03, ADR 0035 : écran Paramètres', () => {
     expect(screen.getByRole('alert').elements()).toHaveLength(0)
   })
 
-  it('Parametres-Telephone : carte du profil et liste des sections ; Compte s’ouvre en sous-page, puis « Paramètres » revient', async () => {
+  it('ACC-03, Parametres-Telephone : carte du profil et liste des sections ; Compte s’ouvre en sous-page, puis « Paramètres » revient', async () => {
     const { router, screen } = await renderAt('/parametres', 390, 844)
 
     await expect
@@ -206,20 +206,75 @@ describe('ACC-01 à ACC-03, ADR 0035 : écran Paramètres', () => {
 
     expect(router.state.location.search).toBe('?section=compte')
     await expect.element(screen.getByRole('heading', { level: 1, name: 'Compte' })).toBeVisible()
-    await expect.element(screen.getByRole('heading', { level: 3, name: 'Profil' })).toBeVisible()
+    await expect.element(screen.getByRole('heading', { level: 2, name: 'Profil' })).toBeVisible()
     expect(screen.getByLabelText('Nom affiché').elements()).toHaveLength(1)
     await screen.getByRole('link', { name: 'Paramètres' }).click()
     await expect.element(screen.getByText('@valentin.dupont')).toBeVisible()
   })
 
-  it('ADR 0035 : passer du téléphone à la tablette garde une seule section montée', async () => {
+  it('ACC-03, ADR 0035 : passer du téléphone à la tablette garde une seule section montée', async () => {
     const { screen } = await renderAt('/parametres?section=compte', 390, 844)
-    await expect.element(screen.getByRole('heading', { level: 3, name: 'Profil' })).toBeVisible()
+    await expect.element(screen.getByRole('heading', { level: 2, name: 'Profil' })).toBeVisible()
 
     await page.viewport(820, 1180)
     await expect
       .element(screen.getByRole('navigation', { name: 'Sections des paramètres' }))
       .toBeVisible()
     expect(screen.getByLabelText('Nom affiché').elements()).toHaveLength(1)
+  })
+
+  it('AUTH-55, SEC-10 : un retour OAuth limité (RATE_LIMITED) annonce « Trop de tentatives »', async () => {
+    const { router, screen } = await renderAt('/parametres?erreur=RATE_LIMITED', 1440, 1100)
+
+    await expect.element(screen.getByText('Trop de tentatives')).toBeVisible()
+    await expect.element(screen.getByText('Réessayez plus tard.')).toBeVisible()
+    await expect.poll(() => router.state.location.search).toBe('')
+  })
+
+  it('ACC-03, Parametres-Telephone : cadenas « Identifiant définitif » ; le résumé de Compte n’annonce pas les comptes liés', async () => {
+    const { screen } = await renderAt('/parametres', 390, 844)
+
+    await expect.element(screen.getByRole('img', { name: 'Identifiant définitif' })).toBeVisible()
+    await expect
+      .element(screen.getByText('Profil, courriel, mot de passe', { exact: true }))
+      .toBeVisible()
+  })
+
+  it('ACC-03 : sur la sous-page du téléphone, les cartes sont des titres de niveau 2 sous « Compte »', async () => {
+    const { screen } = await renderAt('/parametres?section=compte', 390, 844)
+
+    await expect.element(screen.getByRole('heading', { level: 1, name: 'Compte' })).toBeVisible()
+    await expect.element(screen.getByRole('heading', { level: 2, name: 'Profil' })).toBeVisible()
+    await expect.element(screen.getByRole('heading', { level: 2, name: 'Courriel' })).toBeVisible()
+  })
+
+  it('ACC-01, ADR 0035 : tourner le téléphone garde le dialogue ouvert et sa saisie, dans les deux sens', async () => {
+    const { screen } = await renderAt('/parametres?section=compte', 390, 844)
+
+    await screen.getByRole('button', { name: 'Changer le mot de passe' }).click()
+    await screen.getByLabelText('Mot de passe actuel').fill('phrase en cours')
+    await page.viewport(844, 390)
+    await expect
+      .element(screen.getByRole('navigation', { name: 'Sections des paramètres' }))
+      .toBeInTheDocument()
+    await expect
+      .element(screen.getByLabelText('Mot de passe actuel'))
+      .toHaveValue('phrase en cours')
+    await page.viewport(390, 844)
+    await expect.element(screen.getByRole('link', { name: 'Paramètres' })).toBeVisible()
+    await expect
+      .element(screen.getByLabelText('Mot de passe actuel'))
+      .toHaveValue('phrase en cours')
+  })
+
+  it('ACC-02, ADR 0035 : passer sous 640 px en regardant Compte ouvre sa sous-page et garde le dialogue', async () => {
+    const { router, screen } = await renderAt('/parametres', 820, 1180)
+
+    await screen.getByRole('button', { name: 'Changer de courriel' }).click()
+    await screen.getByLabelText('Nouveau courriel').fill('neuve@exemple.ca')
+    await page.viewport(390, 844)
+
+    await expect.poll(() => router.state.location.search).toBe('?section=compte')
+    await expect.element(screen.getByLabelText('Nouveau courriel')).toHaveValue('neuve@exemple.ca')
   })
 })

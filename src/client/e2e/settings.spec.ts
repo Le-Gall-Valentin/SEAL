@@ -78,7 +78,7 @@ test('ACC-03, ACC-02, ACC-01, AUTH-53 : nom affiché, courriel par code, mot de 
   await expect(page.getByRole('heading', { level: 1, name: 'seal' })).toBeVisible()
 })
 
-test('ADR 0035 : sur téléphone, la liste des sections puis la sous-page Compte, sans barre du bas', async ({
+test('ACC-03, ADR 0035 : sur téléphone, la liste des sections puis la sous-page Compte, sans barre du bas', async ({
   page,
   request,
 }) => {
