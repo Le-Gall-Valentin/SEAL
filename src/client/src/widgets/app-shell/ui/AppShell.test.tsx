@@ -98,4 +98,13 @@ describe('ADR 0035, point 3 : navigation principale', () => {
       .element(nav.getByRole('link', { name: 'Paramètres' }))
       .toHaveAttribute('aria-current', 'page')
   })
+
+  it('ADR 0035 : téléphone, une sous-page des paramètres retire la barre du bas', async () => {
+    const { screen } = await renderAt('/parametres?section=compte', 390, 844)
+
+    await expect.element(screen.getByText('Écran des paramètres')).toBeVisible()
+    expect(
+      screen.getByRole('navigation', { name: 'Navigation principale' }).elements(),
+    ).toHaveLength(0)
+  })
 })
