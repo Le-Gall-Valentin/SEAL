@@ -126,7 +126,10 @@ interface DialogFooterProps {
   readonly canSubmit?: boolean
 }
 
-/** Pied d'une fenêtre : « Annuler » et le bouton d'envoi du formulaire qui l'entoure. */
+/**
+ * Pied d'une fenêtre : « Annuler » et le bouton d'envoi du formulaire qui l'entoure. Sur un écran trop étroit, le
+ * bouton d'envoi passe à la ligne entier plutôt que de couper son texte (280 px, ADR 0024, point 11).
+ */
 export function DialogFooter({
   onCancel,
   cancelable,
@@ -135,11 +138,11 @@ export function DialogFooter({
 }: DialogFooterProps) {
   const t = useMessages(formMessages)
   return (
-    <div className="flex justify-end gap-2 border-t border-line px-6 pt-4 pb-5">
+    <div className="flex flex-wrap justify-end gap-2 border-t border-line px-6 pt-4 pb-5">
       <button
         type="button"
         disabled={!cancelable}
-        className="h-11 rounded-[10px] bg-surface px-4 font-sans text-[14.5px] font-semibold text-ink inset-ring inset-ring-line-strong disabled:opacity-55"
+        className="h-11 rounded-[10px] bg-surface px-4 font-sans text-[14.5px] font-semibold whitespace-nowrap text-ink inset-ring inset-ring-line-strong disabled:opacity-55"
         onClick={onCancel}
       >
         {t('cancel')}
@@ -148,7 +151,7 @@ export function DialogFooter({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="h-11 rounded-[10px] bg-accent px-4 font-sans text-[14.5px] font-semibold text-on-accent disabled:opacity-55"
+          className="h-11 rounded-[10px] bg-accent px-4 font-sans text-[14.5px] font-semibold whitespace-nowrap text-on-accent disabled:opacity-55"
         >
           {submitLabel}
         </button>

@@ -37,7 +37,7 @@ export function ProfileCard({ account }: { readonly account: Account }) {
   return (
     <section
       aria-labelledby={`${id}-titre`}
-      className="flex flex-col gap-4 rounded-[18px] bg-surface p-5 inset-ring inset-ring-line sm:p-6"
+      className="flex flex-col gap-4 rounded-[18px] bg-surface p-4 inset-ring inset-ring-line sm:p-6"
     >
       <h3 id={`${id}-titre`} className="m-0 text-[16px] font-bold">
         {t('profile')}

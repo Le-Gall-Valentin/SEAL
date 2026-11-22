@@ -13,9 +13,9 @@ export function PasswordCard({ account }: { readonly account: Account }) {
   return (
     <section
       aria-labelledby={titleId}
-      className="flex flex-col rounded-[18px] bg-surface p-5 inset-ring inset-ring-line sm:p-6"
+      className="flex flex-col rounded-[18px] bg-surface p-4 inset-ring inset-ring-line sm:p-6"
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:gap-4">
         <div>
           <h3 id={titleId} className="m-0 text-[16px] font-bold">
             {t('title')}
