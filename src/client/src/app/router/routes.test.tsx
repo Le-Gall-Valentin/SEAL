@@ -62,6 +62,9 @@ function fakeApis(account: Account | null): Apis {
     verifyEmail: { verify: never, resend: never, changeEmail: never },
     passwordReset: { request: never, inspect: never, confirm: never },
     logout: { logout: () => Promise.resolve() },
+    loginMethods: {
+      loginMethods: () => Promise.resolve({ passwordSet: true, providers: [] }),
+    },
   }
 }
 
