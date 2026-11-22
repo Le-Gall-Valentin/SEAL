@@ -12,3 +12,9 @@ export const ROUTES = {
   // ACC-01 à ACC-03, ADR 0034 et 0035 : Paramètres, où revient aussi une ré-authentification OAuth.
   SETTINGS: '/parametres',
 } as const
+
+/**
+ * ADR 0035 : sous-page des paramètres ouverte sur téléphone (`/parametres?section=compte`), que le serveur ignore ; la
+ * navigation principale s'y retire, comme dans Parametres-Telephone-Preferences.
+ */
+export const SETTINGS_SECTION_PARAM = 'section'

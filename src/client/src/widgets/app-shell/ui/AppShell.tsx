@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { Link, NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { initialsOf } from '@/entities/account'
 import { useCurrentAccount } from '@/entities/session'
-import { ROUTES } from '@/shared/config'
+import { ROUTES, SETTINGS_SECTION_PARAM } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { PhoqueHead } from '@/shared/ui'
 import { appShellMessages } from '../i18n'
@@ -14,13 +14,18 @@ import { ConversationsIcon, SettingsIcon } from './icons'
  * attendent le lot 3 : SEAL n'annonce pas une fonction absente (ADR 0024, point 3).
  */
 export function AppShell() {
+  const location = useLocation()
+  // Parametres-Telephone-Preferences : une sous-page des paramètres occupe tout l'écran, sans la barre du bas.
+  const settingsSubpage =
+    location.pathname === ROUTES.SETTINGS &&
+    new URLSearchParams(location.search).has(SETTINGS_SECTION_PARAM)
   return (
     <div className="flex min-h-screen flex-col bg-bg font-sans text-ink sm:flex-row">
       <Rail />
       <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
       </div>
-      <BottomBar />
+      {!settingsSubpage && <BottomBar />}
     </div>
   )
 }

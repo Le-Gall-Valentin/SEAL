@@ -217,11 +217,11 @@ function PhoneList({
   )
 }
 
-/** Téléphone : sous-page en plein écran, par-dessus la barre du bas, avec le retour « Paramètres ». */
+/** Téléphone : sous-page en plein écran (la coque y retire la barre du bas), avec le retour « Paramètres ». */
 function PhoneSubpage({ children }: { readonly children: ReactNode }) {
   const t = useMessages(settingsMessages)
   return (
-    <div className="fixed inset-0 z-10 flex flex-col overflow-y-auto bg-bg">
+    <div className="flex flex-1 flex-col">
       <div className="flex h-13 flex-none items-center px-2 py-1">
         <Link
           to={ROUTES.SETTINGS}
