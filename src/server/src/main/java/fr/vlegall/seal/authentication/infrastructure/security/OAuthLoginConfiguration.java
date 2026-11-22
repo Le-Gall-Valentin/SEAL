@@ -14,8 +14,9 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 
 /**
- * Connexion OAuth (AUTH-30 à AUTH-33). {@code SecurityConfig}, transverse, ne connaît aucun contexte (ADR 0008) : il
- * applique ce réglage de {@code oauth2Login}, qu'il reçoit par son type Spring (ADR 0031).
+ * Connexion OAuth (AUTH-30 à AUTH-33) et ré-authentification par OAuth (AUTH-55, ADR 0034). {@code SecurityConfig},
+ * transverse, ne connaît aucun contexte (ADR 0008) : il applique ce réglage de {@code oauth2Login}, qu'il reçoit par
+ * son type Spring (ADR 0031).
  */
 @Configuration(proxyBeanMethods = false)
 class OAuthLoginConfiguration {

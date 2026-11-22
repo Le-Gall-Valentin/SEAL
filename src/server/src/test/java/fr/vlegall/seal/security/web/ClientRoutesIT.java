@@ -49,7 +49,9 @@ class ClientRoutesIT {
                 "/inscription/identifiant",
                 "/parametres"
             })
-    @DisplayName("AUTH-70, TRN-20 : chaque écran de l'authentification rend le client à un anonyme, avec la CSP")
+    @DisplayName(
+            "AUTH-70, TRN-20, ADR 0034 : chaque écran de l'authentification, et Paramètres, rend le client à un anonyme,"
+                    + " avec la CSP")
     void auth70EachScreenAddressServesTheClient(String path) throws Exception {
         mvc.perform(get(path).secure(true))
                 .andExpect(status().isOk())

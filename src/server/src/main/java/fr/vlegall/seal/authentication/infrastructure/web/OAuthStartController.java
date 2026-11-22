@@ -2,7 +2,7 @@ package fr.vlegall.seal.authentication.infrastructure.web;
 
 import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
-import fr.vlegall.seal.security.session.SealAuthorities;
+import fr.vlegall.seal.security.session.FullSessions;
 import fr.vlegall.seal.security.web.ClientRoutesController;
 import fr.vlegall.seal.security.web.OAuthRoutes;
 import jakarta.servlet.http.HttpServletResponse;
@@ -24,12 +24,9 @@ public class OAuthStartController {
     @GetMapping(OAuthRoutes.AUTHORIZATION_BASE + "/{registrationId}")
     public void unresolvedStart(@Nullable Authentication authentication, HttpServletResponse response)
             throws IOException {
-        boolean fullSession = authentication != null
-                && authentication.getAuthorities().stream()
-                        .anyMatch(authority -> SealAuthorities.ACCOUNT_ACTIVE.equals(authority.getAuthority()));
-        if (!fullSession) {
+        if (FullSessions.user(authentication).isEmpty()) {
             throw new SealException(ErrorCode.NOT_FOUND);
         }
-        response.sendRedirect(ClientRoutesController.SETTINGS_REQUEST_REJECTED);
+        response.sendRedirect(ClientRoutesController.rejectedTo(true));
     }
 }

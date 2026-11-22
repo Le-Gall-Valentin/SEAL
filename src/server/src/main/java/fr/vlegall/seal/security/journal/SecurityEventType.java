@@ -6,7 +6,7 @@ public enum SecurityEventType {
     RATE_LIMIT_EXCEEDED,
     /** SEC-20 : inscription, classique (AUTH-10) ou OAuth (AUTH-32). */
     ACCOUNT_REGISTERED,
-    /** SEC-20 : courriel d'un compte remplacé (AUTH-17). */
+    /** SEC-20 : courriel d'un compte remplacé, en attente (AUTH-17) ou actif (ACC-02). */
     EMAIL_CHANGED,
     /** SEC-20 : connexion réussie (AUTH-20). */
     LOGIN_SUCCEEDED,

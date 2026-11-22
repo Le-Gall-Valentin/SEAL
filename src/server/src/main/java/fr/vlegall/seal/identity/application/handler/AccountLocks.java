@@ -31,7 +31,7 @@ final class AccountLocks {
         return account;
     }
 
-    /** SEC-03 : les gestes des paramètres (ACC-02, ACC-03) ne valent que pour un compte actif, en plus de la règle d'URL. */
+    /** SEC-03 : les gestes des paramètres (ACC-02, ACC-03) ne valent que pour un compte actif, en plus de l'URL. */
     static Account lockActive(UserRepository users, UserId user) {
         Account account = lock(users, user);
         if (account.status() != AccountStatus.ACTIVE) {

@@ -31,7 +31,7 @@ import org.jspecify.annotations.Nullable;
  * Doublures en mémoire des gestes sur le mot de passe : oubli (AUTH-70), ré-authentification (AUTH-55) et changement
  * (ACC-01). Chaque effet s'inscrit dans {@link #calls}, dans l'ordre, pour que les tests vérifient aussi la séquence.
  */
-final class PasswordResetFixture {
+final class PasswordFixture {
 
     static final Instant NOW = Instant.parse("2026-11-13T12:00:00Z");
     static final String PASSWORD = "fjord-tuque-raquette";

@@ -6,6 +6,7 @@ import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.security.session.FullSessions;
 import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.session.SessionEstablisher;
 import fr.vlegall.seal.security.web.ClientRoutesController;
@@ -13,7 +14,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Optional;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
@@ -23,8 +23,6 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextRepository;
 
 /**
  * Retour OAuth réussi chez le fournisseur (AUTH-30 à AUTH-33). L'authentification de Spring n'est jamais gardée : le
@@ -41,7 +39,6 @@ final class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final OAuthReauthenticateUseCase reauthentication;
     private final SessionEstablisher sessions;
     private final PendingOAuthSession pending;
-    private final SecurityContextRepository contexts = new HttpSessionSecurityContextRepository();
 
     OAuthLoginSuccessHandler(
             OAuthLoginUseCase login,
@@ -115,10 +112,10 @@ final class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
      */
     private void reauthenticate(HttpServletRequest request, HttpServletResponse response, ExternalIdentity identity)
             throws IOException {
-        SecurityContext stored = contexts.loadDeferredContext(request).get();
-        Optional<UUID> user = OAuthRequests.fullSessionUserInSession(request);
-        if (user.isEmpty() || !reauthentication.reauthenticate(new UserId(user.get()), identity)) {
-            response.sendRedirect(ClientRoutesController.SETTINGS_REQUEST_REJECTED);
+        SecurityContext stored = FullSessions.stored(request);
+        Optional<UserId> user = FullSessions.user(stored.getAuthentication());
+        if (user.isEmpty() || !reauthentication.reauthenticate(user.get(), identity)) {
+            response.sendRedirect(ClientRoutesController.rejectedTo(true));
             return;
         }
         holder.setContext(stored);
@@ -129,9 +126,6 @@ final class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
     private void reject(HttpServletResponse response, @Nullable OAuthProvider provider, boolean reauthenticating)
             throws IOException {
         login.rejected(provider, "invalid_user_info");
-        response.sendRedirect(
-                reauthenticating
-                        ? ClientRoutesController.SETTINGS_REQUEST_REJECTED
-                        : ClientRoutesController.LOGIN_REQUEST_REJECTED);
+        response.sendRedirect(ClientRoutesController.rejectedTo(reauthenticating));
     }
 }

@@ -83,7 +83,7 @@ public final class OAuthAuthorizationRequests implements AuthorizationRequestRep
             // ADR 0034 : une ré-authentification ne revient qu'à la session complète du compte qui l'a demandée.
             request.setAttribute(REAUTHENTICATED_USER, reauthenticated);
             if (!OAuthRequests.fullSessionUser()
-                    .map(user -> user.toString().equals(reauthenticated))
+                    .map(user -> user.value().toString().equals(reauthenticated))
                     .orElse(false)) {
                 request.setAttribute(REJECTION, "reauth_session_mismatch");
                 return null;

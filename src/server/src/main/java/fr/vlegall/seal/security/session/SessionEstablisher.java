@@ -66,8 +66,7 @@ public final class SessionEstablisher {
         if (!(authenticated.getPrincipal() instanceof SealPrincipal principal)) {
             throw new IllegalStateException("authentification sans compte SEAL");
         }
-        boolean active = authenticated.getAuthorities().stream()
-                .anyMatch(authority -> SealAuthorities.ACCOUNT_ACTIVE.equals(authority.getAuthority()));
+        boolean active = FullSessions.user(authenticated).isPresent();
         return establish(principal, active ? fullAuthorities() : restrictedAuthorities(), request, response);
     }
 
@@ -205,10 +204,9 @@ public final class SessionEstablisher {
     /** Session complète en cours ; toute autre situation est une erreur de programmation (échec fermé). */
     private FullSession fullSession() {
         Authentication current = holder.getContext().getAuthentication();
-        if (current == null
-                || !(current.getPrincipal() instanceof SealPrincipal principal)
-                || current.getAuthorities().stream()
-                        .noneMatch(a -> SealAuthorities.ACCOUNT_ACTIVE.equals(a.getAuthority()))) {
+        if (FullSessions.user(current).isEmpty()
+                || current == null
+                || !(current.getPrincipal() instanceof SealPrincipal principal)) {
             throw new IllegalStateException("aucune session complète à ré-authentifier");
         }
         return new FullSession(current, principal);

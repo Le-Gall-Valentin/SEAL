@@ -1,14 +1,7 @@
 package fr.vlegall.seal.authentication.application.handler;
 
 import fr.vlegall.seal.authentication.application.port.in.ChangePasswordUseCase;
-import fr.vlegall.seal.authentication.domain.model.AccountContact;
-import fr.vlegall.seal.authentication.domain.model.Password;
 import fr.vlegall.seal.authentication.domain.model.PasswordChangeOutcome;
-import fr.vlegall.seal.authentication.domain.model.StoredCredential;
-import fr.vlegall.seal.authentication.domain.port.out.AccountContactPort;
-import fr.vlegall.seal.authentication.domain.port.out.CredentialRepository;
-import fr.vlegall.seal.authentication.domain.port.out.PasswordHasher;
-import fr.vlegall.seal.authentication.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.authentication.domain.port.out.SessionRevocationPort;
 import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
@@ -26,29 +19,20 @@ import org.springframework.transaction.annotation.Transactional;
 @ApplicationService
 public class ChangePasswordHandler implements ChangePasswordUseCase {
 
-    private final AccountContactPort accounts;
-    private final CredentialRepository credentials;
-    private final PasswordHasher hasher;
+    private final CurrentPasswordCheck check;
     private final PasswordPreparation preparation;
     private final PasswordChangeWriter writer;
     private final SessionRevocationPort sessions;
-    private final SecurityEventPort journal;
 
     public ChangePasswordHandler(
-            AccountContactPort accounts,
-            CredentialRepository credentials,
-            PasswordHasher hasher,
+            CurrentPasswordCheck check,
             PasswordPreparation preparation,
             PasswordChangeWriter writer,
-            SessionRevocationPort sessions,
-            SecurityEventPort journal) {
-        this.accounts = accounts;
-        this.credentials = credentials;
-        this.hasher = hasher;
+            SessionRevocationPort sessions) {
+        this.check = check;
         this.preparation = preparation;
         this.writer = writer;
         this.sessions = sessions;
-        this.journal = journal;
     }
 
     /**
@@ -63,23 +47,17 @@ public class ChangePasswordHandler implements ChangePasswordUseCase {
             String newPassword,
             boolean signOutOtherSessions,
             String currentSession) {
-        Password current = Password.fromInput(currentPassword);
-        Optional<AccountContact> contact = accounts.findActiveContact(user);
-        Optional<StoredCredential> stored = contact.flatMap(found -> credentials.find(user));
-        if (contact.isEmpty() || stored.isEmpty()) {
-            hasher.verifyDecoy(current);
-            journal.loginFailed(user);
+        Optional<CurrentPasswordCheck.Verified> verified = check.verify(user, currentPassword);
+        if (verified.isEmpty()) {
             return new PasswordChangeOutcome.InvalidCurrentPassword();
         }
-        if (!hasher.matches(current, stored.get().hash())) {
-            journal.loginFailed(user);
-            return new PasswordChangeOutcome.InvalidCurrentPassword();
-        }
-        Optional<String> hash = preparation.prepare(newPassword, contact.get().personalWords());
+        Optional<String> hash =
+                preparation.prepare(newPassword, verified.get().contact().personalWords());
         if (hash.isEmpty()) {
             return new PasswordChangeOutcome.WeakPassword();
         }
-        OptionalLong version = writer.apply(contact.get(), stored.get().hash(), hash.get(), signOutOtherSessions);
+        OptionalLong version = writer.apply(
+                verified.get().contact(), verified.get().stored().hash(), hash.get(), signOutOtherSessions);
         if (version.isEmpty()) {
             return new PasswordChangeOutcome.InvalidCurrentPassword();
         }

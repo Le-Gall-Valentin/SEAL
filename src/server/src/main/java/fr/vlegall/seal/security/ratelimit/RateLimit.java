@@ -24,7 +24,7 @@ public enum RateLimit {
     REGISTRATIONS_PER_IP(5, Duration.ofHours(1), RateLimitKind.IP),
     /** AUTH-05. */
     USERNAME_CHECKS_PER_IP(30, Duration.ofMinutes(1), RateLimitKind.IP),
-    /** AUTH-14 : 3 renvois du code par heure. */
+    /** AUTH-14, AUTH-17, ACC-02 : 3 envois de code par heure, renvois et changements de courriel (ADR 0034). */
     EMAIL_CODE_RESENDS_PER_USER(3, Duration.ofHours(1), RateLimitKind.USER),
     PASSWORD_RESETS_PER_EMAIL(3, Duration.ofHours(1), RateLimitKind.EMAIL),
     PASSWORD_RESETS_PER_IP(3, Duration.ofHours(1), RateLimitKind.IP),

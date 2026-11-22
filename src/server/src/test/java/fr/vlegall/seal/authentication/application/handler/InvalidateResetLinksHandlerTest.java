@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class InvalidateResetLinksHandlerTest {
 
-    private final PasswordResetFixture fixture = new PasswordResetFixture();
+    private final PasswordFixture fixture = new PasswordFixture();
     private final InvalidateResetLinksHandler handler =
             new InvalidateResetLinksHandler(fixture.credentials, fixture.tokens, fixture.clock);
 

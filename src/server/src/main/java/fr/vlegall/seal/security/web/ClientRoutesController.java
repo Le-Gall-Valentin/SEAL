@@ -38,6 +38,19 @@ public class ClientRoutesController {
     public static final List<String> PATHS =
             List.of(LOGIN, REGISTER, VERIFY_EMAIL, FORGOT_PASSWORD, RESET_PASSWORD, CHOOSE_USERNAME, SETTINGS);
 
+    /**
+     * ADR 0032 (point 2) et ADR 0034 (point 2) : adresse d'un départ ou d'un retour OAuth refusé, aux paramètres pour
+     * une ré-authentification, à la connexion sinon. Toujours une constante (A01, redirection ouverte).
+     */
+    public static String rejectedTo(boolean reauthentication) {
+        return reauthentication ? SETTINGS_REQUEST_REJECTED : LOGIN_REQUEST_REJECTED;
+    }
+
+    /** Même choix pour un départ ou un retour OAuth au-delà de sa limite (SEC-10). */
+    public static String rateLimitedTo(boolean reauthentication) {
+        return reauthentication ? SETTINGS_RATE_LIMITED : LOGIN_RATE_LIMITED;
+    }
+
     @GetMapping({LOGIN, REGISTER, VERIFY_EMAIL, FORGOT_PASSWORD, RESET_PASSWORD, CHOOSE_USERNAME, SETTINGS})
     String client() {
         return "forward:/index.html";

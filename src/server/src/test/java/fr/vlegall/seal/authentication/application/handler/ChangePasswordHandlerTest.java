@@ -1,6 +1,6 @@
 package fr.vlegall.seal.authentication.application.handler;
 
-import static fr.vlegall.seal.authentication.application.handler.PasswordResetFixture.PASSWORD;
+import static fr.vlegall.seal.authentication.application.handler.PasswordFixture.PASSWORD;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.authentication.domain.model.AccountContact;
@@ -14,16 +14,13 @@ class ChangePasswordHandlerTest {
     private static final String NEW_PASSWORD = "raquette-sous-la-neige";
     private static final String SESSION = "session-courante";
 
-    private final PasswordResetFixture fixture = new PasswordResetFixture();
+    private final PasswordFixture fixture = new PasswordFixture();
     private final ChangePasswordHandler handler = new ChangePasswordHandler(
-            fixture.accounts,
-            fixture.credentials,
-            fixture.hasher,
+            new CurrentPasswordCheck(fixture.accounts, fixture.credentials, fixture.hasher, fixture.loginJournal),
             fixture.preparation(),
             new PasswordChangeWriter(
                     fixture.credentials, fixture.tokens, fixture.changeJournal, fixture.changeMail, fixture.clock),
-            fixture.sessions,
-            fixture.loginJournal);
+            fixture.sessions);
 
     private AccountContact withPassword() {
         AccountContact contact = fixture.active("valentin", false);

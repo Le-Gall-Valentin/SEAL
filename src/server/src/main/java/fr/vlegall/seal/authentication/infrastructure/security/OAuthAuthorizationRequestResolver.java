@@ -6,7 +6,6 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.web.OAuthRoutes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -55,8 +54,9 @@ final class OAuthAuthorizationRequestResolver implements OAuth2AuthorizationRequ
         this.reauthentication.setAuthorizationRequestCustomizer(builder -> builder.additionalParameters(
                         parameters -> parameters.put("prompt", SELECT_ACCOUNT))
                 .attributes(attributes -> OAuthRequests.fullSessionUser()
-                        .ifPresent(user ->
-                                attributes.put(OAuthAuthorizationRequests.REAUTHENTICATED_USER, user.toString()))));
+                        .ifPresent(user -> attributes.put(
+                                OAuthAuthorizationRequests.REAUTHENTICATED_USER,
+                                user.value().toString()))));
     }
 
     @Override
@@ -74,13 +74,13 @@ final class OAuthAuthorizationRequestResolver implements OAuth2AuthorizationRequ
         if (clientRegistrationId == null || registrations.findByRegistrationId(clientRegistrationId) == null) {
             return null;
         }
-        Optional<UUID> fullSession = OAuthRequests.fullSessionUser();
+        Optional<UserId> fullSession = OAuthRequests.fullSessionUser();
         if (fullSession.isPresent()) {
             // ADR 0034 : pas d'aller-retour vers un fournisseur que le compte n'a pas lié ; OAuthStartController
             // renvoie
             // alors aux paramètres.
             Optional<OAuthProvider> provider = OAuthProvider.fromRegistrationId(clientRegistrationId);
-            if (provider.isEmpty() || !reauthenticated.canStart(new UserId(fullSession.get()), provider.get())) {
+            if (provider.isEmpty() || !reauthenticated.canStart(fullSession.get(), provider.get())) {
                 return null;
             }
             return reauthentication.resolve(request, clientRegistrationId);

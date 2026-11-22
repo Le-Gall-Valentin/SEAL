@@ -1,6 +1,6 @@
 package fr.vlegall.seal.authentication.application.handler;
 
-import static fr.vlegall.seal.authentication.application.handler.PasswordResetFixture.NOW;
+import static fr.vlegall.seal.authentication.application.handler.PasswordFixture.NOW;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.authentication.domain.model.AccountContact;
@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class InspectPasswordResetHandlerTest {
 
-    private final PasswordResetFixture fixture = new PasswordResetFixture();
+    private final PasswordFixture fixture = new PasswordFixture();
     private final InspectPasswordResetHandler handler =
             new InspectPasswordResetHandler(fixture.tokens, fixture.accounts, fixture.clock);
 
