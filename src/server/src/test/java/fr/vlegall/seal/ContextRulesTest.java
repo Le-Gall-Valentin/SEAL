@@ -238,7 +238,10 @@ class ContextRulesTest {
     @Test
     @DisplayName("ADR 0007, ADR 0034, règle 16 : seul security.session écrit le contexte de sécurité dans la session")
     void rule16OnlySecuritySessionStoresTheSecurityContext() {
-        expectViolations(ContextRules.onlySecuritySessionStoresTheSecurityContext(ROOT), "ContextWriter");
+        expectViolations(
+                ContextRules.onlySecuritySessionStoresTheSecurityContext(ROOT),
+                "ContextWriter",
+                "ContextWriterByReference");
         expectAllowed(
                 ContextRules.onlySecuritySessionStoresTheSecurityContext(ROOT),
                 FixtureSessionWriter.class,

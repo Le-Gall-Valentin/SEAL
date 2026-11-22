@@ -76,9 +76,8 @@ final class OAuthAuthorizationRequestResolver implements OAuth2AuthorizationRequ
         }
         Optional<UserId> fullSession = OAuthRequests.fullSessionUser();
         if (fullSession.isPresent()) {
-            // ADR 0034 : pas d'aller-retour vers un fournisseur que le compte n'a pas lié ; OAuthStartController
-            // renvoie
-            // alors aux paramètres.
+            // ADR 0034 : pas d'aller-retour vers un fournisseur que le compte n'a pas lié ;
+            // OAuthStartController renvoie alors aux paramètres.
             Optional<OAuthProvider> provider = OAuthProvider.fromRegistrationId(clientRegistrationId);
             if (provider.isEmpty() || !reauthenticated.canStart(fullSession.get(), provider.get())) {
                 return null;

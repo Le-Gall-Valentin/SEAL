@@ -249,7 +249,8 @@ class OAuthReauthenticationIT {
 
     @Test
     @DisplayName(
-            "ADR 0034 : un départ vers un fournisseur que le compte n'a pas lié revient aux paramètres sans aller-retour")
+            "AUTH-55, ADR 0034 : un départ vers un fournisseur que le compte n'a pas lié revient aux paramètres sans"
+                    + " aller-retour")
     void adr0034StartToAnUnlinkedProviderGoesBackToSettings() throws Exception {
         Cookie stale = staleSessionLinkedTo("nonlie", googleSubject());
 

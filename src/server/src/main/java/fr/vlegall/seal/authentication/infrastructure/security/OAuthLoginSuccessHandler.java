@@ -27,8 +27,8 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 /**
  * Retour OAuth réussi chez le fournisseur (AUTH-30 à AUTH-33). L'authentification de Spring n'est jamais gardée : le
  * compte lié reçoit une session SEAL, le premier passage une attente non authentifiée, la ré-authentification d'une
- * session complète un facteur redaté (AUTH-55, ADR 0034), et tout autre cas un refus. Les
- * adresses de retour sont des constantes (ADR 0024, point 5 ; ADR 0032, points 2 et 4).
+ * session complète un facteur redaté (AUTH-55, ADR 0034), et tout autre cas un refus. Les adresses de retour sont des
+ * constantes (ADR 0024, point 5 ; ADR 0032, points 2 et 4).
  */
 final class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
 

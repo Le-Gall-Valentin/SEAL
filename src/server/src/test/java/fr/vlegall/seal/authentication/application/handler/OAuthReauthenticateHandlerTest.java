@@ -139,7 +139,7 @@ class OAuthReauthenticateHandlerTest {
     }
 
     @Test
-    @DisplayName("ADR 0034 : le départ vers un fournisseur que le compte n'a pas lié est refusé d'emblée")
+    @DisplayName("AUTH-55, ADR 0034 : le départ vers un fournisseur que le compte n'a pas lié est refusé d'emblée")
     void adr0034StartToAnUnlinkedProviderIsRefused() {
         UserId user = account(AccountLoginState.ACTIVE);
         linked.put("GOOGLE:sujet-a", user);

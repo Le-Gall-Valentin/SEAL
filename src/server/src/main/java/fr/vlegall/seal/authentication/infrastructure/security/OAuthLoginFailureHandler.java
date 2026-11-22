@@ -71,9 +71,9 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
             HttpServletRequest request, HttpServletResponse response, AuthenticationException exception)
             throws IOException {
         login.rejected(provider(request), cause(request, exception));
-        // ADR 0034 : une ré-authentification refusée ramène aux paramètres, où la session complète est restée ouverte.
-        // Un
-        // retour de connexion refusé ramène à la connexion, même si une session s'est ouverte entre-temps (ADR 0032).
+        // ADR 0034 : une ré-authentification refusée ramène aux paramètres, où la session complète est restée
+        // ouverte. Un retour de connexion refusé ramène à la connexion, même si une session s'est ouverte
+        // entre-temps (ADR 0032).
         boolean reauthenticating = request.getAttribute(OAuthAuthorizationRequests.REAUTHENTICATED_USER) != null;
         response.sendRedirect(ClientRoutesController.rejectedTo(reauthenticating));
     }

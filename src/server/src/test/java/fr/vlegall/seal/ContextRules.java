@@ -6,10 +6,8 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
-import com.tngtech.archunit.core.domain.JavaCall;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.properties.HasName;
-import com.tngtech.archunit.core.domain.properties.HasOwner;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -356,22 +354,6 @@ final class ContextRules {
                 .because("un courriel part après la validation de la transaction, par MailDispatcher (ADR 0019)");
     }
 
-    // Règle 16
-    static ArchRule onlySecuritySessionStoresTheSecurityContext(String root) {
-        return noClasses()
-                .that()
-                .resideInAPackage(root + "..")
-                .and()
-                .resideOutsideOfPackage(root + ".security.session..")
-                .should()
-                .callMethodWhere(JavaCall.Predicates.target(HasName.Predicates.name("saveContext"))
-                        .and(JavaCall.Predicates.target(HasOwner.Predicates.With.owner(
-                                JavaClass.Predicates.assignableTo(SecurityContextRepository.class)))))
-                .because(
-                        "seul SessionEstablisher écrit le contexte SEAL dans la session : ouverture, élévation et"
-                                + " ré-authentification changent l'identifiant et le jeton CSRF (ADR 0007, point 2 ; ADR 0034)");
-    }
-
     // Règle 13
     static ArchRule noCors(String root) {
         return noClasses()
@@ -398,6 +380,26 @@ final class ContextRules {
                 .should()
                 .beAssignableTo(Serializable.class)
                 .because("une session garde un instantané d'infrastructure, jamais un objet du domaine (ADR 0032)");
+    }
+
+    // Règle 16 (ADR 0034) : seul security.session écrit le contexte de sécurité dans la session. La règle voit les
+    // appels
+    // et les références de méthode (contexts::saveContext) ; une écriture directe de l'attribut SPRING_SECURITY_CONTEXT
+    // dans la session lui échappe, sa constante étant recopiée dans le code compilé.
+    static ArchRule onlySecuritySessionStoresTheSecurityContext(String root) {
+        return noClasses()
+                .that()
+                .resideInAPackage(root + "..")
+                .and()
+                .resideOutsideOfPackage(root + ".security.session..")
+                .should()
+                .accessTargetWhere(DescribedPredicate.<JavaAccess<?>>describe(
+                        "SecurityContextRepository.saveContext",
+                        access -> "saveContext".equals(access.getTarget().getName())
+                                && access.getTarget().getOwner().isAssignableTo(SecurityContextRepository.class)))
+                .because("seul security.session, par SessionEstablisher, écrit le contexte SEAL dans la session :"
+                        + " ouverture, élévation et ré-authentification changent l'identifiant et le jeton CSRF"
+                        + " (ADR 0007, point 2 ; ADR 0034)");
     }
 
     private static DescribedPredicate<JavaClass> belongToAContext(String root) {
