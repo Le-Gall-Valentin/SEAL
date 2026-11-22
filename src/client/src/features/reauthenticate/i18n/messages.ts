@@ -9,8 +9,6 @@ export const reauthMessages = defineMessages({
     providerIntro: 'Reconnectez-vous avec le fournisseur lié à votre compte pour continuer.',
     password: 'Mot de passe',
     submit: 'Confirmer',
-    or: 'ou',
-    continueWith: 'Continuer avec {provider}',
     invalidPassword: 'Mot de passe incorrect.',
     rejected: 'La confirmation par le fournisseur a échoué. Réessayez.',
     rateLimitedTitle: 'Trop de tentatives',

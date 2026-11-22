@@ -8,13 +8,16 @@ interface EmailCardProps {
   readonly account: Account
   /** 403 REAUTH_REQUIRED : l'écran ouvre la ré-authentification, puis appelle retry (ADR 0035). */
   readonly onReauthRequired: (retry: () => void) => void
+  /** 2 sous le titre de la sous-page du téléphone, 3 sous « Compte » de l'ordinateur (ADR 0035). */
+  readonly headingLevel?: 2 | 3
 }
 
 /**
  * ACC-02 : carte Courriel de Parametres-Ordinateur, qui ouvre le dialogue ; la réussite est annoncée. Sur téléphone
  * (non dessiné), le bouton passe sous l'adresse, et la carte prend la marge de Parametres-Telephone-Preferences.
  */
-export function EmailCard({ account, onReauthRequired }: EmailCardProps) {
+export function EmailCard({ account, onReauthRequired, headingLevel = 3 }: EmailCardProps) {
+  const Heading = headingLevel === 2 ? 'h2' : 'h3'
   const t = useMessages(emailChangeMessages)
   const titleId = useId()
   const [open, setOpen] = useState(false)
@@ -26,9 +29,9 @@ export function EmailCard({ account, onReauthRequired }: EmailCardProps) {
     >
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <h3 id={titleId} className="m-0 text-[16px] font-bold">
+          <Heading id={titleId} className="m-0 text-[16px] font-bold">
             {t('title')}
-          </h3>
+          </Heading>
           <p className="mt-1 mb-0 font-mono text-[13px] wrap-anywhere text-ink-3">
             {account.email}
           </p>

@@ -30,7 +30,15 @@ function LockIcon({ size }: { readonly size: 14 | 18 }) {
  * ACC-03 : carte Profil de Parametres-Ordinateur : l'avatar à initiales, « Nom affiché », l'identifiant définitif en
  * lecture seule (AUTH-01), « Enregistrer ».
  */
-export function ProfileCard({ account }: { readonly account: Account }) {
+export function ProfileCard({
+  account,
+  headingLevel = 3,
+}: {
+  readonly account: Account
+  /** 2 sous le titre de la sous-page du téléphone, 3 sous « Compte » de l'ordinateur (ADR 0035). */
+  readonly headingLevel?: 2 | 3
+}) {
+  const Heading = headingLevel === 2 ? 'h2' : 'h3'
   const t = useMessages(displayNameMessages)
   const form = useDisplayNameForm(account)
   const id = useId()
@@ -39,9 +47,9 @@ export function ProfileCard({ account }: { readonly account: Account }) {
       aria-labelledby={`${id}-titre`}
       className="flex flex-col gap-4 rounded-[18px] bg-surface p-4 inset-ring inset-ring-line sm:p-6"
     >
-      <h3 id={`${id}-titre`} className="m-0 text-[16px] font-bold">
+      <Heading id={`${id}-titre`} className="m-0 text-[16px] font-bold">
         {t('profile')}
-      </h3>
+      </Heading>
       <div className="flex items-center gap-4">
         <span
           aria-hidden="true"
@@ -66,7 +74,7 @@ export function ProfileCard({ account }: { readonly account: Account }) {
           onBlur={form.touch}
           invalid={form.invalid}
           withHint={false}
-          disabled={form.locked}
+          disabled={form.locked || form.pending}
         />
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-identifiant`} className="text-[13px] font-semibold text-ink-2">

@@ -41,6 +41,18 @@ describe('entities/account : adaptateur des méthodes de connexion (ADR 0035)', 
     })
   })
 
+  it('ADR 0035 : un compte lié à Microsoft, que le client n’affiche pas encore (AUTH-34), reste lisible', async () => {
+    request.mockResolvedValue({
+      passwordSet: false,
+      providers: [{ provider: 'microsoft' }, { provider: 'github' }],
+    })
+
+    await expect(loginMethodsApi.loginMethods()).resolves.toEqual({
+      passwordSet: false,
+      providers: ['github'],
+    })
+  })
+
   it.each([
     ['un fournisseur inconnu', { passwordSet: true, providers: [{ provider: 'okta' }] }],
     [

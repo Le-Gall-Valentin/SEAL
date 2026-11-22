@@ -1,6 +1,12 @@
-import { useId } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useId } from 'react'
 import { useLoginMethods } from '@/entities/account'
-import { ProviderLogo, useOAuthProviderName, useOAuthProviders } from '@/entities/oauth-provider'
+import {
+  OrSeparator,
+  ProviderLinks,
+  retryFailedOAuthProviders,
+  useOAuthProviders,
+} from '@/entities/oauth-provider'
 import { PASSWORD_INPUT_MAX_LENGTH } from '@/entities/password'
 import { useMessages } from '@/shared/i18n'
 import {
@@ -34,8 +40,18 @@ export function ReauthDialog({ open, onReauthenticated, onCancel }: ReauthDialog
   const descriptionId = useId()
   const methods = useLoginMethods()
   const configured = useOAuthProviders()
-  const name = useOAuthProviderName()
   const reauth = useReauthentication(onReauthenticated)
+  const client = useQueryClient()
+  const { isError: methodsFailed, refetch: refetchMethods } = methods
+  // Une lecture ratée (sans nouvel essai automatique) est refaite à chaque ouverture : le dialogue a toujours une issue.
+  useEffect(() => {
+    if (open) {
+      if (methodsFailed) {
+        void refetchMethods()
+      }
+      void retryFailedOAuthProviders(client)
+    }
+  }, [open, methodsFailed, refetchMethods, client])
   const passwordSet = methods.data?.passwordSet === true
   const providers = (methods.data?.providers ?? []).filter((provider) =>
     configured.includes(provider),
@@ -83,31 +99,8 @@ export function ReauthDialog({ open, onReauthenticated, onCancel }: ReauthDialog
               error={reauth.failure?.kind === 'invalid-password' ? t('invalidPassword') : null}
             />
           )}
-          {passwordSet && providers.length > 0 && (
-            <div className="flex items-center gap-3 text-[13px] text-ink-3">
-              <span className="h-px flex-1 bg-line" />
-              {t('or')}
-              <span className="h-px flex-1 bg-line" />
-            </div>
-          )}
-          {providers.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {providers.map((provider) => (
-                <a
-                  key={provider}
-                  href={`/oauth2/authorization/${provider}`}
-                  className="flex h-11 items-center gap-3 rounded-[10px] bg-surface pr-3.5 pl-2.5 font-sans text-[14.5px] font-semibold text-ink no-underline inset-ring inset-ring-line-strong"
-                >
-                  <span aria-hidden="true" className="grid size-6 place-items-center">
-                    <ProviderLogo provider={provider} size={18} />
-                  </span>
-                  <span className="flex-1 text-left">
-                    {t('continueWith', { provider: name(provider) })}
-                  </span>
-                </a>
-              ))}
-            </div>
-          )}
+          {passwordSet && providers.length > 0 && <OrSeparator />}
+          {providers.length > 0 && <ProviderLinks providers={providers} />}
         </DialogBody>
         <DialogFooter
           onCancel={cancel}

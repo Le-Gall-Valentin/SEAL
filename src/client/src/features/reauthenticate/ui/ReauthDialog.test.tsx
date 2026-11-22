@@ -42,7 +42,7 @@ function Harness({ onReauthenticated }: { readonly onReauthenticated: () => void
 }
 
 async function renderDialog(
-  methods: LoginMethods,
+  methods: LoginMethods | (() => Promise<LoginMethods>),
   api: FakeReauthApi,
   configured: readonly OAuthProviderId[] = ['google', 'github'],
   // Comme le client de l'application (app/providers/queryClient) : une mutation sans écran qui la suit est oubliée.
@@ -54,7 +54,11 @@ async function renderDialog(
   const screen = await render(
     <QueryClientProvider client={client}>
       <PasswordBlocklistProvider api={{ load: () => Promise.resolve([]) }}>
-        <LoginMethodsApiProvider api={{ loginMethods: () => Promise.resolve(methods) }}>
+        <LoginMethodsApiProvider
+          api={{
+            loginMethods: typeof methods === 'function' ? methods : () => Promise.resolve(methods),
+          }}
+        >
           <OAuthProvidersApiProvider api={{ providers: () => Promise.resolve(configured) }}>
             <ReauthApiProvider api={api}>
               <Harness onReauthenticated={onReauthenticated} />
@@ -228,5 +232,19 @@ describe('AUTH-55, ADR 0035 : « Confirmez votre identité »', () => {
     await vi.waitFor(() => {
       expect(secrets()).not.toContain('phrase secrète')
     })
+  })
+
+  it('AUTH-55, ADR 0035 : une lecture ratée des méthodes de connexion est refaite à l’ouverture', async () => {
+    let calls = 0
+    const { screen } = await renderDialog(
+      () => {
+        calls += 1
+        return calls === 1 ? Promise.reject(new Error('réseau')) : Promise.resolve(PASSWORD_ONLY)
+      },
+      { reauthenticate: () => Promise.resolve() },
+    )
+
+    await expect.element(screen.getByLabelText('Mot de passe', { exact: true })).toBeVisible()
+    expect(calls).toBe(2)
   })
 })

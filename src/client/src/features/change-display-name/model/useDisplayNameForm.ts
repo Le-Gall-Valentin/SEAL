@@ -50,6 +50,7 @@ export function useDisplayNameForm(account: Account) {
     formFailure: failure !== null && isFormFailure(failure) ? failure : null,
     saved,
     locked,
+    pending: mutation.isPending,
     canSubmit: !locked && !mutation.isPending && ready,
     submit: () => {
       if (!locked && !mutation.isPending && ready) {

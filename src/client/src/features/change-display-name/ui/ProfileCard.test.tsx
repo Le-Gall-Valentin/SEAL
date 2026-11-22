@@ -114,4 +114,32 @@ describe('ACC-03 : carte Profil', () => {
     await expect.element(screen.getByText('Trop de tentatives')).toBeVisible()
     await expect.element(screen.getByLabelText('Nom affiché')).toBeDisabled()
   })
+
+  it('SEC-02 : un nom affiché balisé, rendu par le serveur, s’affiche en texte', async () => {
+    const hostile = '<img src=x onerror=alert(1)>'
+    const screen = await renderCard((name) => Promise.resolve({ ...ACCOUNT, displayName: name }))
+
+    await screen.getByLabelText('Nom affiché').fill(hostile)
+    await screen.getByRole('button', { name: 'Enregistrer' }).click()
+
+    await expect.element(screen.getByText(`Cache : ${hostile}`)).toBeVisible()
+    expect(document.querySelectorAll('img')).toHaveLength(0)
+  })
+
+  it('ACC-03 : pendant l’envoi, « Nom affiché » ne se modifie plus', async () => {
+    let finish: (account: Account) => void = () => undefined
+    const screen = await renderCard(
+      () =>
+        new Promise<Account>((resolve) => {
+          finish = resolve
+        }),
+    )
+
+    await screen.getByLabelText('Nom affiché').fill('Léa Tremblay')
+    await screen.getByRole('button', { name: 'Enregistrer' }).click()
+
+    await expect.element(screen.getByLabelText('Nom affiché')).toBeDisabled()
+    finish({ ...ACCOUNT, displayName: 'Léa Tremblay' })
+    await expect.element(screen.getByLabelText('Nom affiché')).toBeEnabled()
+  })
 })
