@@ -6,7 +6,10 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
+import com.tngtech.archunit.core.domain.JavaCall;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.properties.HasName;
+import com.tngtech.archunit.core.domain.properties.HasOwner;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -24,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.CrossOrigin;
 
@@ -350,6 +354,22 @@ final class ContextRules {
                 .dependOnClassesThat()
                 .resideInAnyPackage("org.springframework.mail..", "jakarta.mail..")
                 .because("un courriel part après la validation de la transaction, par MailDispatcher (ADR 0019)");
+    }
+
+    // Règle 16
+    static ArchRule onlySecuritySessionStoresTheSecurityContext(String root) {
+        return noClasses()
+                .that()
+                .resideInAPackage(root + "..")
+                .and()
+                .resideOutsideOfPackage(root + ".security.session..")
+                .should()
+                .callMethodWhere(JavaCall.Predicates.target(HasName.Predicates.name("saveContext"))
+                        .and(JavaCall.Predicates.target(HasOwner.Predicates.With.owner(
+                                JavaClass.Predicates.assignableTo(SecurityContextRepository.class)))))
+                .because(
+                        "seul SessionEstablisher écrit le contexte SEAL dans la session : ouverture, élévation et"
+                                + " ré-authentification changent l'identifiant et le jeton CSRF (ADR 0007, point 2 ; ADR 0034)");
     }
 
     // Règle 13
