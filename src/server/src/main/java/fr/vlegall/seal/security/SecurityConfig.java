@@ -162,6 +162,10 @@ class SecurityConfig {
                         // ACC-03, ADR 0034 : paramètres du compte, pour la seule session complète (AUTH-16).
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/account/profile")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // AUTH-55, ADR 0035 (point 2) : méthodes de connexion du compte, pour la seule session
+                        // complète.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/account/identities")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         // ACC-01, ADR 0034 : changement du mot de passe, pour la seule session complète.
                         .requestMatchers(HttpMethod.POST, "/api/v1/account/password")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)

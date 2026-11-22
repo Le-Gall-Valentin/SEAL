@@ -98,6 +98,11 @@
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.OAuthStartController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- GET /api/v1/account/identities (session complète, ADR 0035) : AccountIdentitiesIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.authentication.infrastructure.web.AccountIdentitiesController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /api/v1/account/password (session complète, ACC-01) : PasswordChangeIT. -->
     <Match>
         <Class name="fr.vlegall.seal.authentication.infrastructure.web.AccountPasswordController"/>
