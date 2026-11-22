@@ -8,6 +8,8 @@ import fr.vlegall.seal.common.UserId;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -41,6 +43,19 @@ public class OAuthIdentityRepositoryAdapter implements OAuthIdentityRepository {
                 .param("provider", provider.name())
                 .query(Boolean.class)
                 .single());
+    }
+
+    @Override
+    public List<OAuthProvider> linkedProviders(UserId user) {
+        return jdbc
+                .sql("SELECT provider FROM oauth_identities WHERE user_id = :user")
+                .param("user", user.value())
+                .query(String.class)
+                .list()
+                .stream()
+                .map(OAuthProvider::valueOf)
+                .sorted(Comparator.naturalOrder())
+                .toList();
     }
 
     /**

@@ -6,15 +6,12 @@ import fr.vlegall.seal.authentication.domain.model.ExternalIdentity;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthAccountLookupPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthEventPort;
-import fr.vlegall.seal.authentication.domain.port.out.OAuthIdentityRepository;
 import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.UserId;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
@@ -24,28 +21,10 @@ import org.junit.jupiter.api.Test;
 @DisplayName("AUTH-55 : ré-authentification par OAuth")
 class OAuthReauthenticateHandlerTest {
 
-    private final Map<String, UserId> linked = new HashMap<>();
     private final Map<UserId, AccountLoginState> states = new HashMap<>();
     private final List<String> events = new ArrayList<>();
 
-    private final OAuthIdentityRepository identities = new OAuthIdentityRepository() {
-        @Override
-        public Optional<UserId> findUser(OAuthProvider provider, String subject) {
-            return Optional.ofNullable(linked.get(provider + ":" + subject));
-        }
-
-        @Override
-        public boolean isLinked(UserId user, OAuthProvider provider) {
-            return linked.entrySet().stream()
-                    .anyMatch(entry -> entry.getKey().startsWith(provider + ":")
-                            && entry.getValue().equals(user));
-        }
-
-        @Override
-        public void link(UserId user, ExternalIdentity identity, Instant linkedAt) {
-            throw new UnsupportedOperationException("la ré-authentification ne lie rien (ACC-04, P1)");
-        }
-    };
+    private final InMemoryOAuthIdentities identities = new InMemoryOAuthIdentities();
 
     private final OAuthAccountLookupPort accounts = new OAuthAccountLookupPort() {
         @Override
@@ -87,7 +66,7 @@ class OAuthReauthenticateHandlerTest {
     @DisplayName("AUTH-55 : l'identité liée au compte de la session ouvre le sudo, sans rien journaliser")
     void auth55LinkedIdentityOfTheSameAccount() {
         UserId user = account(AccountLoginState.ACTIVE);
-        linked.put("GOOGLE:sujet-a", user);
+        identities.put(OAuthProvider.GOOGLE, "sujet-a", user);
 
         assertThat(handler.canStart(user, OAuthProvider.GOOGLE)).isTrue();
         assertThat(handler.reauthenticate(user, identity(OAuthProvider.GOOGLE, "sujet-a")))
@@ -100,8 +79,8 @@ class OAuthReauthenticateHandlerTest {
     void auth55IdentityOfAnotherAccountIsRefused() {
         UserId user = account(AccountLoginState.ACTIVE);
         UserId other = account(AccountLoginState.ACTIVE);
-        linked.put("GOOGLE:sujet-a", user);
-        linked.put("GOOGLE:sujet-b", other);
+        identities.put(OAuthProvider.GOOGLE, "sujet-a", user);
+        identities.put(OAuthProvider.GOOGLE, "sujet-b", other);
 
         assertThat(handler.reauthenticate(user, identity(OAuthProvider.GOOGLE, "sujet-b")))
                 .isFalse();
@@ -112,7 +91,7 @@ class OAuthReauthenticateHandlerTest {
     @DisplayName("AUTH-55 : une identité liée à personne, ou le même sujet chez un autre fournisseur, est refusée")
     void auth55UnlinkedOrOtherProviderIsRefused() {
         UserId user = account(AccountLoginState.ACTIVE);
-        linked.put("GOOGLE:sujet-a", user);
+        identities.put(OAuthProvider.GOOGLE, "sujet-a", user);
 
         assertThat(handler.reauthenticate(user, identity(OAuthProvider.GOOGLE, "inconnu")))
                 .isFalse();
@@ -126,7 +105,7 @@ class OAuthReauthenticateHandlerTest {
     void sec03InactiveAccountIsRefused() {
         for (AccountLoginState state : List.of(AccountLoginState.PENDING_EMAIL, AccountLoginState.UNUSABLE)) {
             UserId user = account(state);
-            linked.put("GOOGLE:sujet-" + state, user);
+            identities.put(OAuthProvider.GOOGLE, "sujet-" + state, user);
 
             assertThat(handler.canStart(user, OAuthProvider.GOOGLE))
                     .as(state.name())
@@ -142,7 +121,7 @@ class OAuthReauthenticateHandlerTest {
     @DisplayName("AUTH-55, ADR 0034 : le départ vers un fournisseur que le compte n'a pas lié est refusé d'emblée")
     void adr0034StartToAnUnlinkedProviderIsRefused() {
         UserId user = account(AccountLoginState.ACTIVE);
-        linked.put("GOOGLE:sujet-a", user);
+        identities.put(OAuthProvider.GOOGLE, "sujet-a", user);
 
         assertThat(handler.canStart(user, OAuthProvider.GITHUB)).isFalse();
     }

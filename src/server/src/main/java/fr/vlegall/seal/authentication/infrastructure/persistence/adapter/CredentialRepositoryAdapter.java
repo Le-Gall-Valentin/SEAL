@@ -60,6 +60,14 @@ public class CredentialRepositoryAdapter implements CredentialRepository {
     }
 
     @Override
+    public boolean hasPassword(UserId user) {
+        return Boolean.TRUE.equals(jdbc.sql("SELECT EXISTS (SELECT 1 FROM user_credentials WHERE user_id = :user)")
+                .param("user", user.value())
+                .query(Boolean.class)
+                .single());
+    }
+
+    @Override
     public Optional<StoredCredential> find(UserId user) {
         return jdbc.sql("SELECT password_hash, version FROM user_credentials WHERE user_id = :user")
                 .param("user", user.value())

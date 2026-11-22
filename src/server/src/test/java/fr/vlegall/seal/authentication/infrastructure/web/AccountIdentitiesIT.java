@@ -15,11 +15,13 @@ import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.AuthClient.Registered;
 import fr.vlegall.seal.support.FakeOAuthProvider;
 import fr.vlegall.seal.support.FakeOAuthProvider.GoogleAccount;
+import fr.vlegall.seal.support.MutableClock;
 import fr.vlegall.seal.support.OAuthFlow;
 import fr.vlegall.seal.support.OAuthTestConfiguration;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -52,6 +54,9 @@ class AccountIdentitiesIT {
     @Autowired
     private OAuthIdentityRepository identities;
 
+    @Autowired
+    private MutableClock clock;
+
     private AuthClient client;
     private OAuthFlow oauth;
 
@@ -68,6 +73,20 @@ class AccountIdentitiesIT {
     void reset() {
         mail.reset();
         fake.reset();
+        clock.reset();
+    }
+
+    /** Compte par mot de passe, à session complète, lié à ces fournisseurs dans l'ordre donné. */
+    private Cookie linkedAccount(String base, OAuthProvider... providers) throws Exception {
+        Registered account = client.register(base + run + "@exemple.ca", base + run);
+        Cookie full = client.verify(account);
+        for (OAuthProvider provider : providers) {
+            identities.link(
+                    new UserId(account.id()),
+                    ExternalIdentity.of(provider, provider + googleSubject(), account.email(), true, "Nom"),
+                    Instant.now());
+        }
+        return full;
     }
 
     private static String googleSubject() {
@@ -134,5 +153,48 @@ class AccountIdentitiesIT {
         mvc.perform(client.from(get(IDENTITIES)).cookie(pending.session()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName(
+            "AUTH-55, ADR 0035 : hors délai du mode sudo, la lecture reste permise ; la ré-authentification en dépend")
+    void auth55ReadableOutsideSudo() throws Exception {
+        Cookie full = client.verify(client.register("horsudo" + run + "@exemple.ca", "horsudo" + run));
+        clock.advance(Duration.ofMinutes(11));
+
+        mvc.perform(client.from(get(IDENTITIES)).cookie(full))
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"passwordSet\":true,\"providers\":[]}", JsonCompareMode.STRICT));
+    }
+
+    @Test
+    @DisplayName("AUTH-35, ADR 0035 : les fournisseurs liés suivent l'ordre de GET /api/v1/auth/providers")
+    void auth35SameOrderAsConfiguredProviders() throws Exception {
+        Cookie full = linkedAccount("ordre", OAuthProvider.GITHUB, OAuthProvider.GOOGLE);
+
+        String configured = mvc.perform(client.from(get("/api/v1/auth/providers")))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        assertThat(configured).isEqualTo("{\"providers\":[\"google\",\"github\"]}");
+        mvc.perform(client.from(get(IDENTITIES)).cookie(full))
+                .andExpect(status().isOk())
+                .andExpect(content()
+                        .json(
+                                "{\"passwordSet\":true,\"providers\":[{\"provider\":\"google\"},{\"provider\":\"github\"}]}",
+                                JsonCompareMode.STRICT));
+    }
+
+    @Test
+    @DisplayName("ACC-04, ADR 0035 : un fournisseur lié mais non configuré reste dans la réponse, à sa place")
+    void acc04LinkedButUnconfiguredProviderIsListed() throws Exception {
+        Cookie full = linkedAccount("nonconf", OAuthProvider.GITHUB, OAuthProvider.MICROSOFT);
+
+        mvc.perform(client.from(get(IDENTITIES)).cookie(full))
+                .andExpect(status().isOk())
+                .andExpect(content()
+                        .json(
+                                "{\"passwordSet\":true,\"providers\":[{\"provider\":\"microsoft\"},{\"provider\":\"github\"}]}",
+                                JsonCompareMode.STRICT));
     }
 }
