@@ -1,10 +1,18 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { type Account, useCurrentAccount } from '@/entities/session'
 import { initialsOf, useLoginMethods } from '@/entities/account'
 import { ProfileCard } from '@/features/change-display-name'
+import { EmailCard } from '@/features/change-email'
 import { PasswordCard } from '@/features/change-password'
 import { LogoutButton } from '@/features/logout'
+import {
+  REAUTH_ERROR_PARAM,
+  ReauthDialog,
+  type ReauthReturnError,
+  ReauthReturnAlert,
+  reauthReturnErrorOf,
+} from '@/features/reauthenticate'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { useMediaQuery, WIDE_SCREEN } from '@/shared/lib'
@@ -22,7 +30,8 @@ const ACCOUNT_SECTION = `${ROUTES.SETTINGS}?${SECTION_PARAM}=compte`
 export function SettingsPage() {
   const account = useCurrentAccount().data
   const wide = useMediaQuery(WIDE_SCREEN)
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
+  const returnError = useOAuthReturnError(params, setParams)
   if (account == null) {
     return null
   }
@@ -34,6 +43,7 @@ export function SettingsPage() {
         <main className="min-w-0 flex-1">
           <div className="flex flex-col gap-4 px-6 pt-6 pb-10 lg:max-w-176 lg:gap-5 lg:px-12 lg:pt-9 lg:pb-16">
             <SectionTitle level={2} />
+            {returnError !== null && <ReauthReturnAlert error={returnError} />}
             <AccountContent account={account} />
           </div>
         </main>
@@ -42,11 +52,37 @@ export function SettingsPage() {
   }
   return sectionOf(params) === 'compte' ? (
     <PhoneSubpage>
+      {returnError !== null && <ReauthReturnAlert error={returnError} />}
       <AccountContent account={account} />
     </PhoneSubpage>
   ) : (
-    <PhoneList account={account} />
+    <PhoneList account={account} returnError={returnError} />
   )
+}
+
+/**
+ * AUTH-55, ADR 0034 : refus d'une ré-authentification OAuth, lu une fois dans `?erreur=`, puis retiré de l'adresse pour
+ * qu'un rechargement ne le montre pas de nouveau.
+ */
+function useOAuthReturnError(
+  params: URLSearchParams,
+  setParams: ReturnType<typeof useSearchParams>[1],
+): ReauthReturnError | null {
+  const [error] = useState(() => reauthReturnErrorOf(`?${params.toString()}`))
+  const present = params.has(REAUTH_ERROR_PARAM)
+  useEffect(() => {
+    if (present) {
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current)
+          next.delete(REAUTH_ERROR_PARAM)
+          return next
+        },
+        { replace: true },
+      )
+    }
+  }, [present, setParams])
+  return error
 }
 
 /**
@@ -55,10 +91,28 @@ export function SettingsPage() {
  */
 function AccountContent({ account }: { readonly account: Account }) {
   const methods = useLoginMethods()
+  // AUTH-55, ADR 0035 : l'action refusée faute de mode sudo, relancée après un mot de passe accepté.
+  const [pendingRetry, setPendingRetry] = useState<{ readonly retry: () => void } | null>(null)
   return (
     <div className="flex flex-col gap-4 lg:gap-5">
       <ProfileCard account={account} />
+      <EmailCard
+        account={account}
+        onReauthRequired={(retry) => {
+          setPendingRetry({ retry })
+        }}
+      />
       {methods.data?.passwordSet === true && <PasswordCard account={account} />}
+      <ReauthDialog
+        open={pendingRetry !== null}
+        onReauthenticated={() => {
+          pendingRetry?.retry()
+          setPendingRetry(null)
+        }}
+        onCancel={() => {
+          setPendingRetry(null)
+        }}
+      />
     </div>
   )
 }
@@ -104,13 +158,20 @@ function SectionsNav() {
 }
 
 /** Téléphone : carte du profil (sans l'empreinte, KEY-52 en P1), liste des sections, « Se déconnecter ». */
-function PhoneList({ account }: { readonly account: Account }) {
+function PhoneList({
+  account,
+  returnError,
+}: {
+  readonly account: Account
+  readonly returnError: ReauthReturnError | null
+}) {
   const t = useMessages(settingsMessages)
   return (
     <main className="flex flex-col gap-3.5 px-4 pt-4 pb-6">
       <header className="flex min-h-11 items-center">
         <h1 className="m-0 text-[26px] font-bold tracking-[-0.025em]">{t('title')}</h1>
       </header>
+      {returnError !== null && <ReauthReturnAlert error={returnError} />}
       <Link
         to={ACCOUNT_SECTION}
         className="flex items-center gap-3.5 rounded-[18px] bg-surface py-3.5 pr-2.5 pl-3.5 text-ink no-underline inset-ring inset-ring-line"

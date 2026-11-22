@@ -1,0 +1,1 @@
+export { emailChangeMessages } from './messages'

@@ -8,6 +8,7 @@ import { oauthProvidersApi } from '@/entities/oauth-provider'
 import { passwordBlocklist } from '@/entities/password'
 import { sessionApi } from '@/entities/session'
 import { profileApi } from '@/features/change-display-name'
+import { emailChangeApi } from '@/features/change-email'
 import { passwordChangeApi } from '@/features/change-password'
 import { loginApi } from '@/features/login'
 import { logoutApi } from '@/features/logout'
@@ -50,6 +51,7 @@ const apis: Apis = {
   reauth: reauthApi,
   profile: profileApi,
   passwordChange: passwordChangeApi,
+  emailChange: emailChangeApi,
 }
 
 // KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un
