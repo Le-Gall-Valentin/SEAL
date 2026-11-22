@@ -11,6 +11,7 @@ import { type IOAuthProvidersApi, OAuthProvidersApiProvider } from '@/entities/o
 import { type IPasswordBlocklist, PasswordBlocklistProvider } from '@/entities/password'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
 import { type IProfileApi, ProfileApiProvider } from '@/features/change-display-name'
+import { type IPasswordChangeApi, PasswordChangeApiProvider } from '@/features/change-password'
 import { type ILoginApi, LoginApiProvider } from '@/features/login'
 import { type ILogoutApi, LogoutApiProvider } from '@/features/logout'
 import {
@@ -39,6 +40,7 @@ export interface Apis {
   readonly loginMethods: ILoginMethodsApi
   readonly reauth: IReauthApi
   readonly profile: IProfileApi
+  readonly passwordChange: IPasswordChangeApi
 }
 
 interface ApiProvidersProps {
@@ -80,6 +82,9 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
     (inner) => <LoginMethodsApiProvider api={apis.loginMethods}>{inner}</LoginMethodsApiProvider>,
     (inner) => <ReauthApiProvider api={apis.reauth}>{inner}</ReauthApiProvider>,
     (inner) => <ProfileApiProvider api={apis.profile}>{inner}</ProfileApiProvider>,
+    (inner) => (
+      <PasswordChangeApiProvider api={apis.passwordChange}>{inner}</PasswordChangeApiProvider>
+    ),
   ]
   return layers.reduceRight<ReactNode>((inner, layer) => layer(inner), children)
 }

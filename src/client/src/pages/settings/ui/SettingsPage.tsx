@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { type Account, useCurrentAccount } from '@/entities/session'
-import { initialsOf } from '@/entities/account'
+import { initialsOf, useLoginMethods } from '@/entities/account'
 import { ProfileCard } from '@/features/change-display-name'
+import { PasswordCard } from '@/features/change-password'
 import { LogoutButton } from '@/features/logout'
 import { ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
@@ -48,11 +49,16 @@ export function SettingsPage() {
   )
 }
 
-/** Section Compte : Profil, Courriel, Mot de passe (ADR 0035, point 4 : « Comptes liés » attend ACC-04). */
+/**
+ * Section Compte : Profil, Courriel, Mot de passe (ADR 0035, point 4 : « Comptes liés » attend ACC-04 ; un compte
+ * sans mot de passe, ou dont les méthodes ne sont pas encore lues, ne voit pas la carte Mot de passe).
+ */
 function AccountContent({ account }: { readonly account: Account }) {
+  const methods = useLoginMethods()
   return (
     <div className="flex flex-col gap-4 lg:gap-5">
       <ProfileCard account={account} />
+      {methods.data?.passwordSet === true && <PasswordCard account={account} />}
     </div>
   )
 }

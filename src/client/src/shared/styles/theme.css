@@ -43,6 +43,8 @@
   --color-accent-text: var(--accent-text);
   --color-accent-line: var(--accent-line);
   --color-av-moss: var(--av-moss);
+  --color-switch-off: var(--switch-off);
+  --color-thumb-off: var(--thumb-off);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-danger-line: var(--danger-line);

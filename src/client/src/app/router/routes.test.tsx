@@ -67,6 +67,7 @@ function fakeApis(account: Account | null): Apis {
     },
     reauth: { reauthenticate: never },
     profile: { changeDisplayName: never },
+    passwordChange: { changePassword: never },
   }
 }
 

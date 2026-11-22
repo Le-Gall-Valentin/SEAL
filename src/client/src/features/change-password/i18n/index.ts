@@ -1,0 +1,1 @@
+export { passwordChangeMessages } from './messages'
