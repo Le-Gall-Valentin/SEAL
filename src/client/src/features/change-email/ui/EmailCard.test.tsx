@@ -31,11 +31,12 @@ function Screen({ onReauthRequired }: { readonly onReauthRequired: (retry: () =>
 async function renderCard(
   api: FakeEmailChangeApi,
   onReauthRequired = vi.fn<(retry: () => void) => void>(),
+  account: Account = ACCOUNT,
 ) {
   const screen = await render(
     <QueryClientProvider client={new QueryClient()}>
       <SessionApiProvider
-        api={{ me: () => Promise.resolve(ACCOUNT), reloadCsrf: () => Promise.resolve() }}
+        api={{ me: () => Promise.resolve(account), reloadCsrf: () => Promise.resolve() }}
       >
         <EmailChangeApiProvider api={api}>
           <Screen onReauthRequired={onReauthRequired} />
@@ -189,5 +190,102 @@ describe('ACC-02 : « Changer de courriel »', () => {
 
     await expect.element(screen.getByText('Étape 1 sur 2')).toBeVisible()
     await expect.element(screen.getByLabelText('Nouveau courriel')).toHaveValue('')
+  })
+
+  it('ACC-02 : après une réussite, rouvrir repart à l’étape 1, vide', async () => {
+    const { screen } = await renderCard({
+      request: () => Promise.resolve(),
+      confirm: () => Promise.resolve({ ...ACCOUNT, email: 'neuve@exemple.ca' }),
+    })
+
+    await screen.getByLabelText('Nouveau courriel').fill('neuve@exemple.ca')
+    await screen.getByRole('button', { name: 'Envoyer le code' }).click()
+    await typeCode('503271')
+    await screen.getByRole('button', { name: 'Confirmer' }).click()
+    await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument()
+    await screen.getByRole('button', { name: 'Changer de courriel' }).click()
+
+    await expect.element(screen.getByText('Étape 1 sur 2')).toBeVisible()
+    await expect.element(screen.getByLabelText('Nouveau courriel')).toHaveValue('')
+  })
+
+  it('ACC-02, ADR 0035 : à l’étape 2 et après un code refusé, la saisie reprend à la case 1', async () => {
+    const { screen } = await renderCard({
+      request: () => Promise.resolve(),
+      confirm: () => Promise.reject(new ApiError(422, 'INVALID_CODE')),
+    })
+
+    await expect.element(screen.getByLabelText('Nouveau courriel')).toHaveFocus()
+    await screen.getByLabelText('Nouveau courriel').fill('neuve@exemple.ca')
+    await screen.getByRole('button', { name: 'Envoyer le code' }).click()
+    await expect.element(screen.getByLabelText('Chiffre 1 sur 6')).toHaveFocus()
+    await typeCode('111111')
+    await screen.getByRole('button', { name: 'Confirmer' }).click()
+
+    await expect.element(screen.getByText('Code incorrect.')).toBeVisible()
+    await expect.element(screen.getByLabelText('Chiffre 1 sur 6')).toHaveFocus()
+  })
+
+  it('ACC-02 : une adresse refusée (400) reste signalée et ne repart pas ; corrigée, elle peut partir', async () => {
+    const requested: string[] = []
+    const { screen } = await renderCard({
+      request: (email) => {
+        requested.push(email)
+        return Promise.reject(new ApiError(400, 'VALIDATION_FAILED'))
+      },
+      confirm: () => Promise.reject(new Error('non attendu')),
+    })
+
+    await screen.getByLabelText('Nouveau courriel').fill('refusee@exemple.ca')
+    const send = screen.getByRole('button', { name: 'Envoyer le code' })
+    await send.click()
+    await expect.element(screen.getByText('Adresse invalide.')).toBeVisible()
+    await expect.element(send).toBeDisabled()
+    await screen.getByLabelText('Nouveau courriel').fill('acceptee@exemple.ca')
+
+    expect(screen.getByText('Adresse invalide.').elements()).toHaveLength(0)
+    await expect.element(send).toBeEnabled()
+    expect(requested).toEqual(['refusee@exemple.ca'])
+  })
+
+  it('ACC-02 : l’adresse actuelle est signalée « Adresse invalide. » une fois le champ quitté', async () => {
+    const { screen } = await renderCard({
+      request: () => Promise.reject(new Error('non attendu')),
+      confirm: () => Promise.reject(new Error('non attendu')),
+    })
+
+    await screen.getByLabelText('Nouveau courriel').fill('valentin.dupont@uqac.ca')
+    await userEvent.tab()
+
+    await expect.element(screen.getByText('Adresse invalide.')).toBeVisible()
+  })
+
+  it('ACC-02, ADR 0024 (point 9) : un renvoi réussi l’annonce, « Code envoyé à … »', async () => {
+    const { screen } = await renderCard({
+      request: () => Promise.resolve(),
+      confirm: () => Promise.reject(new Error('non attendu')),
+    })
+
+    await screen.getByLabelText('Nouveau courriel').fill('neuve@exemple.ca')
+    await screen.getByRole('button', { name: 'Envoyer le code' }).click()
+    expect(screen.getByText('Code envoyé à neuve@exemple.ca.').elements()).toHaveLength(0)
+    await screen.getByRole('button', { name: 'Renvoyer le code' }).click()
+
+    await expect.element(screen.getByText('Code envoyé à neuve@exemple.ca.')).toBeVisible()
+  })
+
+  it('SEC-02 : un courriel balisé s’affiche en texte dans la carte', async () => {
+    const hostile = '"<img src=x onerror=alert(1)>"@uqac.ca'
+    const { screen } = await renderCard(
+      {
+        request: () => Promise.reject(new Error('non attendu')),
+        confirm: () => Promise.reject(new Error('non attendu')),
+      },
+      vi.fn<(retry: () => void) => void>(),
+      { ...ACCOUNT, email: hostile },
+    )
+
+    await expect.element(screen.getByText(hostile, { exact: true })).toBeVisible()
+    expect(document.querySelectorAll('img')).toHaveLength(0)
   })
 })

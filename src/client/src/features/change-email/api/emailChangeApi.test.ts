@@ -43,4 +43,10 @@ describe('features/change-email : adaptateur', () => {
       'POST /api/v1/account/email/confirm {"code":"123456"}',
     ])
   })
+
+  it('SEC-01 : un compte rendu hors du contrat refuse la confirmation', async () => {
+    respond.mockReturnValue({ id: 'pas-un-uuid', email: 'neuve@exemple.ca' })
+
+    await expect(emailChangeApi.confirm('123456')).rejects.toThrow()
+  })
 })

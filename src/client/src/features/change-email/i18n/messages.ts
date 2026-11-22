@@ -18,6 +18,8 @@ export const emailChangeMessages = defineMessages({
     code: 'Code de vérification',
     codeBox: 'Chiffre {index} sur 6',
     resend: 'Renvoyer le code',
+    // Texte de Verification-Courriel (ADR 0024, point 9).
+    sent: 'Code envoyé à {email}.',
     confirm: 'Confirmer',
     changed: 'Courriel changé.',
     invalidEmail: 'Adresse invalide.',

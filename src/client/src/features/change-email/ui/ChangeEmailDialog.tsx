@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { EMAIL_MAX_LENGTH } from '@/entities/account'
 import type { Account } from '@/entities/session'
 import { useMessages } from '@/shared/i18n'
@@ -34,6 +34,15 @@ export function ChangeEmailDialog({
   const introId = useId()
   const boxes = useRef<(HTMLInputElement | null)[]>([])
   const change = useEmailChange({ account, onReauthRequired, onChanged })
+  // Étape 2, ou cases vidées après un code refusé : la saisie reprend à la case 1, comme Verification-Courriel. La
+  // demande attend la fin de l'envoi : une case désactivée ne prend pas le focus.
+  const focusHandled = useRef(0)
+  useEffect(() => {
+    if (change.codeFocus > focusHandled.current && !change.pending) {
+      focusHandled.current = change.codeFocus
+      boxes.current[0]?.focus()
+    }
+  }, [change.codeFocus, change.pending])
   const cancel = () => {
     change.clear()
     onCancel()
@@ -93,6 +102,9 @@ export function ChangeEmailDialog({
               {t('codeIntro', { email: change.target })}
             </p>
             <FormAlert failure={change.confirmFailure ?? change.sendFailure} />
+            <p role="status" className="m-0 text-[13px] wrap-anywhere text-ink-2 empty:hidden">
+              {change.resentTo !== null && t('sent', { email: change.resentTo })}
+            </p>
             {change.codeFailure !== null && (
               <Alert variant="error">
                 {change.codeFailure === 'expired' ? t('expired') : t('invalidCode')}

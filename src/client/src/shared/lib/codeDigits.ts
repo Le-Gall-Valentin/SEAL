@@ -4,6 +4,14 @@
 /** AUTH-14 : code à 6 chiffres. */
 export const CODE_LENGTH = 6
 
+/** Les six cases vides. */
+export const EMPTY_CODE: readonly string[] = Array.from({ length: CODE_LENGTH }, () => '')
+
+/** Vrai quand chaque case porte un chiffre. */
+export function isCodeComplete(cells: readonly string[]): boolean {
+  return cells.length === CODE_LENGTH && cells.every((cell) => /^[0-9]$/.test(cell))
+}
+
 /**
  * Saisie dans la case index : chaque chiffre remplit une case, à partir de celle-ci (un code collé ou proposé par le
  * système remplit les suivantes) ; tout autre caractère est ignoré. Le focus va à la case qui suit le dernier chiffre.
