@@ -292,4 +292,45 @@ describe('AUTH-70, ADR 0022 : Nouveau-Mot-de-passe', () => {
 
     await expect.element(screen.getByRole('alert')).toMatchTextContent('Réessayez dans 2 minutes.')
   })
+
+  it('AUTH-70, ADR 0033 (point 6) : un double clic sur « Enregistrer le mot de passe » n’envoie qu’une confirmation', async () => {
+    const { screen, calls } = await renderReset({
+      confirm: () => new Promise<void>(() => undefined),
+    })
+    await screen.getByLabelText('Nouveau mot de passe', { exact: true }).fill(PASSWORD)
+    await screen.getByLabelText('Confirmer le mot de passe', { exact: true }).fill(PASSWORD)
+    const submit = screen.getByRole('button', { name: 'Enregistrer le mot de passe' })
+    await expect.element(submit).toBeEnabled()
+
+    // Deux envois dans la même tâche, sans rendu entre eux : le pire cas d'un double clic. Le second consommerait un
+    // lien déjà utilisé et afficherait « Ce lien n'est plus valable. ».
+    const form = submit.element().closest('form')
+    form?.requestSubmit()
+    form?.requestSubmit()
+
+    await expect.poll(() => calls.length).toBe(2)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(calls).toEqual([`inspect ${TOKEN}`, `confirm ${TOKEN} ${PASSWORD}`])
+  })
+
+  it('AUTH-70, ADR 0033 (point 6) : après un échec, le verrou est rendu et une nouvelle confirmation part', async () => {
+    let attempts = 0
+    const { screen, calls } = await renderReset({
+      confirm: () => {
+        attempts += 1
+        return attempts === 1
+          ? Promise.reject(new NetworkError())
+          : new Promise<void>(() => undefined)
+      },
+    })
+    await screen.getByLabelText('Nouveau mot de passe', { exact: true }).fill(PASSWORD)
+    await screen.getByLabelText('Confirmer le mot de passe', { exact: true }).fill(PASSWORD)
+    const submit = screen.getByRole('button', { name: 'Enregistrer le mot de passe' })
+
+    await submit.click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await submit.click()
+
+    await expect.poll(() => calls.length).toBe(3)
+  })
 })

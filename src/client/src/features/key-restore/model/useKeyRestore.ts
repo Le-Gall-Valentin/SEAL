@@ -10,7 +10,7 @@ import {
   WrongRecoveryKeyError,
 } from '@/entities/keyring'
 import type { RecoveryKey } from '@/shared/crypto'
-import { failureOf, useClock, withLock } from '@/shared/lib'
+import { failureOf, useClock, useSubmitGuard, withLock } from '@/shared/lib'
 import { EMPTY_GROUPS, enterGroups, recoveryKeyOf } from './recoveryKeyText'
 
 /** Refus d'une restauration (ADR 0029, point 5) ; réseau et erreur inattendue reprennent les textes communs. */
@@ -33,7 +33,9 @@ export interface KeyRestore {
 /**
  * KEY-33 : Restauration-Appareil. La clé saisie ne quitte pas l'appareil : restoreKeys ouvre le coffre ici, sous le
  * verrou des clés, puis la zone du compte complète la publication (onRestored). KEY-31, KEY-40 : la clé n'entre pas
- * dans le cache des mutations (ni en variables, ni gardée après le démontage) ; elle ne vit que dans l'écran.
+ * dans le cache des mutations (ni en variables, ni gardée après le démontage) ; elle ne vit que dans l'écran. Une seule
+ * restauration à la fois (ADR 0033, point 6) : sans verrou d'envoi, le verrou des clés rangerait un second envoi
+ * derrière le premier, et la restauration serait rejouée une fois finie.
  */
 export function useKeyRestore(owner: KeyOwner, onRestored: () => void): KeyRestore {
   const api = useKeysApi()
@@ -42,6 +44,7 @@ export function useKeyRestore(owner: KeyOwner, onRestored: () => void): KeyResto
   const [groups, setGroups] = useState(EMPTY_GROUPS)
   const recoveryKey = useMemo(() => recoveryKeyOf(groups), [groups])
   const submitted = useRef<RecoveryKey | null>(null)
+  const guard = useSubmitGuard()
   const restore = useMutation({
     mutationFn: () => {
       const key = submitted.current
@@ -68,8 +71,10 @@ export function useKeyRestore(owner: KeyOwner, onRestored: () => void): KeyResto
     canSubmit: recoveryKey !== null && !restore.isPending,
     submit: () => {
       if (recoveryKey !== null && !restore.isPending) {
-        submitted.current = recoveryKey
-        restore.mutate()
+        guard.run(() => {
+          submitted.current = recoveryKey
+          return restore.mutateAsync()
+        })
       }
     },
     pending: restore.isPending,

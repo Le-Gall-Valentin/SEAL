@@ -23,9 +23,6 @@ export function useForgotPassword() {
         setRefused(address)
       }
     },
-    onSettled: () => {
-      guard.release()
-    },
   })
   const locked = useRetryAfterLock(mutation.error, mutation.reset)
   const failure = mutation.error === null ? null : resetFailureOf(mutation.error)
@@ -42,9 +39,11 @@ export function useForgotPassword() {
     sent,
     canSubmit,
     submit: () => {
-      if (canSubmit && guard.enter()) {
-        setSent(false)
-        mutation.mutate(email)
+      if (canSubmit) {
+        guard.run(() => {
+          setSent(false)
+          return mutation.mutateAsync(email)
+        })
       }
     },
   }

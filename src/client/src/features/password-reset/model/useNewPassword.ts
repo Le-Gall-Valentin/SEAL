@@ -10,7 +10,7 @@ import {
   usePasswordBlocklist,
 } from '@/entities/password'
 import { ROUTES } from '@/shared/config'
-import { isFormFailure, useClock, useRetryAfterLock } from '@/shared/lib'
+import { isFormFailure, useClock, useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
 import { linkState, minutesLeft, resetFailureOf } from './resetLink'
 import { usePasswordResetApi } from './passwordResetApiPort'
 
@@ -33,6 +33,7 @@ export function useNewPassword(token: string | null, linkId: number) {
   const [confirmTouched, setConfirmTouched] = useState(false)
   const [refusedPassword, setRefusedPassword] = useState<string | null>(null)
   const [linkDead, setLinkDead] = useState(false)
+  const guard = useSubmitGuard()
 
   // Le jeton n'entre pas dans la clé : il ne vit que dans la fermeture ; linkId distingue un second lien.
   const link = useQuery({
@@ -109,7 +110,7 @@ export function useNewPassword(token: string | null, linkId: number) {
     canSubmit,
     submit: () => {
       if (canSubmit) {
-        mutation.mutate(password)
+        guard.run(() => mutation.mutateAsync(password))
       }
     },
   }

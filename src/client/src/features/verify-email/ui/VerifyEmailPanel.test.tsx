@@ -9,7 +9,7 @@ import {
   SessionApiProvider,
   useCurrentAccount,
 } from '@/entities/session'
-import { ApiError, ClockProvider } from '@/shared/lib'
+import { ApiError, ClockProvider, NetworkError } from '@/shared/lib'
 import { VerifyEmailApiProvider } from '../model/verifyEmailApiPort'
 import { VerifyEmailPanel } from './VerifyEmailPanel'
 
@@ -344,5 +344,206 @@ describe('AUTH-14, AUTH-17 : vérification du courriel', () => {
     await screen.getByRole('button', { name: 'Envoyer le code' }).click()
 
     await expect.element(screen.getByRole('button', { name: 'Modifier le courriel' })).toHaveFocus()
+  })
+
+  const never = () => new Promise<void>(() => undefined)
+
+  it('AUTH-14, ADR 0033 (point 6) : un double clic sur « Vérifier » n’envoie qu’un code', async () => {
+    const { screen, calls } = await renderPanel({ verify: never })
+    await box(screen, 1).fill('503271')
+    const submit = screen.getByRole('button', { name: 'Vérifier' })
+    await expect.element(submit).toBeEnabled()
+
+    // Deux envois dans la même tâche, sans rendu entre eux : le pire cas d'un double clic.
+    const form = submit.element().closest('form')
+    form?.requestSubmit()
+    form?.requestSubmit()
+
+    await expect.poll(() => calls.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(calls).toEqual(['verify 503271'])
+  })
+
+  it('AUTH-14, ADR 0033 (point 6) : un double clic sur « Renvoyer le code » ne consomme qu’un renvoi', async () => {
+    const { screen, calls } = await renderPanel({ resend: never })
+    const resend = screen.getByRole('button', { name: 'Renvoyer le code' })
+    await expect.element(resend).toBeEnabled()
+
+    const button = resend.element()
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new TypeError('bouton attendu')
+    }
+    button.click()
+    button.click()
+
+    await expect.poll(() => calls.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(calls).toEqual(['resend'])
+  })
+
+  it('AUTH-17, ADR 0033 (point 6) : un double clic sur « Envoyer le code » ne change le courriel qu’une fois', async () => {
+    const { screen, calls } = await renderPanel({ changeEmail: never })
+    await screen.getByRole('button', { name: 'Modifier le courriel' }).click()
+    await screen.getByLabelText('Courriel', { exact: true }).fill('noah@uqac.ca')
+    const submit = screen.getByRole('button', { name: 'Envoyer le code' })
+    await expect.element(submit).toBeEnabled()
+
+    const form = submit.element().closest('form')
+    form?.requestSubmit()
+    form?.requestSubmit()
+
+    await expect.poll(() => calls.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(calls).toEqual(['change noah@uqac.ca'])
+  })
+
+  it('AUTH-14, ADR 0033 (point 6) : une action à la fois ; « Vérifier » ne part pas pendant un renvoi', async () => {
+    const { screen, calls } = await renderPanel({ resend: never })
+    await box(screen, 1).fill('503271')
+    const resend = screen.getByRole('button', { name: 'Renvoyer le code' }).element()
+    if (!(resend instanceof HTMLButtonElement)) {
+      throw new TypeError('bouton attendu')
+    }
+
+    resend.click()
+    screen.getByRole('button', { name: 'Vérifier' }).element().closest('form')?.requestSubmit()
+
+    await expect.poll(() => calls.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(calls).toEqual(['resend'])
+  })
+
+  it('AUTH-14, ADR 0033 (point 6) : après un échec, le verrou est rendu et un nouveau renvoi part', async () => {
+    let attempts = 0
+    const { screen, calls } = await renderPanel({
+      resend: () => {
+        attempts += 1
+        return attempts === 1 ? Promise.reject(new NetworkError()) : never()
+      },
+    })
+    const resend = screen.getByRole('button', { name: 'Renvoyer le code' })
+
+    await resend.click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await resend.click()
+
+    await expect.poll(() => calls.length).toBe(2)
+  })
+
+  it('AUTH-14, ADR 0033 (point 6) : après « Code incorrect. », un second code part', async () => {
+    let attempts = 0
+    const { screen, calls } = await renderPanel({
+      verify: () => {
+        attempts += 1
+        return attempts === 1 ? Promise.reject(new ApiError(422, 'INVALID_CODE')) : never()
+      },
+    })
+    await box(screen, 1).fill('503271')
+    await screen.getByRole('button', { name: 'Vérifier' }).click()
+    await expect.element(screen.getByRole('alert')).toHaveTextContent('Code incorrect.')
+
+    await box(screen, 1).fill('503272')
+    await screen.getByRole('button', { name: 'Vérifier' }).click()
+
+    await expect.poll(() => calls).toEqual(['verify 503271', 'verify 503272'])
+  })
+
+  it('AUTH-17, ADR 0033 (point 6) : après un changement de courriel en échec, le renvoi part', async () => {
+    const { screen, calls } = await renderPanel({
+      changeEmail: () => Promise.reject(new NetworkError()),
+    })
+    await screen.getByRole('button', { name: 'Modifier le courriel' }).click()
+    await screen.getByLabelText('Courriel', { exact: true }).fill('noah@uqac.ca')
+    await screen.getByRole('button', { name: 'Envoyer le code' }).click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Renvoyer le code' }).click()
+
+    await expect.poll(() => calls).toEqual(['change noah@uqac.ca', 'resend'])
+  })
+
+  it('AUTH-14, ADR 0033 (point 6) : après un renvoi réussi, « Vérifier » part', async () => {
+    const { screen, calls } = await renderPanel({})
+    await screen.getByRole('button', { name: 'Renvoyer le code' }).click()
+    await expect
+      .element(screen.getByRole('status'))
+      .toHaveTextContent('Code envoyé à valentin@uqac.ca.')
+
+    await box(screen, 1).fill('503271')
+    await screen.getByRole('button', { name: 'Vérifier' }).click()
+
+    await expect.poll(() => calls).toEqual(['resend', 'verify 503271'])
+  })
+
+  it('AUTH-17, ADR 0033 (point 6) : « Annuler » pendant l’envoi n’abandonne pas le changement ; les actions attendent sa réponse', async () => {
+    let finish: () => void = () => undefined
+    const { screen, calls } = await renderPanel({
+      changeEmail: () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        }),
+    })
+    await screen.getByRole('button', { name: 'Modifier le courriel' }).click()
+    await screen.getByLabelText('Courriel', { exact: true }).fill('noah@uqac.ca')
+    await screen.getByRole('button', { name: 'Envoyer le code' }).click()
+    await expect.poll(() => calls).toEqual(['change noah@uqac.ca'])
+
+    await screen.getByRole('button', { name: 'Annuler' }).click()
+    await box(screen, 1).fill('503271')
+
+    // La requête est partie : ni « Vérifier » ni « Renvoyer le code » ne paraissent actifs sans pouvoir partir.
+    await expect.element(screen.getByRole('button', { name: 'Vérifier' })).toBeDisabled()
+    await expect.element(screen.getByRole('button', { name: 'Renvoyer le code' })).toBeDisabled()
+    finish()
+    await expect
+      .element(screen.getByRole('status'))
+      .toHaveTextContent('Code envoyé à noah@uqac.ca.')
+    await expect.element(screen.getByRole('button', { name: 'Renvoyer le code' })).toBeEnabled()
+  })
+
+  it('SEC-10 : un 429 du renvoi tient jusqu’à Retry-After, même après une vérification', async () => {
+    const { screen } = await renderPanel({
+      resend: () => Promise.reject(new ApiError(429, 'RATE_LIMITED', { retryAfterSeconds: 3600 })),
+      verify: () => Promise.reject(new ApiError(422, 'INVALID_CODE')),
+    })
+    await screen.getByRole('button', { name: 'Renvoyer le code' }).click()
+    await expect.element(screen.getByRole('alert')).toMatchTextContent('Trop de tentatives')
+
+    await box(screen, 1).fill('503271')
+    await screen.getByRole('button', { name: 'Vérifier' }).click()
+    await expect.element(screen.getByRole('alert')).toHaveTextContent('Code incorrect.')
+
+    await expect.element(screen.getByRole('button', { name: 'Renvoyer le code' })).toBeDisabled()
+  })
+
+  it('SEC-10 : un 429 du changement de courriel tient jusqu’à Retry-After, même après « Annuler »', async () => {
+    const { screen } = await renderPanel({
+      changeEmail: () =>
+        Promise.reject(new ApiError(429, 'RATE_LIMITED', { retryAfterSeconds: 3600 })),
+    })
+    await screen.getByRole('button', { name: 'Modifier le courriel' }).click()
+    await screen.getByLabelText('Courriel', { exact: true }).fill('noah@uqac.ca')
+    await screen.getByRole('button', { name: 'Envoyer le code' }).click()
+    await expect.element(screen.getByRole('alert')).toMatchTextContent('Trop de tentatives')
+
+    await screen.getByRole('button', { name: 'Annuler' }).click()
+
+    await expect.element(screen.getByRole('button', { name: 'Renvoyer le code' })).toBeDisabled()
+  })
+
+  it('SEC-10 : un 429 de la vérification tient jusqu’à Retry-After, même après un renvoi', async () => {
+    const { screen } = await renderPanel({
+      verify: () => Promise.reject(new ApiError(429, 'RATE_LIMITED', { retryAfterSeconds: 3600 })),
+    })
+    await box(screen, 1).fill('503271')
+    await screen.getByRole('button', { name: 'Vérifier' }).click()
+    await expect.element(screen.getByRole('alert')).toMatchTextContent('Trop de tentatives')
+
+    await screen.getByRole('button', { name: 'Renvoyer le code' }).click()
+    await expect
+      .element(screen.getByRole('status'))
+      .toHaveTextContent('Code envoyé à valentin@uqac.ca.')
+
+    await expect.element(screen.getByRole('button', { name: 'Vérifier' })).toBeDisabled()
   })
 })

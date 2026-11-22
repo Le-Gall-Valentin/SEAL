@@ -51,9 +51,6 @@ export function useOAuthRegistrationForm(pending: PendingRegistration) {
           return
       }
     },
-    onSettled: () => {
-      guard.release()
-    },
   })
   const locked = useRetryAfterLock(mutation.error, mutation.reset)
   const failure = mutation.error === null ? null : oauthRegistrationFailureOf(mutation.error)
@@ -82,17 +79,19 @@ export function useOAuthRegistrationForm(pending: PendingRegistration) {
     alert,
     canSubmit,
     submit: () => {
-      if (canSubmit && guard.enter()) {
-        mutation.mutate(
-          { username, displayName },
-          {
-            onError: (error) => {
-              const failure = oauthRegistrationFailureOf(error)
-              if (failure.kind === 'abandoned') {
-                void navigate(loginPathWithError(failure.error), { replace: true })
-              }
+      if (canSubmit) {
+        guard.run(() =>
+          mutation.mutateAsync(
+            { username, displayName },
+            {
+              onError: (error) => {
+                const failure = oauthRegistrationFailureOf(error)
+                if (failure.kind === 'abandoned') {
+                  void navigate(loginPathWithError(failure.error), { replace: true })
+                }
+              },
             },
-          },
+          ),
         )
       }
     },

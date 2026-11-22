@@ -64,9 +64,6 @@ export function useRegisterForm() {
           return
       }
     },
-    onSettled: () => {
-      guard.release()
-    },
   })
   const locked = useRetryAfterLock(mutation.error, mutation.reset)
   const failure = mutation.error === null ? null : registerFailureOf(mutation.error)
@@ -103,13 +100,15 @@ export function useRegisterForm() {
     locked,
     canSubmit,
     submit: () => {
-      if (canSubmit && guard.enter()) {
-        mutation.mutate({
-          email: values.email,
-          username,
-          displayName: values.displayName,
-          password: values.password,
-        })
+      if (canSubmit) {
+        guard.run(() =>
+          mutation.mutateAsync({
+            email: values.email,
+            username,
+            displayName: values.displayName,
+            password: values.password,
+          }),
+        )
       }
     },
   }

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { type Account, refreshSession } from '@/entities/session'
-import { ApiError, useRetryAfterLock } from '@/shared/lib'
+import { ApiError, useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
 import { CODE_LENGTH, verifyFailureOf } from './code'
 import { useSecondsLeft } from './useSecondsLeft'
 import { verificationView } from './verificationView'
@@ -15,10 +15,10 @@ interface VerificationProps {
 }
 
 /**
- * AUTH-14, AUTH-17 : vérification du code, renvoi et changement du courriel en attente. Une seule action à la fois
- * affiche son erreur. Le renvoi et le changement partagent leur limite : un 429 de l'un suspend les deux, jamais la
- * vérification du code en cours. Chaque réussite relit /me : le compte à rebours et les renvois restants en viennent,
- * et la garde mène à l'accueil une fois le compte actif.
+ * AUTH-14, AUTH-17 : vérification du code, renvoi et changement du courriel en attente. Une seule action à la fois part
+ * (un verrou synchrone partagé, ADR 0033, point 6) et affiche son erreur. Le renvoi et le changement partagent leur
+ * limite : un 429 de l'un suspend les deux, jamais la vérification du code en cours. Chaque réussite relit /me : le
+ * compte à rebours et les renvois restants en viennent, et la garde mène à l'accueil une fois le compte actif.
  */
 export function useEmailVerification(
   { email, verification }: VerificationProps,
@@ -32,6 +32,7 @@ export function useEmailVerification(
   const [newEmail, setNewEmail] = useState('')
   const [newEmailTouched, setNewEmailTouched] = useState(false)
   const [refusedEmail, setRefusedEmail] = useState<string | null>(null)
+  const guard = useSubmitGuard()
 
   const verify = useMutation({
     mutationFn: (code: string) => api.verify(code),
@@ -89,11 +90,18 @@ export function useEmailVerification(
     refusedEmail,
   })
 
-  /** Une action efface l'erreur et la confirmation de la précédente. */
+  /**
+   * Une action efface l'erreur et la confirmation de la précédente, sauf un 429 : il suspend son action jusqu'à la fin
+   * de Retry-After (SEC-10).
+   */
   const start = () => {
-    verify.reset()
-    resend.reset()
-    change.reset()
+    if (!verifyLocked) {
+      verify.reset()
+    }
+    if (!sendLocked) {
+      resend.reset()
+      change.reset()
+    }
     setSentTo(null)
   }
 
@@ -106,16 +114,20 @@ export function useEmailVerification(
     canVerify: view.canVerify,
     verify: () => {
       if (view.canVerify) {
-        start()
-        verify.mutate(cells.join(''))
+        guard.run(() => {
+          start()
+          return verify.mutateAsync(cells.join(''))
+        })
       }
     },
     resendsRemaining: verification?.resendsRemaining ?? 0,
     canResend: view.canResend,
     resend: () => {
       if (view.canResend) {
-        start()
-        resend.mutate()
+        guard.run(() => {
+          start()
+          return resend.mutateAsync()
+        })
       }
     },
     sentTo,
@@ -127,7 +139,11 @@ export function useEmailVerification(
       setChanging(false)
       setNewEmail('')
       setNewEmailTouched(false)
-      change.reset()
+      // Une requête partie n'est pas abandonnée : les actions attendent son issue, qui s'affiche (ADR 0033, point 6). Un
+      // 429 garde son verrou jusqu'à la fin de Retry-After (SEC-10).
+      if (!change.isPending && !sendLocked) {
+        change.reset()
+      }
     },
     newEmail,
     setNewEmail,
@@ -138,8 +154,10 @@ export function useEmailVerification(
     canChange: view.canChange,
     changeEmail: () => {
       if (view.canChange) {
-        start()
-        change.mutate(newEmail)
+        guard.run(() => {
+          start()
+          return change.mutateAsync(newEmail)
+        })
       }
     },
   }
