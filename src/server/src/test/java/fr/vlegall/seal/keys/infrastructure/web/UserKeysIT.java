@@ -36,7 +36,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.JsonNode;
 
-/** KEY-33, QA-05 : un nouvel appareil relit son certificat et ses sous-clés valides (ADR 0029, point 4). */
+/**
+ * KEY-33, API-02, QA-05 : un nouvel appareil relit son certificat et ses sous-clés valides (ADR 0029, point 4) ; un ami
+ * les lit aussi (ADR 0037, point 7).
+ */
 @SealIntegrationTest
 class UserKeysIT {
 

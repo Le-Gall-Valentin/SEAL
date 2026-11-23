@@ -15,7 +15,9 @@ public interface FriendRequestRepository {
 
     /**
      * FRD-01 : verrou de la paire jusqu'à la fin de la transaction. Inviter et répondre à une invitation de la même paire
-     * se succèdent : aucune invitation ne naît entre deux comptes qui deviennent amis au même moment.
+     * se succèdent : aucune invitation ne naît entre deux comptes qui deviennent amis au même moment. Ordre imposé : un
+     * geste qui verrouille aussi une invitation ({@link #lockPending}) prend ce verrou de ligne d'abord, la paire
+     * ensuite, jamais l'inverse, sous peine d'interblocage (ADR 0037, Conséquences).
      */
     void lockPair(UserPair pair);
 

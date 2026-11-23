@@ -12,7 +12,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** KEY-33, ADR 0029 (point 4) : clés publiées d'un compte, telles que GET /users/{moi}/keys les sert. */
+/** KEY-33, API-02 : clés publiées d'un compte, telles que GET /users/{userId}/keys les sert (ADR 0029, point 4). */
 class UserKeysTest {
 
     private static final UserId OWNER = new UserId(UUID.fromString("0192f7a1-ffff-7000-8000-00000000a11c"));

@@ -22,7 +22,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** KEY-33, A01 : le compte relit son certificat courant et ses sous-clés valides, et seulement les siens. */
+/**
+ * KEY-33, API-02 : le compte relit son certificat courant et ses sous-clés valides ; un ami les lit aussi, tout autre
+ * compte ne lit rien (ADR 0037, point 7).
+ */
 class ReadUserKeysHandlerTest {
 
     private static final UserId OWNER = new UserId(UUID.fromString("0192f7a1-ffff-7000-8000-00000000a11c"));
