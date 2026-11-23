@@ -5,7 +5,9 @@ import static fr.vlegall.seal.friends.infrastructure.web.FriendsTestClient.REQUE
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -272,5 +274,20 @@ class FriendListsIT {
         mvc.perform(restricted.unsafe(delete(FRIENDS + "/" + friend.id), registered.session(), null))
                 .andExpect(status().isForbidden());
         assertThat(page(me, FRIENDS).get("items")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Section 14 : une méthode hors de 14.4 est refusée par défaut (403), même en session complète")
+    void unlistedMethodsAreDeniedByDefault() throws Exception {
+        FriendsTestClient me = account("meth");
+        FriendsTestClient friend = account("methf");
+        befriend(me, friend);
+        UUID request = invite(me, account("methr"));
+
+        mvc.perform(me.unsafe(put(FRIENDS + "/" + friend.id), null)).andExpect(status().isForbidden());
+        mvc.perform(me.unsafe(post(FRIENDS), null)).andExpect(status().isForbidden());
+        mvc.perform(me.unsafe(put(REQUESTS + "/" + request), null)).andExpect(status().isForbidden());
+        mvc.perform(me.unsafe(post(REQUESTS + "/" + request + "/autre"), null)).andExpect(status().isForbidden());
+        mvc.perform(me.unsafe(patch(REQUESTS), null)).andExpect(status().isForbidden());
     }
 }

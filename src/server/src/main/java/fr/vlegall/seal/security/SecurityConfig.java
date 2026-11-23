@@ -175,12 +175,15 @@ class SecurityConfig {
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         // Section 14.4, ADR 0037 (point 7) : amis et invitations, pour la seule session complète ; le
                         // contrôle d'appartenance est fait par chaque handler (SEC-03).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/friends", "/api/v1/friend-requests")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         .requestMatchers(
+                                HttpMethod.POST,
                                 "/api/v1/friend-requests",
-                                "/api/v1/friend-requests/*",
-                                "/api/v1/friend-requests/*/*",
-                                "/api/v1/friends",
-                                "/api/v1/friends/*")
+                                "/api/v1/friend-requests/*/accept",
+                                "/api/v1/friend-requests/*/decline")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/friends/*", "/api/v1/friend-requests/*")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         // KEY-10, KEY-11, ADR 0025 (point 9) : clé de l'Autorité, pour la seule session complète.
                         .requestMatchers(HttpMethod.GET, "/api/v1/pki/ca")
