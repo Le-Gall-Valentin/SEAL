@@ -77,6 +77,7 @@ function fakeApis(account: Account | null): Apis {
     },
     sendFriendRequest: { send: never },
     answerFriendRequest: { accept: never, decline: never, revoke: never },
+    removeFriend: { unfriend: never },
   }
 }
 

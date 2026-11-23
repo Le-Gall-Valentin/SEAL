@@ -27,6 +27,7 @@ import {
 import { type IPasswordResetApi, PasswordResetApiProvider } from '@/features/password-reset'
 import { type IReauthApi, ReauthApiProvider } from '@/features/reauthenticate'
 import { type IRegisterApi, RegisterApiProvider } from '@/features/register'
+import { type IRemoveFriendApi, RemoveFriendApiProvider } from '@/features/remove-friend'
 import {
   type ISendFriendRequestApi,
   SendFriendRequestApiProvider,
@@ -55,6 +56,7 @@ export interface Apis {
   readonly friends: IFriendsApi
   readonly sendFriendRequest: ISendFriendRequestApi
   readonly answerFriendRequest: IAnswerFriendRequestApi
+  readonly removeFriend: IRemoveFriendApi
 }
 
 interface ApiProvidersProps {
@@ -111,6 +113,7 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
         {inner}
       </AnswerFriendRequestApiProvider>
     ),
+    (inner) => <RemoveFriendApiProvider api={apis.removeFriend}>{inner}</RemoveFriendApiProvider>,
   ]
   return layers.reduceRight<ReactNode>((inner, layer) => layer(inner), children)
 }
