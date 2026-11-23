@@ -235,7 +235,7 @@ signature = Ed25519.sign(clé CA, SealCertificate)
 
 Un compte a au plus un certificat non révoqué. Après son expiration, une nouvelle publication de la **même** clé
 d'identité révoque l'ancien, motif « remplacé » (code 4 de X.509) ; une autre clé est refusée, car changer de clé
-est une réinitialisation, réservée au mode sudo (KEY-12, KEY-34, ADR 0025, point 4).
+est une réinitialisation, réservée au mode sudo (KEY-12, KEY-34, ADR 0025, point 4 ; section 5.6).
 
 ### 4.3 Preuve de possession (KEY-03)
 
@@ -379,6 +379,21 @@ repart du coffre relu.
 `vectors/vault.json` donne la version 2 dans `nextVersion` : l'AAD (`vaultAad`), les octets du trousseau à deux
 sous-clés (`keyringBytes`), la clé publique de la seconde (`ekPublic`, celle de Bob dans la RFC 7748) et la charge
 (`payload`), qui s'ouvre aussi par RK.
+
+### 5.6 Réinitialisation de l'identité (KEY-34, ADR 0036)
+
+Sans sa clé de récupération, un compte remplace son identité : le client tire une nouvelle RK, la fait confirmer
+(5.1), puis génère une nouvelle IK, une nouvelle EK et une nouvelle VDK, et chiffre le nouveau trousseau comme en 5.3,
+sous l'AAD de la version qui suit celle du coffre enregistré (`vaultVersion + 1`). Il envoie en une seule requête,
+`POST /api/v1/keys/identity/reset`, en mode sudo, la preuve de possession de la nouvelle IK (4.3, sur un défi neuf) et
+le nouveau coffre. Le serveur, dans une transaction, consomme le défi, vérifie la preuve, écrit le coffre s'il suit la
+version enregistrée (409 `VAULT_VERSION_CONFLICT` sinon), révoque le certificat courant, motif « remplacé » (code 4),
+et émet celui de la nouvelle IK. La sous-clé se publie ensuite comme à la première connexion (4.4, 5.5).
+
+Le trousseau n'est enregistré sur l'appareil qu'une fois la réinitialisation acquise : une réponse perdue se tranche
+en relisant `GET /api/v1/users/{moi}/keys`, dont le certificat porte alors la nouvelle IK. L'ancienne RK n'ouvre plus
+le coffre ; les messages chiffrés pour les anciennes sous-clés deviennent illisibles, et les correspondants voient une
+nouvelle IK (KEY-51). Les formats ne changent pas : aucun vecteur nouveau.
 
 ## 6. Messages (CDC 7 ; KEY-20, QA-02 à QA-04, ADR 0030)
 
