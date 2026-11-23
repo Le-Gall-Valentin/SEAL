@@ -13,6 +13,7 @@ import fr.vlegall.seal.identity.infrastructure.persistence.repository.UserJpaRep
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -85,6 +86,16 @@ public class UserRepositoryAdapter implements UserRepository {
     @Override
     public Optional<Account> findById(UserId id) {
         return jpa.findById(id.value()).map(UserRepositoryAdapter::toAccount);
+    }
+
+    @Override
+    public List<Account> findAll(Collection<UserId> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return jpa.findAllById(ids.stream().map(UserId::value).toList()).stream()
+                .map(UserRepositoryAdapter::toAccount)
+                .toList();
     }
 
     @Override
