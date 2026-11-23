@@ -11,10 +11,20 @@ interface DisplayNameFieldProps {
   readonly onChange: (value: string) => void
   readonly onBlur: () => void
   readonly invalid: boolean
+  /** « Visible par vos amis… » : à l'inscription, pas dans Profil (Parametres-Ordinateur). */
+  readonly withHint?: boolean
+  readonly disabled?: boolean
 }
 
 /** AUTH-10, ACC-03 : « Nom affiché », d'Inscription-Telephone et d'Identifiant-OAuth. */
-export function DisplayNameField({ value, onChange, onBlur, invalid }: DisplayNameFieldProps) {
+export function DisplayNameField({
+  value,
+  onChange,
+  onBlur,
+  invalid,
+  withHint = true,
+  disabled = false,
+}: DisplayNameFieldProps) {
   const t = useMessages(accountMessages)
   return (
     <TextField
@@ -24,7 +34,8 @@ export function DisplayNameField({ value, onChange, onBlur, invalid }: DisplayNa
       value={value}
       onChange={onChange}
       onBlur={onBlur}
-      hint={t('displayNameHint')}
+      hint={withHint ? t('displayNameHint') : undefined}
+      disabled={disabled}
       error={invalid ? t('invalidDisplayName') : null}
     />
   )

@@ -1,6 +1,6 @@
 import { isEmailWellFormed } from '@/entities/account'
-import { ApiError } from '@/shared/lib'
-import { CODE_LENGTH, verifyFailureOf, type VerifyFailure } from './code'
+import { ApiError, CODE_LENGTH } from '@/shared/lib'
+import { verifyFailureOf, type VerifyFailure } from './code'
 
 /** Ce que l'écran sait au moment du rendu. */
 export interface VerificationInput {

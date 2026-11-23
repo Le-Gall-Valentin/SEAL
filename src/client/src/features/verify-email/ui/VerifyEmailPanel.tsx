@@ -2,11 +2,10 @@ import { useEffect, useRef } from 'react'
 import { EMAIL_MAX_LENGTH } from '@/entities/account'
 import type { Account } from '@/entities/session'
 import { useMessages } from '@/shared/i18n'
-import { Alert, FormAlert, PrimaryButton, SecondaryButton, TextField } from '@/shared/ui'
+import { Alert, CodeInput, FormAlert, PrimaryButton, SecondaryButton, TextField } from '@/shared/ui'
 import { verifyEmailMessages } from '../i18n'
 import { formatCountdown, type VerifyFailure } from '../model/code'
 import { useEmailVerification } from '../model/useEmailVerification'
-import { CodeInput } from './CodeInput'
 
 interface VerifyEmailPanelProps {
   readonly email: string
@@ -59,6 +58,8 @@ export function VerifyEmailPanel({ email, verification }: VerifyEmailPanelProps)
         }}
       >
         <CodeInput
+          label={t('code')}
+          boxLabel={(index) => t('codeBox', { index })}
           cells={panel.cells}
           onChange={panel.setCells}
           disabled={panel.codeLocked}

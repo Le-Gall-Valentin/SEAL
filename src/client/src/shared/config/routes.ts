@@ -9,4 +9,22 @@ export const ROUTES = {
   RESET_PASSWORD: '/mot-de-passe/nouveau',
   // AUTH-32, ADR 0032 (point 4) : Identifiant-OAuth, où le serveur renvoie après un premier passage.
   CHOOSE_USERNAME: '/inscription/identifiant',
+  // ACC-01 à ACC-03, ADR 0034 et 0035 : Paramètres, où revient aussi une ré-authentification OAuth.
+  SETTINGS: '/parametres',
 } as const
+
+/**
+ * ADR 0035 : sous-page des paramètres ouverte sur téléphone (`/parametres?section=compte`), que le serveur ignore ; la
+ * navigation principale s'y retire, comme dans Parametres-Telephone-Preferences. Seule « Compte » existe en P0.
+ */
+export const SETTINGS_SECTION_PARAM = 'section'
+
+export type SettingsSection = 'compte'
+
+/** La sous-page de l'adresse, une règle pour la coque et pour la page : toute autre valeur, ou aucune, n'en est pas. */
+export function settingsSectionOf(params: URLSearchParams): SettingsSection | null {
+  return params.get(SETTINGS_SECTION_PARAM) === 'compte' ? 'compte' : null
+}
+
+/** L'adresse de la sous-page Compte. */
+export const SETTINGS_ACCOUNT = `/parametres?${SETTINGS_SECTION_PARAM}=compte`

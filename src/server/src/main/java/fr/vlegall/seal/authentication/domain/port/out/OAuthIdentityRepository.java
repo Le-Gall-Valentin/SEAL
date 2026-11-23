@@ -5,6 +5,7 @@ import fr.vlegall.seal.authentication.domain.model.OAuthException;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.common.UserId;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /** AUTH-31 : table {@code oauth_identities}, un compte par couple (fournisseur, identifiant stable). */
@@ -15,6 +16,12 @@ public interface OAuthIdentityRepository {
 
     /** AUTH-55, ADR 0034 : vrai si le compte a une identité liée chez ce fournisseur. */
     boolean isLinked(UserId user, OAuthProvider provider);
+
+    /**
+     * ADR 0035, point 2 : les fournisseurs auxquels le compte est lié, configurés ou non, dans l'ordre des boutons de la
+     * maquette ; lus en une requête.
+     */
+    List<OAuthProvider> linkedProviders(UserId user);
 
     /**
      * Lie l'identité au compte, dans la transaction en cours, avec le courriel vu chez le fournisseur.

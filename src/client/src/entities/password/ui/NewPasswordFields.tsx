@@ -1,12 +1,11 @@
-import { type ReactNode, useId } from 'react'
+import type { ReactNode } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { PasswordField } from '@/shared/ui'
 import { passwordMessages } from '../i18n'
 import { PASSWORD_INPUT_MAX_LENGTH } from '../model/passwordForm'
 import type { PasswordRules } from '../model/passwordPolicy'
 import type { PasswordStrength } from '../model/passwordStrength'
-import { PasswordRulesList } from './PasswordRulesList'
-import { StrengthMeter } from './StrengthMeter'
+import { NewPasswordField } from './NewPasswordField'
 
 interface NewPasswordFieldsProps {
   /** « Mot de passe » (Inscription-Telephone) ou « Nouveau mot de passe » (Nouveau-Mot-de-passe). */
@@ -19,6 +18,7 @@ interface NewPasswordFieldsProps {
   readonly confirmMismatch: boolean
   readonly rules: PasswordRules
   readonly strength: PasswordStrength
+  readonly disabled?: boolean
   /** Lignes ajoutées après les règles, propres à l'écran. */
   readonly children?: ReactNode
 }
@@ -37,24 +37,22 @@ export function NewPasswordFields({
   confirmMismatch,
   rules,
   strength,
+  disabled = false,
   children,
 }: NewPasswordFieldsProps) {
   const t = useMessages(passwordMessages)
-  const strengthId = useId()
   return (
     <>
-      <PasswordField
+      <NewPasswordField
         label={passwordLabel}
-        autoComplete="new-password"
-        maxLength={PASSWORD_INPUT_MAX_LENGTH}
         value={password}
         onChange={onPasswordChange}
-        describedBy={strengthId}
-      />
-      <div id={strengthId} className="flex flex-col gap-2">
-        <StrengthMeter strength={strength} />
-        <PasswordRulesList rules={rules}>{children}</PasswordRulesList>
-      </div>
+        rules={rules}
+        strength={strength}
+        disabled={disabled}
+      >
+        {children}
+      </NewPasswordField>
       <PasswordField
         label={t('confirm')}
         autoComplete="new-password"
@@ -62,6 +60,7 @@ export function NewPasswordFields({
         value={confirm}
         onChange={onConfirmChange}
         onBlur={onConfirmBlur}
+        disabled={disabled}
         error={confirmMismatch ? t('mismatch') : null}
       />
     </>

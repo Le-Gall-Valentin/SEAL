@@ -7,6 +7,7 @@ export {
 export { refusedAccountField } from './model/refusedField'
 export { useUsernameChoice } from './model/useUsernameChoice'
 export { EMAIL_MAX_LENGTH, isEmailWellFormed, localPartOf } from './model/email'
+export { initialsOf } from './model/initials'
 export {
   isReservedUsername,
   isUsernameWellFormed,
@@ -22,3 +23,7 @@ export { isUsernameSubmittable, usernameRefusalReason } from './model/usernamePr
 export { DisplayNameField } from './ui/DisplayNameField'
 export { FinalUsernameNotice } from './ui/FinalUsernameNotice'
 export { UsernameField } from './ui/UsernameField'
+export type { ILoginMethodsApi, LoginMethods } from './api/ILoginMethodsApi'
+export { loginMethodsApi } from './api/loginMethodsApi'
+export { LoginMethodsApiProvider } from './model/loginMethodsPort'
+export { LOGIN_METHODS_QUERY_KEY, useLoginMethods } from './model/useLoginMethods'

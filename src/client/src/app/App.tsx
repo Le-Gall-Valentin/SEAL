@@ -1,16 +1,20 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createBrowserRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
-import { usernameAvailabilityApi } from '@/entities/account'
+import { loginMethodsApi, usernameAvailabilityApi } from '@/entities/account'
 import { authorityApi } from '@/entities/authority'
 import { keysApi } from '@/entities/keyring'
 import { oauthProvidersApi } from '@/entities/oauth-provider'
 import { passwordBlocklist } from '@/entities/password'
 import { sessionApi } from '@/entities/session'
+import { profileApi } from '@/features/change-display-name'
+import { emailChangeApi } from '@/features/change-email'
+import { passwordChangeApi } from '@/features/change-password'
 import { loginApi } from '@/features/login'
 import { logoutApi } from '@/features/logout'
 import { oauthRegistrationApi } from '@/features/oauth-registration'
 import { passwordResetApi } from '@/features/password-reset'
+import { reauthApi } from '@/features/reauthenticate'
 import { registerApi } from '@/features/register'
 import { verifyEmailApi } from '@/features/verify-email'
 import { LanguageProvider } from '@/shared/i18n'
@@ -43,6 +47,11 @@ const apis: Apis = {
   verifyEmail: verifyEmailApi,
   passwordReset: passwordResetApi,
   logout: logoutApi,
+  loginMethods: loginMethodsApi,
+  reauth: reauthApi,
+  profile: profileApi,
+  passwordChange: passwordChangeApi,
+  emailChange: emailChangeApi,
 }
 
 // KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un

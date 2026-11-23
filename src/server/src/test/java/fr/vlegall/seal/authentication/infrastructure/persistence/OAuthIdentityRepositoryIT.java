@@ -117,4 +117,19 @@ class OAuthIdentityRepositoryIT {
 
         assertThat(identities.findUser(OAuthProvider.GOOGLE, subject)).isEmpty();
     }
+
+    @Test
+    @DisplayName(
+            "SEC-03, ADR 0035 : les liaisons d'un autre compte ne comptent pas ; les siennes, dans l'ordre des boutons")
+    void sec03LinksBelongToTheirAccount() {
+        UserId owner = insertUser();
+        UserId other = insertUser();
+        identities.link(owner, identity(OAuthProvider.GITHUB, subject(), "a@exemple.ca"), NOW);
+        identities.link(owner, identity(OAuthProvider.GOOGLE, subject(), "a@exemple.ca"), NOW);
+
+        assertThat(identities.isLinked(owner, OAuthProvider.GITHUB)).isTrue();
+        assertThat(identities.isLinked(other, OAuthProvider.GITHUB)).isFalse();
+        assertThat(identities.linkedProviders(owner)).containsExactly(OAuthProvider.GOOGLE, OAuthProvider.GITHUB);
+        assertThat(identities.linkedProviders(other)).isEmpty();
+    }
 }

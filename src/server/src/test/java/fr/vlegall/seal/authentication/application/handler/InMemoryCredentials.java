@@ -21,6 +21,11 @@ class InMemoryCredentials implements CredentialRepository {
     }
 
     @Override
+    public boolean hasPassword(UserId user) {
+        return hashes.containsKey(user);
+    }
+
+    @Override
     public Optional<StoredCredential> find(UserId user) {
         return Optional.ofNullable(hashes.get(user)).map(hash -> new StoredCredential(hash, versions.get(user)));
     }

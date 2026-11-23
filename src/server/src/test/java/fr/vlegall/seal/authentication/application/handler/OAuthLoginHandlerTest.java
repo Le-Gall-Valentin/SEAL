@@ -7,16 +7,13 @@ import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthAccountLookupPort;
 import fr.vlegall.seal.authentication.domain.port.out.OAuthEventPort;
-import fr.vlegall.seal.authentication.domain.port.out.OAuthIdentityRepository;
 import fr.vlegall.seal.common.AccountLoginState;
 import fr.vlegall.seal.common.UserId;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -27,29 +24,17 @@ import org.junit.jupiter.api.Test;
 @DisplayName("AUTH-31 : issue d'un retour OAuth")
 class OAuthLoginHandlerTest {
 
-    private final Map<String, UserId> linked = new HashMap<>();
     private final Set<UserId> active = new HashSet<>();
     private final Set<UserId> pending = new HashSet<>();
     private final Map<String, UserId> activeEmails = new HashMap<>();
     private final List<String> emailLookups = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
 
-    private final OAuthIdentityRepository identities = new OAuthIdentityRepository() {
-        @Override
-        public Optional<UserId> findUser(OAuthProvider provider, String subject) {
-            return Optional.ofNullable(linked.get(provider + ":" + subject));
-        }
+    private final InMemoryOAuthIdentities identities = new InMemoryOAuthIdentities();
 
-        @Override
-        public boolean isLinked(UserId user, OAuthProvider provider) {
-            throw new UnsupportedOperationException("réservé à la ré-authentification (ADR 0034)");
-        }
-
-        @Override
-        public void link(UserId user, ExternalIdentity identity, Instant linkedAt) {
-            throw new UnsupportedOperationException("le retour OAuth ne lie rien");
-        }
-    };
+    {
+        identities.forbidLinks("le retour OAuth ne lie rien : la liaison suit l'inscription (AUTH-32)");
+    }
 
     private final OAuthAccountLookupPort accounts = new OAuthAccountLookupPort() {
         @Override
@@ -87,7 +72,7 @@ class OAuthLoginHandlerTest {
 
     private UserId linkedTo(String subject) {
         UserId user = new UserId(UUID.randomUUID());
-        linked.put(OAuthProvider.GOOGLE + ":" + subject, user);
+        identities.put(OAuthProvider.GOOGLE, subject, user);
         return user;
     }
 

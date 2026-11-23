@@ -24,6 +24,11 @@ function apisWith(reloadCsrf: () => Promise<void>): Apis {
     verifyEmail: { verify: never, resend: never, changeEmail: never },
     passwordReset: { request: never, inspect: never, confirm: never },
     logout: { logout: never },
+    loginMethods: { loginMethods: never },
+    reauth: { reauthenticate: never },
+    profile: { changeDisplayName: never },
+    passwordChange: { changePassword: never },
+    emailChange: { request: never, confirm: never },
   }
 }
 

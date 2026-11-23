@@ -16,6 +16,9 @@ public interface CredentialRepository {
      */
     Optional<StoredCredential> find(UserId user);
 
+    /** ADR 0035, point 2 : vrai si le compte a un mot de passe, sans lire son haché. */
+    boolean hasPassword(UserId user);
+
     /**
      * AUTH-70 : remplace le haché d'un compte qui a déjà un mot de passe et incrémente sa version (ADR 0023), dans la
      * transaction de l'appelant.

@@ -38,11 +38,17 @@ function toAccount(dto: z.infer<typeof ACCOUNT>): Account {
   }
 }
 
+/**
+ * Le compte courant tel que le rendent /me et les routes du compte qui le renvoient (ACC-02, ACC-03, ADR 0034) : une
+ * seule définition du contrat.
+ */
+export const ACCOUNT_RESPONSE = ACCOUNT.transform(toAccount)
+
 /** Adaptateur HTTP du port ISessionApi. */
 export const sessionApi: ISessionApi = {
   async me(signal) {
     try {
-      return toAccount(await request('/api/v1/auth/me', ACCOUNT, signal ? { signal } : {}))
+      return await request('/api/v1/auth/me', ACCOUNT_RESPONSE, signal ? { signal } : {})
     } catch (error) {
       // AUTH-16 : sans session, /me répond 401 ; c'est l'état « anonyme », pas une panne.
       if (error instanceof ApiError && error.status === 401) {

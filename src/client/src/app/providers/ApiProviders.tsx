@@ -1,10 +1,18 @@
 import type { ReactNode } from 'react'
-import { type IUsernameAvailabilityApi, UsernameAvailabilityApiProvider } from '@/entities/account'
+import {
+  type ILoginMethodsApi,
+  type IUsernameAvailabilityApi,
+  LoginMethodsApiProvider,
+  UsernameAvailabilityApiProvider,
+} from '@/entities/account'
 import { AuthorityApiProvider, type IAuthorityApi } from '@/entities/authority'
 import { type IKeysApi, KeysApiProvider } from '@/entities/keyring'
 import { type IOAuthProvidersApi, OAuthProvidersApiProvider } from '@/entities/oauth-provider'
 import { type IPasswordBlocklist, PasswordBlocklistProvider } from '@/entities/password'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
+import { type IProfileApi, ProfileApiProvider } from '@/features/change-display-name'
+import { EmailChangeApiProvider, type IEmailChangeApi } from '@/features/change-email'
+import { type IPasswordChangeApi, PasswordChangeApiProvider } from '@/features/change-password'
 import { type ILoginApi, LoginApiProvider } from '@/features/login'
 import { type ILogoutApi, LogoutApiProvider } from '@/features/logout'
 import {
@@ -12,6 +20,7 @@ import {
   OAuthRegistrationApiProvider,
 } from '@/features/oauth-registration'
 import { type IPasswordResetApi, PasswordResetApiProvider } from '@/features/password-reset'
+import { type IReauthApi, ReauthApiProvider } from '@/features/reauthenticate'
 import { type IRegisterApi, RegisterApiProvider } from '@/features/register'
 import { type IVerifyEmailApi, VerifyEmailApiProvider } from '@/features/verify-email'
 
@@ -29,6 +38,11 @@ export interface Apis {
   readonly verifyEmail: IVerifyEmailApi
   readonly passwordReset: IPasswordResetApi
   readonly logout: ILogoutApi
+  readonly loginMethods: ILoginMethodsApi
+  readonly reauth: IReauthApi
+  readonly profile: IProfileApi
+  readonly passwordChange: IPasswordChangeApi
+  readonly emailChange: IEmailChangeApi
 }
 
 interface ApiProvidersProps {
@@ -36,31 +50,44 @@ interface ApiProvidersProps {
   readonly children: ReactNode
 }
 
-/** Injecte chaque port dans sa tranche (ADR 0024, point 7). */
+type Layer = (children: ReactNode) => ReactNode
+
+/** Injecte chaque port dans sa tranche (ADR 0024, point 7) ; le premier fournisseur est le plus extérieur. */
 export function ApiProviders({ apis, children }: ApiProvidersProps) {
-  return (
-    <SessionApiProvider api={apis.session}>
-      <AuthorityApiProvider api={apis.authority}>
-        <KeysApiProvider api={apis.keys}>
-          <PasswordBlocklistProvider api={apis.passwordBlocklist}>
-            <UsernameAvailabilityApiProvider api={apis.usernameAvailability}>
-              <OAuthProvidersApiProvider api={apis.oauthProviders}>
-                <LoginApiProvider api={apis.login}>
-                  <RegisterApiProvider api={apis.register}>
-                    <OAuthRegistrationApiProvider api={apis.oauthRegistration}>
-                      <VerifyEmailApiProvider api={apis.verifyEmail}>
-                        <PasswordResetApiProvider api={apis.passwordReset}>
-                          <LogoutApiProvider api={apis.logout}>{children}</LogoutApiProvider>
-                        </PasswordResetApiProvider>
-                      </VerifyEmailApiProvider>
-                    </OAuthRegistrationApiProvider>
-                  </RegisterApiProvider>
-                </LoginApiProvider>
-              </OAuthProvidersApiProvider>
-            </UsernameAvailabilityApiProvider>
-          </PasswordBlocklistProvider>
-        </KeysApiProvider>
-      </AuthorityApiProvider>
-    </SessionApiProvider>
-  )
+  const layers: readonly Layer[] = [
+    (inner) => <SessionApiProvider api={apis.session}>{inner}</SessionApiProvider>,
+    (inner) => <AuthorityApiProvider api={apis.authority}>{inner}</AuthorityApiProvider>,
+    (inner) => <KeysApiProvider api={apis.keys}>{inner}</KeysApiProvider>,
+    (inner) => (
+      <PasswordBlocklistProvider api={apis.passwordBlocklist}>{inner}</PasswordBlocklistProvider>
+    ),
+    (inner) => (
+      <UsernameAvailabilityApiProvider api={apis.usernameAvailability}>
+        {inner}
+      </UsernameAvailabilityApiProvider>
+    ),
+    (inner) => (
+      <OAuthProvidersApiProvider api={apis.oauthProviders}>{inner}</OAuthProvidersApiProvider>
+    ),
+    (inner) => <LoginApiProvider api={apis.login}>{inner}</LoginApiProvider>,
+    (inner) => <RegisterApiProvider api={apis.register}>{inner}</RegisterApiProvider>,
+    (inner) => (
+      <OAuthRegistrationApiProvider api={apis.oauthRegistration}>
+        {inner}
+      </OAuthRegistrationApiProvider>
+    ),
+    (inner) => <VerifyEmailApiProvider api={apis.verifyEmail}>{inner}</VerifyEmailApiProvider>,
+    (inner) => (
+      <PasswordResetApiProvider api={apis.passwordReset}>{inner}</PasswordResetApiProvider>
+    ),
+    (inner) => <LogoutApiProvider api={apis.logout}>{inner}</LogoutApiProvider>,
+    (inner) => <LoginMethodsApiProvider api={apis.loginMethods}>{inner}</LoginMethodsApiProvider>,
+    (inner) => <ReauthApiProvider api={apis.reauth}>{inner}</ReauthApiProvider>,
+    (inner) => <ProfileApiProvider api={apis.profile}>{inner}</ProfileApiProvider>,
+    (inner) => (
+      <PasswordChangeApiProvider api={apis.passwordChange}>{inner}</PasswordChangeApiProvider>
+    ),
+    (inner) => <EmailChangeApiProvider api={apis.emailChange}>{inner}</EmailChangeApiProvider>,
+  ]
+  return layers.reduceRight<ReactNode>((inner, layer) => layer(inner), children)
 }

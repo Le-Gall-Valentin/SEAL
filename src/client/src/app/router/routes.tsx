@@ -4,9 +4,11 @@ import { ForgotPasswordPage } from '@/pages/forgot-password'
 import { HomePage } from '@/pages/home'
 import { LoginPage } from '@/pages/login'
 import { RegisterPage } from '@/pages/register'
+import { SettingsPage } from '@/pages/settings'
 import { ResetPasswordPage } from '@/pages/reset-password'
 import { VerifyEmailPage } from '@/pages/verify-email'
 import { ROUTES } from '@/shared/config'
+import { AppShell } from '@/widgets/app-shell'
 import { RouteErrorBoundary } from './RouteErrorBoundary'
 import { ActiveRoute, AnonymousRoute, PendingRoute } from './routeGuards'
 
@@ -16,8 +18,19 @@ export function withRootErrorBoundary(children: RouteObject[]): RouteObject[] {
 }
 
 export const routes = withRootErrorBoundary([
-  // ADR 0024, point 2 : accueil provisoire du compte actif.
-  { element: <ActiveRoute />, children: [{ path: ROUTES.HOME, element: <HomePage /> }] },
+  // ADR 0024, point 2, et ADR 0035, point 3 : accueil provisoire et Paramètres, dans la navigation principale.
+  {
+    element: <ActiveRoute />,
+    children: [
+      {
+        element: <AppShell />,
+        children: [
+          { path: ROUTES.HOME, element: <HomePage /> },
+          { path: ROUTES.SETTINGS, element: <SettingsPage /> },
+        ],
+      },
+    ],
+  },
   // AUTH-16 : écrans réservés aux anonymes ; un compte connecté va à l'écran de son état.
   {
     element: <AnonymousRoute />,

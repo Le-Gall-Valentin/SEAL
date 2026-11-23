@@ -1,8 +1,26 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 import type { OAuthProviderId } from '../api/IOAuthProvidersApi'
 import { useOAuthProvidersApi } from './oauthProvidersPort'
 
 const NONE: readonly OAuthProviderId[] = []
+const QUERY_KEY = ['oauth-providers'] as const
+
+/**
+ * ADR 0035 : de quoi relire les fournisseurs configurés si leur lecture a échoué, sans rien relire sinon (la
+ * configuration ne change qu'au redémarrage du serveur).
+ */
+export function useRetryFailedOAuthProviders(): () => Promise<void> {
+  const client = useQueryClient()
+  return useCallback(
+    () =>
+      client.refetchQueries({
+        queryKey: QUERY_KEY,
+        predicate: (query) => query.state.status === 'error',
+      }),
+    [client],
+  )
+}
 
 /**
  * AUTH-35, OPS-03 : les fournisseurs configurés. Tant qu'ils ne sont pas lus, ou si la lecture échoue, aucun n'est
@@ -12,7 +30,7 @@ const NONE: readonly OAuthProviderId[] = []
 export function useOAuthProviders(): readonly OAuthProviderId[] {
   const api = useOAuthProvidersApi()
   const query = useQuery({
-    queryKey: ['oauth-providers'],
+    queryKey: QUERY_KEY,
     queryFn: ({ signal }) => api.providers(signal),
     staleTime: Number.POSITIVE_INFINITY,
   })

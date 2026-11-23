@@ -1,13 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { type Account, refreshSession } from '@/entities/session'
-import { ApiError, useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
-import { CODE_LENGTH, verifyFailureOf } from './code'
+import { ApiError, EMPTY_CODE, useRetryAfterLock, useSubmitGuard } from '@/shared/lib'
+import { verifyFailureOf } from './code'
 import { useSecondsLeft } from './useSecondsLeft'
 import { verificationView } from './verificationView'
 import { useVerifyEmailApi } from './verifyEmailApiPort'
-
-const EMPTY_CODE: readonly string[] = Array.from({ length: CODE_LENGTH }, () => '')
 
 interface VerificationProps {
   readonly email: string

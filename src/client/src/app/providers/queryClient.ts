@@ -9,6 +9,8 @@ import { isUnauthenticated } from '@/shared/lib'
  *   fois la limite de débit (SEC-10).
  * - AUTH-53, ADR 0023 : une requête qui découvre la session perdue (UNAUTHENTICATED) termine la session du client ; les
  *   gardes de route ramènent alors à la connexion.
+ * - CDC 3, ADR 0035 : une mutation garde ses variables, mots de passe compris ; elle est oubliée dès qu'aucun écran ne
+ *   la suit plus, au lieu des 5 minutes par défaut.
  */
 export function createQueryClient(): QueryClient {
   const onError = (error: unknown) => {
@@ -21,7 +23,7 @@ export function createQueryClient(): QueryClient {
     mutationCache: new MutationCache({ onError }),
     defaultOptions: {
       queries: { retry: false },
-      mutations: { retry: false },
+      mutations: { retry: false, gcTime: 0 },
     },
   })
   return client
