@@ -5,22 +5,32 @@ import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.application.port.in.AcceptFriendRequestUseCase;
 import fr.vlegall.seal.friends.application.port.in.DeclineFriendRequestUseCase;
+import fr.vlegall.seal.friends.application.port.in.ListFriendRequestsQuery;
 import fr.vlegall.seal.friends.application.port.in.RevokeFriendRequestUseCase;
 import fr.vlegall.seal.friends.application.port.in.SendFriendRequestUseCase;
+import fr.vlegall.seal.friends.domain.model.Direction;
 import fr.vlegall.seal.friends.domain.model.InvitationOutcome;
+import fr.vlegall.seal.friends.domain.model.Page;
 import fr.vlegall.seal.friends.infrastructure.web.dto.InvitationView;
+import fr.vlegall.seal.friends.infrastructure.web.dto.PageView;
 import fr.vlegall.seal.friends.infrastructure.web.dto.SendFriendRequestBody;
 import fr.vlegall.seal.security.ratelimit.RateLimit;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.web.CurrentUser;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,6 +43,7 @@ public class FriendRequestsController {
     private final AcceptFriendRequestUseCase accepts;
     private final DeclineFriendRequestUseCase declines;
     private final RevokeFriendRequestUseCase revocations;
+    private final ListFriendRequestsQuery lists;
     private final RateLimiter limiter;
 
     public FriendRequestsController(
@@ -40,12 +51,25 @@ public class FriendRequestsController {
             AcceptFriendRequestUseCase accepts,
             DeclineFriendRequestUseCase declines,
             RevokeFriendRequestUseCase revocations,
+            ListFriendRequestsQuery lists,
             RateLimiter limiter) {
         this.invitations = invitations;
         this.accepts = accepts;
         this.declines = declines;
         this.revocations = revocations;
+        this.lists = lists;
         this.limiter = limiter;
+    }
+
+    /** Section 14.4, ADR 0037 (point 3) : invitations en attente reçues ({@code incoming}) ou envoyées. */
+    @GetMapping
+    public PageView<InvitationView> list(
+            @CurrentUser UserId user,
+            @RequestParam @Pattern(regexp = "incoming|outgoing") String direction,
+            @RequestParam Optional<UUID> after,
+            @RequestParam(defaultValue = "50") @Min(1) @Max(Page.MAX_LIMIT) int limit) {
+        Direction chosen = direction.equals("incoming") ? Direction.INCOMING : Direction.OUTGOING;
+        return PageView.of(lists.list(user, chosen, after, limit), InvitationView::of);
     }
 
     /**
