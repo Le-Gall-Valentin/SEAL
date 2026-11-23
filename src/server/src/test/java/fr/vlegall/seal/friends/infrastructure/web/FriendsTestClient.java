@@ -7,6 +7,7 @@ import fr.vlegall.seal.support.RecordingMailSender;
 import jakarta.servlet.http.Cookie;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -39,7 +40,8 @@ final class FriendsTestClient {
     }
 
     /** Requête non sûre de ce compte, jeton CSRF compris. */
-    MockHttpServletRequestBuilder unsafe(MockHttpServletRequestBuilder request, Map<String, ?> body) throws Exception {
+    MockHttpServletRequestBuilder unsafe(MockHttpServletRequestBuilder request, @Nullable Map<String, ?> body)
+            throws Exception {
         return client.unsafe(request, session, body);
     }
 

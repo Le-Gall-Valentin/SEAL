@@ -3,6 +3,9 @@ package fr.vlegall.seal.friends.infrastructure.web;
 import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.UserId;
+import fr.vlegall.seal.friends.application.port.in.AcceptFriendRequestUseCase;
+import fr.vlegall.seal.friends.application.port.in.DeclineFriendRequestUseCase;
+import fr.vlegall.seal.friends.application.port.in.RevokeFriendRequestUseCase;
 import fr.vlegall.seal.friends.application.port.in.SendFriendRequestUseCase;
 import fr.vlegall.seal.friends.domain.model.InvitationOutcome;
 import fr.vlegall.seal.friends.infrastructure.web.dto.InvitationView;
@@ -11,7 +14,10 @@ import fr.vlegall.seal.security.ratelimit.RateLimit;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.web.CurrentUser;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,10 +30,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class FriendRequestsController {
 
     private final SendFriendRequestUseCase invitations;
+    private final AcceptFriendRequestUseCase accepts;
+    private final DeclineFriendRequestUseCase declines;
+    private final RevokeFriendRequestUseCase revocations;
     private final RateLimiter limiter;
 
-    public FriendRequestsController(SendFriendRequestUseCase invitations, RateLimiter limiter) {
+    public FriendRequestsController(
+            SendFriendRequestUseCase invitations,
+            AcceptFriendRequestUseCase accepts,
+            DeclineFriendRequestUseCase declines,
+            RevokeFriendRequestUseCase revocations,
+            RateLimiter limiter) {
         this.invitations = invitations;
+        this.accepts = accepts;
+        this.declines = declines;
+        this.revocations = revocations;
         this.limiter = limiter;
     }
 
@@ -59,5 +76,30 @@ public class FriendRequestsController {
             case InvitationOutcome.AlreadyPending pending -> throw new SealException(ErrorCode.REQUEST_ALREADY_PENDING);
             case InvitationOutcome.IncomingExists incoming -> throw new IncomingRequestExists(incoming.requestId());
         };
+    }
+
+    @PostMapping("/{id}/accept")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void accept(@CurrentUser UserId user, @PathVariable UUID id) {
+        found(accepts.accept(user, id));
+    }
+
+    @PostMapping("/{id}/decline")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void decline(@CurrentUser UserId user, @PathVariable UUID id) {
+        found(declines.decline(user, id));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revoke(@CurrentUser UserId user, @PathVariable UUID id) {
+        found(revocations.revoke(user, id));
+    }
+
+    /** A01 : une invitation inconnue, d'un autre ou close reçoit le même 404. */
+    private static void found(boolean done) {
+        if (!done) {
+            throw new SealException(ErrorCode.NOT_FOUND);
+        }
     }
 }
