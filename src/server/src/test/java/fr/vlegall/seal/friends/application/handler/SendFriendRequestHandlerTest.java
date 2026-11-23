@@ -38,6 +38,10 @@ class SendFriendRequestHandlerTest {
     private boolean open = true;
     private boolean friends;
     private Optional<FriendRequest> pending = Optional.empty();
+    /** Une invitation concurrente de la paire passe juste avant la création, qui n'insère rien. */
+    private boolean conflict;
+    /** Ce que la relecture trouve après le conflit. */
+    private Optional<FriendRequest> afterConflict = Optional.empty();
 
     private SendFriendRequestHandler handler() {
         DirectoryPort directory = new DirectoryPort() {
@@ -88,12 +92,15 @@ class SendFriendRequestHandlerTest {
             @Override
             public Optional<FriendRequest> pendingBetween(UserPair pair) {
                 calls.add("pending");
-                return pending;
+                return calls.contains("create") ? afterConflict : pending;
             }
 
             @Override
             public Optional<FriendRequest> createPending(UserId sender, UserId receiver, Instant createdAt) {
                 calls.add("create");
+                if (conflict) {
+                    return Optional.empty();
+                }
                 return Optional.of(new FriendRequest(UUID.randomUUID(), sender, receiver, RequestStatus.PENDING, NOW));
             }
 
@@ -194,5 +201,26 @@ class SendFriendRequestHandlerTest {
         assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.Sent.class);
         assertThat(calls).containsSubsequence("lock", "friends", "pending", "create", "journal");
         assertThat(calls.indexOf("lock")).isLessThan(calls.indexOf("blocks"));
+    }
+
+    @Test
+    @DisplayName(
+            "FRD-01 : création refusée par une invitation concurrente de l'autre : relue, 409 avec son identifiant")
+    void frd01ConflictRereadsTheIncomingRequest() {
+        conflict = true;
+        UUID id = UUID.randomUUID();
+        afterConflict = Optional.of(new FriendRequest(id, RECEIVER, SENDER, RequestStatus.PENDING, NOW));
+
+        assertThat(handler().send(SENDER, "sarah")).isEqualTo(new InvitationOutcome.IncomingExists(id));
+        assertThat(calls).doesNotContain("journal");
+    }
+
+    @Test
+    @DisplayName("FRD-01 : création refusée sans invitation relue : 409 REQUEST_ALREADY_PENDING, rien de journalisé")
+    void frd01ConflictWithoutRereadIsAlreadyPending() {
+        conflict = true;
+
+        assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.AlreadyPending.class);
+        assertThat(calls).doesNotContain("journal");
     }
 }

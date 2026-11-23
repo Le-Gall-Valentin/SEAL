@@ -43,8 +43,8 @@ class UserPairTest {
     }
 
     @Test
-    @DisplayName("CANNOT_INVITE_SELF : une paire de deux fois le même compte n'existe pas")
-    void samePersonTwiceIsNotAPair() {
+    @DisplayName("FRD-01, CANNOT_INVITE_SELF : une paire de deux fois le même compte n'existe pas")
+    void frd01SamePersonTwiceIsNotAPair() {
         assertThatThrownBy(() -> UserPair.of(LOW, LOW)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new UserPair(HIGH, LOW)).isInstanceOf(IllegalArgumentException.class);
     }
