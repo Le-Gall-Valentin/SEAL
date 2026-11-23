@@ -3,7 +3,7 @@ package fr.vlegall.seal.keys.infrastructure.web;
 import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.UserId;
-import fr.vlegall.seal.keys.application.port.in.OwnKeysQuery;
+import fr.vlegall.seal.keys.application.port.in.UserKeysQuery;
 import fr.vlegall.seal.keys.infrastructure.web.dto.UserKeysView;
 import fr.vlegall.seal.security.web.CurrentUser;
 import java.util.UUID;
@@ -19,9 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class UserKeysController {
 
-    private final OwnKeysQuery keys;
+    private final UserKeysQuery keys;
 
-    public UserKeysController(OwnKeysQuery keys) {
+    public UserKeysController(UserKeysQuery keys) {
         this.keys = keys;
     }
 

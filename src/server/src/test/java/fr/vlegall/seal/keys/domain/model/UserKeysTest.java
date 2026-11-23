@@ -13,7 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** KEY-33, ADR 0029 (point 4) : clés publiées d'un compte, telles que GET /users/{moi}/keys les sert. */
-class OwnKeysTest {
+class UserKeysTest {
 
     private static final UserId OWNER = new UserId(UUID.fromString("0192f7a1-ffff-7000-8000-00000000a11c"));
     private static final UserId OTHER = new UserId(UUID.fromString("0192f7a1-ffff-7000-8000-000000000b0b"));
@@ -56,7 +56,7 @@ class OwnKeysTest {
     void key33SubkeysBelongToTheCertificate() {
         List<PublishedSubkey> served = new ArrayList<>(List.of(subkey(OWNER, serial(1), new byte[64])));
 
-        OwnKeys keys = new OwnKeys(certificate(), served);
+        UserKeys keys = new UserKeys(certificate(), served);
         served.clear();
 
         assertThat(keys.subkeys()).hasSize(1);
@@ -66,9 +66,9 @@ class OwnKeysTest {
     @Test
     @DisplayName("KEY-33, ADR 0029 : une sous-clé liée à un autre certificat ou à un autre compte est refusée")
     void key33ForeignSubkeyIsRefused() {
-        assertThatThrownBy(() -> new OwnKeys(certificate(), List.of(subkey(OWNER, serial(2), new byte[64]))))
+        assertThatThrownBy(() -> new UserKeys(certificate(), List.of(subkey(OWNER, serial(2), new byte[64]))))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new OwnKeys(certificate(), List.of(subkey(OTHER, serial(1), new byte[64]))))
+        assertThatThrownBy(() -> new UserKeys(certificate(), List.of(subkey(OTHER, serial(1), new byte[64]))))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

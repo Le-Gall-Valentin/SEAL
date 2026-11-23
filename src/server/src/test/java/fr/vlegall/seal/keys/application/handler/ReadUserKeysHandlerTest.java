@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
-import fr.vlegall.seal.keys.domain.model.OwnKeys;
 import fr.vlegall.seal.keys.domain.model.PublishedSubkey;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
+import fr.vlegall.seal.keys.domain.model.UserKeys;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
 import fr.vlegall.seal.keys.domain.port.out.SubkeyRepository;
 import java.time.Clock;
@@ -22,7 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** KEY-33, A01 : le compte relit son certificat courant et ses sous-clés valides, et seulement les siens. */
-class ReadOwnKeysHandlerTest {
+class ReadUserKeysHandlerTest {
 
     private static final UserId OWNER = new UserId(UUID.fromString("0192f7a1-ffff-7000-8000-00000000a11c"));
     private static final UserId OTHER = new UserId(UUID.fromString("0192f7a1-ffff-7000-8000-000000000b0b"));
@@ -51,7 +51,7 @@ class ReadOwnKeysHandlerTest {
                     NOW.plus(SubkeyBinding.VALIDITY)),
             new byte[64]);
 
-    private ReadOwnKeysHandler handler() {
+    private ReadUserKeysHandler handler() {
         CertificationPort certification = new CertificationPort() {
             @Override
             public Optional<IdentityCertificate> certify(UserId subject, String username, byte[] ikPublic) {
@@ -86,13 +86,13 @@ class ReadOwnKeysHandlerTest {
                 throw new UnsupportedOperationException();
             }
         };
-        return new ReadOwnKeysHandler(certification, subkeys, Clock.fixed(NOW, ZoneOffset.UTC));
+        return new ReadUserKeysHandler(certification, subkeys, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
     @DisplayName("KEY-33 : le certificat courant et les sous-clés valides qui lui sont liées, à l'instant présent")
     void key33ReadsTheCurrentCertificateAndItsLiveSubkeys() {
-        Optional<OwnKeys> keys = handler().read(OWNER, OWNER);
+        Optional<UserKeys> keys = handler().read(OWNER, OWNER);
 
         assertThat(keys).isPresent();
         assertThat(keys.get().certificate()).isEqualTo(current.orElseThrow());
