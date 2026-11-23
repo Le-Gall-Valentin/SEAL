@@ -1,8 +1,9 @@
 /**
  * Serveur des clés en mémoire, fidèle aux règles de l'ADR 0025 que le client rencontre : un seul certificat (403
  * ensuite), sous-clé liée au certificat courant, créée à 5 minutes au plus de l'horloge et sous un ekId jamais publié
- * (400 sinon), coffre en versions successives (409 sinon), réinitialisation qui remplace coffre et certificat (ADR 0036). `subkeys` est la liste servie : un test la vide pour imiter
- * un serveur qui tait une sous-clé publiée. Une panne se règle avant ou après l'effet, pour imiter une réponse perdue. Réservé aux tests.
+ * (400 sinon), coffre en versions successives (409 sinon), réinitialisation qui remplace coffre et certificat
+ * (ADR 0036). `subkeys` est la liste servie : un test la vide pour imiter un serveur qui tait une sous-clé publiée. Une
+ * panne se règle avant ou après l'effet, pour imiter une réponse perdue. Réservé aux tests.
  */
 import { ApiError, NetworkError } from '@/shared/lib'
 import type { CertificateView, IKeysApi, SubkeyView, VaultView } from '../../api/IKeysApi'

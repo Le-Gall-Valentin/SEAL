@@ -60,15 +60,22 @@ async function sendReset(
   try {
     const proof = await proveIdentity(keyring, await api.createChallenge())
     const result = await api.resetIdentity({ ...proof, vault: vaultToWire(vault) })
-    return result === 'conflict' ? 'taken' : 'sent'
+    // Un 409 répond aussi à la relance d'un envoi déjà appliqué, dont la réponse s'était perdue (ADR 0036).
+    return result === 'conflict' && !(await servesKeyring(api, owner, keyring)) ? 'taken' : 'sent'
   } catch (error) {
-    // Réponse perdue ou erreur du serveur : la transaction a pu aboutir ; le certificat servi le dit (ADR 0036).
-    const maybeApplied = !(error instanceof ApiError && error.status < 500)
-    if (maybeApplied && (await serves(api, owner, keyring).catch(() => false))) {
+    // Seul un refus 4xx prouve que rien n'a été appliqué : réponse perdue, erreur du serveur ou 2xx au corps
+    // illisible peuvent suivre une transaction aboutie, que le certificat servi révèle (ADR 0036).
+    const refused = error instanceof ApiError && error.status >= 400 && error.status < 500
+    if (!refused && (await servesKeyring(api, owner, keyring))) {
       return 'sent'
     }
     throw error
   }
+}
+
+/** Vrai si le certificat courant du serveur porte l'IK de `keyring` ; faux aussi si la relecture échoue. */
+async function servesKeyring(api: IKeysApi, owner: KeyOwner, keyring: Keyring): Promise<boolean> {
+  return serves(api, owner, keyring).catch(() => false)
 }
 
 /** Vrai si le certificat courant du serveur porte l'IK de `keyring`. */

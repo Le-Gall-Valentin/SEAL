@@ -68,6 +68,35 @@ describe('KEY-34 : réinitialisation de l’identité (ADR 0036)', () => {
     await expect(store.loadCertificate(VECTOR_OWNER.userId)).resolves.toBeDefined()
   })
 
+  it('ADR 0036 : réponse perdue et relecture ratée, la relance reçoit 409 mais relit le certificat : le parcours se termine', async () => {
+    const { server, store, context } = await scenario()
+    const keys = await pending()
+    server.fail('resetIdentity', 'after')
+    server.fail('readOwnKeys', 'before')
+
+    await expect(resetIdentity(context, keys)).rejects.toBeInstanceOf(NetworkError)
+    await expect(store.loadKeyring(VECTOR_OWNER.userId)).resolves.toBeUndefined()
+    await expect(resetIdentity(context, keys)).resolves.toBe('done')
+
+    expect(server.calls.filter((call) => call === 'resetIdentity')).toHaveLength(2)
+    await expect(store.loadCertificate(VECTOR_OWNER.userId)).resolves.toBeDefined()
+  })
+
+  it('ADR 0036 : un 200 au corps illisible n’est pas un refus, le certificat servi est relu', async () => {
+    const { server, store, context } = await scenario()
+    const api = {
+      ...server,
+      resetIdentity: async (body: Parameters<typeof server.resetIdentity>[0]) => {
+        await server.resetIdentity(body)
+        throw new ApiError(200, 'INTERNAL_ERROR')
+      },
+    }
+
+    await expect(resetIdentity({ ...context, api }, await pending())).resolves.toBe('done')
+
+    await expect(store.loadCertificate(VECTOR_OWNER.userId)).resolves.toBeDefined()
+  })
+
   it('ADR 0036 : échec avant la réinitialisation, l’erreur remonte et rien n’est enregistré sur l’appareil', async () => {
     const { server, store, context } = await scenario()
     server.fail('resetIdentity', 'before')
