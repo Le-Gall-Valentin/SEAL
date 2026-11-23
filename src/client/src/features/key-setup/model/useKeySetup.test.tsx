@@ -1,6 +1,6 @@
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import {
   ForeignIdentityError,
@@ -209,6 +209,16 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
     }
   })
 
+  it('ADR 0029, point 12 : à la première connexion, un 403 REAUTH_REQUIRED est une erreur inattendue, pas une relance', async () => {
+    vi.mocked(setupKeys).mockRejectedValueOnce(new ApiError(403, 'REAUTH_REQUIRED'))
+    const { result } = await renderSetup(await freshStore(), () => undefined)
+    await confirm(result)
+
+    result.current.finish()
+
+    await expect.poll(() => result.current.failure).toBe('unexpected')
+  })
+
   it('ADR 0029, point 12 : une erreur réseau garde son texte, toute autre erreur est inattendue', async () => {
     vi.mocked(setupKeys).mockRejectedValueOnce(new Error('IndexedDB indisponible'))
     const { result } = await renderSetup(await freshStore(), () => undefined)
@@ -234,8 +244,12 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
 })
 
 describe('KEY-34, ADR 0036 : Dialogue-Cle-Recuperation à la réinitialisation de l’identité', () => {
-  /** Identité préparée : un repère suffit, prepareReset et resetIdentity sont des doublures. */
-  const PREPARED = { keyring: { userId: OWNER.userId } } as unknown as NewKeyring
+  /** Identité préparée : un vrai trousseau ; prepareReset et resetIdentity sont des doublures. */
+  let PREPARED: NewKeyring
+
+  beforeAll(async () => {
+    PREPARED = await generateKeyring(OWNER.userId, generateRecoveryKey(), Date.now())
+  })
 
   it('KEY-34 : « Terminer » prépare la nouvelle identité puis l’envoie ; setupKeys n’est jamais appelé', async () => {
     const onDone = vi.fn()

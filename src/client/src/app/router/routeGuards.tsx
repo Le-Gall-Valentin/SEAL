@@ -13,8 +13,8 @@ import { AuthorityChangedPage } from '@/pages/authority-changed'
 import { IdentityChangedPage } from '@/pages/identity-changed'
 import { RestoreKeysPage } from '@/pages/restore-keys'
 import { LogoutButton } from '@/features/logout'
-import { KeysWaitingPage } from '@/pages/keys-waiting'
 import { ErrorPage } from '../layouts'
+import { KeysWaitingPage } from '@/widgets/keys-waiting'
 
 /**
  * AUTH-16 : chaque écran n'accepte qu'un état du compte ; un autre état mène à son propre écran (destinationFor).
@@ -88,7 +88,7 @@ function KeyGateFor({ owner }: { readonly owner: KeyOwner }) {
     case 'ready':
       return <Outlet />
     case 'setup':
-      return <KeySetupDialog owner={owner} onDone={keys.reread} />
+      return <KeySetupDialog owner={owner} onDone={keys.reread} waiting={<KeysWaitingPage />} />
     case 'restore':
       return <RestoreKeysPage owner={owner} onRestored={keys.reread} />
     case 'foreign':

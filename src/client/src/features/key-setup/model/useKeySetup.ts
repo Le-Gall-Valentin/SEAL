@@ -28,6 +28,8 @@ export type Slot = 0 | 1
 export interface KeySetup {
   /** Le verrou des clés est tenu et aucun trousseau n'existe : la clé peut s'afficher (ADR 0029, point 3). */
   readonly ready: boolean
+  /** Un autre onglet tient le verrou des clés, et ce dialogue l'attend (ADR 0029, point 13). */
+  readonly waiting: boolean
   readonly step: 1 | 2
   readonly groups: readonly string[]
   /** Index (0 à 7) des deux groupes à ressaisir, dans l'ordre. */
@@ -152,6 +154,7 @@ export function useKeySetup(
 
   return {
     ready: lock.held && existing.data === false,
+    waiting: lock.waiting,
     step,
     groups,
     picked,
@@ -181,17 +184,17 @@ export function useKeySetup(
       }
     },
     saving: setup.isPending,
-    failure: failureFrom(setup.error),
+    failure: failureFrom(setup.error, reset !== undefined),
   }
 }
 
-/** AUTH-55 : le mode sudo est fermé ; ce n'est pas un échec à afficher, la ré-authentification s'ouvre. */
+/** AUTH-55 : le mode sudo est fermé ; à la réinitialisation, la ré-authentification s'ouvre au lieu d'un échec. */
 function isReauthRequired(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403 && error.code === 'REAUTH_REQUIRED'
 }
 
-function failureFrom(error: Error | null): KeySetup['failure'] {
-  if (error === null || isReauthRequired(error)) {
+function failureFrom(error: Error | null, resetting: boolean): KeySetup['failure'] {
+  if (error === null || (resetting && isReauthRequired(error))) {
     return null
   }
   return failureOf(error).kind === 'network' ? 'network' : 'unexpected'

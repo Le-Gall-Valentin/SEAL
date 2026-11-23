@@ -1,4 +1,4 @@
-import { type Ref, useEffect, useId, useRef } from 'react'
+import { type ReactNode, type Ref, useEffect, useId, useRef } from 'react'
 import type { KeyOwner } from '@/entities/keyring'
 import { useMessages } from '@/shared/i18n'
 import { Alert, Dialog, FailureAlert, FieldError, FieldLabel, SecondaryButton } from '@/shared/ui'
@@ -9,6 +9,8 @@ type KeySetupDialogProps = {
   readonly owner: KeyOwner
   /** Appelé une fois le parcours fini, ou repris par un autre onglet : la zone du compte relit l'état des clés. */
   readonly onDone: () => void
+  /** Affiché tant qu'un autre onglet tient le verrou des clés (ADR 0029, point 13) ; rien sinon. */
+  readonly waiting?: ReactNode
 } & (
   | { readonly variant?: 'setup' }
   | {
@@ -44,7 +46,7 @@ export function KeySetupDialog(props: KeySetupDialogProps) {
   const titleId = useId()
   const textId = useId()
   if (!setup.ready) {
-    return null
+    return setup.waiting ? (props.waiting ?? null) : null
   }
   return (
     <Dialog labelledBy={titleId} describedBy={textId} stepKey={setup.step}>
