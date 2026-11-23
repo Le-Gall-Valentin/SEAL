@@ -182,6 +182,54 @@ class FriendRequestTransitionsIT {
     }
 
     @Test
+    @DisplayName("Section 10.1 : acceptation et révocation simultanées : une seule l'emporte, état cohérent")
+    void acceptAndRevokeRaceLeavesAConsistentState() throws Exception {
+        for (int round = 0; round < 3; round++) {
+            FriendsTestClient sender = account("cor");
+            FriendsTestClient receiver = account("crr");
+            UUID request = invite(sender, receiver);
+
+            List<Integer> statuses = Race.run(
+                    2,
+                    index -> (index == 0 ? as(receiver, accept(request)) : as(sender, revoke(request)))
+                            .andReturn()
+                            .getResponse()
+                            .getStatus());
+
+            assertThat(statuses).containsExactlyInAnyOrder(204, 404);
+            boolean accepted = statuses.get(0) == 204;
+            assertThat(statusOf(request)).isEqualTo(accepted ? "ACCEPTED" : "REVOKED");
+            assertThat(friendships(sender.id, receiver.id)).isEqualTo(accepted ? 1 : 0);
+        }
+    }
+
+    @Test
+    @DisplayName("FRD-01 : réinviter pendant que l'autre accepte ne laisse jamais d'invitation en attente entre amis")
+    void frd01InvitingWhileAcceptingNeverLeavesAPendingRequestBetweenFriends() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            FriendsTestClient sender = account("rea");
+            FriendsTestClient receiver = account("rer");
+            UUID request = invite(sender, receiver);
+
+            Race.run(
+                    2,
+                    index -> (index == 0 ? as(receiver, accept(request)) : sender.invite(receiver.username))
+                            .andReturn()
+                            .getResponse()
+                            .getStatus());
+
+            long pending = jdbc.sql("SELECT count(*) FROM friend_requests WHERE status = 'PENDING'"
+                            + " AND sender_id IN (:a, :b) AND receiver_id IN (:a, :b)")
+                    .param("a", sender.id)
+                    .param("b", receiver.id)
+                    .query(Long.class)
+                    .single();
+            assertThat(friendships(sender.id, receiver.id)).isEqualTo(1);
+            assertThat(pending).isZero();
+        }
+    }
+
+    @Test
     @DisplayName("ADR 0037 : l'invitation d'un compte qui n'est plus actif ne s'accepte ni ne se refuse plus")
     void inactiveSenderInvitationIsGone() throws Exception {
         FriendsTestClient sender = account("ina");

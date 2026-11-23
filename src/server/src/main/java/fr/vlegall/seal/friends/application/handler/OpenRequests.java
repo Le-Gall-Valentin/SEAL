@@ -37,8 +37,13 @@ public class OpenRequests {
     }
 
     private Optional<FriendRequest> lock(UserId actor, UUID id, Predicate<FriendRequest> allowed) {
+        // Verrou de la ligne, puis de la paire : un envoi concurrent de la même paire attend la réponse (FRD-01).
         return requests.lockPending(id)
                 .filter(allowed)
+                .map(request -> {
+                    requests.lockPair(request.pair());
+                    return request;
+                })
                 .filter(request ->
                         !directory.activeProfiles(List.of(request.other(actor))).isEmpty());
     }

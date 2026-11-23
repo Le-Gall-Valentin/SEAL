@@ -60,8 +60,13 @@ public class SendFriendRequestHandler implements SendFriendRequestUseCase {
             return new InvitationOutcome.Self();
         }
         UserPair pair = UserPair.of(sender, receiver.user());
-        // FRD-03 : une seule issue pour le blocage, dans un sens ou l'autre, et les invitations fermées.
-        if (blocks.blockedEitherWay(pair) || !directory.acceptsInvitations(receiver.user())) {
+        // FRD-01 : une réponse concurrente à une invitation de la paire attend la fin de cet envoi, et inversement.
+        requests.lockPair(pair);
+        // FRD-03 : une seule issue pour le blocage, dans un sens ou l'autre, et les invitations fermées ; les deux sont
+        // toujours consultés, pour qu'aucune durée ne trahisse la cause.
+        boolean blocked = blocks.blockedEitherWay(pair);
+        boolean open = directory.acceptsInvitations(receiver.user());
+        if (blocked || !open) {
             return new InvitationOutcome.CannotInvite();
         }
         if (friendships.exists(pair)) {

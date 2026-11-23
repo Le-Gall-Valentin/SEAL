@@ -13,6 +13,12 @@ import java.util.UUID;
 /** Table {@code friend_requests}. */
 public interface FriendRequestRepository {
 
+    /**
+     * FRD-01 : verrou de la paire jusqu'à la fin de la transaction. Inviter et répondre à une invitation de la même paire
+     * se succèdent : aucune invitation ne naît entre deux comptes qui deviennent amis au même moment.
+     */
+    void lockPair(UserPair pair);
+
     /** FRD-01 : l'invitation en attente de la paire, quel que soit son sens. */
     Optional<FriendRequest> pendingBetween(UserPair pair);
 

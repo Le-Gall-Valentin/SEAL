@@ -86,6 +86,30 @@ class FriendsPersistenceIT {
     }
 
     @Test
+    @DisplayName("ADR 0037 : la date rendue à la création est celle que la base garde, à la microseconde")
+    void adr0037CreatedAtIsTheStoredValue() {
+        UserId a = user();
+        UserId b = user();
+
+        FriendRequest created =
+                requests.createPending(a, b, NOW.plusNanos(123_456_789)).orElseThrow();
+
+        // PostgreSQL garde la microseconde, arrondie : .123456789 devient .123457.
+        assertThat(created.createdAt()).isEqualTo(NOW.plusNanos(123_457_000));
+        assertThat(requests.pendingBetween(UserPair.of(a, b))).contains(created);
+    }
+
+    @Test
+    @DisplayName("FRD-01 : le verrou de paire exige une transaction (échec fermé)")
+    void frd01PairLockRequiresATransaction() {
+        UserPair pair = UserPair.of(user(), user());
+
+        assertThatThrownBy(() -> requests.lockPair(pair))
+                .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+        transactions.executeWithoutResult(status -> requests.lockPair(pair));
+    }
+
+    @Test
     @DisplayName("FRD-01 : une invitation close libère la paire pour une nouvelle invitation")
     void frd01ClosedRequestFreesThePair() {
         UserId a = user();

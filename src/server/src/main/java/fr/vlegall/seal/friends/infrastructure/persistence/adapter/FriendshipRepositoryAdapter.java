@@ -5,6 +5,7 @@ import fr.vlegall.seal.friends.domain.model.Friend;
 import fr.vlegall.seal.friends.domain.model.UserPair;
 import fr.vlegall.seal.friends.domain.port.out.FriendshipRepository;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +16,12 @@ import org.springframework.stereotype.Component;
 /** {@code friendships} par {@link JdbcClient} : une ligne par paire, {@code user_low < user_high}. */
 @Component
 public class FriendshipRepositoryAdapter implements FriendshipRepository {
+
+    /** FRD-10 : amis de {@code :user}, après {@code :after} s'il est donné, triés par identifiant ; constante (A05). */
+    private static final String FRIENDS_OF = "SELECT friend, created_at FROM (SELECT CASE WHEN user_low = :user"
+            + " THEN user_high ELSE user_low END AS friend, created_at FROM friendships"
+            + " WHERE user_low = :user OR user_high = :user) AS mine"
+            + " WHERE CAST(:after AS uuid) IS NULL OR friend > CAST(:after AS uuid) ORDER BY friend LIMIT :limit";
 
     private final JdbcClient jdbc;
 
@@ -53,16 +60,10 @@ public class FriendshipRepositoryAdapter implements FriendshipRepository {
 
     @Override
     public List<Friend> of(UserId user, Optional<UserId> after, int limit) {
-        String sql =
-                "SELECT friend, created_at FROM (SELECT CASE WHEN user_low = :user THEN user_high ELSE user_low END"
-                        + " AS friend, created_at FROM friendships WHERE user_low = :user OR user_high = :user) AS mine"
-                        + (after.isPresent() ? " WHERE friend > :after" : "") + " ORDER BY friend LIMIT :limit";
-        JdbcClient.StatementSpec statement =
-                jdbc.sql(sql).param("user", user.value()).param("limit", limit);
-        if (after.isPresent()) {
-            statement = statement.param("after", after.get().value());
-        }
-        return statement
+        return jdbc.sql(FRIENDS_OF)
+                .param("user", user.value())
+                .param("after", after.map(UserId::value).orElse(null), Types.OTHER)
+                .param("limit", limit)
                 .query((row, number) -> new Friend(
                         new UserId(row.getObject("friend", UUID.class)),
                         row.getTimestamp("created_at").toInstant()))
