@@ -23,6 +23,8 @@ public class ClientRoutesController {
 
     /** ADR 0034 (point 2) : écran Paramètres, où revient une ré-authentification OAuth (AUTH-55). */
     public static final String SETTINGS = "/parametres";
+    /** ADR 0038 (point 5) : écran Amis ; l'onglet Invitations est un paramètre de requête. */
+    private static final String FRIENDS = "/amis";
     /** ADR 0032 (point 2) : retours vers l'écran de connexion, avec un code de la section 14.6 du CDC. */
     public static final String LOGIN_REQUEST_REJECTED = LOGIN + "?erreur=REQUEST_REJECTED";
 
@@ -36,7 +38,7 @@ public class ClientRoutesController {
 
     /** Adresses ouvertes à tous par {@code SecurityConfig}, comme {@code /} : du HTML statique, sans donnée. */
     public static final List<String> PATHS =
-            List.of(LOGIN, REGISTER, VERIFY_EMAIL, FORGOT_PASSWORD, RESET_PASSWORD, CHOOSE_USERNAME, SETTINGS);
+            List.of(LOGIN, REGISTER, VERIFY_EMAIL, FORGOT_PASSWORD, RESET_PASSWORD, CHOOSE_USERNAME, SETTINGS, FRIENDS);
 
     /**
      * ADR 0032 (point 2) et ADR 0034 (point 2) : adresse d'un départ ou d'un retour OAuth refusé, aux paramètres pour
@@ -51,7 +53,7 @@ public class ClientRoutesController {
         return reauthentication ? SETTINGS_RATE_LIMITED : LOGIN_RATE_LIMITED;
     }
 
-    @GetMapping({LOGIN, REGISTER, VERIFY_EMAIL, FORGOT_PASSWORD, RESET_PASSWORD, CHOOSE_USERNAME, SETTINGS})
+    @GetMapping({LOGIN, REGISTER, VERIFY_EMAIL, FORGOT_PASSWORD, RESET_PASSWORD, CHOOSE_USERNAME, SETTINGS, FRIENDS})
     String client() {
         return "forward:/index.html";
     }
