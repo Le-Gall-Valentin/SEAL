@@ -7,9 +7,11 @@ import { DialogBody, DialogFooter, ModalDialog } from './ModalDialog'
 function Harness({
   closable = true,
   tall = false,
+  danger = false,
 }: {
   readonly closable?: boolean
   readonly tall?: boolean
+  readonly danger?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [closed, setClosed] = useState(0)
@@ -36,6 +38,7 @@ function Harness({
         title="Changer de courriel"
         eyebrow="Étape 1 sur 2"
         subtitle="Cette action est protégée."
+        danger={danger}
       >
         <form
           onSubmit={(event) => {
@@ -54,6 +57,7 @@ function Harness({
             cancelable={closable}
             submitLabel="Envoyer le code"
             canSubmit
+            danger={danger}
           />
         </form>
       </ModalDialog>
@@ -87,6 +91,29 @@ describe('ACC-01, ACC-02, ADR 0035 (point 1) : fenêtre modale des paramètres',
     const box = submit.element().getBoundingClientRect()
     expect(box.bottom).toBeLessThanOrEqual(390)
     expect(box.top).toBeGreaterThanOrEqual(0)
+  })
+
+  it('KEY-34, ADR 0036 (point 3) : une action irréversible met le sous-titre et le bouton d’envoi en --danger', async () => {
+    /** Couleur d'un jeton de design (#rrggbb), telle que getComputedStyle la rend. */
+    const token = (name: string) => {
+      const hex = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+      const [r, g, b] = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16))
+      return `rgb(${String(r)}, ${String(g)}, ${String(b)})`
+    }
+    const colors = async (danger: boolean) => {
+      const screen = await render(<Harness danger={danger} />)
+      await screen.getByRole('button', { name: 'Ouvrir' }).click()
+      const subtitle = getComputedStyle(screen.getByText('Cette action est protégée.').element())
+      const submit = getComputedStyle(
+        screen.getByRole('button', { name: 'Envoyer le code' }).element(),
+      )
+      const result = [subtitle.color, submit.backgroundColor, submit.color]
+      await screen.unmount()
+      return result
+    }
+
+    expect(await colors(true)).toEqual([token('--danger'), token('--danger'), token('--on-danger')])
+    expect(await colors(false)).toEqual([token('--ink-3'), token('--accent'), token('--on-accent')])
   })
 
   it('ACC-02, ADR 0035 : titre, étape et sous-titre ; le reste de la page devient inerte', async () => {

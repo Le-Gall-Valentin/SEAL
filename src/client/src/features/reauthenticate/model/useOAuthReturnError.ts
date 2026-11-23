@@ -1,14 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import {
-  REAUTH_ERROR_PARAM,
-  type ReauthReturnError,
-  reauthReturnErrorOf,
-} from '@/features/reauthenticate'
+import { REAUTH_ERROR_PARAM, type ReauthReturnError, reauthReturnErrorOf } from './oauthReturn'
 
 /**
  * AUTH-55, ADR 0034 : refus d'une ré-authentification OAuth, lu une fois dans `?erreur=`, puis retiré de l'adresse pour
- * qu'un rechargement ne le montre pas de nouveau ; l'alerte reste tant que la page est ouverte.
+ * qu'un rechargement ne le montre pas de nouveau ; l'alerte reste tant que la page est ouverte. Lu par Paramètres et,
+ * tant que l'appareil n'a pas de clés, par la restauration, que `/parametres` affiche alors (ADR 0036, point 4).
  */
 export function useOAuthReturnError(): ReauthReturnError | null {
   const [params, setParams] = useSearchParams()

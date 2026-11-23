@@ -13,6 +13,8 @@ interface ModalDialogProps {
   readonly eyebrow?: string | undefined
   /** Sous le titre (Dialogue-Suppression). */
   readonly subtitle?: string | undefined
+  /** Sous-titre en --danger, pour une action irréversible (Dialogue-Suppression) ; --ink-3 sinon (ADR 0035). */
+  readonly danger?: boolean
   /** Identifiant du texte qui décrit la fenêtre. */
   readonly describedBy?: string | undefined
   readonly children: ReactNode
@@ -31,6 +33,7 @@ export function ModalDialog({
   title,
   eyebrow,
   subtitle,
+  danger = false,
   describedBy,
   children,
 }: ModalDialogProps) {
@@ -80,7 +83,11 @@ export function ModalDialog({
                 {title}
               </h2>
               {subtitle !== undefined && (
-                <span className="text-[14px] font-semibold text-ink-3">{subtitle}</span>
+                <span
+                  className={`text-[14px] font-semibold ${danger ? 'text-danger' : 'text-ink-3'}`}
+                >
+                  {subtitle}
+                </span>
               )}
             </div>
             <button
@@ -127,6 +134,8 @@ interface DialogFooterProps {
   /** Absent : pas de bouton d'envoi (ré-authentification par fournisseur seulement). */
   readonly submitLabel?: string | undefined
   readonly canSubmit?: boolean
+  /** Bouton d'envoi en --danger, pour une action irréversible (Dialogue-Suppression). */
+  readonly danger?: boolean
 }
 
 /**
@@ -138,6 +147,7 @@ export function DialogFooter({
   cancelable,
   submitLabel,
   canSubmit = false,
+  danger = false,
 }: DialogFooterProps) {
   const t = useMessages(formMessages)
   return (
@@ -154,7 +164,7 @@ export function DialogFooter({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="h-11 rounded-[10px] bg-accent px-4 font-sans text-[14.5px] font-semibold whitespace-nowrap text-on-accent disabled:opacity-55"
+          className={`h-11 rounded-[10px] px-4 font-sans text-[14.5px] font-semibold whitespace-nowrap disabled:opacity-55 ${danger ? 'bg-danger text-on-danger' : 'bg-accent text-on-accent'}`}
         >
           {submitLabel}
         </button>
