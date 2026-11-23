@@ -10,7 +10,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Section 10.1, SEC-03 : accepter, refuser et révoquer, vus par les ports. */
+/** FRD-01, SEC-03, section 10.1 : accepter, refuser et révoquer, vus par les ports. */
 @DisplayName("FRD-01 : transitions d'une invitation")
 class FriendRequestTransitionsHandlerTest {
 
@@ -71,7 +71,7 @@ class FriendRequestTransitionsHandlerTest {
     }
 
     @Test
-    @DisplayName("Section 10.1 : refuser clôt sans amitié ni journal")
+    @DisplayName("FRD-01, section 10.1 : refuser clôt sans amitié ni journal")
     void frd01DeclineClosesWithoutFriendship() {
         assertThat(decline().decline(receiver.user(), request.id())).isTrue();
 
@@ -81,7 +81,7 @@ class FriendRequestTransitionsHandlerTest {
     }
 
     @Test
-    @DisplayName("Section 10.1 : seul l'émetteur révoque ; une invitation close ou inconnue ne se révoque pas")
+    @DisplayName("FRD-01, section 10.1 : seul l'émetteur révoque ; une invitation close ou inconnue ne se révoque pas")
     void frd01OnlyTheSenderRevokes() {
         assertThat(revoke().revoke(receiver.user(), request.id())).isFalse();
         assertThat(revoke().revoke(sender.user(), request.id())).isTrue();

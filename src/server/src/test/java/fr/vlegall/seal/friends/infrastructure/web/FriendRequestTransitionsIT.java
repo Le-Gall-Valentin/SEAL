@@ -291,7 +291,7 @@ class FriendRequestTransitionsIT {
         UUID request = sender.inviteOk(receiver);
         AuthClient anonymous = new AuthClient(mvc, mail);
         AuthClient restricted = new AuthClient(mvc, mail);
-        String pending = "qat" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String pending = FriendsTestClient.name("qat");
         AuthClient.Registered registered = restricted.register(pending + "@exemple.ca", pending);
 
         for (MockHttpServletRequestBuilder route : List.of(accept(request), decline(request), revoke(request))) {

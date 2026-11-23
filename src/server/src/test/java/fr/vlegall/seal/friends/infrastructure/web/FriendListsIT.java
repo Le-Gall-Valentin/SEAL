@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,6 +18,7 @@ import fr.vlegall.seal.support.SealIntegrationTest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -249,7 +251,7 @@ class FriendListsIT {
         befriend(me, friend);
         AuthClient anonymous = new AuthClient(mvc, mail);
         AuthClient restricted = new AuthClient(mvc, mail);
-        String pending = "qap" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String pending = FriendsTestClient.name("qap");
         AuthClient.Registered registered = restricted.register(pending + "@exemple.ca", pending);
 
         for (String path : List.of(FRIENDS, REQUESTS + "?direction=incoming")) {
@@ -295,5 +297,19 @@ class FriendListsIT {
         mvc.perform(me.unsafe(patch(REQUESTS), null))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("SEC-01, ADR 0037 (point 7) : plus de 16 Kio sous /friends répond 413 REQUEST_REJECTED, avec la CSP")
+    void sec01BodyOver16KiBUnderFriendsIsRejected() throws Exception {
+        FriendsTestClient me = account("lourdf");
+        FriendsTestClient friend = account("lourdg");
+        befriend(me, friend);
+
+        mvc.perform(me.unsafe(delete(FRIENDS + "/" + friend.id), Map.of("rembourrage", "a".repeat(17 * 1024))))
+                .andExpect(status().isContentTooLarge())
+                .andExpect(jsonPath("$.code").value("REQUEST_REJECTED"))
+                .andExpect(header().exists("Content-Security-Policy"));
+        assertThat(page(me, FRIENDS).get("items")).hasSize(1);
     }
 }

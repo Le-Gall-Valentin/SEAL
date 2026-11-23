@@ -36,10 +36,8 @@ final class InMemoryFriends {
     static final Instant NOW = Instant.parse("2026-11-23T12:00:00Z");
     static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
-    /** Ordre des {@code uuid} de PostgreSQL, comme celui des identifiants de compte. */
-    private static final Comparator<UUID> UUID_ORDER = Comparator.comparing(
-                    UUID::getMostSignificantBits, Long::compareUnsigned)
-            .thenComparing(UUID::getLeastSignificantBits, Long::compareUnsigned);
+    /** Ordre des {@code uuid} de PostgreSQL, celui des paires appliqué aux identifiants d'invitation. */
+    private static final Comparator<UUID> UUID_ORDER = Comparator.comparing(UserId::new, UserPair.POSTGRES_ORDER);
 
     final List<String> calls = new ArrayList<>();
     final List<String> events = new ArrayList<>();

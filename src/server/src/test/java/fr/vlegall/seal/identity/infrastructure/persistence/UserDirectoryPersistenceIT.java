@@ -57,12 +57,16 @@ class UserDirectoryPersistenceIT {
     void frd02ActiveAccountIsFoundByUsername() {
         UserId active = insert("annuaire.trouve", "ACTIVE");
         insert("annuaire.pas.fini", "PENDING_EMAIL");
+        jdbc.sql(
+                        "INSERT INTO users (username, display_name, status, deleted_at) VALUES ('annuaire.parti', 'Nom', 'DELETED', now())")
+                .update();
 
         assertThat(users.findActiveByUsername(Username.parse("annuaire.trouve")))
                 .map(Account::id)
                 .contains(active);
         assertThat(users.findActiveByUsername(Username.parse("annuaire.pas.fini")))
                 .isEmpty();
+        assertThat(users.findActiveByUsername(Username.parse("annuaire.parti"))).isEmpty();
         assertThat(users.findActiveByUsername(Username.parse("annuaire.absent")))
                 .isEmpty();
     }

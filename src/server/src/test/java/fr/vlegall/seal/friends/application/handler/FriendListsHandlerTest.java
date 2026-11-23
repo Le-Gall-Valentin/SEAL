@@ -2,6 +2,7 @@ package fr.vlegall.seal.friends.application.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.domain.model.Direction;
 import fr.vlegall.seal.friends.domain.model.FriendRequest;
 import fr.vlegall.seal.friends.domain.model.FriendSummary;
@@ -42,8 +43,7 @@ class FriendListsHandlerTest {
         friends.active.remove(gone.user());
 
         Page<FriendSummary> page = friendsList().list(me.user(), Optional.empty(), 2);
-        Page<FriendSummary> rest =
-                friendsList().list(me.user(), page.next().map(id -> new fr.vlegall.seal.common.UserId(id)), 2);
+        Page<FriendSummary> rest = friendsList().list(me.user(), page.next().map(UserId::new), 2);
 
         assertThat(page.items()).extracting(summary -> summary.person().user()).containsExactly(first.user());
         assertThat(page.next()).contains(gone.user().value());

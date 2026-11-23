@@ -57,7 +57,7 @@ class SecurityConfig {
      * {@code /api/v1/account/}, qui reçoit aussi des mots de passe (ADR 0034), et sous les routes des amis (ADR 0037,
      * point 10).
      */
-    static final int AUTH_BODY_LIMIT = 16 * 1024;
+    static final int SMALL_BODY_LIMIT = 16 * 1024;
 
     /** SEC-01, A06 : 64 Kio au plus pour un corps sous {@code /api/v1/keys/}, coffre compris (ADR 0025, point 6). */
     static final int KEYS_BODY_LIMIT = 64 * 1024;
@@ -261,7 +261,7 @@ class SecurityConfig {
                                         PathPatternRequestMatcher.withDefaults().matcher("/api/v1/account/**"),
                                         PathPatternRequestMatcher.withDefaults().matcher("/api/v1/friend-requests/**"),
                                         PathPatternRequestMatcher.withDefaults().matcher("/api/v1/friends/**")),
-                                AUTH_BODY_LIMIT,
+                                SMALL_BODY_LIMIT,
                                 problemDetails::rejectTooLarge),
                         HeaderWriterFilter.class)
                 // Chemins disjoints : chaque requête ne passe que par le filtre de sa limite.
