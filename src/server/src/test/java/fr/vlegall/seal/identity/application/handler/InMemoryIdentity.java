@@ -9,6 +9,7 @@ import fr.vlegall.seal.identity.domain.model.CodePolicy;
 import fr.vlegall.seal.identity.domain.model.DisplayName;
 import fr.vlegall.seal.identity.domain.model.EmailAddress;
 import fr.vlegall.seal.identity.domain.model.IdentityException;
+import fr.vlegall.seal.identity.domain.model.InvitationPolicy;
 import fr.vlegall.seal.identity.domain.model.LiveCode;
 import fr.vlegall.seal.identity.domain.model.LiveEmailChange;
 import fr.vlegall.seal.identity.domain.model.PreparedPassword;
@@ -23,6 +24,7 @@ import fr.vlegall.seal.identity.domain.port.out.ResendAllowance;
 import fr.vlegall.seal.identity.domain.port.out.SecurityEventPort;
 import fr.vlegall.seal.identity.domain.port.out.SudoModePort;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
+import fr.vlegall.seal.identity.domain.port.out.UserSettingsRepository;
 import fr.vlegall.seal.support.MutableClock;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -86,6 +88,8 @@ final class InMemoryIdentity {
     boolean sudoActive = true;
     /** Comptes dont les liens de réinitialisation ont été invalidés (ADR 0034). */
     final List<UserId> resetLinksInvalidated = new ArrayList<>();
+    /** ACC-06 : politique d'invitation enregistrée ; sans entrée, pas de ligne dans {@code user_settings}. */
+    final Map<UserId, InvitationPolicy> policies = new HashMap<>();
 
     Account add(String username, String email, AccountStatus status) {
         UserId id = new UserId(UUID.randomUUID());
@@ -177,6 +181,25 @@ final class InMemoryIdentity {
             }
 
             @Override
+            public List<Account> findAll(Collection<UserId> ids) {
+                // Ordre inverse de la demande : le vrai dépôt ne garantit aucun ordre.
+                return ids.stream()
+                        .distinct()
+                        .map(accounts::get)
+                        .filter(Objects::nonNull)
+                        .toList()
+                        .reversed();
+            }
+
+            @Override
+            public Optional<Account> findActiveByUsername(Username username) {
+                return accounts.values().stream()
+                        .filter(account ->
+                                account.isActive() && account.username().equals(username))
+                        .findFirst();
+            }
+
+            @Override
             public Optional<UserId> findNotDeletedByUsername(Username username) {
                 return accounts.values().stream()
                         .filter(account -> account.status() != AccountStatus.DELETED
@@ -209,6 +232,10 @@ final class InMemoryIdentity {
                         .collect(Collectors.toSet());
             }
         };
+    }
+
+    UserSettingsRepository settings() {
+        return user -> policies.getOrDefault(user, InvitationPolicy.EVERYONE);
     }
 
     EmailCodeRepository emailCodes() {

@@ -4,10 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
-import fr.vlegall.seal.keys.domain.model.OwnKeys;
 import fr.vlegall.seal.keys.domain.model.PublishedSubkey;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
+import fr.vlegall.seal.keys.domain.model.UserKeys;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
+import fr.vlegall.seal.keys.domain.port.out.RelationPort;
 import fr.vlegall.seal.keys.domain.port.out.SubkeyRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -21,8 +22,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** KEY-33, A01 : le compte relit son certificat courant et ses sous-clés valides, et seulement les siens. */
-class ReadOwnKeysHandlerTest {
+/**
+ * KEY-33, API-02 : le compte relit son certificat courant et ses sous-clés valides ; un ami les lit aussi, tout autre
+ * compte ne lit rien (ADR 0037, point 7).
+ */
+class ReadUserKeysHandlerTest {
 
     private static final UserId OWNER = new UserId(UUID.fromString("0192f7a1-ffff-7000-8000-00000000a11c"));
     private static final UserId OTHER = new UserId(UUID.fromString("0192f7a1-ffff-7000-8000-000000000b0b"));
@@ -30,6 +34,9 @@ class ReadOwnKeysHandlerTest {
     private static final byte[] SERIAL = new byte[16];
 
     private final List<String> calls = new ArrayList<>();
+    /** API-02 : l'appelant est-il ami du titulaire (membre d'une conversation commune à la PR 3) ? */
+    private boolean related;
+
     private Optional<IdentityCertificate> current = Optional.of(new IdentityCertificate(
             SERIAL,
             new byte[8],
@@ -51,7 +58,7 @@ class ReadOwnKeysHandlerTest {
                     NOW.plus(SubkeyBinding.VALIDITY)),
             new byte[64]);
 
-    private ReadOwnKeysHandler handler() {
+    private ReadUserKeysHandler handler() {
         CertificationPort certification = new CertificationPort() {
             @Override
             public Optional<IdentityCertificate> certify(UserId subject, String username, byte[] ikPublic) {
@@ -86,13 +93,17 @@ class ReadOwnKeysHandlerTest {
                 throw new UnsupportedOperationException();
             }
         };
-        return new ReadOwnKeysHandler(certification, subkeys, Clock.fixed(NOW, ZoneOffset.UTC));
+        RelationPort relations = (caller, owner) -> {
+            calls.add("related " + caller.value() + " " + owner.value());
+            return related;
+        };
+        return new ReadUserKeysHandler(certification, subkeys, relations, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
     @DisplayName("KEY-33 : le certificat courant et les sous-clés valides qui lui sont liées, à l'instant présent")
     void key33ReadsTheCurrentCertificateAndItsLiveSubkeys() {
-        Optional<OwnKeys> keys = handler().read(OWNER, OWNER);
+        Optional<UserKeys> keys = handler().read(OWNER, OWNER);
 
         assertThat(keys).isPresent();
         assertThat(keys.get().certificate()).isEqualTo(current.orElseThrow());
@@ -110,9 +121,25 @@ class ReadOwnKeysHandlerTest {
     }
 
     @Test
-    @DisplayName("A01 : un autre compte ne lit rien, sans même interroger la PKI (amis au lot 3)")
-    void a01OtherCallerReadsNothing() {
+    @DisplayName("API-02 : un compte sans lien avec le titulaire ne lit rien, sans même interroger la PKI")
+    void api02UnrelatedCallerReadsNothing() {
         assertThat(handler().read(OTHER, OWNER)).isEmpty();
-        assertThat(calls).isEmpty();
+        assertThat(calls).containsExactly("related " + OTHER.value() + " " + OWNER.value());
+    }
+
+    @Test
+    @DisplayName("API-02 : un ami du titulaire lit son certificat courant et ses sous-clés valides")
+    void api02RelatedCallerReadsTheKeys() {
+        related = true;
+
+        Optional<UserKeys> keys = handler().read(OTHER, OWNER);
+
+        assertThat(keys).isPresent();
+        assertThat(keys.get().subkeys()).containsExactly(subkey);
+        assertThat(calls)
+                .containsExactly(
+                        "related " + OTHER.value() + " " + OWNER.value(),
+                        "current " + OWNER.value(),
+                        "findLive " + OWNER.value() + " true " + NOW);
     }
 }

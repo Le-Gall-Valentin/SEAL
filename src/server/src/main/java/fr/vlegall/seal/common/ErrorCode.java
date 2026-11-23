@@ -41,7 +41,20 @@ public enum ErrorCode {
     /** Signature fausse, ou clé publique hors de la courbe (KEY-03, KEY-05). */
     INVALID_SIGNATURE(422),
     /** KEY-32 : la version du coffre n'est pas celle qui suit la version enregistrée. */
-    VAULT_VERSION_CONFLICT(409);
+    VAULT_VERSION_CONFLICT(409),
+    // Amis : statuts fixés par le tableau de la section 10.1.
+    /** FRD-02 : aucun compte actif ne porte cet identifiant (risque d'énumération assumé et limité). */
+    USER_NOT_FOUND(404),
+    /** Section 10.1 : l'identifiant est celui de l'appelant. */
+    CANNOT_INVITE_SELF(422),
+    /** Section 10.1 : les deux comptes sont déjà amis. */
+    ALREADY_FRIENDS(409),
+    /** FRD-01 : l'appelant a déjà invité ce compte. */
+    REQUEST_ALREADY_PENDING(409),
+    /** FRD-01 : ce compte a déjà invité l'appelant ; la propriété {@code requestId} désigne son invitation. */
+    INCOMING_REQUEST_EXISTS(409),
+    /** FRD-03 : blocage dans un sens ou l'autre, ou invitations fermées, sans dire lequel. */
+    CANNOT_INVITE(403);
 
     private final int status;
 

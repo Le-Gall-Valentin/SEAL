@@ -15,4 +15,8 @@ public interface UserJpaRepository extends JpaRepository<UserEntity, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from UserEntity u where u.id = :id")
     Optional<UserEntity> findForUpdate(@Param("id") UUID id);
+
+    /** FRD-02 : compte actif de cet identifiant, en une requête. */
+    @Query("select u from UserEntity u where u.username = :username and u.status = 'ACTIVE'")
+    Optional<UserEntity> findActiveByUsername(@Param("username") String username);
 }

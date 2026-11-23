@@ -31,6 +31,10 @@ public enum RateLimit {
      * un certificat et rouvre trois sous-clés ; un refus rend son jeton.
      */
     IDENTITY_RESETS_PER_USER(3, Duration.ofHours(24), RateLimitKind.USER),
+    /** FRD-02, 15.2 : 60 tentatives d'invitation par heure et par utilisateur, identifiants inexistants compris. */
+    INVITATION_ATTEMPTS_PER_USER(60, Duration.ofHours(1), RateLimitKind.USER),
+    /** FRD-02, 15.2 : 20 invitations créées par heure et par utilisateur ; une tentative qui ne crée rien rend son jeton. */
+    INVITATIONS_CREATED_PER_USER(20, Duration.ofHours(1), RateLimitKind.USER),
     PASSWORD_RESETS_PER_EMAIL(3, Duration.ofHours(1), RateLimitKind.EMAIL),
     PASSWORD_RESETS_PER_IP(3, Duration.ofHours(1), RateLimitKind.IP),
     /**

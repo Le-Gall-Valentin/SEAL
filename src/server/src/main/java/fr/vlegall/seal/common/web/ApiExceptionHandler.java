@@ -50,6 +50,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             body.setProperty(
                     FIELDS, exception.fields().stream().distinct().sorted().toList());
         }
+        if (body != null) {
+            exception.properties().forEach(body::setProperty);
+        }
         OptionalLong retryAfter = exception.retryAfterSeconds();
         return retryAfter.isPresent()
                 ? ResponseEntity.status(response.getStatusCode())

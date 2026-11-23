@@ -2,6 +2,7 @@ package fr.vlegall.seal.common;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -35,6 +36,14 @@ public class SealException extends RuntimeException {
     /** Champs de la requête en erreur ; vide s'il n'y en a pas. */
     public List<String> fields() {
         return List.of(fields);
+    }
+
+    /**
+     * Propriétés propres au code, ajoutées telles quelles au Problem Details (RFC 9457, section 3.2) : identifiants
+     * internes seulement, jamais de saisie ni de secret ; aucune le plus souvent.
+     */
+    public Map<String, String> properties() {
+        return Map.of();
     }
 
     /** Délai avant lequel il est inutile de réessayer, renvoyé dans l'en-tête {@code Retry-After} (SEC-10). */
