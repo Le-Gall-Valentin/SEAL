@@ -30,5 +30,11 @@ public enum SecurityEventType {
     /** SEC-20 : sous-clé de chiffrement publiée (KEY-05), avec son ekId. */
     SUBKEY_PUBLISHED,
     /** SEC-20 : compte lié à un fournisseur OAuth (AUTH-31), avec le fournisseur. */
-    OAUTH_LINKED
+    OAUTH_LINKED,
+    /** FRD-02, ADR 0037 (point 5) : invitation créée, avec l'identifiant interne du destinataire et de l'invitation. */
+    FRIEND_REQUEST_SENT,
+    /** ADR 0037, point 5 : invitation acceptée, avec l'identifiant interne de l'émetteur et de l'invitation. */
+    FRIEND_REQUEST_ACCEPTED,
+    /** FRD-11, ADR 0037 (point 5) : ami retiré, avec l'identifiant interne de l'ancien ami. */
+    FRIEND_REMOVED
 }
