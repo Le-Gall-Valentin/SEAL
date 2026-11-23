@@ -8,6 +8,7 @@ import fr.vlegall.seal.keys.domain.model.PublishedSubkey;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
 import fr.vlegall.seal.keys.domain.model.UserKeys;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
+import fr.vlegall.seal.keys.domain.port.out.RelationPort;
 import fr.vlegall.seal.keys.domain.port.out.SubkeyRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -30,6 +31,9 @@ class ReadUserKeysHandlerTest {
     private static final byte[] SERIAL = new byte[16];
 
     private final List<String> calls = new ArrayList<>();
+    /** API-02 : l'appelant est-il ami du titulaire (membre d'une conversation commune à la PR 3) ? */
+    private boolean related;
+
     private Optional<IdentityCertificate> current = Optional.of(new IdentityCertificate(
             SERIAL,
             new byte[8],
@@ -86,7 +90,11 @@ class ReadUserKeysHandlerTest {
                 throw new UnsupportedOperationException();
             }
         };
-        return new ReadUserKeysHandler(certification, subkeys, Clock.fixed(NOW, ZoneOffset.UTC));
+        RelationPort relations = (caller, owner) -> {
+            calls.add("related " + caller.value() + " " + owner.value());
+            return related;
+        };
+        return new ReadUserKeysHandler(certification, subkeys, relations, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -110,9 +118,25 @@ class ReadUserKeysHandlerTest {
     }
 
     @Test
-    @DisplayName("A01 : un autre compte ne lit rien, sans même interroger la PKI (amis au lot 3)")
-    void a01OtherCallerReadsNothing() {
+    @DisplayName("API-02 : un compte sans lien avec le titulaire ne lit rien, sans même interroger la PKI")
+    void api02UnrelatedCallerReadsNothing() {
         assertThat(handler().read(OTHER, OWNER)).isEmpty();
-        assertThat(calls).isEmpty();
+        assertThat(calls).containsExactly("related " + OTHER.value() + " " + OWNER.value());
+    }
+
+    @Test
+    @DisplayName("API-02 : un ami du titulaire lit son certificat courant et ses sous-clés valides")
+    void api02RelatedCallerReadsTheKeys() {
+        related = true;
+
+        Optional<UserKeys> keys = handler().read(OTHER, OWNER);
+
+        assertThat(keys).isPresent();
+        assertThat(keys.get().subkeys()).containsExactly(subkey);
+        assertThat(calls)
+                .containsExactly(
+                        "related " + OTHER.value() + " " + OWNER.value(),
+                        "current " + OWNER.value(),
+                        "findLive " + OWNER.value() + " true " + NOW);
     }
 }

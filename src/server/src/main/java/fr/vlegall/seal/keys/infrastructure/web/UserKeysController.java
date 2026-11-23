@@ -12,9 +12,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * KEY-33 : certificat et sous-clés valides d'un compte, réservés à la session complète dans {@code SecurityConfig}.
- * Jusqu'au lot 3 (API-02), seul l'appelant lit les siens ; un autre compte reçoit 404 {@code KEY_NOT_FOUND}, comme un
- * compte sans certificat (A01, ADR 0029, point 4).
+ * KEY-33, API-02 : certificat et sous-clés valides d'un compte, réservés à la session complète dans
+ * {@code SecurityConfig}, lus par l'appelant lui-même ou par un ami ; tout autre compte reçoit 404 {@code KEY_NOT_FOUND},
+ * comme un compte sans certificat (A01, ADR 0029, point 4 ; ADR 0037, point 7).
  */
 @RestController
 public class UserKeysController {

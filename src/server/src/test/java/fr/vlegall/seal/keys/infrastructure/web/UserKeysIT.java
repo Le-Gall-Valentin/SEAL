@@ -22,6 +22,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -236,19 +237,63 @@ class UserKeysIT {
                 .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"));
     }
 
-    @Test
-    @DisplayName("A01 : les clés d'un autre compte, même certifié, répondent 404 KEY_NOT_FOUND (amis au lot 3)")
-    void a01OtherAccountsKeysAreNotFound() throws Exception {
-        KeysTestClient reader = KeysTestClient.account(mvc, mail, "cles_lecteur");
-        KeysTestClient owner = KeysTestClient.account(mvc, mail, "cles_proprio");
-        owner.publishIdentity();
+    private void befriend(KeysTestClient a, KeysTestClient b) {
+        jdbc.sql("INSERT INTO friendships (user_low, user_high) VALUES (LEAST(:a, :b), GREATEST(:a, :b))")
+                .param("a", a.id)
+                .param("b", b.id)
+                .update();
+    }
 
-        read(reader, owner.id)
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"));
-        read(reader, UUID.randomUUID())
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"));
+    private void unfriend(KeysTestClient a, KeysTestClient b) {
+        jdbc.sql("DELETE FROM friendships WHERE user_low = LEAST(:a, :b) AND user_high = GREATEST(:a, :b)")
+                .param("a", a.id)
+                .param("b", b.id)
+                .update();
+    }
+
+    @Test
+    @DisplayName("API-02 : un ami lit le certificat et les sous-clés valides du titulaire")
+    void api02FriendReadsTheKeys() throws Exception {
+        KeysTestClient reader = KeysTestClient.account(mvc, mail, "cles_ami");
+        KeysTestClient owner = KeysTestClient.account(mvc, mail, "cles_titulaire");
+        byte[] serial = owner.publishIdentity();
+        byte[] ekId = publishSubkey(owner, serial);
+        befriend(reader, owner);
+
+        JsonNode body = AuthClient.body(read(reader, owner.id)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.certificate.subjectId").value(owner.id.toString()))
+                .andReturn());
+
+        assertThat(bytes(body.get("certificate"), "serial")).isEqualTo(serial);
+        assertThat(body.get("subkeys").valueStream().map(subkey -> bytes(subkey, "ekId")))
+                .containsExactly(ekId);
+    }
+
+    @Test
+    @DisplayName("API-02, A01 : non-ami, ancien ami, ami sans certificat, inconnu : le même 404 KEY_NOT_FOUND")
+    void api02OthersGetTheSameNotFound() throws Exception {
+        KeysTestClient reader = KeysTestClient.account(mvc, mail, "cles_lecteur");
+        KeysTestClient stranger = KeysTestClient.account(mvc, mail, "cles_etranger");
+        stranger.publishIdentity();
+        KeysTestClient former = KeysTestClient.account(mvc, mail, "cles_ancien");
+        former.publishIdentity();
+        befriend(reader, former);
+        unfriend(reader, former);
+        KeysTestClient uncertified = KeysTestClient.account(mvc, mail, "cles_sans_cert");
+        befriend(reader, uncertified);
+
+        List<String> bodies = new ArrayList<>();
+        for (UUID owner : List.of(stranger.id, former.id, uncertified.id, UUID.randomUUID())) {
+            bodies.add(read(reader, owner)
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString()
+                    .replace(owner.toString(), "<owner>"));
+        }
+        assertThat(bodies).containsOnly(bodies.getFirst());
     }
 
     @Test
