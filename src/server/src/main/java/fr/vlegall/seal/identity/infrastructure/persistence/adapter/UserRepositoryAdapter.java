@@ -170,6 +170,11 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<Account> findActiveByUsername(Username username) {
+        return jpa.findActiveByUsername(username.value()).map(UserRepositoryAdapter::toAccount);
+    }
+
+    @Override
     public Optional<UserId> findNotDeletedByUsername(Username username) {
         return jdbc.sql("SELECT id FROM users WHERE username = :username AND status <> 'DELETED'")
                 .param("username", username.value())

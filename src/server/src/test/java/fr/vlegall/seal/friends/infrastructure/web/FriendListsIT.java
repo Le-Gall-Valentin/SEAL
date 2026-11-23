@@ -46,22 +46,11 @@ class FriendListsIT {
     }
 
     private FriendsTestClient account(String prefix) throws Exception {
-        return FriendsTestClient.account(
-                mvc,
-                mail,
-                prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 8));
-    }
-
-    private UUID invite(FriendsTestClient sender, FriendsTestClient receiver) throws Exception {
-        return UUID.fromString(AuthClient.body(sender.invite(receiver.username)
-                        .andExpect(status().isCreated())
-                        .andReturn())
-                .get("id")
-                .asString());
+        return FriendsTestClient.fresh(mvc, mail, prefix);
     }
 
     private void befriend(FriendsTestClient a, FriendsTestClient b) throws Exception {
-        UUID request = invite(a, b);
+        UUID request = a.inviteOk(b);
         mvc.perform(b.unsafe(post(REQUESTS + "/" + request + "/accept"), null)).andExpect(status().isNoContent());
     }
 
@@ -73,20 +62,14 @@ class FriendListsIT {
         return AuthClient.body(read(reader, path).andExpect(status().isOk()).andReturn());
     }
 
-    private void deactivate(FriendsTestClient account) {
-        jdbc.sql("UPDATE users SET status = 'DELETED', email = NULL, deleted_at = now() WHERE id = ?")
-                .param(account.id)
-                .update();
-    }
-
     @Test
-    @DisplayName("Section 14.4, API-01 : reçues avec le nom affiché de l'émetteur, envoyées avec l'identifiant seul")
-    void requestsAreListedByDirection() throws Exception {
+    @DisplayName("API-01, section 14.4 : reçues avec le nom affiché de l'émetteur, envoyées avec l'identifiant seul")
+    void api01RequestsAreListedByDirection() throws Exception {
         FriendsTestClient me = account("moi");
         FriendsTestClient from = account("de");
         FriendsTestClient to = account("vers");
-        UUID incoming = invite(from, me);
-        UUID outgoing = invite(me, to);
+        UUID incoming = from.inviteOk(me);
+        UUID outgoing = me.inviteOk(to);
 
         JsonNode received = page(me, REQUESTS + "?direction=incoming");
         JsonNode sent = page(me, REQUESTS + "?direction=outgoing");
@@ -110,17 +93,17 @@ class FriendListsIT {
     @Test
     @DisplayName(
             "ADR 0037, point 3 : invitations paginées par curseur, sans doublon ni trou ; close ou inactive absente")
-    void requestsArePaginated() throws Exception {
+    void adr0037RequestsArePaginated() throws Exception {
         FriendsTestClient me = account("pag");
         List<UUID> expected = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            expected.add(invite(account("pa"), me));
+            expected.add(account("pa").inviteOk(me));
         }
         FriendsTestClient gone = account("parti");
-        invite(gone, me);
-        deactivate(gone);
+        gone.inviteOk(me);
+        FriendsTestClient.deactivate(jdbc, gone.id);
         FriendsTestClient declined = account("non");
-        UUID refused = invite(declined, me);
+        UUID refused = declined.inviteOk(me);
         mvc.perform(me.unsafe(post(REQUESTS + "/" + refused + "/decline"), null))
                 .andExpect(status().isNoContent());
 
@@ -167,41 +150,44 @@ class FriendListsIT {
     }
 
     @Test
-    @DisplayName("ADR 0037, point 3 : amis paginés par curseur ; un compte inactif disparaît de la liste")
-    void friendsArePaginatedWithoutInactiveAccounts() throws Exception {
+    @DisplayName("FRD-10, ADR 0037 (point 3) : un compte inactif en tête de page n'arrête pas la pagination")
+    void frd10FriendsArePaginatedWithoutInactiveAccounts() throws Exception {
         FriendsTestClient me = account("liste");
+        // Créé d'abord, donc premier dans l'ordre des UUIDv7 : il tombe dans la première page.
+        FriendsTestClient gone = account("disparu");
+        befriend(gone, me);
+        FriendsTestClient.deactivate(jdbc, gone.id);
         List<String> expected = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             FriendsTestClient friend = account("li");
             befriend(friend, me);
             expected.add(friend.id.toString());
         }
-        FriendsTestClient gone = account("disparu");
-        befriend(gone, me);
-        deactivate(gone);
-
-        JsonNode first = page(me, FRIENDS + "?limit=2");
-        JsonNode rest = page(me, FRIENDS + "?limit=2&after=" + first.get("next").asString());
 
         List<String> seen = new ArrayList<>();
+        JsonNode first = page(me, FRIENDS + "?limit=2");
+        assertThat(first.get("items")).hasSize(1);
+        assertThat(first.get("next").isNull()).isFalse();
         first.get("items")
                 .valueStream()
                 .forEach(item -> seen.add(item.get("userId").asString()));
-        rest.get("items")
-                .valueStream()
-                .forEach(item -> seen.add(item.get("userId").asString()));
-        if (!rest.get("next").isNull()) {
-            page(me, FRIENDS + "?limit=2&after=" + rest.get("next").asString())
-                    .get("items")
+        String next = first.get("next").asString();
+        int pages = 1;
+        while (next != null && pages < 10) {
+            JsonNode body = page(me, FRIENDS + "?limit=2&after=" + next);
+            body.get("items")
                     .valueStream()
                     .forEach(item -> seen.add(item.get("userId").asString()));
+            next = body.get("next").isNull() ? null : body.get("next").asString();
+            pages++;
         }
+
         assertThat(seen).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     @Test
-    @DisplayName("Section 14.4 : direction absente ou inconnue, limit hors de 1 à 50, after mal formé : 400")
-    void invalidParametersAreRejected() throws Exception {
+    @DisplayName("SEC-01, section 14.4 : direction absente ou inconnue, limit hors de 1 à 50, after mal formé : 400")
+    void sec01InvalidParametersAreRejected() throws Exception {
         FriendsTestClient me = account("param");
 
         for (String path : List.of(
@@ -267,30 +253,47 @@ class FriendListsIT {
         AuthClient.Registered registered = restricted.register(pending + "@exemple.ca", pending);
 
         for (String path : List.of(FRIENDS, REQUESTS + "?direction=incoming")) {
-            mvc.perform(anonymous.from(get(path))).andExpect(status().isUnauthorized());
-            mvc.perform(restricted.from(get(path)).cookie(registered.session())).andExpect(status().isForbidden());
+            mvc.perform(anonymous.from(get(path)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+            mvc.perform(restricted.from(get(path)).cookie(registered.session()))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         }
         mvc.perform(anonymous.unsafe(delete(FRIENDS + "/" + friend.id), null, null))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
         mvc.perform(me.client.from(delete(FRIENDS + "/" + friend.id)).cookie(me.session))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         mvc.perform(restricted.unsafe(delete(FRIENDS + "/" + friend.id), registered.session(), null))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         assertThat(page(me, FRIENDS).get("items")).hasSize(1);
     }
 
     @Test
-    @DisplayName("Section 14 : une méthode hors de 14.4 est refusée par défaut (403), même en session complète")
-    void unlistedMethodsAreDeniedByDefault() throws Exception {
+    @DisplayName("QA-05, section 14 : une méthode hors de 14.4 est refusée par défaut (403), même en session complète")
+    void qa05UnlistedMethodsAreDeniedByDefault() throws Exception {
         FriendsTestClient me = account("meth");
         FriendsTestClient friend = account("methf");
         befriend(me, friend);
-        UUID request = invite(me, account("methr"));
+        UUID request = me.inviteOk(account("methr"));
 
-        mvc.perform(me.unsafe(put(FRIENDS + "/" + friend.id), null)).andExpect(status().isForbidden());
-        mvc.perform(me.unsafe(post(FRIENDS), null)).andExpect(status().isForbidden());
-        mvc.perform(me.unsafe(put(REQUESTS + "/" + request), null)).andExpect(status().isForbidden());
-        mvc.perform(me.unsafe(post(REQUESTS + "/" + request + "/autre"), null)).andExpect(status().isForbidden());
-        mvc.perform(me.unsafe(patch(REQUESTS), null)).andExpect(status().isForbidden());
+        mvc.perform(me.unsafe(put(FRIENDS + "/" + friend.id), null))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        mvc.perform(me.unsafe(post(FRIENDS), null))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        mvc.perform(me.unsafe(put(REQUESTS + "/" + request), null))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        mvc.perform(me.unsafe(post(REQUESTS + "/" + request + "/autre"), null))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        mvc.perform(me.unsafe(patch(REQUESTS), null))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 }

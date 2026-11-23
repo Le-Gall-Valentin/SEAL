@@ -18,8 +18,25 @@ class InvitedUsernameTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "@", "@@sarah", "ab", "deux mots", "sarah..b", "élodie", "abcdefghijklmnopqrstu"})
-    @DisplayName("AUTH-01 : toute autre saisie est refusée")
+    @ValueSource(
+            strings = {
+                "",
+                "@",
+                "@@sarah",
+                "ab",
+                "deux mots",
+                "sarah..b",
+                "élodie",
+                "abcdefghijklmnopqrstu",
+                "\u001Fsarah",
+                "sarah\u001C",
+                "\tsarah",
+                "\u00A0sarah",
+                "\uFEFFsarah",
+                "\u212Aarine",
+                "SARAH\u0130"
+            })
+    @DisplayName("AUTH-01, ADR 0037 (point 10) : toute autre saisie, dont les caractères hors de l'ASCII, est refusée")
     void auth01OtherInputIsRejected(String input) {
         assertThat(InvitedUsername.normalize(input)).isEmpty();
     }

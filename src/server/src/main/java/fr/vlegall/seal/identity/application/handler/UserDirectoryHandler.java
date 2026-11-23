@@ -31,11 +31,7 @@ public class UserDirectoryHandler implements UserDirectoryQuery {
     @Override
     @Transactional(readOnly = true)
     public Optional<Profile> findActiveByUsername(String username) {
-        return Username.tryParse(username)
-                .flatMap(users::findNotDeletedByUsername)
-                .flatMap(users::findById)
-                .filter(Account::isActive)
-                .map(UserDirectoryHandler::profileOf);
+        return Username.tryParse(username).flatMap(users::findActiveByUsername).map(UserDirectoryHandler::profileOf);
     }
 
     @Override

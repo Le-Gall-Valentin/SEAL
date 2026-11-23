@@ -182,11 +182,21 @@ final class InMemoryIdentity {
 
             @Override
             public List<Account> findAll(Collection<UserId> ids) {
+                // Ordre inverse de la demande : le vrai dépôt ne garantit aucun ordre.
                 return ids.stream()
                         .distinct()
                         .map(accounts::get)
                         .filter(Objects::nonNull)
-                        .toList();
+                        .toList()
+                        .reversed();
+            }
+
+            @Override
+            public Optional<Account> findActiveByUsername(Username username) {
+                return accounts.values().stream()
+                        .filter(account ->
+                                account.isActive() && account.username().equals(username))
+                        .findFirst();
             }
 
             @Override

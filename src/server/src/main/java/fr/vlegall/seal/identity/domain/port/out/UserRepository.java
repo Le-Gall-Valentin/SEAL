@@ -62,6 +62,12 @@ public interface UserRepository {
     /** FRD-10 : comptes demandés qui existent, quel que soit leur statut, dans un ordre quelconque, en une requête. */
     List<Account> findAll(Collection<UserId> ids);
 
+    /**
+     * FRD-02 : compte actif qui porte cet identifiant, en une seule requête : un compte en attente ou supprimé ne se
+     * distingue d'un identifiant inconnu ni par la réponse ni par la durée.
+     */
+    Optional<Account> findActiveByUsername(Username username);
+
     /** AUTH-20 : compte non supprimé qui porte cet identifiant, en attente ou actif. */
     Optional<UserId> findNotDeletedByUsername(Username username);
 

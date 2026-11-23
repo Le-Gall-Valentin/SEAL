@@ -42,13 +42,8 @@ class FriendRequestSendIT {
         mail.reset();
     }
 
-    /** Identifiant neuf, au format d'AUTH-01. */
-    private static String name(String prefix) {
-        return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-    }
-
     private FriendsTestClient account(String prefix) throws Exception {
-        return FriendsTestClient.account(mvc, mail, name(prefix));
+        return FriendsTestClient.fresh(mvc, mail, prefix);
     }
 
     /** Compte actif sans session, inséré directement : une cible d'invitation suffit. */
@@ -68,13 +63,6 @@ class FriendRequestSendIT {
                 .param("b", b)
                 .query(Long.class)
                 .single();
-    }
-
-    private void befriend(UUID a, UUID b) {
-        jdbc.sql("INSERT INTO friendships (user_low, user_high) VALUES (LEAST(:a, :b), GREATEST(:a, :b))")
-                .param("a", a)
-                .param("b", b)
-                .update();
     }
 
     @Test
@@ -104,7 +92,7 @@ class FriendRequestSendIT {
     @DisplayName("ADR 0037, point 6 : espaces, @ initial et majuscules sont retirés avant la recherche")
     void adr0037InputIsNormalized() throws Exception {
         FriendsTestClient sender = account("norm");
-        String receiver = name("sarah.b");
+        String receiver = FriendsTestClient.name("sarah.b");
         target(receiver);
 
         sender.invite("  @" + receiver.toUpperCase(java.util.Locale.ROOT) + " ")
@@ -117,7 +105,7 @@ class FriendRequestSendIT {
     void adr0037MalformedInputIsRejected() throws Exception {
         FriendsTestClient sender = account("mal");
 
-        for (String input : List.of("ab", "deux mots", "@", "é" + name("x"), "a".repeat(21))) {
+        for (String input : List.of("ab", "deux mots", "@", "é" + FriendsTestClient.name("x"), "a".repeat(21))) {
             sender.invite(input)
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
@@ -129,15 +117,15 @@ class FriendRequestSendIT {
     @DisplayName("FRD-02 : identifiant inexistant, en attente ou supprimé : 404 USER_NOT_FOUND")
     void frd02UnknownOrInactiveUserIsNotFound() throws Exception {
         FriendsTestClient sender = account("enum");
-        String deleted = name("supp");
+        String deleted = FriendsTestClient.name("supp");
         jdbc.sql("INSERT INTO users (username, display_name, status, deleted_at) VALUES (?, 'Nom', 'DELETED', now())")
                 .param(deleted)
                 .update();
         AuthClient pendingClient = new AuthClient(mvc, mail);
-        String pending = name("att");
+        String pending = FriendsTestClient.name("att");
         pendingClient.register(pending + "@exemple.ca", pending);
 
-        for (String username : List.of(name("absent"), deleted, pending)) {
+        for (String username : List.of(FriendsTestClient.name("absent"), deleted, pending)) {
             sender.invite(username)
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
@@ -145,8 +133,8 @@ class FriendRequestSendIT {
     }
 
     @Test
-    @DisplayName("Section 10.1 : s'inviter soi-même, 422 CANNOT_INVITE_SELF")
-    void selfInvitationIsRejected() throws Exception {
+    @DisplayName("FRD-01, section 10.1 : s'inviter soi-même, 422 CANNOT_INVITE_SELF")
+    void frd01SelfInvitationIsRejected() throws Exception {
         FriendsTestClient sender = account("soi");
 
         sender.invite("@" + sender.username)
@@ -158,9 +146,9 @@ class FriendRequestSendIT {
     @DisplayName("FRD-03 : blocage dans un sens, dans l'autre, ou invitations fermées : le même 403 CANNOT_INVITE")
     void frd03SameRefusalForEveryCause() throws Exception {
         FriendsTestClient sender = account("bloq");
-        UUID blockedBySender = target(name("b1"));
-        UUID blockingSender = target(name("b2"));
-        UUID closed = target(name("b3"));
+        UUID blockedBySender = target(FriendsTestClient.name("b1"));
+        UUID blockingSender = target(FriendsTestClient.name("b2"));
+        UUID closed = target(FriendsTestClient.name("b3"));
         jdbc.sql("INSERT INTO blocks (blocker_id, blocked_id) VALUES (?, ?), (?, ?)")
                 .param(sender.id)
                 .param(blockedBySender)
@@ -202,9 +190,9 @@ class FriendRequestSendIT {
                         .andReturn())
                 .get("id")
                 .asString();
-        String closedFriend = name("fami");
+        String closedFriend = FriendsTestClient.name("fami");
         UUID closedFriendId = target(closedFriend);
-        befriend(me.id, closedFriendId);
+        FriendsTestClient.befriend(jdbc, me.id, closedFriendId);
         jdbc.sql("INSERT INTO user_settings (user_id, invitation_policy) VALUES (?, 'NOBODY')")
                 .param(closedFriendId)
                 .update();
@@ -219,11 +207,11 @@ class FriendRequestSendIT {
     }
 
     @Test
-    @DisplayName("Section 10.1 : déjà amis, 409 ALREADY_FRIENDS")
-    void alreadyFriendsIsRejected() throws Exception {
+    @DisplayName("FRD-01, section 10.1 : déjà amis, 409 ALREADY_FRIENDS")
+    void frd01AlreadyFriendsIsRejected() throws Exception {
         FriendsTestClient sender = account("ami");
-        String friend = name("deja");
-        befriend(sender.id, target(friend));
+        String friend = FriendsTestClient.name("deja");
+        FriendsTestClient.befriend(jdbc, sender.id, target(friend));
 
         sender.invite(friend)
                 .andExpect(status().isConflict())
@@ -234,7 +222,7 @@ class FriendRequestSendIT {
     @DisplayName("FRD-01 : seconde invitation dans le même sens, 409 REQUEST_ALREADY_PENDING")
     void frd01SecondInvitationIsAlreadyPending() throws Exception {
         FriendsTestClient sender = account("deux");
-        String receiver = name("recoit");
+        String receiver = FriendsTestClient.name("recoit");
         UUID receiverId = target(receiver);
         sender.invite(receiver).andExpect(status().isCreated());
 
@@ -292,7 +280,7 @@ class FriendRequestSendIT {
     @DisplayName("FRD-01 : après un retrait, l'ancienne invitation acceptée n'empêche pas d'inviter à nouveau")
     void frd01InviteAgainAfterRemoval() throws Exception {
         FriendsTestClient sender = account("rev");
-        String former = name("ancien");
+        String former = FriendsTestClient.name("ancien");
         UUID formerId = target(former);
         jdbc.sql("INSERT INTO friend_requests (sender_id, receiver_id, status, responded_at) "
                         + "VALUES (?, ?, 'ACCEPTED', now())")
@@ -307,7 +295,7 @@ class FriendRequestSendIT {
     @DisplayName("FRD-02, SEC-20 : l'invitation créée est journalisée avec des identifiants internes seulement")
     void frd02SentInvitationIsJournaled() throws Exception {
         FriendsTestClient sender = account("jour");
-        String receiver = name("lu");
+        String receiver = FriendsTestClient.name("lu");
         UUID receiverId = target(receiver);
 
         String id =
@@ -327,10 +315,10 @@ class FriendRequestSendIT {
         FriendsTestClient sender = account("tent");
 
         for (int i = 0; i < 60; i++) {
-            sender.invite(name("nul")).andExpect(status().isNotFound());
+            sender.invite(FriendsTestClient.name("nul")).andExpect(status().isNotFound());
         }
 
-        sender.invite(name("nul"))
+        sender.invite(FriendsTestClient.name("nul"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
                 .andExpect(header().exists("Retry-After"));
@@ -341,7 +329,7 @@ class FriendRequestSendIT {
     void frd02TwentyCreatedPerHour() throws Exception {
         FriendsTestClient sender = account("cree");
         for (int i = 0; i < 25; i++) {
-            sender.invite(name("nul")).andExpect(status().isNotFound());
+            sender.invite(FriendsTestClient.name("nul")).andExpect(status().isNotFound());
         }
 
         for (int i = 0; i < 20; i++) {
@@ -355,9 +343,42 @@ class FriendRequestSendIT {
     }
 
     private String jdbcTarget() {
-        String username = name("cib");
+        String username = FriendsTestClient.name("cib");
         target(username);
         return username;
+    }
+
+    @Test
+    @DisplayName("SEC-01, ADR 0037 (point 7) : un corps de plus de 16 Kio répond 413 REQUEST_REJECTED, sans tentative")
+    void sec01BodyOver16KiBIsRejected() throws Exception {
+        FriendsTestClient sender = account("lourd");
+        String huge = "a".repeat(17 * 1024);
+
+        sender.invite(huge)
+                .andExpect(status().isContentTooLarge())
+                .andExpect(jsonPath("$.code").value("REQUEST_REJECTED"));
+        mvc.perform(sender.unsafe(post(REQUESTS + "/" + UUID.randomUUID() + "/accept"), Map.of("rembourrage", huge)))
+                .andExpect(status().isContentTooLarge())
+                .andExpect(jsonPath("$.code").value("REQUEST_REJECTED"));
+        for (int i = 0; i < 60; i++) {
+            sender.invite(FriendsTestClient.name("nul")).andExpect(status().isNotFound());
+        }
+    }
+
+    @Test
+    @DisplayName("ADR 0037, point 9 : mon invitation en attente passe avant les invitations fermées, 409")
+    void adr0037OwnPendingRequestBeforeClosedInvitations() throws Exception {
+        FriendsTestClient sender = account("enatt");
+        String receiver = FriendsTestClient.name("fermee");
+        UUID receiverId = target(receiver);
+        sender.invite(receiver).andExpect(status().isCreated());
+        jdbc.sql("INSERT INTO user_settings (user_id, invitation_policy) VALUES (?, 'NOBODY')")
+                .param(receiverId)
+                .update();
+
+        sender.invite(receiver)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REQUEST_ALREADY_PENDING"));
     }
 
     @Test
@@ -367,18 +388,22 @@ class FriendRequestSendIT {
         AuthClient anonymous = new AuthClient(mvc, mail);
         Map<String, Object> body = Map.of("username", sender.username);
 
-        mvc.perform(anonymous.unsafe(post(REQUESTS), null, body)).andExpect(status().isUnauthorized());
+        mvc.perform(anonymous.unsafe(post(REQUESTS), null, body))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
         mvc.perform(sender.client
                         .from(post(REQUESTS))
                         .cookie(sender.session)
                         .contentType("application/json")
                         .content("{\"username\":\"" + sender.username + "\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         AuthClient restricted = new AuthClient(mvc, mail);
-        String pending = name("restr");
+        String pending = FriendsTestClient.name("restr");
         AuthClient.Registered registered = restricted.register(pending + "@exemple.ca", pending);
         mvc.perform(restricted.unsafe(post(REQUESTS), registered.session(), body))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
     @Test

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.identity.domain.model.Account;
 import fr.vlegall.seal.identity.domain.model.InvitationPolicy;
+import fr.vlegall.seal.identity.domain.model.Username;
 import fr.vlegall.seal.identity.domain.port.out.UserRepository;
 import fr.vlegall.seal.identity.domain.port.out.UserSettingsRepository;
 import fr.vlegall.seal.support.SealIntegrationTest;
@@ -49,6 +50,21 @@ class UserDirectoryPersistenceIT {
 
         assertThat(accounts).extracting(Account::id).containsExactlyInAnyOrder(active, pending);
         assertThat(users.findAll(List.of())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FRD-02 : un compte actif se trouve par son identifiant en une requête ; en attente ou supprimé, rien")
+    void frd02ActiveAccountIsFoundByUsername() {
+        UserId active = insert("annuaire.trouve", "ACTIVE");
+        insert("annuaire.pas.fini", "PENDING_EMAIL");
+
+        assertThat(users.findActiveByUsername(Username.parse("annuaire.trouve")))
+                .map(Account::id)
+                .contains(active);
+        assertThat(users.findActiveByUsername(Username.parse("annuaire.pas.fini")))
+                .isEmpty();
+        assertThat(users.findActiveByUsername(Username.parse("annuaire.absent")))
+                .isEmpty();
     }
 
     @Test
