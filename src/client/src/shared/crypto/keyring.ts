@@ -158,15 +158,20 @@ export function serializeKeyring(keyring: KeyringExport): Uint8Array<ArrayBuffer
 }
 
 /**
- * KEY-02, KEY-40 : IK, EK et VDK neuves, et le premier coffre (version 1) sous la clé de récupération que
- * l'utilisateur vient de confirmer (ADR 0029, point 2). Rien n'est publié ni enregistré ici : le parcours de première
- * connexion le fera, coffre d'abord.
+ * KEY-02, KEY-40 : IK, EK et VDK neuves, et leur coffre sous la clé de récupération que l'utilisateur vient de
+ * confirmer (ADR 0029, point 2) : version 1 à la première connexion, version suivant l'enregistrée pour remplacer le
+ * coffre d'une identité réinitialisée (KEY-34, ADR 0036 point 2). Rien n'est publié ni enregistré ici : le parcours le
+ * fera, coffre d'abord.
  */
 export async function generateKeyring(
   userId: string,
   recoveryKey: RecoveryKey,
   now: number,
+  vaultVersion = 1,
 ): Promise<NewKeyring> {
+  if (!Number.isSafeInteger(vaultVersion) || vaultVersion < 1) {
+    throw new TypeError('KEY-32 : la version d’un coffre est un entier à partir de 1')
+  }
   // KEY-40 : chaque tampon secret est remis à zéro à la sortie, même sur une exception.
   const buffers: Uint8Array[] = []
   const held = <T extends Uint8Array>(buffer: T): T => {
@@ -193,7 +198,7 @@ export async function generateKeyring(
         createdAt: now,
       }),
     )
-    const vault = await sealVault({ userId, vaultVersion: 1, recoveryKey, vdk, plaintext })
+    const vault = await sealVault({ userId, vaultVersion, recoveryKey, vdk, plaintext })
     const keyring = createKeyring(
       {
         userId,
