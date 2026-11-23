@@ -32,6 +32,7 @@ function apisWith(reloadCsrf: () => Promise<void>): Apis {
     emailChange: { request: never, confirm: never },
     friends: { friends: never, receivedRequests: never, sentRequests: never },
     sendFriendRequest: { send: never },
+    answerFriendRequest: { accept: never, decline: never, revoke: never },
   }
 }
 

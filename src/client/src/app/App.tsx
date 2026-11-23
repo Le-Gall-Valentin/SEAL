@@ -8,6 +8,7 @@ import { keysApi } from '@/entities/keyring'
 import { oauthProvidersApi } from '@/entities/oauth-provider'
 import { passwordBlocklist } from '@/entities/password'
 import { sessionApi } from '@/entities/session'
+import { answerFriendRequestApi } from '@/features/answer-friend-request'
 import { profileApi } from '@/features/change-display-name'
 import { emailChangeApi } from '@/features/change-email'
 import { passwordChangeApi } from '@/features/change-password'
@@ -56,6 +57,7 @@ const apis: Apis = {
   emailChange: emailChangeApi,
   friends: friendsApi,
   sendFriendRequest: sendFriendRequestApi,
+  answerFriendRequest: answerFriendRequestApi,
 }
 
 // KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un

@@ -11,6 +11,10 @@ import { type IKeysApi, KeysApiProvider } from '@/entities/keyring'
 import { type IOAuthProvidersApi, OAuthProvidersApiProvider } from '@/entities/oauth-provider'
 import { type IPasswordBlocklist, PasswordBlocklistProvider } from '@/entities/password'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
+import {
+  AnswerFriendRequestApiProvider,
+  type IAnswerFriendRequestApi,
+} from '@/features/answer-friend-request'
 import { type IProfileApi, ProfileApiProvider } from '@/features/change-display-name'
 import { EmailChangeApiProvider, type IEmailChangeApi } from '@/features/change-email'
 import { type IPasswordChangeApi, PasswordChangeApiProvider } from '@/features/change-password'
@@ -50,6 +54,7 @@ export interface Apis {
   readonly emailChange: IEmailChangeApi
   readonly friends: IFriendsApi
   readonly sendFriendRequest: ISendFriendRequestApi
+  readonly answerFriendRequest: IAnswerFriendRequestApi
 }
 
 interface ApiProvidersProps {
@@ -100,6 +105,11 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
       <SendFriendRequestApiProvider api={apis.sendFriendRequest}>
         {inner}
       </SendFriendRequestApiProvider>
+    ),
+    (inner) => (
+      <AnswerFriendRequestApiProvider api={apis.answerFriendRequest}>
+        {inner}
+      </AnswerFriendRequestApiProvider>
     ),
   ]
   return layers.reduceRight<ReactNode>((inner, layer) => layer(inner), children)
