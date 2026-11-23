@@ -108,7 +108,7 @@ describe('KEY-33, KEY-34 : page Restauration-Appareil', () => {
 
     await screen.getByRole('button', { name: 'Réinitialiser mon identité…' }).click()
 
-    const confirm = screen.getByRole('dialog', { name: 'Réinitialiser votre identité ?' })
+    const confirm = screen.getByRole('alertdialog', { name: 'Réinitialiser votre identité ?' })
     await expect.element(confirm.getByText('Cette action est irréversible.')).toBeVisible()
     await expect
       .element(
@@ -131,7 +131,7 @@ describe('KEY-33, KEY-34 : page Restauration-Appareil', () => {
     await screen.getByRole('button', { name: 'Réinitialiser', exact: true }).click()
 
     await expect
-      .element(screen.getByRole('dialog', { name: 'Réinitialiser votre identité ?' }))
+      .element(screen.getByRole('alertdialog', { name: 'Réinitialiser votre identité ?' }))
       .not.toBeInTheDocument()
     await expect.element(screen.getByText('mode reset')).toBeVisible()
     // ADR 0036 (point 3) : Dialogue-Cle-Recuperation seul sur le fond, comme à la première connexion (ADR 0029).

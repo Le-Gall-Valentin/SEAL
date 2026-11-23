@@ -37,13 +37,7 @@ export function ResetIdentityConfirm({ open, onCancel, onConfirm }: ResetIdentit
             {t('confirmText')}
           </p>
         </DialogBody>
-        <DialogFooter
-          onCancel={onCancel}
-          cancelable
-          submitLabel={t('confirmSubmit')}
-          canSubmit
-          danger
-        />
+        <DialogFooter onCancel={onCancel} cancelable submitLabel={t('confirmSubmit')} canSubmit />
       </form>
     </ModalDialog>
   )

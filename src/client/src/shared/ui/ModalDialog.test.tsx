@@ -57,7 +57,6 @@ function Harness({
             cancelable={closable}
             submitLabel="Envoyer le code"
             canSubmit
-            danger={danger}
           />
         </form>
       </ModalDialog>
@@ -114,6 +113,57 @@ describe('ACC-01, ACC-02, ADR 0035 (point 1) : fenêtre modale des paramètres',
 
     expect(await colors(true)).toEqual([token('--danger'), token('--danger'), token('--on-danger')])
     expect(await colors(false)).toEqual([token('--ink-3'), token('--accent'), token('--on-accent')])
+  })
+
+  it('KEY-34, ADR 0036 (point 3) : en variante danger, rôle alertdialog, triangle de 44 px et en-tête de Dialogue-Suppression', async () => {
+    const token = (name: string) => {
+      const hex = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+      const [r, g, b] = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16))
+      return `rgb(${String(r)}, ${String(g)}, ${String(b)})`
+    }
+    const danger = await render(<Harness danger />)
+    await danger.getByRole('button', { name: 'Ouvrir' }).click()
+
+    const alert = danger.getByRole('alertdialog', { name: 'Changer de courriel' })
+    await expect.element(alert).toBeVisible()
+    const header = alert.element().querySelector<HTMLElement>(':scope > div')
+    const icon = header?.querySelector<HTMLElement>(':scope > span[aria-hidden="true"]')
+    expect(icon?.querySelector('svg')).not.toBeNull()
+    const iconStyle = getComputedStyle(icon ?? document.body)
+    expect([iconStyle.width, iconStyle.height, iconStyle.backgroundColor, iconStyle.color]).toEqual(
+      ['44px', '44px', token('--danger-soft'), token('--danger')],
+    )
+    const headerStyle = getComputedStyle(header ?? document.body)
+    expect([headerStyle.paddingTop, headerStyle.paddingBottom, headerStyle.columnGap]).toEqual([
+      '22px',
+      '14px',
+      '14px',
+    ])
+    await danger.unmount()
+
+    const neutral = await render(<Harness />)
+    await neutral.getByRole('button', { name: 'Ouvrir' }).click()
+    const dialog = neutral.getByRole('dialog', { name: 'Changer de courriel' })
+    await expect.element(dialog).toBeVisible()
+    const plain = dialog.element().querySelector<HTMLElement>(':scope > div')
+    expect(plain?.querySelector(':scope > span[aria-hidden="true"]')).toBeNull()
+    expect(getComputedStyle(plain ?? document.body).paddingTop).toBe('20px')
+  })
+
+  it('ADR 0024 (point 11), ADR 0036 : sous 360 px, le triangle décoratif s’efface pour que le titre tienne', async () => {
+    await page.viewport(280, 653)
+    const screen = await render(<Harness danger />)
+    await screen.getByRole('button', { name: 'Ouvrir' }).click()
+    const alert = screen.getByRole('alertdialog', { name: 'Changer de courriel' })
+    await expect.element(alert).toBeVisible()
+    const icon = alert
+      .element()
+      .querySelector<HTMLElement>(':scope > div > span[aria-hidden="true"]')
+
+    expect(getComputedStyle(icon ?? document.body).display).toBe('none')
+    await page.viewport(390, 844)
+    await expect.poll(() => getComputedStyle(icon ?? document.body).display).toBe('grid')
+    await page.viewport(1280, 800)
   })
 
   it('ACC-02, ADR 0035 : titre, étape et sous-titre ; le reste de la page devient inerte', async () => {

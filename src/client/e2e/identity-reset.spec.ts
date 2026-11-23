@@ -40,7 +40,7 @@ test('KEY-34 : sans sa clé, un nouvel appareil confirme, reçoit une nouvelle c
   await expect(page.getByRole('heading', { name: 'Clé de récupération perdue ?' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Réinitialiser mon identité…' }).click()
-  const confirm = page.getByRole('dialog', { name: 'Réinitialiser votre identité ?' })
+  const confirm = page.getByRole('alertdialog', { name: 'Réinitialiser votre identité ?' })
   await expect(confirm.getByText('Cette action est irréversible.')).toBeVisible()
   await expect(
     confirm.getByText(
