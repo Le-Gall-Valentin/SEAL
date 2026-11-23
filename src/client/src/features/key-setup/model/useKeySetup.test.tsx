@@ -109,7 +109,7 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
     await expect.poll(() => result.current.confirmed).toBe(true)
 
     result.current.finish()
-    await expect.poll(() => result.current.failure).toBe('network')
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'network' })
     result.current.finish()
     await expect.poll(() => onDone.mock.calls.length).toBe(1)
 
@@ -216,7 +216,7 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
 
     result.current.finish()
 
-    await expect.poll(() => result.current.failure).toBe('unexpected')
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'unexpected' })
   })
 
   it('ADR 0029, point 12 : une erreur réseau garde son texte, toute autre erreur est inattendue', async () => {
@@ -226,7 +226,7 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
 
     result.current.finish()
 
-    await expect.poll(() => result.current.failure).toBe('unexpected')
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'unexpected' })
   })
 
   it('ADR 0029, point 3 : un trousseau illisible sur l’appareil rend le verrou et la main, sans page blanche', async () => {
@@ -291,6 +291,21 @@ describe('KEY-34, ADR 0036 : Dialogue-Cle-Recuperation à la réinitialisation d
     ])
   })
 
+  it('SEC-10, ADR 0036 (point 7) : au-delà de la limite, 429 annoncé avec son délai, et la main n’est pas rendue', async () => {
+    const onDone = vi.fn()
+    vi.mocked(prepareReset).mockResolvedValue(PREPARED)
+    vi.mocked(resetIdentity).mockRejectedValueOnce(
+      new ApiError(429, 'RATE_LIMITED', { retryAfterSeconds: 7_200 }),
+    )
+    const { result } = await renderSetup(await freshStore(), onDone, { onReauthRequired: vi.fn() })
+    await confirm(result)
+
+    result.current.finish()
+
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'rate-limited', minutes: 120 })
+    expect(onDone).not.toHaveBeenCalled()
+  })
+
   it('ADR 0036 : coffre changé entre-temps (taken) rend la main ; une erreur réseau garde son texte', async () => {
     const onDone = vi.fn()
     vi.mocked(prepareReset).mockResolvedValue(PREPARED)
@@ -301,7 +316,7 @@ describe('KEY-34, ADR 0036 : Dialogue-Cle-Recuperation à la réinitialisation d
     await confirm(result)
 
     result.current.finish()
-    await expect.poll(() => result.current.failure).toBe('network')
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'network' })
     result.current.finish()
 
     await expect.poll(() => onDone.mock.calls.length).toBe(1)

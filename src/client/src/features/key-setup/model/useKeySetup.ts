@@ -18,7 +18,15 @@ import {
   type NewKeyring,
   pickRecoveryGroups,
 } from '@/shared/crypto'
-import { ApiError, downloadText, failureOf, useClock, useHeldLock } from '@/shared/lib'
+import {
+  ApiError,
+  downloadText,
+  failureOf,
+  type FormFailure,
+  isFormFailure,
+  useClock,
+  useHeldLock,
+} from '@/shared/lib'
 import { keySetupMessages } from '../i18n'
 import { recoveryKeyFile } from './recoveryKeyFile'
 
@@ -44,8 +52,11 @@ export interface KeySetup {
   readonly download: () => void
   readonly finish: () => void
   readonly saving: boolean
-  /** ADR 0029, point 12 : échec de la sauvegarde, réseau ou inattendu ; null sinon. */
-  readonly failure: 'network' | 'unexpected' | null
+  /**
+   * ADR 0029, point 12 : échec de la sauvegarde, réseau ou inattendu ; limite atteinte à la réinitialisation (SEC-10,
+   * ADR 0036 point 7) ; null sinon.
+   */
+  readonly failure: FormFailure | null
 }
 
 const GROUP_LENGTH = 4
@@ -197,5 +208,6 @@ function failureFrom(error: Error | null, resetting: boolean): KeySetup['failure
   if (error === null || (resetting && isReauthRequired(error))) {
     return null
   }
-  return failureOf(error).kind === 'network' ? 'network' : 'unexpected'
+  const failure = failureOf(error)
+  return isFormFailure(failure) ? failure : { kind: 'unexpected' }
 }

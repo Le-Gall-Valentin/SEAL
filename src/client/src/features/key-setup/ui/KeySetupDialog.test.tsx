@@ -136,7 +136,9 @@ describe('KEY-30 : Dialogue-Cle-Recuperation, étape 2', () => {
   })
 
   it('ADR 0029, points 5 et 9 : un échec réseau s’annonce, sans le texte de sauvegarde, et « Terminer » reste disponible ; en cours, il est inactif', async () => {
-    const failed = await renderWith(state({ step: 2, confirmed: true, failure: 'network' }))
+    const failed = await renderWith(
+      state({ step: 2, confirmed: true, failure: { kind: 'network' } }),
+    )
 
     await expect
       .element(failed.getByRole('alert'))
@@ -147,7 +149,9 @@ describe('KEY-30 : Dialogue-Cle-Recuperation, étape 2', () => {
     await expect.element(failed.getByRole('button', { name: 'Terminer' })).toBeEnabled()
     await failed.unmount()
 
-    const unexpected = await renderWith(state({ step: 2, confirmed: true, failure: 'unexpected' }))
+    const unexpected = await renderWith(
+      state({ step: 2, confirmed: true, failure: { kind: 'unexpected' } }),
+    )
     await expect
       .element(unexpected.getByRole('alert'))
       .toHaveTextContent('Une erreur inattendue est survenue. Réessayez.')
@@ -231,5 +235,17 @@ describe('KEY-34 : Dialogue-Cle-Recuperation à la réinitialisation (ADR 0036)'
       />,
     )
     expect(screen.getByText('attente de l’autre onglet').query()).toBeNull()
+  })
+
+  it('SEC-10, ADR 0036 (point 7) : une limite atteinte s’annonce « Trop de tentatives », avec son délai', async () => {
+    const screen = await renderWith(
+      state({ step: 2, confirmed: true, failure: { kind: 'rate-limited', minutes: 120 } }),
+    )
+
+    await expect.element(screen.getByText('Trop de tentatives')).toBeVisible()
+    await expect.element(screen.getByText('120 minutes')).toBeVisible()
+    expect(
+      screen.getByText('Vos clés n’ont pas pu être sauvegardées.', { exact: false }).query(),
+    ).toBeNull()
   })
 })

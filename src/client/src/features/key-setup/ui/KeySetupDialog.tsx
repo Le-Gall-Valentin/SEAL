@@ -1,7 +1,15 @@
 import { type ReactNode, type Ref, useEffect, useId, useRef } from 'react'
 import type { KeyOwner } from '@/entities/keyring'
 import { useMessages } from '@/shared/i18n'
-import { Alert, Dialog, FailureAlert, FieldError, FieldLabel, SecondaryButton } from '@/shared/ui'
+import {
+  Alert,
+  Dialog,
+  FailureAlert,
+  FieldError,
+  FieldLabel,
+  RateLimitedAlert,
+  SecondaryButton,
+} from '@/shared/ui'
 import { keySetupMessages } from '../i18n'
 import { type KeySetup, type Slot, useKeySetup } from '../model/useKeySetup'
 
@@ -214,8 +222,11 @@ function VerifyStep({ setup, titleId, textId }: StepProps) {
         {setup.confirmed && setup.failure === null && (
           <p className="m-0 text-[13.5px] leading-[1.45] text-ink-3">{t('savedText')}</p>
         )}
-        {setup.failure === 'network' && <Alert variant="error">{t('saveFailed')}</Alert>}
-        {setup.failure === 'unexpected' && <FailureAlert failure={{ kind: 'unexpected' }} />}
+        {setup.failure?.kind === 'network' && <Alert variant="error">{t('saveFailed')}</Alert>}
+        {setup.failure?.kind === 'rate-limited' && (
+          <RateLimitedAlert minutes={setup.failure.minutes} />
+        )}
+        {setup.failure?.kind === 'unexpected' && <FailureAlert failure={{ kind: 'unexpected' }} />}
       </div>
       <footer className={FOOTER}>
         <SecondaryButton onClick={setup.showKey}>{t('review')}</SecondaryButton>
