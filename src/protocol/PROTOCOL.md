@@ -354,9 +354,10 @@ RFC et les recalcule avec `cryptography` avant de les écrire ; WebCrypto (Node 
 Une nouvelle sous-clé (rotation, ou reprise d'une publication interrompue) s'écrit dans une nouvelle version du coffre,
 sans la clé de récupération : le client déchiffre le blob avec la VDK de son trousseau, ajoute la sous-clé au trousseau
 et le rechiffre avec la même VDK, sous l'AAD de la version suivante (`vaultVersion + 1`) et avec un `nonceB` neuf.
-`salt`, `nonceK` et `wrappedVdk` ne changent pas ; seule la régénération de RK (KEY-35) les renouvelle. Le trousseau
-relu DOIT contenir toutes les sous-clés du trousseau de l'appareil : une version plus ancienne, resservie, en
-perdrait. Le serveur n'accepte que la version qui suit l'enregistrée (409 `VAULT_VERSION_CONFLICT` sinon).
+`salt`, `nonceK` et `wrappedVdk` ne changent pas ; seules la régénération de RK (KEY-35) et la réinitialisation (5.6)
+les renouvellent. Le trousseau relu DOIT contenir toutes les sous-clés du trousseau de l'appareil : une version plus
+ancienne, resservie, en perdrait. Le serveur n'accepte que la version qui suit l'enregistrée (409
+`VAULT_VERSION_CONFLICT` sinon).
 
 **Sous-clé jamais publiée (ADR 0029, point 11).** Quand la sous-clé la plus récente a plus de 4 minutes, la reprise
 la redate au lieu d'en ajouter une, si elle est tenue pour jamais publiée : `GET /api/v1/users/{moi}/keys` ne la sert
