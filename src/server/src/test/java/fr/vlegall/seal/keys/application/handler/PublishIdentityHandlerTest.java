@@ -13,7 +13,6 @@ import fr.vlegall.seal.keys.domain.model.ProofOfPossession;
 import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.port.out.AccountPort;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
-import fr.vlegall.seal.keys.domain.port.out.ChallengeRepository;
 import fr.vlegall.seal.keys.domain.port.out.KeyEventPort;
 import java.time.Clock;
 import java.time.Instant;
@@ -36,7 +35,7 @@ class PublishIdentityHandlerTest {
     private static final UserId OTHER = new UserId(UUID.fromString("0192f7a1-ffff-7000-8000-000000000b0b"));
     private static final Instant NOW = Instant.parse("2026-11-13T12:00:00Z");
 
-    private final FakeChallenges challenges = new FakeChallenges();
+    private final InMemoryChallenges challenges = new InMemoryChallenges();
     private final FakeCertification certification = new FakeCertification();
     private final List<UserId> published = new ArrayList<>();
     private final Map<UserId, String> usernames = new HashMap<>(Map.of(USER, "valentin", OTHER, "autre"));
@@ -66,6 +65,11 @@ class PublishIdentityHandlerTest {
             @Override
             public void identityPublished(UserId user, byte[] serial) {
                 published.add(user);
+            }
+
+            @Override
+            public void identityReset(UserId user, byte[] serial) {
+                throw new AssertionError("KEY-03 : la publication ne réinitialise rien");
             }
 
             @Override
@@ -189,29 +193,6 @@ class PublishIdentityHandlerTest {
         assertThat(certification.issued).isEmpty();
     }
 
-    /** Défi tel que {@code key_challenges} le garde : son haché et son expiration. */
-    private record Stored(byte[] hash, Instant expiresAt) {}
-
-    /** Table key_challenges en mémoire : un défi vivant par compte. */
-    private final class FakeChallenges implements ChallengeRepository {
-        final Map<UserId, Stored> live = new HashMap<>();
-
-        @Override
-        public void renew(UserId user, byte[] hash, Instant expiresAt) {
-            live.put(user, new Stored(hash.clone(), expiresAt));
-        }
-
-        @Override
-        public boolean consume(UserId user, byte[] hash, Instant at) {
-            Stored stored = live.get(user);
-            if (stored == null || !Arrays.equals(stored.hash(), hash) || !at.isBefore(stored.expiresAt())) {
-                return false;
-            }
-            live.remove(user);
-            return true;
-        }
-    }
-
     private static final class FakeCertification implements CertificationPort {
         final List<IdentityCertificate> issued = new ArrayList<>();
         boolean refuse;
@@ -225,6 +206,11 @@ class PublishIdentityHandlerTest {
                     new byte[16], new byte[8], subject, username, ikPublic, NOW, NOW, 3, new byte[64]);
             issued.add(certificate);
             return Optional.of(certificate);
+        }
+
+        @Override
+        public Optional<IdentityCertificate> supersede(UserId subject, String username, byte[] ikPublic) {
+            throw new AssertionError("KEY-12 : la publication ne remplace aucun certificat");
         }
 
         @Override

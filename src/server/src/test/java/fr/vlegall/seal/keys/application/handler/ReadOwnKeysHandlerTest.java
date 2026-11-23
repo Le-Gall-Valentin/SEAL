@@ -59,6 +59,11 @@ class ReadOwnKeysHandlerTest {
             }
 
             @Override
+            public Optional<IdentityCertificate> supersede(UserId subject, String username, byte[] ikPublic) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
             public Optional<IdentityCertificate> current(UserId subject) {
                 calls.add("current " + subject.value());
                 return current;

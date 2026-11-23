@@ -7,14 +7,17 @@ import fr.vlegall.seal.common.web.Base64Url;
 import fr.vlegall.seal.keys.application.port.in.CreateChallengeUseCase;
 import fr.vlegall.seal.keys.application.port.in.PublishIdentityUseCase;
 import fr.vlegall.seal.keys.application.port.in.PublishSubkeyUseCase;
+import fr.vlegall.seal.keys.application.port.in.ResetIdentityUseCase;
 import fr.vlegall.seal.keys.application.port.in.SaveVaultUseCase;
 import fr.vlegall.seal.keys.application.port.in.VaultQuery;
 import fr.vlegall.seal.keys.domain.model.IdentityPublication;
+import fr.vlegall.seal.keys.domain.model.IdentityReset;
 import fr.vlegall.seal.keys.domain.model.SubkeyPublication;
 import fr.vlegall.seal.keys.infrastructure.web.dto.CertificateView;
 import fr.vlegall.seal.keys.infrastructure.web.dto.ChallengeView;
 import fr.vlegall.seal.keys.infrastructure.web.dto.PublishIdentityRequest;
 import fr.vlegall.seal.keys.infrastructure.web.dto.PublishSubkeyRequest;
+import fr.vlegall.seal.keys.infrastructure.web.dto.ResetIdentityRequest;
 import fr.vlegall.seal.keys.infrastructure.web.dto.VaultRequest;
 import fr.vlegall.seal.keys.infrastructure.web.dto.VaultView;
 import fr.vlegall.seal.security.web.CurrentUser;
@@ -41,18 +44,21 @@ public class KeysController {
     private final PublishSubkeyUseCase subkeys;
     private final VaultQuery vaults;
     private final SaveVaultUseCase vaultSaver;
+    private final ResetIdentityUseCase resets;
 
     public KeysController(
             CreateChallengeUseCase challenges,
             PublishIdentityUseCase identities,
             PublishSubkeyUseCase subkeys,
             VaultQuery vaults,
-            SaveVaultUseCase vaultSaver) {
+            SaveVaultUseCase vaultSaver,
+            ResetIdentityUseCase resets) {
         this.challenges = challenges;
         this.identities = identities;
         this.subkeys = subkeys;
         this.vaults = vaults;
         this.vaultSaver = vaultSaver;
+        this.resets = resets;
     }
 
     /** KEY-03 : 32 octets, 5 minutes ; remplace le défi précédent (ADR 0025, point 8). */
@@ -74,6 +80,27 @@ public class KeysController {
             case IdentityPublication.ChallengeExpired expired -> throw new SealException(ErrorCode.CODE_EXPIRED);
             case IdentityPublication.InvalidSignature invalid -> throw new SealException(ErrorCode.INVALID_SIGNATURE);
             case IdentityPublication.Refused refused -> throw new SealException(ErrorCode.FORBIDDEN);
+        };
+    }
+
+    /**
+     * KEY-34 : nouvelle IK et nouveau coffre, en mode sudo et en une transaction ; statuts de l'ADR 0036, point 1. Le
+     * mode sudo et le compte actif sont vérifiés par le handler (SEC-03), qui lève 403.
+     */
+    @PostMapping("/identity/reset")
+    public CertificateView reset(@CurrentUser UserId user, @Valid @RequestBody ResetIdentityRequest body) {
+        IdentityReset result = resets.reset(
+                user,
+                Base64Url.decode(body.ikPublic()),
+                Base64Url.decode(body.challenge()),
+                Base64Url.decode(body.signature()),
+                body.vault().toVault());
+        return switch (result) {
+            case IdentityReset.Reset reset -> CertificateView.of(reset.certificate());
+            case IdentityReset.NoVault none -> throw new SealException(ErrorCode.KEY_NOT_FOUND);
+            case IdentityReset.ChallengeExpired expired -> throw new SealException(ErrorCode.CODE_EXPIRED);
+            case IdentityReset.InvalidSignature invalid -> throw new SealException(ErrorCode.INVALID_SIGNATURE);
+            case IdentityReset.VaultConflict conflict -> throw new SealException(ErrorCode.VAULT_VERSION_CONFLICT);
         };
     }
 

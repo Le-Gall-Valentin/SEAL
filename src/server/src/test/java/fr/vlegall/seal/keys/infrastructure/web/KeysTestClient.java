@@ -24,6 +24,8 @@ final class KeysTestClient {
 
     static final String CHALLENGE = "/api/v1/keys/challenge";
     static final String IDENTITY = "/api/v1/keys/identity";
+    static final String RESET = "/api/v1/keys/identity/reset";
+    static final String VAULT = "/api/v1/keys/vault";
 
     final AuthClient client;
     final UUID id;
@@ -89,5 +91,35 @@ final class KeysTestClient {
         JsonNode certificate =
                 AuthClient.body(putIdentity(proof()).andExpect(status().isOk()).andReturn());
         return Base64Url.decode(certificate.get("serial").asString());
+    }
+
+    /** Corps de {@code PUT /keys/vault} : champs aux bonnes tailles, blob de {@code blobBytes} marqué au premier octet. */
+    static Map<String, Object> vault(long version, int blobBytes, int marker) {
+        byte[] blob = new byte[blobBytes];
+        blob[0] = (byte) marker;
+        Map<String, Object> body = new HashMap<>();
+        body.put("vaultVersion", version);
+        body.put("salt", Base64Url.encode(new byte[32]));
+        body.put("nonceK", Base64Url.encode(new byte[12]));
+        body.put("wrappedVdk", Base64Url.encode(new byte[48]));
+        body.put("nonceB", Base64Url.encode(new byte[12]));
+        body.put("blob", Base64Url.encode(blob));
+        return body;
+    }
+
+    /** KEY-32 : écrit le coffre de ce compte. */
+    void saveVault(Map<String, Object> vault) throws Exception {
+        mvc.perform(unsafe(put(VAULT), vault)).andExpect(status().isNoContent());
+    }
+
+    /** KEY-34 : corps de {@code POST /keys/identity/reset}, preuve de {@code key} sur un défi neuf et coffre. */
+    Map<String, Object> resetBody(Ed25519.GeneratedKey key, Map<String, Object> vault) throws Exception {
+        Map<String, Object> body = proof(id, challenge(), key);
+        body.put("vault", vault);
+        return body;
+    }
+
+    ResultActions reset(Map<String, Object> body) throws Exception {
+        return mvc.perform(unsafe(post(RESET), body));
     }
 }

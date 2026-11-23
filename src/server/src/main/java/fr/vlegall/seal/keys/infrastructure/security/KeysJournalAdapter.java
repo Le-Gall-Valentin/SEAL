@@ -36,6 +36,14 @@ public class KeysJournalAdapter implements KeyEventPort {
                 Map.of("serial", HexFormat.of().formatHex(serial))));
     }
 
+    @Override
+    public void identityReset(UserId user, byte[] serial) {
+        journal.recordInTransaction(new SecurityEvent(
+                SecurityEventType.IDENTITY_KEY_RESET,
+                user,
+                Map.of("serial", HexFormat.of().formatHex(serial))));
+    }
+
     /**
      * A09 (CDC section 15) : alerte sur les échecs cryptographiques répétés, avec la route et le compte, pour voir qui
      * les accumule ; aucune valeur reçue, ni clé, ni signature, ni défi (SEC-21). L'identifiant de corrélation du
@@ -49,6 +57,7 @@ public class KeysJournalAdapter implements KeyEventPort {
     private static String route(SignedStructure structure) {
         return switch (structure) {
             case PROOF_OF_POSSESSION -> "PUT /api/v1/keys/identity";
+            case RESET_PROOF_OF_POSSESSION -> "POST /api/v1/keys/identity/reset";
             case SUBKEY_BINDING -> "POST /api/v1/keys/subkeys";
         };
     }

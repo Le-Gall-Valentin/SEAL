@@ -11,6 +11,9 @@ public interface KeyEventPort {
 
     void identityPublished(UserId user, byte[] serial);
 
+    /** KEY-34 : identité réinitialisée, avec le numéro de série du nouveau certificat (rotation de clé). */
+    void identityReset(UserId user, byte[] serial);
+
     void subkeyPublished(UserId user, byte[] ekId);
 
     /**
