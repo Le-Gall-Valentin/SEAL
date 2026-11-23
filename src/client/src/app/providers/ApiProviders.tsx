@@ -6,6 +6,7 @@ import {
   UsernameAvailabilityApiProvider,
 } from '@/entities/account'
 import { AuthorityApiProvider, type IAuthorityApi } from '@/entities/authority'
+import { FriendsApiProvider, type IFriendsApi } from '@/entities/friend'
 import { type IKeysApi, KeysApiProvider } from '@/entities/keyring'
 import { type IOAuthProvidersApi, OAuthProvidersApiProvider } from '@/entities/oauth-provider'
 import { type IPasswordBlocklist, PasswordBlocklistProvider } from '@/entities/password'
@@ -43,6 +44,7 @@ export interface Apis {
   readonly profile: IProfileApi
   readonly passwordChange: IPasswordChangeApi
   readonly emailChange: IEmailChangeApi
+  readonly friends: IFriendsApi
 }
 
 interface ApiProvidersProps {
@@ -88,6 +90,7 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
       <PasswordChangeApiProvider api={apis.passwordChange}>{inner}</PasswordChangeApiProvider>
     ),
     (inner) => <EmailChangeApiProvider api={apis.emailChange}>{inner}</EmailChangeApiProvider>,
+    (inner) => <FriendsApiProvider api={apis.friends}>{inner}</FriendsApiProvider>,
   ]
   return layers.reduceRight<ReactNode>((inner, layer) => layer(inner), children)
 }

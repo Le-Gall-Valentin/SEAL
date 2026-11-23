@@ -70,6 +70,11 @@ function fakeApis(account: Account | null): Apis {
     profile: { changeDisplayName: never },
     passwordChange: { changePassword: never },
     emailChange: { request: never, confirm: never },
+    friends: {
+      friends: () => Promise.resolve({ items: [], next: null }),
+      receivedRequests: () => Promise.resolve({ items: [], next: null }),
+      sentRequests: () => Promise.resolve({ items: [], next: null }),
+    },
   }
 }
 

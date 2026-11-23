@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { loginMethodsApi, usernameAvailabilityApi } from '@/entities/account'
 import { authorityApi } from '@/entities/authority'
+import { friendsApi } from '@/entities/friend'
 import { keysApi } from '@/entities/keyring'
 import { oauthProvidersApi } from '@/entities/oauth-provider'
 import { passwordBlocklist } from '@/entities/password'
@@ -52,6 +53,7 @@ const apis: Apis = {
   profile: profileApi,
   passwordChange: passwordChangeApi,
   emailChange: emailChangeApi,
+  friends: friendsApi,
 }
 
 // KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un
