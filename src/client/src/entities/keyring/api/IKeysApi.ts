@@ -57,12 +57,22 @@ export interface VaultView {
   readonly blob: string
 }
 
+/** Corps de POST /api/v1/keys/identity/reset (KEY-34, ADR 0036) : preuve de la nouvelle IK et nouveau coffre. */
+export interface IdentityResetBody extends IdentityProofBody {
+  readonly vault: VaultView
+}
+
 /** Port de la tranche keyring (ADR 0024, point 7) : le modèle ne connaît que lui. */
 export interface IKeysApi {
   /** KEY-03 : défi de preuve de possession, 32 octets en base64url. */
   createChallenge(): Promise<string>
   /** KEY-03, KEY-04 : publie IK et rend le certificat émis, à vérifier avant tout usage (KEY-06). */
   publishIdentity(proof: IdentityProofBody): Promise<CertificateView>
+  /**
+   * KEY-34 : réinitialise l'identité, en mode sudo, et rend le nouveau certificat ; « conflict » si le coffre ne suit
+   * plus la version enregistrée (409). 403 REAUTH_REQUIRED remonte tel quel.
+   */
+  resetIdentity(body: IdentityResetBody): Promise<CertificateView | 'conflict'>
   /** KEY-05 : publie une sous-clé liée au certificat courant. */
   publishSubkey(binding: SubkeyBody): Promise<void>
   /** KEY-33 : le coffre du compte, ou rien s'il n'en a pas. */

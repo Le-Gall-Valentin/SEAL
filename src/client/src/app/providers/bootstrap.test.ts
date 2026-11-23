@@ -10,6 +10,7 @@ function apisWith(reloadCsrf: () => Promise<void>): Apis {
     keys: {
       createChallenge: never,
       publishIdentity: never,
+      resetIdentity: never,
       publishSubkey: never,
       readVault: never,
       saveVault: never,

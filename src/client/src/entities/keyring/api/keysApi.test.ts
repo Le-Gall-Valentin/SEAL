@@ -145,6 +145,33 @@ describe('entities/keyring : adaptateur de l’API des clés (KEY-02, KEY-03, KE
     await expect(keysApi.saveVault(VAULT)).resolves.toBe('conflict')
   })
 
+  it('KEY-34 : POST /keys/identity/reset envoie preuve et coffre et rend le certificat, ou conflict sur 409', async () => {
+    response = CERTIFICATE
+    const body = {
+      ikPublic: B32,
+      challenge: B32,
+      signature: B64,
+      vault: { ...VAULT, vaultVersion: 2 },
+    }
+
+    await expect(keysApi.resetIdentity(body)).resolves.toEqual({
+      ...CERTIFICATE,
+      notBefore: Date.UTC(2026, 10, 19, 12, 0, 0, 123),
+      notAfter: Date.UTC(2027, 11, 21, 12, 0, 0, 123),
+    })
+    expect(calls).toEqual([
+      { path: '/api/v1/keys/identity/reset', options: { method: 'POST', body } },
+    ])
+
+    failure = new ApiError(409, 'VAULT_VERSION_CONFLICT')
+    await expect(keysApi.resetIdentity(body)).resolves.toBe('conflict')
+    failure = new ApiError(403, 'REAUTH_REQUIRED')
+    await expect(keysApi.resetIdentity(body)).rejects.toMatchObject({ code: 'REAUTH_REQUIRED' })
+    failure = undefined
+    response = { ...CERTIFICATE, extra: true }
+    await expect(keysApi.resetIdentity(body)).rejects.toMatchObject({ code: 'INTERNAL_ERROR' })
+  })
+
   it('KEY-33 : GET /users/{id}/keys rend certificat et sous-clés en millisecondes, et rien sur 404', async () => {
     response = { certificate: CERTIFICATE, subkeys: [SUBKEY] }
 
