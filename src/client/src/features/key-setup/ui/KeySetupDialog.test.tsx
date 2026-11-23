@@ -188,3 +188,24 @@ describe('KEY-30 : Dialogue-Cle-Recuperation, étape 2', () => {
     })
   })
 })
+
+describe('KEY-34 : Dialogue-Cle-Recuperation à la réinitialisation (ADR 0036)', () => {
+  it('KEY-34 : en variante « reset », le modèle reçoit le relais de la ré-authentification ; sinon, rien', async () => {
+    const onDone = vi.fn()
+    const onReauthRequired = vi.fn()
+    vi.mocked(useKeySetup).mockReturnValue(state())
+
+    await render(
+      <KeySetupDialog
+        owner={OWNER}
+        onDone={onDone}
+        variant="reset"
+        onReauthRequired={onReauthRequired}
+      />,
+    )
+    await render(<KeySetupDialog owner={OWNER} onDone={onDone} />)
+
+    expect(vi.mocked(useKeySetup).mock.calls.at(0)).toEqual([OWNER, onDone, { onReauthRequired }])
+    expect(vi.mocked(useKeySetup).mock.calls.at(-1)).toEqual([OWNER, onDone, undefined])
+  })
+})

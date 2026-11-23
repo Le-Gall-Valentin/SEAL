@@ -4,6 +4,8 @@ import {
   ForeignIdentityError,
   KEYS_LOCK,
   type KeyOwner,
+  prepareReset,
+  resetIdentity,
   setupKeys,
   StaleVaultError,
   useKeysApi,
@@ -16,7 +18,7 @@ import {
   type NewKeyring,
   pickRecoveryGroups,
 } from '@/shared/crypto'
-import { downloadText, failureOf, useClock, useHeldLock } from '@/shared/lib'
+import { ApiError, downloadText, failureOf, useClock, useHeldLock } from '@/shared/lib'
 import { keySetupMessages } from '../i18n'
 import { recoveryKeyFile } from './recoveryKeyFile'
 
@@ -47,12 +49,25 @@ export interface KeySetup {
 const GROUP_LENGTH = 4
 
 /**
+ * KEY-34, ADR 0036 : le dialogue sert à la réinitialisation de l'identité. Sur 403 REAUTH_REQUIRED, l'écran ouvre
+ * « Confirmez votre identité », puis appelle retry, qui renvoie la même identité.
+ */
+export interface KeyResetOptions {
+  readonly onReauthRequired: (retry: () => void) => void
+}
+
+/**
  * KEY-02, KEY-30, ADR 0029 (points 2 et 3) : Dialogue-Cle-Recuperation. La clé de récupération est tirée à l'ouverture
  * et montrée une seule fois ; deux groupes tirés au hasard la confirment ; « Terminer » génère alors IK, EK et la VDK,
  * une fois, et lance setupKeys (coffre, trousseau, publication). Rien n'est envoyé avant. Le verrou des clés est tenu
- * tant que le dialogue est ouvert : un autre onglet attend au lieu d'en ouvrir un second.
+ * tant que le dialogue est ouvert : un autre onglet attend au lieu d'en ouvrir un second. Avec `reset`, « Terminer »
+ * prépare une nouvelle identité et la fait remplacer l'ancienne (KEY-34, ADR 0036).
  */
-export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
+export function useKeySetup(
+  owner: KeyOwner,
+  onDone: () => void,
+  reset?: KeyResetOptions,
+): KeySetup {
   const t = useMessages(keySetupMessages)
   const api = useKeysApi()
   const store = useKeyStore()
@@ -98,16 +113,32 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
     }
   }, [existing.data, existing.isError, leave])
 
+  // « Terminer », ou la relance après la ré-authentification (KEY-34) ; le verrou running garde une seule sauvegarde.
+  function start(): void {
+    if (!running.current) {
+      running.current = true
+      setup.mutate()
+    }
+  }
+
   const setup = useMutation({
     mutationFn: async () => {
-      pending.current ??= await generateKeyring(owner.userId, recoveryKey, clock.now())
-      return setupKeys({ api, store, owner, clock }, pending.current)
+      const context = { api, store, owner, clock }
+      if (reset === undefined) {
+        pending.current ??= await generateKeyring(owner.userId, recoveryKey, clock.now())
+        return setupKeys(context, pending.current)
+      }
+      // KEY-34 : préparée une fois, l'identité est gardée pour la relance qui suit la ré-authentification.
+      pending.current ??= await prepareReset(context, recoveryKey)
+      return resetIdentity(context, pending.current)
     },
     onSuccess: leave,
     onError: (error) => {
       // Certificat d'une autre IK, coffre rejoué : la zone du compte décide de l'écran (ADR 0029, point 5).
       if (error instanceof ForeignIdentityError || error instanceof StaleVaultError) {
         leave()
+      } else if (reset !== undefined && isReauthRequired(error)) {
+        reset.onReauthRequired(start)
       }
     },
     onSettled: () => {
@@ -145,9 +176,8 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
       downloadText(file.name, file.text)
     },
     finish: () => {
-      if (confirmed && !running.current) {
-        running.current = true
-        setup.mutate()
+      if (confirmed) {
+        start()
       }
     },
     saving: setup.isPending,
@@ -155,8 +185,13 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
   }
 }
 
+/** AUTH-55 : le mode sudo est fermé ; ce n'est pas un échec à afficher, la ré-authentification s'ouvre. */
+function isReauthRequired(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403 && error.code === 'REAUTH_REQUIRED'
+}
+
 function failureFrom(error: Error | null): KeySetup['failure'] {
-  if (error === null) {
+  if (error === null || isReauthRequired(error)) {
     return null
   }
   return failureOf(error).kind === 'network' ? 'network' : 'unexpected'

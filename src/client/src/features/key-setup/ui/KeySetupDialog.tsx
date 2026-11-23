@@ -5,11 +5,19 @@ import { Alert, Dialog, FailureAlert, FieldError, FieldLabel, SecondaryButton } 
 import { keySetupMessages } from '../i18n'
 import { type KeySetup, type Slot, useKeySetup } from '../model/useKeySetup'
 
-interface KeySetupDialogProps {
+type KeySetupDialogProps = {
   readonly owner: KeyOwner
   /** Appelé une fois le parcours fini, ou repris par un autre onglet : la zone du compte relit l'état des clés. */
   readonly onDone: () => void
-}
+} & (
+  | { readonly variant?: 'setup' }
+  | {
+      /** KEY-34, ADR 0036 : nouvelle identité qui remplace l'ancienne, en mode sudo. */
+      readonly variant: 'reset'
+      /** 403 REAUTH_REQUIRED : l'écran ouvre la ré-authentification, puis appelle retry (ADR 0035). */
+      readonly onReauthRequired: (retry: () => void) => void
+    }
+)
 
 const HEADER = 'flex flex-col gap-1 px-6 pt-6 pb-3'
 const STEP = 'text-[12px] font-semibold tracking-[0.08em] text-ink-3 uppercase'
@@ -22,9 +30,17 @@ const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
 const PRIMARY = `h-11 rounded-[10px] bg-accent px-4 font-sans text-[14.5px] font-semibold text-on-accent disabled:opacity-55 ${FOCUS_RING}`
 
-/** KEY-02, KEY-30 : Dialogue-Cle-Recuperation, en deux étapes, sur le fond seul (ADR 0029). */
-export function KeySetupDialog({ owner, onDone }: KeySetupDialogProps) {
-  const setup = useKeySetup(owner, onDone)
+/**
+ * KEY-02, KEY-30 : Dialogue-Cle-Recuperation, en deux étapes, sur le fond seul (ADR 0029) ; à la première connexion,
+ * ou à la réinitialisation de l'identité (KEY-34, ADR 0036 point 3), avec les mêmes textes.
+ */
+export function KeySetupDialog(props: KeySetupDialogProps) {
+  const { owner, onDone } = props
+  const setup = useKeySetup(
+    owner,
+    onDone,
+    props.variant === 'reset' ? { onReauthRequired: props.onReauthRequired } : undefined,
+  )
   const titleId = useId()
   const textId = useId()
   if (!setup.ready) {
