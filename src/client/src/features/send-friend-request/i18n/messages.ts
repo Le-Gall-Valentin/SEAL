@@ -5,6 +5,7 @@ import { defineMessages } from '@/shared/i18n'
 export const sendFriendRequestMessages = defineMessages({
   fr: {
     title: 'Ajouter un ami',
+    close: 'Fermer',
     username: 'Identifiant',
     submit: 'Envoyer l’invitation',
     help: 'Saisissez l’identifiant exact : SEAL ne propose pas d’annuaire d’utilisateurs.',

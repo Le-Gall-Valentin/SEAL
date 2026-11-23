@@ -4,6 +4,7 @@ import { ForgotPasswordPage } from '@/pages/forgot-password'
 import { HomePage } from '@/pages/home'
 import { LoginPage } from '@/pages/login'
 import { RegisterPage } from '@/pages/register'
+import { FriendsPage } from '@/pages/friends'
 import { SettingsPage } from '@/pages/settings'
 import { ResetPasswordPage } from '@/pages/reset-password'
 import { VerifyEmailPage } from '@/pages/verify-email'
@@ -26,6 +27,7 @@ export const routes = withRootErrorBoundary([
         element: <AppShell />,
         children: [
           { path: ROUTES.HOME, element: <HomePage /> },
+          { path: ROUTES.FRIENDS, element: <FriendsPage /> },
           { path: ROUTES.SETTINGS, element: <SettingsPage /> },
         ],
       },

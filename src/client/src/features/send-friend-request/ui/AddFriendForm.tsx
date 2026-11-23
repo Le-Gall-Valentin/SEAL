@@ -1,19 +1,29 @@
-import { useId } from 'react'
+import { type Ref, useId } from 'react'
 import { useMessages } from '@/shared/i18n'
-import { Alert, FieldError, FieldLabel, FormAlert, Notice, PrimaryButton } from '@/shared/ui'
+import { Alert, FieldError, FieldLabel, FormAlert, Notice } from '@/shared/ui'
 import { sendFriendRequestMessages } from '../i18n'
 import { INVITED_USERNAME_MAX_LENGTH } from '../model/invitedUsername'
 import { type SendOutcome, useSendFriendRequest } from '../model/useSendFriendRequest'
+import { PersonPlusIcon } from './icons'
 import { UsernameInText } from './UsernameInText'
 
 interface AddFriendFormProps {
   /** FRD-01 : « Accepter l’invitation » après un 409 INCOMING_REQUEST_EXISTS ; la page fournit l'acceptation. */
   readonly onAccept: (requestId: string) => void
   readonly accepting: boolean
+  /** Feuille du téléphone : champ et bouton sur toute la largeur (Amis-Telephone). */
+  readonly variant?: 'aside' | 'sheet' | undefined
+  /** Pour placer le focus sur le champ (« Ajouter un ami » de l'état vide, ordinateur). */
+  readonly inputRef?: Ref<HTMLInputElement> | undefined
 }
 
 /** Formulaire « Ajouter un ami » de l'aside (Amis-Ordinateur) et de la feuille (Amis-Telephone), ADR 0038. */
-export function AddFriendForm({ onAccept, accepting }: AddFriendFormProps) {
+export function AddFriendForm({
+  onAccept,
+  accepting,
+  variant = 'aside',
+  inputRef,
+}: AddFriendFormProps) {
   const t = useMessages(sendFriendRequestMessages)
   const form = useSendFriendRequest()
   const id = useId()
@@ -27,14 +37,17 @@ export function AddFriendForm({ onAccept, accepting }: AddFriendFormProps) {
         form.submit()
       }}
     >
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex min-w-0 flex-[1_1_192px] flex-col gap-1.5">
+      <div className={`flex flex-wrap items-end ${variant === 'sheet' ? 'gap-2.5' : 'gap-2'}`}>
+        <div
+          className={`flex min-w-0 flex-col gap-1.5 ${variant === 'sheet' ? 'basis-full' : 'flex-[1_1_192px]'}`}
+        >
           <FieldLabel htmlFor={id}>{t('username')}</FieldLabel>
           <div className="flex h-11 items-center rounded-[10px] bg-surface px-3 inset-ring inset-ring-line-strong focus-within:ring-3 focus-within:ring-focus-glow focus-within:inset-ring-accent">
             <span aria-hidden="true" className="font-mono text-[15px] text-ink-3">
               @
             </span>
             <input
+              ref={inputRef}
               id={id}
               value={form.value}
               onChange={(event) => {
@@ -50,7 +63,14 @@ export function AddFriendForm({ onAccept, accepting }: AddFriendFormProps) {
             />
           </div>
         </div>
-        <PrimaryButton disabled={form.locked || form.pending}>{t('submit')}</PrimaryButton>
+        <button
+          type="submit"
+          disabled={form.locked || form.pending}
+          className={`inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-accent pr-4 pl-3.5 text-[14.5px] font-semibold text-on-accent hover:bg-accent-hover disabled:opacity-55 ${variant === 'sheet' ? 'flex-1' : ''}`}
+        >
+          <PersonPlusIcon />
+          {t('submit')}
+        </button>
       </div>
       <FieldError id={errorId} error={form.formatInvalid ? t('invalidUsername') : null} />
       <Outcome outcome={form.outcome} onAccept={onAccept} accepting={accepting} />
