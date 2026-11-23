@@ -43,6 +43,11 @@
   --color-accent-text: var(--accent-text);
   --color-accent-line: var(--accent-line);
   --color-av-moss: var(--av-moss);
+  --color-av-ice: var(--av-ice);
+  --color-av-birch: var(--av-birch);
+  --color-av-heather: var(--av-heather);
+  --color-av-clay: var(--av-clay);
+  --color-av-lichen: var(--av-lichen);
   --color-switch-off: var(--switch-off);
   --color-thumb-off: var(--thumb-off);
   --color-danger: var(--danger);

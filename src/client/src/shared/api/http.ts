@@ -19,7 +19,20 @@ const CSRF_HEADER = 'X-XSRF-TOKEN'
 const PROBLEM = z.object({
   code: z.string().max(64),
   fields: z.array(z.string().max(200)).max(100).optional(),
+  requestId: z.string().max(64).optional(),
 })
+
+/** UUID textuel, comme les identifiants du serveur. */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/** FRD-01, ADR 0038 (point 8) : seule l'invitation reçue d'un 409 INCOMING_REQUEST_EXISTS est gardée. */
+function requestIdOf(code: string, requestId: string | undefined): string | null {
+  return code === 'INCOMING_REQUEST_EXISTS' &&
+    requestId !== undefined &&
+    UUID_PATTERN.test(requestId)
+    ? requestId
+    : null
+}
 
 function csrfToken(): string | null {
   for (const cookie of document.cookie.split(';')) {
@@ -47,6 +60,7 @@ async function problemOf(response: Response): Promise<ApiError> {
   return new ApiError(response.status, toErrorCode(parsed.data.code), {
     fields: parsed.data.fields ?? [],
     retryAfterSeconds: retryAfterSeconds(response),
+    requestId: requestIdOf(parsed.data.code, parsed.data.requestId),
   })
 }
 

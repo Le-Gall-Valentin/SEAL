@@ -143,6 +143,34 @@ describe('shared/api : client HTTP de SEAL', () => {
     expect(String(error)).not.toContain('texte du serveur')
   })
 
+  it('FRD-01, ADR 0038 (point 8) : un 409 INCOMING_REQUEST_EXISTS garde le requestId de l’invitation reçue', async () => {
+    const requestId = '0193a1b2-0000-7000-8000-00000000c0de'
+    stubFetch(() => problem(409, { status: 409, code: 'INCOMING_REQUEST_EXISTS', requestId }))
+
+    const error = await rejection(
+      requestNoContent('/api/v1/friend-requests', { method: 'POST', body: {} }),
+    )
+
+    expect(error).toMatchObject({ status: 409, code: 'INCOMING_REQUEST_EXISTS', requestId })
+  })
+
+  it.each([
+    ['un requestId qui n’est pas un UUID', 'INCOMING_REQUEST_EXISTS', 'pas-un-uuid'],
+    [
+      'un requestId sur un autre code',
+      'REQUEST_ALREADY_PENDING',
+      '0193a1b2-0000-7000-8000-00000000c0de',
+    ],
+  ])('ADR 0038 (point 8) : %s est ignoré', async (_cas, code, requestId) => {
+    stubFetch(() => problem(409, { status: 409, code, requestId }))
+
+    const error = await rejection(
+      requestNoContent('/api/v1/friend-requests', { method: 'POST', body: {} }),
+    )
+
+    expect(error).toMatchObject({ code, requestId: null })
+  })
+
   it.each([
     [
       'un corps qui n’est pas du JSON',

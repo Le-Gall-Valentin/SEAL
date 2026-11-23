@@ -20,7 +20,7 @@ import {
 } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { useMediaQuery, WIDE_SCREEN } from '@/shared/lib'
-import { LockIcon } from '@/shared/ui'
+import { Avatar, LockIcon } from '@/shared/ui'
 import { settingsMessages } from '../i18n'
 import { AccountIcon, ChevronLeft, ChevronRight } from './icons'
 
@@ -192,12 +192,7 @@ function PhoneList({
         to={SETTINGS_ACCOUNT}
         className="flex items-center gap-3.5 rounded-[18px] bg-surface py-3.5 pr-2.5 pl-3.5 text-ink no-underline inset-ring inset-ring-line"
       >
-        <span
-          aria-hidden="true"
-          className="grid size-14 flex-none place-items-center rounded-full bg-av-moss text-[20px] font-semibold text-ink-2"
-        >
-          {initialsOf(account.displayName)}
-        </span>
+        <Avatar initials={initialsOf(account.displayName)} size={56} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.75">
           <span className="truncate text-[17px] font-bold tracking-[-0.01em]">
             {account.displayName}

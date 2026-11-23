@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { DisplayNameField, initialsOf } from '@/entities/account'
 import type { Account } from '@/entities/session'
 import { useMessages } from '@/shared/i18n'
-import { FormAlert, LockIcon } from '@/shared/ui'
+import { Avatar, FormAlert, LockIcon } from '@/shared/ui'
 import { displayNameMessages } from '../i18n'
 import { useDisplayNameForm } from '../model/useDisplayNameForm'
 
@@ -31,12 +31,7 @@ export function ProfileCard({
         {t('profile')}
       </Heading>
       <div className="flex items-center gap-4">
-        <span
-          aria-hidden="true"
-          className="grid size-16 flex-none place-items-center rounded-full bg-av-moss text-[23px] font-semibold text-ink-2"
-        >
-          {initialsOf(account.displayName)}
-        </span>
+        <Avatar initials={initialsOf(account.displayName)} size={64} />
         <span className="text-[13px] leading-[1.4] text-ink-3">{t('avatarNote')}</span>
       </div>
       <FormAlert failure={form.formFailure} />

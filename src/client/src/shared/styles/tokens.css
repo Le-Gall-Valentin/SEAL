@@ -20,8 +20,13 @@
   --accent-hover: #525e15;
   --accent-soft: #eef1e2;
   --accent-soft-2: #e5ead3;
-  /* Avatar à initiales (Parametres-*, ADR 0035). */
+  /* Avatar à initiales : six teintes (Parametres-*, Amis-*, ADR 0035, ADR 0038). */
   --av-moss: #e5ead3;
+  --av-ice: #dde8e5;
+  --av-birch: #e9e3d6;
+  --av-heather: #e4e1ea;
+  --av-clay: #e8ddd6;
+  --av-lichen: #dce4d9;
   /* Interrupteur (Parametres-Telephone-Preferences, ADR 0035). */
   --switch-off: #cdd2c0;
   --thumb-off: #ffffff;
@@ -68,6 +73,11 @@
     --accent-soft: #1e2611;
     --accent-soft-2: #26301a;
     --av-moss: #232c16;
+    --av-ice: #1d2a28;
+    --av-birch: #2a261d;
+    --av-heather: #25232b;
+    --av-clay: #2b221e;
+    --av-lichen: #1f271d;
     --switch-off: #364029;
     --thumb-off: #99a187;
     --accent-text: #c2d26a;

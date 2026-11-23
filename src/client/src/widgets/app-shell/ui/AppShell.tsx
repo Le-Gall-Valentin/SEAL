@@ -4,7 +4,7 @@ import { initialsOf } from '@/entities/account'
 import { useCurrentAccount } from '@/entities/session'
 import { ROUTES, settingsSectionOf } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
-import { PhoqueHead } from '@/shared/ui'
+import { Avatar, PhoqueHead } from '@/shared/ui'
 import { appShellMessages } from '../i18n'
 import { ConversationsIcon, SettingsIcon } from './icons'
 
@@ -100,9 +100,9 @@ function ProfileLink() {
     <Link
       to={ROUTES.SETTINGS}
       aria-label={t('profile')}
-      className="grid size-10 place-items-center rounded-full bg-av-moss text-[13px] font-semibold text-ink-2 no-underline"
+      className="grid size-10 place-items-center rounded-full no-underline"
     >
-      <span aria-hidden="true">{account == null ? '' : initialsOf(account.displayName)}</span>
+      <Avatar initials={account == null ? '' : initialsOf(account.displayName)} size={40} />
     </Link>
   )
 }
