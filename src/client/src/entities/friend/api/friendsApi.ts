@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { request } from '@/shared/api'
-import type { IFriendsApi, Page } from './IFriendsApi'
+import type { IFriendsApi, Page, SentRequest } from './IFriendsApi'
 
 /** Taille de page demandée, le plafond du serveur (ADR 0037, point 3). */
 const PAGE_LIMIT = 50
@@ -28,12 +28,19 @@ const RECEIVED = z.strictObject({
 })
 
 // API-01 : une invitation envoyée ne porte jamais le nom affiché d'un non-ami.
-const SENT = z.strictObject({
+export const SENT_REQUEST_RESPONSE = z.strictObject({
   id: UUID,
   userId: UUID,
   username: USERNAME,
   createdAt: z.iso.datetime(),
 })
+
+const SENT = SENT_REQUEST_RESPONSE
+
+/** Invitation envoyée, date convertie ; aussi la réponse 201 de l'invitation (ADR 0037, point 7). */
+export function sentRequestOf(dto: z.infer<typeof SENT_REQUEST_RESPONSE>): SentRequest {
+  return { ...dto, createdAt: new Date(dto.createdAt) }
+}
 
 function pageOf<T extends z.ZodType>(item: T) {
   return z.strictObject({ items: z.array(item).max(PAGE_LIMIT), next: UUID.nullable() })

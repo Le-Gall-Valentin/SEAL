@@ -75,6 +75,7 @@ function fakeApis(account: Account | null): Apis {
       receivedRequests: () => Promise.resolve({ items: [], next: null }),
       sentRequests: () => Promise.resolve({ items: [], next: null }),
     },
+    sendFriendRequest: { send: never },
   }
 }
 

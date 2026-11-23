@@ -17,6 +17,7 @@ import { oauthRegistrationApi } from '@/features/oauth-registration'
 import { passwordResetApi } from '@/features/password-reset'
 import { reauthApi } from '@/features/reauthenticate'
 import { registerApi } from '@/features/register'
+import { sendFriendRequestApi } from '@/features/send-friend-request'
 import { verifyEmailApi } from '@/features/verify-email'
 import { LanguageProvider } from '@/shared/i18n'
 import {
@@ -54,6 +55,7 @@ const apis: Apis = {
   passwordChange: passwordChangeApi,
   emailChange: emailChangeApi,
   friends: friendsApi,
+  sendFriendRequest: sendFriendRequestApi,
 }
 
 // KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un

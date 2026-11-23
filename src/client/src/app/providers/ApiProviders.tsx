@@ -23,6 +23,10 @@ import {
 import { type IPasswordResetApi, PasswordResetApiProvider } from '@/features/password-reset'
 import { type IReauthApi, ReauthApiProvider } from '@/features/reauthenticate'
 import { type IRegisterApi, RegisterApiProvider } from '@/features/register'
+import {
+  type ISendFriendRequestApi,
+  SendFriendRequestApiProvider,
+} from '@/features/send-friend-request'
 import { type IVerifyEmailApi, VerifyEmailApiProvider } from '@/features/verify-email'
 
 /** Les ports des tranches ; la racine de composition leur donne leurs adaptateurs, les tests des doublures. */
@@ -45,6 +49,7 @@ export interface Apis {
   readonly passwordChange: IPasswordChangeApi
   readonly emailChange: IEmailChangeApi
   readonly friends: IFriendsApi
+  readonly sendFriendRequest: ISendFriendRequestApi
 }
 
 interface ApiProvidersProps {
@@ -91,6 +96,11 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
     ),
     (inner) => <EmailChangeApiProvider api={apis.emailChange}>{inner}</EmailChangeApiProvider>,
     (inner) => <FriendsApiProvider api={apis.friends}>{inner}</FriendsApiProvider>,
+    (inner) => (
+      <SendFriendRequestApiProvider api={apis.sendFriendRequest}>
+        {inner}
+      </SendFriendRequestApiProvider>
+    ),
   ]
   return layers.reduceRight<ReactNode>((inner, layer) => layer(inner), children)
 }

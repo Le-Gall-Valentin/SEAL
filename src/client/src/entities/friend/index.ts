@@ -1,6 +1,6 @@
 // API publique de la tranche friend (ADR 0012) : listes d'amis et d'invitations (14.4, ADR 0037, ADR 0038).
 export type { Friend, IFriendsApi, Page, ReceivedRequest, SentRequest } from './api/IFriendsApi'
-export { friendsApi } from './api/friendsApi'
+export { friendsApi, SENT_REQUEST_RESPONSE, sentRequestOf } from './api/friendsApi'
 export { FriendsApiProvider } from './model/friendsPort'
 export { matchFriend, normalizeSearch, tintOf, usernameInitials } from './model/friends'
 export {
