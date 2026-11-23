@@ -29,3 +29,14 @@ export function SettingsIcon() {
     </svg>
   )
 }
+
+export function FriendsIcon() {
+  return (
+    <svg {...STROKE}>
+      <circle cx="9" cy="7.8" r="3.6" />
+      <path d="M2.5 20c.6-3.5 3.2-5.6 6.5-5.6s5.9 2.1 6.5 5.6" />
+      <path d="M15.5 4.6a3.4 3.4 0 0 1 0 6.4" />
+      <path d="M17.6 14.7c2.1.7 3.5 2.6 3.9 5.3" />
+    </svg>
+  )
+}
