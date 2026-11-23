@@ -239,14 +239,21 @@ class FriendRequestSendIT {
             FriendsTestClient a = account("cra");
             FriendsTestClient b = account("crb");
 
-            List<Integer> statuses = Race.run(
-                    2,
-                    index -> (index == 0 ? a.invite(b.username) : b.invite(a.username))
-                            .andReturn()
-                            .getResponse()
-                            .getStatus());
+            List<MvcResult> results =
+                    Race.run(2, index -> (index == 0 ? a.invite(b.username) : b.invite(a.username)).andReturn());
 
-            assertThat(statuses).containsExactlyInAnyOrder(201, 409);
+            MvcResult created = results.stream()
+                    .filter(result -> result.getResponse().getStatus() == 201)
+                    .findFirst()
+                    .orElseThrow();
+            MvcResult refused = results.stream()
+                    .filter(result -> result != created)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(refused.getResponse().getStatus()).isEqualTo(409);
+            assertThat(AuthClient.body(refused).get("code").asString()).isEqualTo("INCOMING_REQUEST_EXISTS");
+            assertThat(AuthClient.body(refused).get("requestId").asString())
+                    .isEqualTo(AuthClient.body(created).get("id").asString());
             assertThat(pendingBetween(a.id, b.id)).isEqualTo(1);
         }
     }
