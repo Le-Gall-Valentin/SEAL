@@ -124,6 +124,12 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("KEY-34, ADR 0036 : seul l'adaptateur keys/infrastructure/pki fait émettre ou remplacer un certificat")
+    void onlyKeysAsksPkiForCertificates() {
+        ContextRules.onlyKeysAsksPkiForCertificates(ROOT).check(CLASSES);
+    }
+
+    @Test
     @DisplayName("ADR 0008, ADR 0025 (point 17) : seul authentication lit les coordonnées d'un compte")
     void onlyAuthenticationLooksUpAccounts() {
         ContextRules.onlyAuthenticationLooksUpAccounts(ROOT).check(CLASSES);

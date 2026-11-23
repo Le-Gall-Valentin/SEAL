@@ -27,6 +27,7 @@ import fr.vlegall.archfixture.common.FixtureProperties;
 import fr.vlegall.archfixture.common.TimeConfiguration;
 import fr.vlegall.archfixture.common.mail.FixtureMailer;
 import fr.vlegall.archfixture.crypto.PureCrypto;
+import fr.vlegall.archfixture.keys.infrastructure.pki.CertificationAdapter;
 import fr.vlegall.archfixture.security.FixtureJournal;
 import fr.vlegall.archfixture.security.session.FixtureSessionWriter;
 import org.junit.jupiter.api.DisplayName;
@@ -197,6 +198,13 @@ class ContextRulesTest {
         expectViolations(ContextRules.onlyAuthenticationLooksUpAccounts(ROOT), "ContactAdapter", "LookupAdapter");
         expectAllowed(
                 ContextRules.onlyAuthenticationLooksUpAccounts(ROOT), AccountLookupAdapter.class, AlphaThing.class);
+    }
+
+    @Test
+    @DisplayName("KEY-34, ADR 0036 : seul l'adaptateur keys/infrastructure/pki fait émettre ou remplacer un certificat")
+    void adr0036OnlyKeysAsksPkiForCertificates() {
+        expectViolations(ContextRules.onlyKeysAsksPkiForCertificates(ROOT), "CertifyingAdapter", "ReplacingController");
+        expectAllowed(ContextRules.onlyKeysAsksPkiForCertificates(ROOT), CertificationAdapter.class, AlphaThing.class);
     }
 
     @Test
