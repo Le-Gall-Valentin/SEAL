@@ -36,6 +36,8 @@ class SendFriendRequestHandlerTest {
     private final List<String> calls = new ArrayList<>();
     private boolean blocked;
     private boolean open = true;
+    private boolean friends;
+    private Optional<FriendRequest> pending = Optional.empty();
 
     private SendFriendRequestHandler handler() {
         DirectoryPort directory = new DirectoryPort() {
@@ -59,7 +61,7 @@ class SendFriendRequestHandlerTest {
             @Override
             public boolean exists(UserPair pair) {
                 calls.add("friends");
-                return false;
+                return friends;
             }
 
             @Override
@@ -86,7 +88,7 @@ class SendFriendRequestHandlerTest {
             @Override
             public Optional<FriendRequest> pendingBetween(UserPair pair) {
                 calls.add("pending");
-                return Optional.empty();
+                return pending;
             }
 
             @Override
@@ -139,21 +141,51 @@ class SendFriendRequestHandlerTest {
     }
 
     @Test
-    @DisplayName("FRD-03 : un blocage consulte aussi la politique, pour ne pas se distinguer d'elle par le temps")
-    void frd03BlockAndPolicyAreBothConsulted() {
+    @DisplayName(
+            "FRD-03 : un blocage lit aussi amitié, invitations et politique, pour ne pas se distinguer par le temps")
+    void frd03BlockReadsEverythingBeforeDeciding() {
         blocked = true;
-
-        assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.CannotInvite.class);
-        assertThat(calls).contains("blocks", "policy").doesNotContain("friends", "pending", "create");
-    }
-
-    @Test
-    @DisplayName("FRD-03 : invitations fermées : même chemin que le blocage")
-    void frd03ClosedInvitationsTakeTheSamePath() {
         open = false;
 
         assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.CannotInvite.class);
-        assertThat(calls).contains("blocks", "policy").doesNotContain("friends", "pending", "create");
+        assertThat(calls).contains("blocks", "friends", "pending", "policy").doesNotContain("create");
+    }
+
+    @Test
+    @DisplayName("FRD-03 : invitations fermées : mêmes lectures que le blocage, même issue")
+    void frd03ClosedInvitationsReadTheSame() {
+        open = false;
+
+        assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.CannotInvite.class);
+        assertThat(calls).contains("blocks", "friends", "pending", "policy").doesNotContain("create");
+    }
+
+    @Test
+    @DisplayName("ADR 0037, point 9 : déjà amis passe avant les invitations fermées")
+    void adr0037AlreadyFriendsBeforeClosedInvitations() {
+        open = false;
+        friends = true;
+
+        assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.AlreadyFriends.class);
+    }
+
+    @Test
+    @DisplayName("ADR 0037, point 9 : une invitation reçue passe avant les invitations fermées de son émetteur")
+    void adr0037IncomingRequestBeforeClosedInvitations() {
+        open = false;
+        UUID id = UUID.randomUUID();
+        pending = Optional.of(new FriendRequest(id, RECEIVER, SENDER, RequestStatus.PENDING, NOW));
+
+        assertThat(handler().send(SENDER, "sarah")).isEqualTo(new InvitationOutcome.IncomingExists(id));
+    }
+
+    @Test
+    @DisplayName("FRD-03 : le blocage passe avant tout le reste")
+    void frd03BlockComesFirst() {
+        blocked = true;
+        friends = true;
+
+        assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.CannotInvite.class);
     }
 
     @Test
@@ -161,6 +193,6 @@ class SendFriendRequestHandlerTest {
     void frd01PairIsLockedBeforeItsChecks() {
         assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.Sent.class);
         assertThat(calls).containsSubsequence("lock", "friends", "pending", "create", "journal");
-        assertThat(calls.indexOf("lock")).isLessThan(calls.indexOf("friends"));
+        assertThat(calls.indexOf("lock")).isLessThan(calls.indexOf("blocks"));
     }
 }

@@ -78,7 +78,7 @@ class FriendRequestSendIT {
     }
 
     @Test
-    @DisplayName("FRD-01 : invitation créée, 201 avec l'invitation et le profil du destinataire")
+    @DisplayName("FRD-01, API-01 : invitation créée, 201 avec l'identifiant du destinataire, sans son nom affiché")
     void frd01InvitationIsCreated() throws Exception {
         FriendsTestClient sender = account("inv");
         FriendsTestClient receiver = account("dest");
@@ -87,7 +87,7 @@ class FriendRequestSendIT {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.userId").value(receiver.id.toString()))
                 .andExpect(jsonPath("$.username").value(receiver.username))
-                .andExpect(jsonPath("$.displayName").value("Valentin"))
+                .andExpect(jsonPath("$.displayName").doesNotExist())
                 .andReturn();
 
         UUID id = UUID.fromString(AuthClient.body(result).get("id").asString());
@@ -186,6 +186,36 @@ class FriendRequestSendIT {
             assertThat(pendingBetween(sender.id, target)).isZero();
         }
         assertThat(bodies).containsOnly(bodies.getFirst());
+    }
+
+    @Test
+    @DisplayName("ADR 0037, point 9 : invitations fermées, mais l'autre m'a invité ou est déjà mon ami : 409, pas 403")
+    void adr0037ClosedInvitationsDoNotHideAFriendshipOrAnIncomingRequest() throws Exception {
+        FriendsTestClient me = account("ouvre");
+        FriendsTestClient closedInviter = account("ferme");
+        jdbc.sql("INSERT INTO user_settings (user_id, invitation_policy) VALUES (?, 'NOBODY')")
+                .param(closedInviter.id)
+                .update();
+        String requestId = AuthClient.body(closedInviter
+                        .invite(me.username)
+                        .andExpect(status().isCreated())
+                        .andReturn())
+                .get("id")
+                .asString();
+        String closedFriend = name("fami");
+        UUID closedFriendId = target(closedFriend);
+        befriend(me.id, closedFriendId);
+        jdbc.sql("INSERT INTO user_settings (user_id, invitation_policy) VALUES (?, 'NOBODY')")
+                .param(closedFriendId)
+                .update();
+
+        me.invite(closedInviter.username)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INCOMING_REQUEST_EXISTS"))
+                .andExpect(jsonPath("$.requestId").value(requestId));
+        me.invite(closedFriend)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ALREADY_FRIENDS"));
     }
 
     @Test

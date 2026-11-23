@@ -11,9 +11,10 @@ import fr.vlegall.seal.friends.application.port.in.SendFriendRequestUseCase;
 import fr.vlegall.seal.friends.domain.model.Direction;
 import fr.vlegall.seal.friends.domain.model.InvitationOutcome;
 import fr.vlegall.seal.friends.domain.model.Page;
-import fr.vlegall.seal.friends.infrastructure.web.dto.InvitationView;
 import fr.vlegall.seal.friends.infrastructure.web.dto.PageView;
+import fr.vlegall.seal.friends.infrastructure.web.dto.ReceivedInvitationView;
 import fr.vlegall.seal.friends.infrastructure.web.dto.SendFriendRequestBody;
+import fr.vlegall.seal.friends.infrastructure.web.dto.SentInvitationView;
 import fr.vlegall.seal.security.ratelimit.RateLimit;
 import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.web.CurrentUser;
@@ -63,13 +64,15 @@ public class FriendRequestsController {
 
     /** Section 14.4, ADR 0037 (point 3) : invitations en attente reçues ({@code incoming}) ou envoyées. */
     @GetMapping
-    public PageView<InvitationView> list(
+    public PageView<?> list(
             @CurrentUser UserId user,
             @RequestParam @Pattern(regexp = "incoming|outgoing") String direction,
             @RequestParam Optional<UUID> after,
             @RequestParam(defaultValue = "50") @Min(1) @Max(Page.MAX_LIMIT) int limit) {
-        Direction chosen = direction.equals("incoming") ? Direction.INCOMING : Direction.OUTGOING;
-        return PageView.of(lists.list(user, chosen, after, limit), InvitationView::of);
+        // API-01, ADR 0037 (point 9) : le nom affiché d'un non-ami n'est servi que dans les invitations reçues.
+        return direction.equals("incoming")
+                ? PageView.of(lists.list(user, Direction.INCOMING, after, limit), ReceivedInvitationView::of)
+                : PageView.of(lists.list(user, Direction.OUTGOING, after, limit), SentInvitationView::of);
     }
 
     /**
@@ -78,7 +81,7 @@ public class FriendRequestsController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public InvitationView send(@CurrentUser UserId user, @Valid @RequestBody SendFriendRequestBody body) {
+    public SentInvitationView send(@CurrentUser UserId user, @Valid @RequestBody SendFriendRequestBody body) {
         limiter.consume(RateLimit.INVITATION_ATTEMPTS_PER_USER, user);
         limiter.consume(RateLimit.INVITATIONS_CREATED_PER_USER, user);
         InvitationOutcome result = null;
@@ -90,7 +93,7 @@ public class FriendRequestsController {
             }
         }
         return switch (result) {
-            case InvitationOutcome.Sent sent -> InvitationView.of(sent.invitation());
+            case InvitationOutcome.Sent sent -> SentInvitationView.of(sent.invitation());
             case InvitationOutcome.Malformed malformed ->
                 throw new SealException(ErrorCode.VALIDATION_FAILED, "username");
             case InvitationOutcome.UserNotFound unknown -> throw new SealException(ErrorCode.USER_NOT_FOUND);

@@ -80,7 +80,7 @@ class FriendListsIT {
     }
 
     @Test
-    @DisplayName("Section 14.4 : invitations reçues et envoyées, avec le profil de l'autre compte")
+    @DisplayName("Section 14.4, API-01 : reçues avec le nom affiché de l'émetteur, envoyées avec l'identifiant seul")
     void requestsAreListedByDirection() throws Exception {
         FriendsTestClient me = account("moi");
         FriendsTestClient from = account("de");
@@ -102,6 +102,9 @@ class FriendListsIT {
         assertThat(sent.get("items")).hasSize(1);
         assertThat(sent.get("items").get(0).get("id").asString()).isEqualTo(outgoing.toString());
         assertThat(sent.get("items").get(0).get("userId").asString()).isEqualTo(to.id.toString());
+        assertThat(sent.get("items").get(0).get("username").asString()).isEqualTo(to.username);
+        // API-01, ADR 0037 (point 9) : le nom affiché d'un non-ami n'est servi que s'il nous a invités.
+        assertThat(sent.get("items").get(0).has("displayName")).isFalse();
     }
 
     @Test

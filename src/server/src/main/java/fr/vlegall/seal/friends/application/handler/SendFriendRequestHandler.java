@@ -43,7 +43,7 @@ public class SendFriendRequestHandler implements SendFriendRequestUseCase {
         this.clock = clock;
     }
 
-    /** Contrôles dans l'ordre de l'ADR 0037 (point 7), chacun avant toute écriture. */
+    /** Contrôles de l'ADR 0037 (points 7 et 9), tous avant toute écriture. */
     @Override
     @Transactional
     public InvitationOutcome send(UserId sender, String input) {
@@ -62,19 +62,24 @@ public class SendFriendRequestHandler implements SendFriendRequestUseCase {
         UserPair pair = UserPair.of(sender, receiver.user());
         // FRD-01 : une réponse concurrente à une invitation de la paire attend la fin de cet envoi, et inversement.
         requests.lockPair(pair);
-        // FRD-03 : une seule issue pour le blocage, dans un sens ou l'autre, et les invitations fermées ; les deux sont
-        // toujours consultés, pour qu'aucune durée ne trahisse la cause.
+        // FRD-03 : les quatre lectures précèdent toute décision, pour qu'aucune durée ne distingue un blocage
+        // d'invitations fermées ; puis l'ordre de l'ADR 0037 (point 7), qui laisse une amitié ou une invitation reçue
+        // passer avant la politique NOBODY (point 9).
         boolean blocked = blocks.blockedEitherWay(pair);
+        boolean friends = friendships.exists(pair);
+        Optional<FriendRequest> pending = requests.pendingBetween(pair);
         boolean open = directory.acceptsInvitations(receiver.user());
-        if (blocked || !open) {
+        if (blocked) {
             return new InvitationOutcome.CannotInvite();
         }
-        if (friendships.exists(pair)) {
+        if (friends) {
             return new InvitationOutcome.AlreadyFriends();
         }
-        Optional<FriendRequest> pending = requests.pendingBetween(pair);
         if (pending.isPresent()) {
             return existing(pending.get(), sender);
+        }
+        if (!open) {
+            return new InvitationOutcome.CannotInvite();
         }
         Optional<FriendRequest> created = requests.createPending(sender, receiver.user(), clock.instant());
         if (created.isEmpty()) {
