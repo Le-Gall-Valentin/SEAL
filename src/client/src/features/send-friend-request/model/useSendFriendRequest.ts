@@ -53,6 +53,9 @@ export function useSendFriendRequest() {
     },
     formatInvalid,
     outcome,
+    clearOutcome: () => {
+      setOutcome(null)
+    },
     formFailure: failure !== null && isFormFailure(failure) ? failure : null,
     locked,
     pending: mutation.isPending,

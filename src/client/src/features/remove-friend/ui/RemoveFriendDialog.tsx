@@ -6,28 +6,37 @@ import { removeFriendMessages } from '../i18n'
 import { useRemoveFriend } from '../model/useRemoveFriend'
 
 interface RemoveFriendDialogProps {
-  readonly friend: Friend
-  readonly onClose: () => void
+  /** L'ami à retirer ; `null` ferme la fenêtre, qui reste montée pour rendre le focus. */
+  readonly friend: Friend | null
+  /** `removed` : l'ami a été retiré, la ligne qui avait le focus a disparu. */
+  readonly onClose: (removed: boolean) => void
 }
 
 /** FRD-11, ADR 0038 (point 2) : confirmation du retrait, dans le cadre de Dialogue-Suppression. */
 export function RemoveFriendDialog({ friend, onClose }: RemoveFriendDialogProps) {
   const t = useMessages(removeFriendMessages)
   const textId = useId()
-  const removal = useRemoveFriend(onClose)
+  const removal = useRemoveFriend(() => {
+    onClose(true)
+  })
+  const cancel = () => {
+    onClose(false)
+  }
   return (
     <ModalDialog
-      open
-      onClose={onClose}
+      open={friend !== null}
+      onClose={cancel}
       closable={!removal.pending}
-      title={t('title', { name: friend.displayName })}
+      title={t('title', { name: friend?.displayName ?? '' })}
       danger
       describedBy={textId}
     >
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          removal.remove(friend.userId)
+          if (friend !== null) {
+            removal.remove(friend.userId)
+          }
         }}
       >
         <DialogBody>
@@ -37,7 +46,7 @@ export function RemoveFriendDialog({ friend, onClose }: RemoveFriendDialogProps)
           <FormAlert failure={removal.formFailure} />
         </DialogBody>
         <DialogFooter
-          onCancel={onClose}
+          onCancel={cancel}
           cancelable={!removal.pending}
           submitLabel={t('submit')}
           canSubmit={!removal.pending}

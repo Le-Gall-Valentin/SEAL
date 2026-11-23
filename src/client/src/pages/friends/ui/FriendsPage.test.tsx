@@ -55,6 +55,7 @@ interface Fakes {
   readonly received?: readonly ReceivedRequest[]
   readonly send?: (username: string) => Promise<SentRequest>
   readonly accept?: (requestId: string) => Promise<void>
+  readonly client?: QueryClient
 }
 
 async function renderAt(entry: string, width: number, height: number, fakes: Fakes = {}) {
@@ -62,7 +63,7 @@ async function renderAt(entry: string, width: number, height: number, fakes: Fak
   const router = createMemoryRouter([{ path: '/amis', element: <FriendsPage /> }], {
     initialEntries: [entry],
   })
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const client = fakes.client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const friendsApi: IFriendsApi = {
     friends: fakes.friends ?? (() => Promise.resolve({ items: FRIENDS, next: null })),
     receivedRequests: () => Promise.resolve({ items: fakes.received ?? RECEIVED, next: null }),
@@ -82,7 +83,7 @@ async function renderAt(entry: string, width: number, height: number, fakes: Fak
       </FriendsApiProvider>
     </QueryClientProvider>,
   )
-  return { screen, accept }
+  return { screen, accept, client }
 }
 
 describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Telephone, ADR 0038)', () => {
@@ -192,6 +193,70 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await screen.getByRole('button', { name: 'Ajouter un ami' }).last().click()
     await expect.element(screen.getByRole('dialog', { name: 'Ajouter un ami' })).toBeVisible()
     expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390)
+  })
+
+  it('FRD-01 : pendant une réponse, les boutons des autres invitations sont désactivés', async () => {
+    const { screen } = await renderAt('/amis?onglet=invitations', 820, 1180, {
+      accept: () => new Promise<void>(() => undefined),
+    })
+
+    await screen.getByRole('button', { name: 'Accepter — Sarah Bélanger' }).click()
+
+    await expect
+      .element(screen.getByRole('button', { name: 'Accepter — Jade Morin' }))
+      .toBeDisabled()
+  })
+
+  it('WCAG 2.4.3 : la confirmation fermée par Échap rend le focus au bouton « Plus d’actions »', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900)
+
+    const more = screen.getByRole('button', { name: 'Plus d’actions — Inès Côté' })
+    await more.click()
+    await userEvent.keyboard('{Enter}')
+    await expect.element(screen.getByRole('alertdialog')).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(more).toHaveFocus()
+  })
+
+  it('A10 : une relecture en échec garde la liste déjà chargée', async () => {
+    let calls = 0
+    const { screen, client } = await renderAt('/amis', 1440, 900, {
+      friends: () => {
+        calls++
+        return calls === 1
+          ? Promise.resolve({ items: FRIENDS, next: null })
+          : Promise.reject(new ApiError(503, 'INTERNAL_ERROR'))
+      },
+    })
+    await expect.element(screen.getByText('Inès Côté')).toBeVisible()
+
+    await client.refetchQueries({ queryKey: ['friends', 'list'] })
+    await expect.poll(() => client.getQueryState(['friends', 'list'])?.status).toBe('error')
+    // Laisse React rendre l'état d'erreur avant de vérifier qu'il n'a pas effacé la liste.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    await expect.element(screen.getByText('Inès Côté')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Réessayer' }).elements()).toHaveLength(0)
+  })
+
+  it('SEC-01, ADR 0024 : recherche bornée à 64 caractères, sans défilement horizontal à 390 px', async () => {
+    const { screen } = await renderAt('/amis', 390, 844)
+
+    const search = screen.getByRole('searchbox', { name: 'Rechercher un ami' })
+    await search.fill('x'.repeat(80))
+
+    expect((search.element() as HTMLInputElement).value).toHaveLength(64)
+    await expect.element(screen.getByRole('button', { name: 'Effacer la recherche' })).toBeVisible()
+    expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390)
+  })
+
+  it('ADR 0038 (point 4) : la feuille s’ouvre le focus dans le champ Identifiant', async () => {
+    const { screen } = await renderAt('/amis', 820, 1180)
+
+    await screen.getByRole('button', { name: 'Ajouter un ami' }).click()
+
+    await expect.element(screen.getByLabelText('Identifiant')).toHaveFocus()
   })
 
   it('A10, Etats : un échec de lecture propose « Réessayer »', async () => {

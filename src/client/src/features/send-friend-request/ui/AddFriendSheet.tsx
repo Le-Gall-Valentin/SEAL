@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
+import type { IncomingAcceptResult } from './AddFriendForm'
 import { useMessages } from '@/shared/i18n'
 import { sendFriendRequestMessages } from '../i18n'
 import { AddFriendForm } from './AddFriendForm'
@@ -7,18 +8,18 @@ import { CloseIcon } from './icons'
 interface AddFriendSheetProps {
   readonly open: boolean
   readonly onClose: () => void
-  readonly onAccept: (requestId: string) => void
-  readonly accepting: boolean
+  readonly onAccept: (requestId: string) => Promise<IncomingAcceptResult>
 }
 
 /**
  * Feuille « Ajouter un ami » d'Amis-Telephone, ancrée en bas ; sur tablette, à la largeur du contenu (ADR 0038,
  * point 4). Modale native : focus piégé, Échap ferme.
  */
-export function AddFriendSheet({ open, onClose, onAccept, accepting }: AddFriendSheetProps) {
+export function AddFriendSheet({ open, onClose, onAccept }: AddFriendSheetProps) {
   const t = useMessages(sendFriendRequestMessages)
   const titleId = useId()
   const ref = useRef<HTMLDialogElement>(null)
+  const field = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const dialog = ref.current
     if (dialog === null) {
@@ -26,6 +27,8 @@ export function AddFriendSheet({ open, onClose, onAccept, accepting }: AddFriend
     }
     if (open && !dialog.open) {
       dialog.showModal()
+      // showModal place le focus sur « Fermer » ; le champ le prend (comme ModalDialog).
+      field.current?.focus()
     } else if (!open && dialog.open) {
       dialog.close()
     }
@@ -59,7 +62,12 @@ export function AddFriendSheet({ open, onClose, onAccept, accepting }: AddFriend
             </button>
           </div>
           <div className="px-6">
-            <AddFriendForm onAccept={onAccept} accepting={accepting} variant="sheet" />
+            <AddFriendForm
+              onAccept={onAccept}
+              onAccepted={onClose}
+              variant="sheet"
+              inputRef={field}
+            />
           </div>
         </>
       )}

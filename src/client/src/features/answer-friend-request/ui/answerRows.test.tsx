@@ -101,6 +101,18 @@ describe('features/answer-friend-request : invitations reçues et envoyées (Ami
     await expect.poll(() => invalidate.mock.calls).toContainEqual([{ queryKey: ['friends'] }])
   })
 
+  it('FRD-01 : deux clics de suite ne lancent qu’une réponse à la fois', async () => {
+    const accept = vi.fn(() => new Promise<void>(() => undefined))
+    const revoke = vi.fn(() => Promise.resolve())
+    const { screen } = await mount({ accept, revoke })
+
+    await screen.getByRole('button', { name: 'Accepter — Sarah Bélanger' }).click()
+    await screen.getByRole('button', { name: 'Révoquer — @antoine.roy' }).click({ force: true })
+
+    expect(accept).toHaveBeenCalledTimes(1)
+    expect(revoke).not.toHaveBeenCalled()
+  })
+
   it('ADR 0038 (point 2) : une invitation close ailleurs (404) l’annonce et relit les listes', async () => {
     const { screen, invalidate } = await mount({
       accept: () => Promise.reject(new ApiError(404, 'NOT_FOUND')),

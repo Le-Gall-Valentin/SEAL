@@ -15,6 +15,8 @@ export const sendFriendRequestMessages = defineMessages({
     notFound: 'Aucun utilisateur ne porte l’identifiant {username}.',
     incoming: '{username} vous a déjà invité. Acceptez directement !',
     accept: 'Accepter l’invitation',
+    // ADR 0038 (point 2) : invitation close entre-temps.
+    gone: 'Cette invitation n’existe plus.',
     self: 'Vous ne pouvez pas vous inviter vous-même',
     alreadyFriends: 'Vous êtes déjà amis',
     alreadyPending: 'Invitation déjà envoyée',

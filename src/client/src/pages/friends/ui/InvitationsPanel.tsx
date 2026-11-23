@@ -50,7 +50,7 @@ export function InvitationsPanel({
               <ReceivedRequestRow
                 key={request.id}
                 request={request}
-                busy={busyId === request.id}
+                busy={busyId !== null}
                 onAccept={onAccept}
                 onDecline={onDecline}
               />
@@ -70,7 +70,7 @@ export function InvitationsPanel({
               <SentRequestRow
                 key={request.id}
                 request={request}
-                busy={busyId === request.id}
+                busy={busyId !== null}
                 onRevoke={onRevoke}
               />
             ))}

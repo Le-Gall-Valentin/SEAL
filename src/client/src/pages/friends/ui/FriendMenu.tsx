@@ -80,10 +80,11 @@ export function FriendMenu({ friend, onRemove }: FriendMenuProps) {
             type="button"
             role="menuitem"
             onClick={() => {
-              setOpen(false)
+              // WCAG 2.4.3 : le focus revient au bouton avant la confirmation, qui le lui rendra.
+              close()
               onRemove(friend)
             }}
-            className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-[15px] text-ink hover:bg-sunken focus:bg-sunken focus:outline-none"
+            className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-[15px] text-ink hover:bg-sunken focus:bg-sunken focus:outline-none focus-visible:inset-ring-2 focus-visible:inset-ring-accent"
           >
             <PersonMinusIcon />
             {t('remove')}

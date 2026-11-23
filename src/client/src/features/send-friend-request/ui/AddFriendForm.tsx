@@ -1,5 +1,6 @@
-import { type Ref, useId } from 'react'
+import { type Ref, useId, useState } from 'react'
 import { useMessages } from '@/shared/i18n'
+import type { FormFailure } from '@/shared/lib'
 import { Alert, FieldError, FieldLabel, FormAlert, Notice } from '@/shared/ui'
 import { sendFriendRequestMessages } from '../i18n'
 import { INVITED_USERNAME_MAX_LENGTH } from '../model/invitedUsername'
@@ -7,20 +8,25 @@ import { type SendOutcome, useSendFriendRequest } from '../model/useSendFriendRe
 import { PersonPlusIcon } from './icons'
 import { UsernameInText } from './UsernameInText'
 
+/** Issue de l'acceptation demandée à la page après un 409 INCOMING_REQUEST_EXISTS. */
+export type IncomingAcceptResult =
+  { readonly kind: 'accepted' } | { readonly kind: 'gone' } | FormFailure
+
 interface AddFriendFormProps {
-  /** FRD-01 : « Accepter l’invitation » après un 409 INCOMING_REQUEST_EXISTS ; la page fournit l'acceptation. */
-  readonly onAccept: (requestId: string) => void
-  readonly accepting: boolean
+  /** FRD-01 : « Accepter l’invitation » après un 409 ; la page fournit l'acceptation et en rend l'issue. */
+  readonly onAccept: (requestId: string) => Promise<IncomingAcceptResult>
+  /** Appelé quand l'invitation reçue est acceptée depuis le formulaire (la feuille se ferme). */
+  readonly onAccepted?: (() => void) | undefined
   /** Feuille du téléphone : champ et bouton sur toute la largeur (Amis-Telephone). */
   readonly variant?: 'aside' | 'sheet' | undefined
-  /** Pour placer le focus sur le champ (« Ajouter un ami » de l'état vide, ordinateur). */
+  /** Pour placer le focus sur le champ (feuille ouverte, « Ajouter un ami » de l'état vide). */
   readonly inputRef?: Ref<HTMLInputElement> | undefined
 }
 
 /** Formulaire « Ajouter un ami » de l'aside (Amis-Ordinateur) et de la feuille (Amis-Telephone), ADR 0038. */
 export function AddFriendForm({
   onAccept,
-  accepting,
+  onAccepted,
   variant = 'aside',
   inputRef,
 }: AddFriendFormProps) {
@@ -28,12 +34,34 @@ export function AddFriendForm({
   const form = useSendFriendRequest()
   const id = useId()
   const errorId = `${id}-erreur`
+  const [accepting, setAccepting] = useState(false)
+  const [acceptIssue, setAcceptIssue] = useState<Exclude<
+    IncomingAcceptResult,
+    { kind: 'accepted' }
+  > | null>(null)
+  const accept = async (requestId: string) => {
+    if (accepting) {
+      return
+    }
+    setAccepting(true)
+    setAcceptIssue(null)
+    const result = await onAccept(requestId)
+    setAccepting(false)
+    if (result.kind === 'accepted') {
+      form.clearOutcome()
+      onAccepted?.()
+    } else {
+      form.clearOutcome()
+      setAcceptIssue(result)
+    }
+  }
   return (
     <form
       noValidate
       className="flex flex-col gap-3.5"
       onSubmit={(event) => {
         event.preventDefault()
+        setAcceptIssue(null)
         form.submit()
       }}
     >
@@ -73,8 +101,19 @@ export function AddFriendForm({
         </button>
       </div>
       <FieldError id={errorId} error={form.formatInvalid ? t('invalidUsername') : null} />
-      <Outcome outcome={form.outcome} onAccept={onAccept} accepting={accepting} />
-      <FormAlert failure={form.formFailure} />
+      <Outcome
+        outcome={form.outcome}
+        onAccept={(requestId) => {
+          void accept(requestId)
+        }}
+        accepting={accepting}
+      />
+      {acceptIssue?.kind === 'gone' && <Alert variant="error">{t('gone')}</Alert>}
+      <FormAlert
+        failure={
+          acceptIssue !== null && acceptIssue.kind !== 'gone' ? acceptIssue : form.formFailure
+        }
+      />
       <p className="text-[13px] leading-[1.4] text-ink-3">{t('help')}</p>
     </form>
   )
@@ -90,9 +129,11 @@ interface OutcomeProps {
 function Outcome({ outcome, onAccept, accepting }: OutcomeProps) {
   const t = useMessages(sendFriendRequestMessages)
   const username = outcome === null ? '' : `@${outcome.username}`
-  if (outcome?.kind === 'sent' || outcome?.kind === 'incoming') {
-    return (
-      <div role="status">
+  const success = outcome?.kind === 'sent' || outcome?.kind === 'incoming'
+  const status = (
+    // Région toujours présente, pour qu'un lecteur d'écran annonce le texte qui y paraît.
+    <div role="status" className="empty:hidden">
+      {success && (
         <Notice variant="success">
           <span className="flex flex-col gap-1.5">
             <span>
@@ -114,11 +155,11 @@ function Outcome({ outcome, onAccept, accepting }: OutcomeProps) {
             )}
           </span>
         </Notice>
-      </div>
-    )
-  }
-  if (outcome === null) {
-    return null
+      )}
+    </div>
+  )
+  if (success || outcome === null) {
+    return status
   }
   const text = (() => {
     switch (outcome.kind) {
@@ -136,7 +177,12 @@ function Outcome({ outcome, onAccept, accepting }: OutcomeProps) {
         return t('invalidUsername')
     }
   })()
-  return <Alert variant="error">{text}</Alert>
+  return (
+    <>
+      {status}
+      <Alert variant="error">{text}</Alert>
+    </>
+  )
 }
 
 function withUsername(text: string, username: string) {

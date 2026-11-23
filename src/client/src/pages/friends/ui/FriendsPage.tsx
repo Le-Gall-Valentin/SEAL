@@ -29,6 +29,7 @@ export function FriendsPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [removing, setRemoving] = useState<Friend | null>(null)
   const field = useRef<HTMLInputElement>(null)
+  const title = useRef<HTMLHeadingElement>(null)
   const openAdd = () => {
     if (large) {
       field.current?.focus()
@@ -36,11 +37,16 @@ export function FriendsPage() {
       setSheetOpen(true)
     }
   }
-  const accepting = answers.busyId !== null
   return (
     <main className="mx-auto flex w-full max-w-184 flex-col gap-4 px-4 pt-4 pb-6 sm:px-8 sm:pt-6 sm:pb-12 lg:max-w-288 lg:px-10 lg:pt-8">
       <header className="flex min-h-11 items-center justify-between gap-3">
-        <h1 className="m-0 text-[26px] font-bold tracking-[-0.025em]">{t('title')}</h1>
+        <h1
+          ref={title}
+          tabIndex={-1}
+          className="m-0 text-[26px] font-bold tracking-[-0.025em] outline-none"
+        >
+          {t('title')}
+        </h1>
         {!large && (
           <button
             type="button"
@@ -65,7 +71,8 @@ export function FriendsPage() {
       <div className={large ? 'flex items-start gap-8' : 'flex flex-col'}>
         <div className="min-w-0 flex-1">
           {tab === 'invitations' ? (
-            received.isError || sent.isError ? (
+            (received.isError && received.data === undefined) ||
+            (sent.isError && sent.data === undefined) ? (
               <LoadErrorState
                 heading="h2"
                 onRetry={() => {
@@ -86,7 +93,7 @@ export function FriendsPage() {
                 />
               )
             )
-          ) : friends.isError ? (
+          ) : friends.isError && friends.data === undefined ? (
             <LoadErrorState heading="h2" onRetry={() => void friends.refetch()} />
           ) : (
             friends.data !== undefined && (
@@ -98,7 +105,7 @@ export function FriendsPage() {
           <aside aria-label={t('addFriend')} className="sticky top-4 w-88 flex-none">
             <section className="flex flex-col gap-3.5 rounded-[18px] bg-surface p-5 inset-ring inset-ring-line">
               <h2 className="m-0 text-[16px] font-bold">{t('addFriend')}</h2>
-              <AddFriendForm onAccept={answers.accept} accepting={accepting} inputRef={field} />
+              <AddFriendForm onAccept={answers.acceptNow} inputRef={field} />
             </section>
           </aside>
         )}
@@ -109,18 +116,19 @@ export function FriendsPage() {
           onClose={() => {
             setSheetOpen(false)
           }}
-          onAccept={answers.accept}
-          accepting={accepting}
+          onAccept={answers.acceptNow}
         />
       )}
-      {removing !== null && (
-        <RemoveFriendDialog
-          friend={removing}
-          onClose={() => {
-            setRemoving(null)
-          }}
-        />
-      )}
+      <RemoveFriendDialog
+        friend={removing}
+        onClose={(removed) => {
+          setRemoving(null)
+          // La ligne retirée avait le focus : il passe au titre de la page.
+          if (removed) {
+            title.current?.focus()
+          }
+        }}
+      />
     </main>
   )
 }

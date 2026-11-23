@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { ApiError } from '@/shared/lib'
@@ -14,16 +15,22 @@ const sent = {
   createdAt: new Date(),
 }
 
-async function mount(send: (username: string) => Promise<SentRequest>, onAccept = vi.fn()) {
+type AcceptResult = Awaited<ReturnType<ComponentProps<typeof AddFriendForm>['onAccept']>>
+
+async function mount(
+  send: (username: string) => Promise<SentRequest>,
+  onAccept = vi.fn((): Promise<AcceptResult> => Promise.resolve({ kind: 'accepted' })),
+) {
+  const onAccepted = vi.fn()
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const screen = await render(
     <QueryClientProvider client={client}>
       <SendFriendRequestApiProvider api={{ send }}>
-        <AddFriendForm onAccept={onAccept} accepting={false} />
+        <AddFriendForm onAccept={onAccept} onAccepted={onAccepted} />
       </SendFriendRequestApiProvider>
     </QueryClientProvider>,
   )
-  return { screen, client, onAccept }
+  return { screen, client, onAccept, onAccepted }
 }
 
 async function invite(screen: Awaited<ReturnType<typeof mount>>['screen'], input: string) {
@@ -45,6 +52,39 @@ describe('features/send-friend-request : formulaire « Ajouter un ami » (Amis-O
     expect(send).toHaveBeenCalledWith('sarah.belanger')
     await expect.element(screen.getByLabelText('Identifiant')).toHaveValue('')
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['friends'] })
+  })
+
+  it('ADR 0038 (point 1) : la région de statut existe avant tout envoi, pour être annoncée', async () => {
+    const { screen } = await mount(() => Promise.resolve(sent))
+
+    expect(screen.container.querySelector('[role="status"]')?.textContent).toBe('')
+  })
+
+  it('FRD-01, ADR 0038 : l’invitation acceptée depuis le formulaire efface le bloc et le signale à la page', async () => {
+    const { screen, onAccepted } = await mount(() =>
+      Promise.reject(new ApiError(409, 'INCOMING_REQUEST_EXISTS', { requestId: REQUEST })),
+    )
+
+    await invite(screen, 'sarah.belanger')
+    await screen.getByRole('button', { name: 'Accepter l’invitation' }).click()
+
+    await expect.poll(() => onAccepted.mock.calls.length).toBe(1)
+    expect(screen.getByRole('button', { name: 'Accepter l’invitation' }).elements()).toHaveLength(0)
+    expect(screen.container.querySelector('[role="status"]')?.textContent).toBe('')
+  })
+
+  it('ADR 0038 (point 2) : une invitation close entre-temps l’annonce dans le formulaire', async () => {
+    const { screen } = await mount(
+      () => Promise.reject(new ApiError(409, 'INCOMING_REQUEST_EXISTS', { requestId: REQUEST })),
+      vi.fn((): Promise<AcceptResult> => Promise.resolve({ kind: 'gone' })),
+    )
+
+    await invite(screen, 'sarah.belanger')
+    await screen.getByRole('button', { name: 'Accepter l’invitation' }).click()
+
+    await expect
+      .element(screen.getByRole('alert'))
+      .toHaveTextContent('Cette invitation n’existe plus.')
   })
 
   it('ADR 0038 (point 1) : une saisie hors AUTH-01 est refusée sans requête', async () => {

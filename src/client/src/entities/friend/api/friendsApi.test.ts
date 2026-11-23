@@ -98,7 +98,18 @@ describe('entities/friend : adaptateur des listes d’amis et d’invitations (1
   it.each([
     ['un champ inconnu', { items: [], next: null, total: 3 }],
     ['un curseur qui n’est pas un UUID', { items: [], next: 'pas-un-uuid' }],
-    ['plus de 50 éléments', { items: Array.from({ length: 51 }, () => ({})), next: null }],
+    [
+      'plus de 50 éléments',
+      {
+        items: Array.from({ length: 51 }, () => ({
+          id: REQUEST,
+          userId: USER,
+          username: 'antoine.roy',
+          createdAt: '2026-11-22T10:00:00Z',
+        })),
+        next: null,
+      },
+    ],
     [
       'un nom affiché dans une invitation envoyée',
       {

@@ -45,6 +45,7 @@ export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
           <SearchIcon />
           <input
             type="search"
+            maxLength={64}
             aria-label={t('search')}
             placeholder={t('search')}
             value={query}
@@ -62,7 +63,7 @@ export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
       </div>
       {shown.length === 0 ? (
         <div className="flex flex-col items-center gap-2 border-t border-line px-4 py-6 text-center">
-          <p className="m-0 text-[14px] text-ink-2">{t('noMatch', { query })}</p>
+          <p className="m-0 text-[14px] wrap-anywhere text-ink-2">{t('noMatch', { query })}</p>
           <button
             type="button"
             onClick={() => {

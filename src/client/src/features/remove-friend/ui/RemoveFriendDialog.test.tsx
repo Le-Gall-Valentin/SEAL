@@ -67,7 +67,7 @@ describe('features/remove-friend : confirmation du retrait (FRD-11, ADR 0038)', 
     await screen.getByRole('button', { name: 'Annuler' }).click()
     await userEvent.keyboard('{Escape}')
 
-    expect(onClose).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(2)
     expect(unfriend).not.toHaveBeenCalled()
   })
 })
