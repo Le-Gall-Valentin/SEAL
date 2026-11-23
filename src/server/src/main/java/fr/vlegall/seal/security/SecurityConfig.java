@@ -181,6 +181,10 @@ class SecurityConfig {
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         .requestMatchers(HttpMethod.PUT, "/api/v1/keys/identity")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // KEY-34, ADR 0036 : réinitialisation de l'identité, session complète ; le mode sudo est
+                        // vérifié par le handler (SEC-03).
+                        .requestMatchers(HttpMethod.POST, "/api/v1/keys/identity/reset")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         // KEY-05, KEY-32, KEY-33 : sous-clés et coffre du compte, session complète.
                         .requestMatchers(HttpMethod.POST, "/api/v1/keys/subkeys")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)

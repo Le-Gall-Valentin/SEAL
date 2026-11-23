@@ -315,6 +315,22 @@ final class ContextRules {
                         Pattern.quote(root + ".identity.application.port.in.AccountLookupQuery") + "(\\$.*)?");
     }
 
+    // KEY-34, ADR 0036 : pki émet ou remplace un certificat sans vérifier ni preuve de possession ni mode sudo ; il
+    // fait
+    // confiance à son seul appelant, l'adaptateur keys/infrastructure/pki, que keys n'atteint qu'après ces contrôles.
+    static ArchRule onlyKeysAsksPkiForCertificates(String root) {
+        String ports = root + ".pki.application.port.in.";
+        return noClasses()
+                .that()
+                .resideInAPackage(root + "..")
+                .and()
+                .resideOutsideOfPackages(root + ".pki..", root + ".keys.infrastructure.pki..")
+                .should()
+                .dependOnClassesThat()
+                .haveNameMatching("(" + Pattern.quote(ports + "IssueCertificateUseCase") + "|"
+                        + Pattern.quote(ports + "ReplaceCertificateUseCase") + ")(\\$.*)?");
+    }
+
     // ADR 0026, point 10 : le poivre des mots de passe ne sert qu'au hacheur d'authentication (moindre privilège).
     static ArchRule onlyAuthenticationReadsThePepper(String root) {
         String pepper = root + ".common.PasswordPepper";

@@ -6,7 +6,12 @@ import { ProfileCard } from '@/features/change-display-name'
 import { EmailCard } from '@/features/change-email'
 import { PasswordCard } from '@/features/change-password'
 import { LogoutButton } from '@/features/logout'
-import { ReauthDialog, type ReauthReturnError, ReauthReturnAlert } from '@/features/reauthenticate'
+import {
+  ReauthDialog,
+  type ReauthReturnError,
+  ReauthReturnAlert,
+  useOAuthReturnError,
+} from '@/features/reauthenticate'
 import {
   ROUTES,
   SETTINGS_ACCOUNT,
@@ -17,7 +22,6 @@ import { useMessages } from '@/shared/i18n'
 import { useMediaQuery, WIDE_SCREEN } from '@/shared/lib'
 import { LockIcon } from '@/shared/ui'
 import { settingsMessages } from '../i18n'
-import { useOAuthReturnError } from '../model/useOAuthReturnError'
 import { AccountIcon, ChevronLeft, ChevronRight } from './icons'
 
 /**

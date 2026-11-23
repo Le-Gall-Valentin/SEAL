@@ -4,6 +4,8 @@ import {
   ForeignIdentityError,
   KEYS_LOCK,
   type KeyOwner,
+  prepareReset,
+  resetIdentity,
   setupKeys,
   StaleVaultError,
   useKeysApi,
@@ -16,7 +18,15 @@ import {
   type NewKeyring,
   pickRecoveryGroups,
 } from '@/shared/crypto'
-import { downloadText, failureOf, useClock, useHeldLock } from '@/shared/lib'
+import {
+  ApiError,
+  downloadText,
+  failureOf,
+  type FormFailure,
+  isFormFailure,
+  useClock,
+  useHeldLock,
+} from '@/shared/lib'
 import { keySetupMessages } from '../i18n'
 import { recoveryKeyFile } from './recoveryKeyFile'
 
@@ -26,6 +36,8 @@ export type Slot = 0 | 1
 export interface KeySetup {
   /** Le verrou des clés est tenu et aucun trousseau n'existe : la clé peut s'afficher (ADR 0029, point 3). */
   readonly ready: boolean
+  /** Un autre onglet tient le verrou des clés, et ce dialogue l'attend (ADR 0029, point 13). */
+  readonly waiting: boolean
   readonly step: 1 | 2
   readonly groups: readonly string[]
   /** Index (0 à 7) des deux groupes à ressaisir, dans l'ordre. */
@@ -40,19 +52,35 @@ export interface KeySetup {
   readonly download: () => void
   readonly finish: () => void
   readonly saving: boolean
-  /** ADR 0029, point 12 : échec de la sauvegarde, réseau ou inattendu ; null sinon. */
-  readonly failure: 'network' | 'unexpected' | null
+  /**
+   * ADR 0029, point 12 : échec de la sauvegarde, réseau ou inattendu ; limite atteinte à la réinitialisation (SEC-10,
+   * ADR 0036 point 7) ; null sinon.
+   */
+  readonly failure: FormFailure | null
 }
 
 const GROUP_LENGTH = 4
 
 /**
+ * KEY-34, ADR 0036 : le dialogue sert à la réinitialisation de l'identité. Sur 403 REAUTH_REQUIRED, l'écran ouvre
+ * « Confirmez votre identité », puis appelle retry, qui renvoie la même identité.
+ */
+export interface KeyResetOptions {
+  readonly onReauthRequired: (retry: () => void) => void
+}
+
+/**
  * KEY-02, KEY-30, ADR 0029 (points 2 et 3) : Dialogue-Cle-Recuperation. La clé de récupération est tirée à l'ouverture
  * et montrée une seule fois ; deux groupes tirés au hasard la confirment ; « Terminer » génère alors IK, EK et la VDK,
  * une fois, et lance setupKeys (coffre, trousseau, publication). Rien n'est envoyé avant. Le verrou des clés est tenu
- * tant que le dialogue est ouvert : un autre onglet attend au lieu d'en ouvrir un second.
+ * tant que le dialogue est ouvert : un autre onglet attend au lieu d'en ouvrir un second. Avec `reset`, « Terminer »
+ * prépare une nouvelle identité et la fait remplacer l'ancienne (KEY-34, ADR 0036).
  */
-export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
+export function useKeySetup(
+  owner: KeyOwner,
+  onDone: () => void,
+  reset?: KeyResetOptions,
+): KeySetup {
   const t = useMessages(keySetupMessages)
   const api = useKeysApi()
   const store = useKeyStore()
@@ -98,16 +126,32 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
     }
   }, [existing.data, existing.isError, leave])
 
+  // « Terminer », ou la relance après la ré-authentification (KEY-34) ; le verrou running garde une seule sauvegarde.
+  function start(): void {
+    if (!running.current) {
+      running.current = true
+      setup.mutate()
+    }
+  }
+
   const setup = useMutation({
     mutationFn: async () => {
-      pending.current ??= await generateKeyring(owner.userId, recoveryKey, clock.now())
-      return setupKeys({ api, store, owner, clock }, pending.current)
+      const context = { api, store, owner, clock }
+      if (reset === undefined) {
+        pending.current ??= await generateKeyring(owner.userId, recoveryKey, clock.now())
+        return setupKeys(context, pending.current)
+      }
+      // KEY-34 : préparée une fois, l'identité est gardée pour la relance qui suit la ré-authentification.
+      pending.current ??= await prepareReset(context, recoveryKey)
+      return resetIdentity(context, pending.current)
     },
     onSuccess: leave,
     onError: (error) => {
       // Certificat d'une autre IK, coffre rejoué : la zone du compte décide de l'écran (ADR 0029, point 5).
       if (error instanceof ForeignIdentityError || error instanceof StaleVaultError) {
         leave()
+      } else if (reset !== undefined && isReauthRequired(error)) {
+        reset.onReauthRequired(start)
       }
     },
     onSettled: () => {
@@ -121,6 +165,7 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
 
   return {
     ready: lock.held && existing.data === false,
+    waiting: lock.waiting,
     step,
     groups,
     picked,
@@ -145,19 +190,24 @@ export function useKeySetup(owner: KeyOwner, onDone: () => void): KeySetup {
       downloadText(file.name, file.text)
     },
     finish: () => {
-      if (confirmed && !running.current) {
-        running.current = true
-        setup.mutate()
+      if (confirmed) {
+        start()
       }
     },
     saving: setup.isPending,
-    failure: failureFrom(setup.error),
+    failure: failureFrom(setup.error, reset !== undefined),
   }
 }
 
-function failureFrom(error: Error | null): KeySetup['failure'] {
-  if (error === null) {
+/** AUTH-55 : le mode sudo est fermé ; à la réinitialisation, la ré-authentification s'ouvre au lieu d'un échec. */
+function isReauthRequired(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403 && error.code === 'REAUTH_REQUIRED'
+}
+
+function failureFrom(error: Error | null, resetting: boolean): KeySetup['failure'] {
+  if (error === null || (resetting && isReauthRequired(error))) {
     return null
   }
-  return failureOf(error).kind === 'network' ? 'network' : 'unexpected'
+  const failure = failureOf(error)
+  return isFormFailure(failure) ? failure : { kind: 'unexpected' }
 }

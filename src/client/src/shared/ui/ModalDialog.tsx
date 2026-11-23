@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useRef } from 'react'
+import { createContext, type ReactNode, use, useEffect, useId, useRef } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { formMessages } from './formMessages'
 
@@ -13,10 +13,18 @@ interface ModalDialogProps {
   readonly eyebrow?: string | undefined
   /** Sous le titre (Dialogue-Suppression). */
   readonly subtitle?: string | undefined
+  /**
+   * Action irréversible : cadre de Dialogue-Suppression (rôle alertdialog, triangle d'alerte, en-tête, sous-titre et
+   * bouton d'envoi en --danger) ; cadre de Dialogue-2FA sinon, sous-titre en --ink-3 (ADR 0035, ADR 0036 point 3).
+   */
+  readonly danger?: boolean
   /** Identifiant du texte qui décrit la fenêtre. */
   readonly describedBy?: string | undefined
   readonly children: ReactNode
 }
+
+/** Ton de la fenêtre, que son pied lit : un seul drapeau, porté par le cadre. */
+const DangerContext = createContext(false)
 
 /**
  * Fenêtre modale au-dessus d'un écran (Dialogue-Suppression, Dialogue-2FA ; ADR 0035, point 1) : élément `dialog`
@@ -31,6 +39,7 @@ export function ModalDialog({
   title,
   eyebrow,
   subtitle,
+  danger = false,
   describedBy,
   children,
 }: ModalDialogProps) {
@@ -53,9 +62,10 @@ export function ModalDialog({
   return (
     <dialog
       ref={ref}
+      role={danger ? 'alertdialog' : undefined}
       aria-labelledby={titleId}
       aria-describedby={describedBy}
-      className="m-auto mt-10 w-[calc(100%-32px)] max-w-[500px] overflow-y-auto rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay"
+      className={`m-auto mt-10 w-[calc(100%-32px)] overflow-y-auto rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay ${danger ? 'max-w-[520px]' : 'max-w-[500px]'}`}
       onCancel={(event) => {
         // Échap : la fenêtre ne se ferme que si l'écran le permet, et par lui.
         event.preventDefault()
@@ -65,9 +75,12 @@ export function ModalDialog({
       }}
     >
       {open && (
-        <>
-          <div className="flex items-start gap-3 pt-5 pr-5 pb-3 pl-6">
-            <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
+        <DangerContext value={danger}>
+          <div
+            className={`flex items-start pr-5 pl-6 ${danger ? 'gap-3.5 pt-5.5 pb-3.5' : 'gap-3 pt-5 pb-3'}`}
+          >
+            {danger && <DangerIcon />}
+            <div className={`flex min-w-0 flex-1 flex-col gap-1 ${danger ? 'pt-0.5' : 'pt-1'}`}>
               {eyebrow !== undefined && (
                 <span className="text-[12px] font-semibold tracking-[0.08em] text-ink-3 uppercase">
                   {eyebrow}
@@ -80,7 +93,11 @@ export function ModalDialog({
                 {title}
               </h2>
               {subtitle !== undefined && (
-                <span className="text-[14px] font-semibold text-ink-3">{subtitle}</span>
+                <span
+                  className={`text-[14px] font-semibold ${danger ? 'text-danger' : 'text-ink-3'}`}
+                >
+                  {subtitle}
+                </span>
               )}
             </div>
             <button
@@ -105,9 +122,36 @@ export function ModalDialog({
             </button>
           </div>
           {children}
-        </>
+        </DangerContext>
       )}
     </dialog>
+  )
+}
+
+/**
+ * Triangle d'alerte de Dialogue-Suppression : 44 px, --danger-soft, anneau --danger-line, pictogramme --danger. Décoratif,
+ * il s'efface sous 360 px, où le titre n'aurait plus la place de tenir à côté de lui (ADR 0024, point 11).
+ */
+function DangerIcon() {
+  return (
+    <span
+      aria-hidden="true"
+      className="hidden size-11 flex-none place-items-center rounded-xl bg-danger-soft text-danger inset-ring inset-ring-danger-line min-[360px]:grid"
+    >
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M10.3 4.6a2 2 0 0 1 3.4 0l7.3 12.6a2 2 0 0 1-1.7 3H4.7a2 2 0 0 1-1.7-3z" />
+        <path d="M12 9.5v4.2M12 16.8h.01" />
+      </svg>
+    </span>
   )
 }
 
@@ -140,6 +184,8 @@ export function DialogFooter({
   canSubmit = false,
 }: DialogFooterProps) {
   const t = useMessages(formMessages)
+  // Bouton d'envoi en --danger quand la fenêtre annonce une action irréversible (Dialogue-Suppression).
+  const danger = use(DangerContext)
   return (
     <div className="flex flex-wrap justify-end gap-2 border-t border-line px-6 pt-4 pb-5">
       <button
@@ -154,7 +200,7 @@ export function DialogFooter({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="h-11 rounded-[10px] bg-accent px-4 font-sans text-[14.5px] font-semibold whitespace-nowrap text-on-accent disabled:opacity-55"
+          className={`h-11 rounded-[10px] px-4 font-sans text-[14.5px] font-semibold whitespace-nowrap disabled:opacity-55 ${danger ? 'bg-danger text-on-danger' : 'bg-accent text-on-accent'}`}
         >
           {submitLabel}
         </button>

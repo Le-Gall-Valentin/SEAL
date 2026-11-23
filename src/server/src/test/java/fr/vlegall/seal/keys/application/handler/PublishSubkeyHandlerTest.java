@@ -73,6 +73,9 @@ class PublishSubkeyHandlerTest {
             public void identityPublished(UserId user, byte[] serial) {}
 
             @Override
+            public void identityReset(UserId user, byte[] serial, Optional<byte[]> revoked) {}
+
+            @Override
             public void subkeyPublished(UserId user, byte[] ekId) {
                 published.add(ekId);
             }

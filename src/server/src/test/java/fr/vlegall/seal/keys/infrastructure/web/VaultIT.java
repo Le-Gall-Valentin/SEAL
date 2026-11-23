@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import fr.vlegall.seal.common.web.Base64Url;
 import fr.vlegall.seal.keys.domain.model.Vault;
 import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.ProtocolVectors;
@@ -16,7 +15,6 @@ import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -48,16 +46,7 @@ class VaultIT {
     }
 
     private static Map<String, Object> vault(long version, int blobBytes, int marker) {
-        byte[] blob = new byte[blobBytes];
-        blob[0] = (byte) marker;
-        Map<String, Object> body = new HashMap<>();
-        body.put("vaultVersion", version);
-        body.put("salt", Base64Url.encode(new byte[32]));
-        body.put("nonceK", Base64Url.encode(new byte[12]));
-        body.put("wrappedVdk", Base64Url.encode(new byte[48]));
-        body.put("nonceB", Base64Url.encode(new byte[12]));
-        body.put("blob", Base64Url.encode(blob));
-        return body;
+        return KeysTestClient.vault(version, blobBytes, marker);
     }
 
     private ResultActions save(KeysTestClient account, Map<String, Object> body) throws Exception {

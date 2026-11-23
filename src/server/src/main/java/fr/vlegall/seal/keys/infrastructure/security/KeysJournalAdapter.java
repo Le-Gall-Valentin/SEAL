@@ -7,7 +7,9 @@ import fr.vlegall.seal.security.journal.SecurityEvent;
 import fr.vlegall.seal.security.journal.SecurityEventType;
 import fr.vlegall.seal.security.journal.SecurityJournal;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -36,6 +38,15 @@ public class KeysJournalAdapter implements KeyEventPort {
                 Map.of("serial", HexFormat.of().formatHex(serial))));
     }
 
+    @Override
+    public void identityReset(UserId user, byte[] serial, Optional<byte[]> revokedSerial) {
+        Map<String, String> details = new LinkedHashMap<>();
+        details.put("serial", HexFormat.of().formatHex(serial));
+        revokedSerial.ifPresent(
+                revoked -> details.put("revokedSerial", HexFormat.of().formatHex(revoked)));
+        journal.recordInTransaction(new SecurityEvent(SecurityEventType.IDENTITY_KEY_RESET, user, details));
+    }
+
     /**
      * A09 (CDC section 15) : alerte sur les échecs cryptographiques répétés, avec la route et le compte, pour voir qui
      * les accumule ; aucune valeur reçue, ni clé, ni signature, ni défi (SEC-21). L'identifiant de corrélation du
@@ -49,6 +60,7 @@ public class KeysJournalAdapter implements KeyEventPort {
     private static String route(SignedStructure structure) {
         return switch (structure) {
             case PROOF_OF_POSSESSION -> "PUT /api/v1/keys/identity";
+            case RESET_PROOF_OF_POSSESSION -> "POST /api/v1/keys/identity/reset";
             case SUBKEY_BINDING -> "POST /api/v1/keys/subkeys";
         };
     }

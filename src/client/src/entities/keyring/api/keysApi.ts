@@ -74,6 +74,13 @@ async function unlessNotFound<T>(pending: Promise<T>): Promise<T | undefined> {
   }
 }
 
+/** KEY-32, KEY-34 : 409 VAULT_VERSION_CONFLICT, le coffre ne suit pas la version enregistrée. */
+function isVaultConflict(error: unknown): boolean {
+  return (
+    error instanceof ApiError && error.status === 409 && error.code === 'VAULT_VERSION_CONFLICT'
+  )
+}
+
 function subkeyBody(binding: SubkeyBody) {
   return {
     certSerial: binding.certSerial,
@@ -93,6 +100,16 @@ export const keysApi: IKeysApi = {
   },
   publishIdentity: (proof) =>
     request('/api/v1/keys/identity', CERTIFICATE, { method: 'PUT', body: proof }),
+  async resetIdentity(body) {
+    try {
+      return await request('/api/v1/keys/identity/reset', CERTIFICATE, { method: 'POST', body })
+    } catch (error) {
+      if (isVaultConflict(error)) {
+        return 'conflict'
+      }
+      throw error
+    }
+  },
   publishSubkey: (binding) =>
     requestNoContent('/api/v1/keys/subkeys', { method: 'POST', body: subkeyBody(binding) }),
   readVault: () => unlessNotFound(request('/api/v1/keys/vault', VAULT)),
@@ -101,11 +118,7 @@ export const keysApi: IKeysApi = {
       await requestNoContent('/api/v1/keys/vault', { method: 'PUT', body: vault })
       return 'saved'
     } catch (error) {
-      if (
-        error instanceof ApiError &&
-        error.status === 409 &&
-        error.code === 'VAULT_VERSION_CONFLICT'
-      ) {
+      if (isVaultConflict(error)) {
         return 'conflict'
       }
       throw error

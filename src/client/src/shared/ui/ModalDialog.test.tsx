@@ -7,9 +7,11 @@ import { DialogBody, DialogFooter, ModalDialog } from './ModalDialog'
 function Harness({
   closable = true,
   tall = false,
+  danger = false,
 }: {
   readonly closable?: boolean
   readonly tall?: boolean
+  readonly danger?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [closed, setClosed] = useState(0)
@@ -36,6 +38,7 @@ function Harness({
         title="Changer de courriel"
         eyebrow="Étape 1 sur 2"
         subtitle="Cette action est protégée."
+        danger={danger}
       >
         <form
           onSubmit={(event) => {
@@ -87,6 +90,80 @@ describe('ACC-01, ACC-02, ADR 0035 (point 1) : fenêtre modale des paramètres',
     const box = submit.element().getBoundingClientRect()
     expect(box.bottom).toBeLessThanOrEqual(390)
     expect(box.top).toBeGreaterThanOrEqual(0)
+  })
+
+  it('KEY-34, ADR 0036 (point 3) : une action irréversible met le sous-titre et le bouton d’envoi en --danger', async () => {
+    /** Couleur d'un jeton de design (#rrggbb), telle que getComputedStyle la rend. */
+    const token = (name: string) => {
+      const hex = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+      const [r, g, b] = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16))
+      return `rgb(${String(r)}, ${String(g)}, ${String(b)})`
+    }
+    const colors = async (danger: boolean) => {
+      const screen = await render(<Harness danger={danger} />)
+      await screen.getByRole('button', { name: 'Ouvrir' }).click()
+      const subtitle = getComputedStyle(screen.getByText('Cette action est protégée.').element())
+      const submit = getComputedStyle(
+        screen.getByRole('button', { name: 'Envoyer le code' }).element(),
+      )
+      const result = [subtitle.color, submit.backgroundColor, submit.color]
+      await screen.unmount()
+      return result
+    }
+
+    expect(await colors(true)).toEqual([token('--danger'), token('--danger'), token('--on-danger')])
+    expect(await colors(false)).toEqual([token('--ink-3'), token('--accent'), token('--on-accent')])
+  })
+
+  it('KEY-34, ADR 0036 (point 3) : en variante danger, rôle alertdialog, triangle de 44 px et en-tête de Dialogue-Suppression', async () => {
+    const token = (name: string) => {
+      const hex = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+      const [r, g, b] = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16))
+      return `rgb(${String(r)}, ${String(g)}, ${String(b)})`
+    }
+    const danger = await render(<Harness danger />)
+    await danger.getByRole('button', { name: 'Ouvrir' }).click()
+
+    const alert = danger.getByRole('alertdialog', { name: 'Changer de courriel' })
+    await expect.element(alert).toBeVisible()
+    const header = alert.element().querySelector<HTMLElement>(':scope > div')
+    const icon = header?.querySelector<HTMLElement>(':scope > span[aria-hidden="true"]')
+    expect(icon?.querySelector('svg')).not.toBeNull()
+    const iconStyle = getComputedStyle(icon ?? document.body)
+    expect([iconStyle.width, iconStyle.height, iconStyle.backgroundColor, iconStyle.color]).toEqual(
+      ['44px', '44px', token('--danger-soft'), token('--danger')],
+    )
+    const headerStyle = getComputedStyle(header ?? document.body)
+    expect([headerStyle.paddingTop, headerStyle.paddingBottom, headerStyle.columnGap]).toEqual([
+      '22px',
+      '14px',
+      '14px',
+    ])
+    await danger.unmount()
+
+    const neutral = await render(<Harness />)
+    await neutral.getByRole('button', { name: 'Ouvrir' }).click()
+    const dialog = neutral.getByRole('dialog', { name: 'Changer de courriel' })
+    await expect.element(dialog).toBeVisible()
+    const plain = dialog.element().querySelector<HTMLElement>(':scope > div')
+    expect(plain?.querySelector(':scope > span[aria-hidden="true"]')).toBeNull()
+    expect(getComputedStyle(plain ?? document.body).paddingTop).toBe('20px')
+  })
+
+  it('ADR 0024 (point 11), ADR 0036 : sous 360 px, le triangle décoratif s’efface pour que le titre tienne', async () => {
+    await page.viewport(280, 653)
+    const screen = await render(<Harness danger />)
+    await screen.getByRole('button', { name: 'Ouvrir' }).click()
+    const alert = screen.getByRole('alertdialog', { name: 'Changer de courriel' })
+    await expect.element(alert).toBeVisible()
+    const icon = alert
+      .element()
+      .querySelector<HTMLElement>(':scope > div > span[aria-hidden="true"]')
+
+    expect(getComputedStyle(icon ?? document.body).display).toBe('none')
+    await page.viewport(390, 844)
+    await expect.poll(() => getComputedStyle(icon ?? document.body).display).toBe('grid')
+    await page.viewport(1280, 800)
   })
 
   it('ACC-02, ADR 0035 : titre, étape et sous-titre ; le reste de la page devient inerte', async () => {

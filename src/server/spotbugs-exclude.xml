@@ -142,7 +142,8 @@
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
     <!-- /api/v1/keys : clés du seul compte de la session, session complète seulement, sans identifiant de compte dans
-         l'URL ni le corps (ADR 0025, point 9) : IdentityPublicationIT, SubkeyPublicationIT, VaultIT. -->
+         l'URL ni le corps (ADR 0025, point 9) ; réinitialisation en mode sudo, vérifié par le handler (ADR 0036) :
+         IdentityPublicationIT, SubkeyPublicationIT, VaultIT, IdentityResetIT. -->
     <Match>
         <Class name="fr.vlegall.seal.keys.infrastructure.web.KeysController"/>
         <Bug pattern="SPRING_ENDPOINT"/>

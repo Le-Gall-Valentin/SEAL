@@ -4,8 +4,10 @@ import { StatePage } from '@/shared/ui'
 import { keysWaitingPageMessages } from '../i18n'
 
 /**
- * KEY-02, ADR 0029 (point 13) : un autre onglet tient le verrou des clés (dialogue de la clé ouvert) ; cet onglet
- * l'attend, sans écran du compte, et peut se déconnecter. Il passe à la zone du compte dès que le verrou est rendu.
+ * KEY-02, KEY-34, ADR 0029 (point 13) : un autre onglet tient le verrou des clés (dialogue de la clé ouvert) ; cet
+ * onglet l'attend, sans écran du compte, et peut se déconnecter. Il passe à la suite dès que le verrou est rendu.
+ * Widget : la garde de la zone du compte et Dialogue-Cle-Recuperation (première connexion, réinitialisation, ADR 0036)
+ * l'affichent.
  */
 export function KeysWaitingPage() {
   const t = useMessages(keysWaitingPageMessages)

@@ -1,6 +1,6 @@
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import {
   ForeignIdentityError,
@@ -8,16 +8,26 @@ import {
   KEYS_LOCK,
   KeysApiProvider,
   KeyStoreProvider,
+  prepareReset,
+  resetIdentity,
   setupKeys,
   StaleVaultError,
 } from '@/entities/keyring'
-import { generateKeyring, generateRecoveryKey, type KeyStore, openKeyStore } from '@/shared/crypto'
-import { NetworkError, withLock } from '@/shared/lib'
-import { useKeySetup } from './useKeySetup'
+import {
+  generateKeyring,
+  generateRecoveryKey,
+  type KeyStore,
+  type NewKeyring,
+  openKeyStore,
+} from '@/shared/crypto'
+import { ApiError, NetworkError, withLock } from '@/shared/lib'
+import { type KeyResetOptions, useKeySetup } from './useKeySetup'
 
 vi.mock('@/entities/keyring', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/entities/keyring')>()),
   setupKeys: vi.fn(),
+  prepareReset: vi.fn(),
+  resetIdentity: vi.fn(),
 }))
 
 const OWNER = { userId: '0192f7a1-ffff-7000-8000-00000000a11c', username: 'valentin.dupont' }
@@ -38,7 +48,7 @@ async function freshStore(): Promise<KeyStore> {
   return openKeyStore(`seal-key-setup-test-${String(Date.now())}-${String(opened)}`)
 }
 
-async function renderSetup(store: KeyStore, onDone: () => void) {
+async function renderSetup(store: KeyStore, onDone: () => void, reset?: KeyResetOptions) {
   const wrapper = ({ children }: { readonly children: ReactNode }) => (
     <QueryClientProvider client={new QueryClient()}>
       <KeysApiProvider api={api}>
@@ -46,12 +56,14 @@ async function renderSetup(store: KeyStore, onDone: () => void) {
       </KeysApiProvider>
     </QueryClientProvider>
   )
-  return renderHook(() => useKeySetup(OWNER, onDone), { wrapper })
+  return renderHook(() => useKeySetup(OWNER, onDone, reset), { wrapper })
 }
 
 afterEach(() => {
   calls.length = 0
   vi.mocked(setupKeys).mockReset()
+  vi.mocked(prepareReset).mockReset()
+  vi.mocked(resetIdentity).mockReset()
 })
 
 /** Les deux groupes tirés, ressaisis justes : « Terminer » devient possible. */
@@ -97,7 +109,7 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
     await expect.poll(() => result.current.confirmed).toBe(true)
 
     result.current.finish()
-    await expect.poll(() => result.current.failure).toBe('network')
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'network' })
     result.current.finish()
     await expect.poll(() => onDone.mock.calls.length).toBe(1)
 
@@ -197,6 +209,16 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
     }
   })
 
+  it('ADR 0029, point 12 : à la première connexion, un 403 REAUTH_REQUIRED est une erreur inattendue, pas une relance', async () => {
+    vi.mocked(setupKeys).mockRejectedValueOnce(new ApiError(403, 'REAUTH_REQUIRED'))
+    const { result } = await renderSetup(await freshStore(), () => undefined)
+    await confirm(result)
+
+    result.current.finish()
+
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'unexpected' })
+  })
+
   it('ADR 0029, point 12 : une erreur réseau garde son texte, toute autre erreur est inattendue', async () => {
     vi.mocked(setupKeys).mockRejectedValueOnce(new Error('IndexedDB indisponible'))
     const { result } = await renderSetup(await freshStore(), () => undefined)
@@ -204,7 +226,7 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
 
     result.current.finish()
 
-    await expect.poll(() => result.current.failure).toBe('unexpected')
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'unexpected' })
   })
 
   it('ADR 0029, point 3 : un trousseau illisible sur l’appareil rend le verrou et la main, sans page blanche', async () => {
@@ -218,5 +240,85 @@ describe('KEY-02, KEY-30 : Dialogue-Cle-Recuperation, modèle', () => {
 
     await expect.poll(() => onDone.mock.calls.length).toBe(1)
     expect(await lockIsFree()).toBe(true)
+  })
+})
+
+describe('KEY-34, ADR 0036 : Dialogue-Cle-Recuperation à la réinitialisation de l’identité', () => {
+  /** Identité préparée : un vrai trousseau ; prepareReset et resetIdentity sont des doublures. */
+  let PREPARED: NewKeyring
+
+  beforeAll(async () => {
+    PREPARED = await generateKeyring(OWNER.userId, generateRecoveryKey(), Date.now())
+  })
+
+  it('KEY-34 : « Terminer » prépare la nouvelle identité puis l’envoie ; setupKeys n’est jamais appelé', async () => {
+    const onDone = vi.fn()
+    vi.mocked(prepareReset).mockResolvedValue(PREPARED)
+    vi.mocked(resetIdentity).mockResolvedValue('done')
+    const { result } = await renderSetup(await freshStore(), onDone, { onReauthRequired: vi.fn() })
+    await confirm(result)
+    expect(prepareReset).not.toHaveBeenCalled()
+
+    result.current.finish()
+
+    await expect.poll(() => onDone.mock.calls.length).toBe(1)
+    expect(vi.mocked(resetIdentity).mock.calls[0]?.[1]).toBe(PREPARED)
+    expect(setupKeys).not.toHaveBeenCalled()
+    expect(await lockIsFree()).toBe(true)
+  })
+
+  it('AUTH-55 : 403 REAUTH_REQUIRED passe la main sans erreur affichée ; la relance renvoie la même identité', async () => {
+    const onDone = vi.fn()
+    const onReauthRequired = vi.fn<(retry: () => void) => void>()
+    vi.mocked(prepareReset).mockResolvedValue(PREPARED)
+    vi.mocked(resetIdentity)
+      .mockRejectedValueOnce(new ApiError(403, 'REAUTH_REQUIRED'))
+      .mockResolvedValueOnce('done')
+    const { result } = await renderSetup(await freshStore(), onDone, { onReauthRequired })
+    await confirm(result)
+
+    result.current.finish()
+    await expect.poll(() => onReauthRequired.mock.calls.length).toBe(1)
+    expect(result.current.failure).toBeNull()
+    expect(onDone).not.toHaveBeenCalled()
+
+    onReauthRequired.mock.calls[0]?.[0]()
+    await expect.poll(() => onDone.mock.calls.length).toBe(1)
+    expect(prepareReset).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(resetIdentity).mock.calls.map(([, pending]) => pending)).toEqual([
+      PREPARED,
+      PREPARED,
+    ])
+  })
+
+  it('SEC-10, ADR 0036 (point 7) : au-delà de la limite, 429 annoncé avec son délai, et la main n’est pas rendue', async () => {
+    const onDone = vi.fn()
+    vi.mocked(prepareReset).mockResolvedValue(PREPARED)
+    vi.mocked(resetIdentity).mockRejectedValueOnce(
+      new ApiError(429, 'RATE_LIMITED', { retryAfterSeconds: 7_200 }),
+    )
+    const { result } = await renderSetup(await freshStore(), onDone, { onReauthRequired: vi.fn() })
+    await confirm(result)
+
+    result.current.finish()
+
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'rate-limited', minutes: 120 })
+    expect(onDone).not.toHaveBeenCalled()
+  })
+
+  it('ADR 0036 : coffre changé entre-temps (taken) rend la main ; une erreur réseau garde son texte', async () => {
+    const onDone = vi.fn()
+    vi.mocked(prepareReset).mockResolvedValue(PREPARED)
+    vi.mocked(resetIdentity)
+      .mockRejectedValueOnce(new NetworkError())
+      .mockResolvedValueOnce('taken')
+    const { result } = await renderSetup(await freshStore(), onDone, { onReauthRequired: vi.fn() })
+    await confirm(result)
+
+    result.current.finish()
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'network' })
+    result.current.finish()
+
+    await expect.poll(() => onDone.mock.calls.length).toBe(1)
   })
 })

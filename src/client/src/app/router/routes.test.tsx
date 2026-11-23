@@ -42,6 +42,7 @@ function fakeApis(account: Account | null): Apis {
     keys: {
       createChallenge: never,
       publishIdentity: never,
+      resetIdentity: never,
       publishSubkey: never,
       readVault: never,
       saveVault: never,
