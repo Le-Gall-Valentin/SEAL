@@ -20,6 +20,8 @@ import fr.vlegall.seal.keys.infrastructure.web.dto.PublishSubkeyRequest;
 import fr.vlegall.seal.keys.infrastructure.web.dto.ResetIdentityRequest;
 import fr.vlegall.seal.keys.infrastructure.web.dto.VaultRequest;
 import fr.vlegall.seal.keys.infrastructure.web.dto.VaultView;
+import fr.vlegall.seal.security.ratelimit.RateLimit;
+import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.security.web.CurrentUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -32,7 +34,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Clés du compte de la session (KEY-03 à KEY-05, KEY-32), réservées à la session complète dans {@code SecurityConfig}.
+ * Clés du compte de la session (KEY-03 à KEY-05, KEY-32, KEY-34), réservées à la session complète dans
+ * {@code SecurityConfig}.
  * Aucun identifiant de compte dans l'URL ni dans le corps : chaque route ne touche que les clés de l'appelant (A01).
  */
 @RestController
@@ -45,6 +48,7 @@ public class KeysController {
     private final VaultQuery vaults;
     private final SaveVaultUseCase vaultSaver;
     private final ResetIdentityUseCase resets;
+    private final RateLimiter limiter;
 
     public KeysController(
             CreateChallengeUseCase challenges,
@@ -52,13 +56,15 @@ public class KeysController {
             PublishSubkeyUseCase subkeys,
             VaultQuery vaults,
             SaveVaultUseCase vaultSaver,
-            ResetIdentityUseCase resets) {
+            ResetIdentityUseCase resets,
+            RateLimiter limiter) {
         this.challenges = challenges;
         this.identities = identities;
         this.subkeys = subkeys;
         this.vaults = vaults;
         this.vaultSaver = vaultSaver;
         this.resets = resets;
+        this.limiter = limiter;
     }
 
     /** KEY-03 : 32 octets, 5 minutes ; remplace le défi précédent (ADR 0025, point 8). */
@@ -85,21 +91,32 @@ public class KeysController {
 
     /**
      * KEY-34 : nouvelle IK et nouveau coffre, en mode sudo et en une transaction ; statuts de l'ADR 0036, point 1. Le
-     * mode sudo et le compte actif sont vérifiés par le handler (SEC-03), qui lève 403.
+     * mode sudo et le compte actif sont vérifiés par le handler (SEC-03), qui lève 403. Un jeton des 3
+     * réinitialisations par 24 heures est pris avant l'appel, hors transaction, et rendu pour tout refus (point 7).
      */
     @PostMapping("/identity/reset")
     public CertificateView reset(@CurrentUser UserId user, @Valid @RequestBody ResetIdentityRequest body) {
-        IdentityReset result = resets.reset(
-                user,
-                Base64Url.decode(body.ikPublic()),
-                Base64Url.decode(body.challenge()),
-                Base64Url.decode(body.signature()),
-                body.vault().toVault());
+        limiter.consume(RateLimit.IDENTITY_RESETS_PER_USER, user);
+        IdentityReset result = null;
+        try {
+            result = resets.reset(
+                    user,
+                    Base64Url.decode(body.ikPublic()),
+                    Base64Url.decode(body.challenge()),
+                    Base64Url.decode(body.signature()),
+                    body.vault().toVault());
+        } finally {
+            // Seule une réinitialisation réussie garde son jeton : refus, exception ou sudo échu le rendent.
+            if (!(result instanceof IdentityReset.Reset)) {
+                limiter.refund(RateLimit.IDENTITY_RESETS_PER_USER, user);
+            }
+        }
         return switch (result) {
             case IdentityReset.Reset reset -> CertificateView.of(reset.certificate());
             case IdentityReset.NoVault none -> throw new SealException(ErrorCode.KEY_NOT_FOUND);
             case IdentityReset.ChallengeExpired expired -> throw new SealException(ErrorCode.CODE_EXPIRED);
             case IdentityReset.InvalidSignature invalid -> throw new SealException(ErrorCode.INVALID_SIGNATURE);
+            case IdentityReset.SameKey same -> throw new SealException(ErrorCode.FORBIDDEN);
             case IdentityReset.VaultConflict conflict -> throw new SealException(ErrorCode.VAULT_VERSION_CONFLICT);
         };
     }

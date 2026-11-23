@@ -26,6 +26,11 @@ public enum RateLimit {
     USERNAME_CHECKS_PER_IP(30, Duration.ofMinutes(1), RateLimitKind.IP),
     /** AUTH-14, AUTH-17, ACC-02 : 3 envois de code par heure, renvois et changements de courriel (ADR 0034). */
     EMAIL_CODE_RESENDS_PER_USER(3, Duration.ofHours(1), RateLimitKind.USER),
+    /**
+     * KEY-34, ADR 0036 (point 7) : 3 réinitialisations de l'identité réussies par 24 heures et par compte. Chacune émet
+     * un certificat et rouvre trois sous-clés ; un refus rend son jeton.
+     */
+    IDENTITY_RESETS_PER_USER(3, Duration.ofHours(24), RateLimitKind.USER),
     PASSWORD_RESETS_PER_EMAIL(3, Duration.ofHours(1), RateLimitKind.EMAIL),
     PASSWORD_RESETS_PER_IP(3, Duration.ofHours(1), RateLimitKind.IP),
     /**

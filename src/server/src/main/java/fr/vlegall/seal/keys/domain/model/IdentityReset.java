@@ -24,6 +24,9 @@ public sealed interface IdentityReset {
     /** Preuve de possession de la nouvelle IK qui ne vérifie pas : 422 {@code INVALID_SIGNATURE}. */
     record InvalidSignature() implements IdentityReset {}
 
+    /** Même IK que le certificat courant, rien à réinitialiser : 403 {@code FORBIDDEN}, défi consommé. */
+    record SameKey() implements IdentityReset {}
+
     /** Coffre dont la version ne suit pas l'enregistrée : 409 {@code VAULT_VERSION_CONFLICT}. */
     record VaultConflict() implements IdentityReset {}
 }

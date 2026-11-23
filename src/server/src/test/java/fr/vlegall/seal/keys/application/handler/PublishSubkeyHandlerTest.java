@@ -64,11 +64,6 @@ class PublishSubkeyHandlerTest {
             }
 
             @Override
-            public Optional<IdentityCertificate> supersede(UserId subject, String username, byte[] ikPublic) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
             public Optional<IdentityCertificate> current(UserId subject) {
                 return current;
             }
@@ -78,7 +73,7 @@ class PublishSubkeyHandlerTest {
             public void identityPublished(UserId user, byte[] serial) {}
 
             @Override
-            public void identityReset(UserId user, byte[] serial) {}
+            public void identityReset(UserId user, byte[] serial, Optional<byte[]> revoked) {}
 
             @Override
             public void subkeyPublished(UserId user, byte[] ekId) {

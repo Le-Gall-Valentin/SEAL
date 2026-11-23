@@ -2,6 +2,7 @@ package fr.vlegall.seal.keys.infrastructure.pki;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.keys.domain.model.IdentityCertificate;
+import fr.vlegall.seal.keys.domain.port.out.CertificateReplacementPort;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
 import fr.vlegall.seal.pki.application.port.in.CertificateDetails;
 import fr.vlegall.seal.pki.application.port.in.CurrentCertificateQuery;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Component;
 
 /** Fait certifier une clé par le contexte {@code pki}, par ses ports d'entrée (ADR 0008, règle 7 ; ADR 0025, point 13). */
 @Component
-public class CertificationAdapter implements CertificationPort {
+public class CertificationAdapter implements CertificationPort, CertificateReplacementPort {
 
     private final IssueCertificateUseCase issuance;
     private final ReplaceCertificateUseCase replacement;

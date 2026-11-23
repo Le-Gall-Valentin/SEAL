@@ -7,7 +7,9 @@ import fr.vlegall.seal.security.journal.SecurityEvent;
 import fr.vlegall.seal.security.journal.SecurityEventType;
 import fr.vlegall.seal.security.journal.SecurityJournal;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -37,11 +39,12 @@ public class KeysJournalAdapter implements KeyEventPort {
     }
 
     @Override
-    public void identityReset(UserId user, byte[] serial) {
-        journal.recordInTransaction(new SecurityEvent(
-                SecurityEventType.IDENTITY_KEY_RESET,
-                user,
-                Map.of("serial", HexFormat.of().formatHex(serial))));
+    public void identityReset(UserId user, byte[] serial, Optional<byte[]> revokedSerial) {
+        Map<String, String> details = new LinkedHashMap<>();
+        details.put("serial", HexFormat.of().formatHex(serial));
+        revokedSerial.ifPresent(
+                revoked -> details.put("revokedSerial", HexFormat.of().formatHex(revoked)));
+        journal.recordInTransaction(new SecurityEvent(SecurityEventType.IDENTITY_KEY_RESET, user, details));
     }
 
     /**

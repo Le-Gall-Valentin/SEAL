@@ -5,8 +5,8 @@ import java.util.Optional;
 
 /**
  * KEY-34, ADR 0036 (point 1) : remplacement du certificat d'un compte qui réinitialise son identité, une fois le mode
- * sudo et la preuve de possession vérifiés par le contexte {@code keys}. Mêmes types que {@link IssueCertificateUseCase}
- * (ADR 0008).
+ * sudo et la preuve de possession vérifiés par le contexte {@code keys}. Mêmes types que
+ * {@link IssueCertificateUseCase} (ADR 0008).
  */
 public interface ReplaceCertificateUseCase {
 

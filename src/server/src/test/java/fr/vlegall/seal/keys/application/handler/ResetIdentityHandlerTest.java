@@ -12,6 +12,7 @@ import fr.vlegall.seal.keys.domain.model.IdentityReset;
 import fr.vlegall.seal.keys.domain.model.ProofOfPossession;
 import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.model.Vault;
+import fr.vlegall.seal.keys.domain.port.out.CertificateReplacementPort;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
 import fr.vlegall.seal.keys.domain.port.out.KeyEventPort;
 import fr.vlegall.seal.keys.domain.port.out.VaultRepository;
@@ -38,6 +39,7 @@ class ResetIdentityHandlerTest {
     private final InMemoryChallenges challenges = new InMemoryChallenges();
     private final InMemoryVaults vaults = new InMemoryVaults();
     private final FakeCertification certification = new FakeCertification();
+    private final FakeReplacement replacement = new FakeReplacement();
     private final Map<UserId, String> usernames = new HashMap<>(Map.of(USER, "valentin"));
     private final List<String> events = new ArrayList<>();
     private final Ed25519.GeneratedKey newIk = Ed25519.generate();
@@ -69,8 +71,9 @@ class ResetIdentityHandlerTest {
             }
 
             @Override
-            public void identityReset(UserId user, byte[] serial) {
-                events.add("reset/" + serial[0]);
+            public void identityReset(UserId user, byte[] serial, Optional<byte[]> revoked) {
+                events.add("reset/" + serial[0] + "/"
+                        + revoked.map(bytes -> (int) bytes[0]).orElse(-1));
             }
 
             @Override
@@ -91,6 +94,7 @@ class ResetIdentityHandlerTest {
                 challenges,
                 vaults,
                 certification,
+                replacement,
                 journal,
                 clock());
     }
@@ -114,6 +118,7 @@ class ResetIdentityHandlerTest {
             + " journalisée")
     void key34ValidResetReplacesTheIdentity() {
         vaults.stored.put(USER, vault(4, 1));
+        certification.current = Optional.of(certificate(3, new byte[32]));
 
         IdentityReset result = reset(challenge(), vault(5, 2));
 
@@ -123,7 +128,8 @@ class ResetIdentityHandlerTest {
         assertThat(certificate.username()).isEqualTo("valentin");
         assertThat(vaults.stored.get(USER).version()).isEqualTo(5);
         assertThat(vaults.stored.get(USER).blob()[0]).isEqualTo((byte) 2);
-        assertThat(events).containsExactly("reset/9");
+        // SEC-20 : la rotation note le nouveau certificat et l'ancien, révoqué.
+        assertThat(events).containsExactly("reset/9/3");
     }
 
     @Test
@@ -138,7 +144,7 @@ class ResetIdentityHandlerTest {
                         SealException.class, error -> assertThat(error.code()).isEqualTo(ErrorCode.REAUTH_REQUIRED));
         assertThat(challenges.live).containsKey(USER);
         assertThat(vaults.stored.get(USER).version()).isEqualTo(1);
-        assertThat(certification.replaced).isEmpty();
+        assertThat(replacement.replaced).isEmpty();
 
         sudo = true;
         assertThat(reset(challenge, vault(2, 2))).isInstanceOf(IdentityReset.Reset.class);
@@ -152,20 +158,45 @@ class ResetIdentityHandlerTest {
         assertThat(reset(challenge, vault(1, 2))).isInstanceOf(IdentityReset.NoVault.class);
         assertThat(challenges.live).containsKey(USER);
         assertThat(vaults.stored).isEmpty();
-        assertThat(certification.replaced).isEmpty();
+        assertThat(replacement.replaced).isEmpty();
     }
 
     @Test
-    @DisplayName("KEY-03 : un défi inconnu ou déjà utilisé ne prouve rien")
-    void key03UnknownOrUsedChallengeIsRefused() {
+    @DisplayName("KEY-03 : un défi déjà utilisé ne prouve rien")
+    void key03UsedChallengeIsRefused() {
         vaults.stored.put(USER, vault(1, 1));
         byte[] challenge = challenge();
         assertThat(reset(challenge, vault(2, 2))).isInstanceOf(IdentityReset.Reset.class);
 
         assertThat(reset(challenge, vault(3, 3))).isInstanceOf(IdentityReset.ChallengeExpired.class);
-        assertThat(reset(new byte[32], vault(3, 3))).isInstanceOf(IdentityReset.ChallengeExpired.class);
         assertThat(vaults.stored.get(USER).version()).isEqualTo(2);
-        assertThat(certification.replaced).hasSize(1);
+        assertThat(replacement.replaced).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("KEY-03 : un défi inconnu ne prouve rien, et le défi vivant du compte reste à lui")
+    void key03UnknownChallengeLeavesTheLiveOne() {
+        vaults.stored.put(USER, vault(1, 1));
+        byte[] live = challenge();
+
+        assertThat(reset(new byte[32], vault(2, 2))).isInstanceOf(IdentityReset.ChallengeExpired.class);
+        assertThat(challenges.live).containsKey(USER);
+        assertThat(reset(live, vault(2, 2))).isInstanceOf(IdentityReset.Reset.class);
+    }
+
+    @Test
+    @DisplayName("KEY-03, ADR 0036 : la même IK que le certificat courant est refusée avant le coffre ; le défi est"
+            + " consommé")
+    void adr0036SameKeyIsRefusedBeforeTheVault() {
+        vaults.stored.put(USER, vault(1, 1));
+        certification.current = Optional.of(certificate(3, newIk.publicKey()));
+        byte[] challenge = challenge();
+
+        assertThat(reset(challenge, vault(2, 2))).isInstanceOf(IdentityReset.SameKey.class);
+        assertThat(challenges.live).doesNotContainKey(USER);
+        assertThat(vaults.stored.get(USER).version()).isEqualTo(1);
+        assertThat(replacement.replaced).isEmpty();
+        assertThat(events).isEmpty();
     }
 
     @Test
@@ -181,7 +212,7 @@ class ResetIdentityHandlerTest {
         assertThat(events).containsExactly("rejected/RESET_PROOF_OF_POSSESSION");
         assertThat(challenges.live).doesNotContainKey(USER);
         assertThat(vaults.stored.get(USER).version()).isEqualTo(1);
-        assertThat(certification.replaced).isEmpty();
+        assertThat(replacement.replaced).isEmpty();
     }
 
     @Test
@@ -192,15 +223,15 @@ class ResetIdentityHandlerTest {
         assertThat(reset(challenge(), vault(3, 2))).isInstanceOf(IdentityReset.VaultConflict.class);
         assertThat(reset(challenge(), vault(5, 2))).isInstanceOf(IdentityReset.VaultConflict.class);
         assertThat(vaults.stored.get(USER).blob()[0]).isEqualTo((byte) 1);
-        assertThat(certification.replaced).isEmpty();
+        assertThat(replacement.replaced).isEmpty();
     }
 
     @Test
-    @DisplayName(
-            "ADR 0036 : un remplacement refusé (même IK, ou devancé) lève 403 FORBIDDEN pour annuler la transaction")
+    @DisplayName("ADR 0036 : un certificat devancé par une publication concurrente lève 403 FORBIDDEN pour annuler la"
+            + " transaction, coffre compris")
     void adr0036RefusedReplacementThrows() {
         vaults.stored.put(USER, vault(1, 1));
-        certification.refuse = true;
+        replacement.refuse = true;
         byte[] challenge = challenge();
 
         assertThatThrownBy(() -> reset(challenge, vault(2, 2)))
@@ -221,7 +252,7 @@ class ResetIdentityHandlerTest {
                         SealException.class, error -> assertThat(error.code()).isEqualTo(ErrorCode.FORBIDDEN));
         assertThat(challenges.live).containsKey(USER);
         assertThat(vaults.stored.get(USER).version()).isEqualTo(1);
-        assertThat(certification.replaced).isEmpty();
+        assertThat(replacement.replaced).isEmpty();
     }
 
     /** Table key_vaults en mémoire : version 1 sans coffre, sinon la version enregistrée plus 1. */
@@ -244,9 +275,16 @@ class ResetIdentityHandlerTest {
         }
     }
 
+    /** Certificat de USER, numéro de série marqué au premier octet. */
+    private static IdentityCertificate certificate(int marker, byte[] ikPublic) {
+        byte[] serial = new byte[16];
+        serial[0] = (byte) marker;
+        return new IdentityCertificate(serial, new byte[8], USER, "valentin", ikPublic, NOW, NOW, 3, new byte[64]);
+    }
+
+    /** L'Autorité, pour la seule lecture du certificat courant. */
     private static final class FakeCertification implements CertificationPort {
-        final List<IdentityCertificate> replaced = new ArrayList<>();
-        boolean refuse;
+        Optional<IdentityCertificate> current = Optional.empty();
 
         @Override
         public Optional<IdentityCertificate> certify(UserId subject, String username, byte[] ikPublic) {
@@ -254,21 +292,23 @@ class ResetIdentityHandlerTest {
         }
 
         @Override
+        public Optional<IdentityCertificate> current(UserId subject) {
+            return current;
+        }
+    }
+
+    private static final class FakeReplacement implements CertificateReplacementPort {
+        final List<IdentityCertificate> replaced = new ArrayList<>();
+        boolean refuse;
+
+        @Override
         public Optional<IdentityCertificate> supersede(UserId subject, String username, byte[] ikPublic) {
             if (refuse) {
                 return Optional.empty();
             }
-            byte[] serial = new byte[16];
-            serial[0] = 9;
-            IdentityCertificate certificate = new IdentityCertificate(
-                    serial, new byte[8], subject, username, ikPublic, NOW, NOW, 3, new byte[64]);
+            IdentityCertificate certificate = certificate(9, ikPublic);
             replaced.add(certificate);
             return Optional.of(certificate);
-        }
-
-        @Override
-        public Optional<IdentityCertificate> current(UserId subject) {
-            return Optional.empty();
         }
     }
 }

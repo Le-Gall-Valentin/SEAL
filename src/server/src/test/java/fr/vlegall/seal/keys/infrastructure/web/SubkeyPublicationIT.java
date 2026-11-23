@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.common.web.Base64Url;
 import fr.vlegall.seal.crypto.Ed25519;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
@@ -18,12 +17,10 @@ import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
 import java.math.BigDecimal;
-import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +43,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class SubkeyPublicationIT {
 
     private static final String SUBKEYS = "/api/v1/keys/subkeys";
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Autowired
     private MockMvc mvc;
@@ -73,26 +69,11 @@ class SubkeyPublicationIT {
             Instant createdAt,
             Instant expiresAt,
             Ed25519.GeneratedKey signer) {
-        byte[] ekPublic = new byte[32];
-        ekPublic[0] = 9;
-        SubkeyBinding signed = new SubkeyBinding(
-                new UserId(account.id), serial, ekId, SubkeyBinding.KEM, ekPublic, createdAt, expiresAt);
-        Map<String, Object> body = new HashMap<>();
-        body.put("certSerial", Base64Url.encode(serial));
-        body.put("ekId", Base64Url.encode(ekId));
-        body.put("kem", SubkeyBinding.KEM);
-        body.put("ekPublic", Base64Url.encode(ekPublic));
-        body.put("createdAt", createdAt.toString());
-        body.put("expiresAt", expiresAt.toString());
-        body.put("signature", Base64Url.encode(Ed25519.sign(signer.privateKey(), signed.encode())));
-        return body;
+        return KeysTestClient.binding(account.id, serial, ekId, createdAt, expiresAt, signer);
     }
 
-    /** 16 octets tirés au hasard, comme le client : aucune collision entre tests sur la base partagée. */
     private static byte[] freshEkId() {
-        byte[] ekId = new byte[SubkeyBinding.EK_ID_BYTES];
-        RANDOM.nextBytes(ekId);
-        return ekId;
+        return KeysTestClient.freshEkId();
     }
 
     private Instant now() {

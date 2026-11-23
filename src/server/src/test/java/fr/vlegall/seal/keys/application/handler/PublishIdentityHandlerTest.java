@@ -68,7 +68,7 @@ class PublishIdentityHandlerTest {
             }
 
             @Override
-            public void identityReset(UserId user, byte[] serial) {
+            public void identityReset(UserId user, byte[] serial, Optional<byte[]> revoked) {
                 throw new AssertionError("KEY-03 : la publication ne réinitialise rien");
             }
 
@@ -206,11 +206,6 @@ class PublishIdentityHandlerTest {
                     new byte[16], new byte[8], subject, username, ikPublic, NOW, NOW, 3, new byte[64]);
             issued.add(certificate);
             return Optional.of(certificate);
-        }
-
-        @Override
-        public Optional<IdentityCertificate> supersede(UserId subject, String username, byte[] ikPublic) {
-            throw new AssertionError("KEY-12 : la publication ne remplace aucun certificat");
         }
 
         @Override

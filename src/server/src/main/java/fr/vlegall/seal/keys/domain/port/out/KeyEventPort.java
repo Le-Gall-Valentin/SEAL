@@ -2,6 +2,7 @@ package fr.vlegall.seal.keys.domain.port.out;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.keys.domain.model.SignedStructure;
+import java.util.Optional;
 
 /**
  * SEC-20 : publications de clés, écrites dans la transaction de la publication ; A09 : signatures refusées (ADR 0025,
@@ -11,8 +12,11 @@ public interface KeyEventPort {
 
     void identityPublished(UserId user, byte[] serial);
 
-    /** KEY-34 : identité réinitialisée, avec le numéro de série du nouveau certificat (rotation de clé). */
-    void identityReset(UserId user, byte[] serial);
+    /**
+     * KEY-34 : identité réinitialisée (rotation de clé), avec le numéro de série du nouveau certificat et celui du
+     * certificat courant qu'il remplace, s'il y en avait un.
+     */
+    void identityReset(UserId user, byte[] serial, Optional<byte[]> revokedSerial);
 
     void subkeyPublished(UserId user, byte[] ekId);
 

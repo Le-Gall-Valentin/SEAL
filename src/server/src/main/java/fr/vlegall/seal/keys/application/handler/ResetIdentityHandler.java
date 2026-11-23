@@ -12,12 +12,15 @@ import fr.vlegall.seal.keys.domain.model.ProofOfPossession;
 import fr.vlegall.seal.keys.domain.model.SignedStructure;
 import fr.vlegall.seal.keys.domain.model.Vault;
 import fr.vlegall.seal.keys.domain.port.out.AccountPort;
+import fr.vlegall.seal.keys.domain.port.out.CertificateReplacementPort;
 import fr.vlegall.seal.keys.domain.port.out.CertificationPort;
 import fr.vlegall.seal.keys.domain.port.out.ChallengeRepository;
 import fr.vlegall.seal.keys.domain.port.out.KeyEventPort;
 import fr.vlegall.seal.keys.domain.port.out.SudoModePort;
 import fr.vlegall.seal.keys.domain.port.out.VaultRepository;
 import java.time.Clock;
+import java.util.Arrays;
+import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
 
 @ApplicationService
@@ -28,6 +31,7 @@ public class ResetIdentityHandler implements ResetIdentityUseCase {
     private final ChallengeRepository challenges;
     private final VaultRepository vaults;
     private final CertificationPort certification;
+    private final CertificateReplacementPort replacement;
     private final KeyEventPort events;
     private final Clock clock;
 
@@ -37,6 +41,7 @@ public class ResetIdentityHandler implements ResetIdentityUseCase {
             ChallengeRepository challenges,
             VaultRepository vaults,
             CertificationPort certification,
+            CertificateReplacementPort replacement,
             KeyEventPort events,
             Clock clock) {
         this.sudo = sudo;
@@ -44,14 +49,15 @@ public class ResetIdentityHandler implements ResetIdentityUseCase {
         this.challenges = challenges;
         this.vaults = vaults;
         this.certification = certification;
+        this.replacement = replacement;
         this.events = events;
         this.clock = clock;
     }
 
     /**
      * Une seule transaction (ADR 0036, point 1) : défi, coffre, révocation et émission (dans celle de {@code pki}),
-     * journal. Le mode sudo et le compte sont vérifiés avant de toucher au défi ; un remplacement refusé lève une
-     * exception, pour que le coffre déjà écrit soit annulé avec le reste.
+     * journal. Le mode sudo et le compte sont vérifiés avant de toucher au défi ; la même IK est refusée avant
+     * d'écrire le coffre ; un remplacement devancé lève une exception, pour que le coffre déjà écrit soit annulé.
      */
     @Override
     @Transactional
@@ -70,14 +76,20 @@ public class ResetIdentityHandler implements ResetIdentityUseCase {
             events.signatureRejected(user, SignedStructure.RESET_PROOF_OF_POSSESSION);
             return new IdentityReset.InvalidSignature();
         }
+        // ADR 0036, point 1.5 : rien à réinitialiser ; refusé avant le coffre, le défi reste consommé (KEY-03).
+        Optional<IdentityCertificate> current = certification.current(user);
+        if (current.filter(held -> Arrays.equals(held.ikPublic(), ikPublic)).isPresent()) {
+            return new IdentityReset.SameKey();
+        }
         // ADR 0036, point 2 : la version suit l'enregistrée ; de deux réinitialisations, la seconde ne change rien.
         if (!vaults.save(user, vault)) {
             return new IdentityReset.VaultConflict();
         }
-        IdentityCertificate certificate = certification
+        // Une publication concurrente qui devance le nouveau certificat annule tout, coffre compris.
+        IdentityCertificate certificate = replacement
                 .supersede(user, username, ikPublic)
                 .orElseThrow(() -> new SealException(ErrorCode.FORBIDDEN));
-        events.identityReset(user, certificate.serial());
+        events.identityReset(user, certificate.serial(), current.map(IdentityCertificate::serial));
         return new IdentityReset.Reset(certificate);
     }
 }

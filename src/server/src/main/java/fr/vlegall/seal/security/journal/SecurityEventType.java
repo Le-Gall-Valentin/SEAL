@@ -23,8 +23,8 @@ public enum SecurityEventType {
     /** SEC-20 : clé d'identité publiée et certifiée (KEY-04), avec le numéro de série du certificat. */
     IDENTITY_KEY_PUBLISHED,
     /**
-     * SEC-20 : identité réinitialisée (KEY-34, rotation de clé), avec le numéro de série du nouveau certificat ; l'ancien
-     * est révoqué dans la même transaction.
+     * SEC-20 : identité réinitialisée (KEY-34, rotation de clé), avec les numéros de série du nouveau certificat et
+     * de l'ancien, révoqué dans la même transaction.
      */
     IDENTITY_KEY_RESET,
     /** SEC-20 : sous-clé de chiffrement publiée (KEY-05), avec son ekId. */

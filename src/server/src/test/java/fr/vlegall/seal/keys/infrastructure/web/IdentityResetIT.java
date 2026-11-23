@@ -6,6 +6,7 @@ import static fr.vlegall.seal.support.AuthClient.sessionOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,7 +18,9 @@ import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
+import java.security.SecureRandom;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -25,7 +28,10 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -34,6 +40,7 @@ import tools.jackson.databind.JsonNode;
 
 /** KEY-34, AUTH-55, ADR 0036 (point 1), SEC-20, QA-05 : réinitialisation de l'identité, attaquée comme par un tiers. */
 @SealIntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
 class IdentityResetIT {
 
     @Autowired
@@ -106,6 +113,9 @@ class IdentityResetIT {
                 .get("certificate")
                 .get("serial")
                 .asString());
+        account.publishSubkey(oldSerial, clock.instant().truncatedTo(ChronoUnit.MILLIS));
+        mvc.perform(get("/api/v1/users/" + account.id + "/keys").cookie(account.session))
+                .andExpect(jsonPath("$.subkeys.length()").value(1));
         Ed25519.GeneratedKey newIk = Ed25519.generate();
 
         JsonNode certificate = AuthClient.body(account.reset(account.resetBody(newIk, vault(2, 64, 2)))
@@ -117,10 +127,9 @@ class IdentityResetIT {
                 .andReturn());
 
         assertThat(currentIk(account)).isEqualTo(Base64Url.encode(newIk.publicKey()));
-        assertThat(mvc.perform(get("/api/v1/users/" + account.id + "/keys").cookie(account.session))
-                        .andExpect(jsonPath("$.subkeys").isEmpty())
-                        .andReturn())
-                .isNotNull();
+        // La sous-clé de l'ancien certificat n'est plus servie.
+        mvc.perform(get("/api/v1/users/" + account.id + "/keys").cookie(account.session))
+                .andExpect(jsonPath("$.subkeys").isEmpty());
         assertThat(jdbc.sql("SELECT revocation_reason FROM identity_certificates WHERE serial = :serial"
                                 + " AND revoked_at IS NOT NULL")
                         .param("serial", oldSerial)
@@ -131,13 +140,16 @@ class IdentityResetIT {
         assertThat(storedVault(account).get("vaultVersion").longValue()).isEqualTo(2L);
         assertThat(storedVault(account).get("blob").asString())
                 .isEqualTo(vault(2, 64, 2).get("blob"));
-        assertThat(jdbc.sql("SELECT details ->> 'serial' FROM security_events"
+        assertThat(jdbc.sql("SELECT details ->> 'serial', details ->> 'revokedSerial' FROM security_events"
                                 + " WHERE user_id = :user AND type = 'IDENTITY_KEY_RESET'")
                         .param("user", account.id)
-                        .query(String.class)
+                        .query((row, index) -> List.of(row.getString(1), row.getString(2)))
                         .single())
-                .isEqualTo(HexFormat.of()
-                        .formatHex(Base64Url.decode(certificate.get("serial").asString())));
+                .containsExactly(
+                        HexFormat.of()
+                                .formatHex(Base64Url.decode(
+                                        certificate.get("serial").asString())),
+                        HexFormat.of().formatHex(oldSerial));
     }
 
     @Test
@@ -183,14 +195,22 @@ class IdentityResetIT {
     }
 
     @Test
-    @DisplayName("ADR 0036 : la même clé d'identité, 403 FORBIDDEN ; le coffre déjà écrit est annulé avec le reste")
-    void adr0036SameKeyRollsTheVaultBack() throws Exception {
+    @DisplayName("KEY-03, ADR 0036 : la même clé d'identité, 403 FORBIDDEN, rien ne change et le défi est consommé")
+    void adr0036SameKeyIsRefusedAndConsumesTheChallenge() throws Exception {
         KeysTestClient account = published("raz_meme");
+        Map<String, Object> same = account.resetBody(account.ik, vault(2, 64, 2));
 
-        account.reset(account.resetBody(account.ik, vault(2, 64, 2)))
+        account.reset(same)
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        assertUnchanged(account);
 
+        Map<String, Object> replay =
+                KeysTestClient.proof(account.id, Base64Url.decode((String) same.get("challenge")), Ed25519.generate());
+        replay.put("vault", vault(2, 64, 2));
+        account.reset(replay)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
         assertUnchanged(account);
     }
 
@@ -240,8 +260,9 @@ class IdentityResetIT {
                         .getResponse()
                         .getStatus());
 
+        // Au-delà des 3 jetons de la limite (ADR 0036, point 7), les envois simultanés reçoivent 429.
         assertThat(statuses)
-                .containsOnly(200, 422)
+                .isSubsetOf(200, 422, 429)
                 .filteredOn(code -> code == 200)
                 .hasSize(1);
         assertThat(unrevoked(account)).isEqualTo(1L);
@@ -294,5 +315,72 @@ class IdentityResetIT {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         assertUnchanged(account);
+    }
+
+    @Test
+    @DisplayName("KEY-03, A09, SEC-21 : une preuve pour un autre compte, ou forgée, donne 422 et une alerte WARN qui"
+            + " nomme la route, sans aucune valeur reçue")
+    void a09ForeignOrForgedProofIsReportedWithoutValues(CapturedOutput output) throws Exception {
+        KeysTestClient account = published("raz_alerte");
+        KeysTestClient victim = published("raz_victime");
+        Ed25519.GeneratedKey newIk = Ed25519.generate();
+
+        Map<String, Object> foreign = KeysTestClient.proof(victim.id, account.challenge(), newIk);
+        foreign.put("vault", vault(2, 64, 2));
+        account.reset(foreign)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("INVALID_SIGNATURE"));
+        // Coffre aux octets aléatoires : des zéros en base64 (« AAAA… ») se retrouveraient n'importe où dans la sortie.
+        Map<String, Object> distinctVault = vault(2, 64, 2);
+        distinctVault.put("blob", Base64Url.encode(randomBytes(64)));
+        distinctVault.put("wrappedVdk", Base64Url.encode(randomBytes(48)));
+        Map<String, Object> forged = account.resetBody(newIk, distinctVault);
+        forged.put("signature", Base64Url.encode(randomBytes(64)));
+        account.reset(forged)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("INVALID_SIGNATURE"));
+
+        assertThat(output.getOut()
+                        .lines()
+                        .filter(line -> line.contains("WARN")
+                                && line.contains("Signature refusée")
+                                && line.contains("POST /api/v1/keys/identity/reset")
+                                && line.contains(account.id.toString())))
+                .hasSize(2);
+        assertThat(output.getAll())
+                .doesNotContain((String) foreign.get("signature"))
+                .doesNotContain((String) forged.get("signature"))
+                .doesNotContain((String) forged.get("challenge"))
+                .doesNotContain((String) distinctVault.get("blob"))
+                .doesNotContain((String) distinctVault.get("wrappedVdk"));
+        assertUnchanged(account);
+        assertUnchanged(victim);
+    }
+
+    @Test
+    @DisplayName("KEY-34, ADR 0036 (point 7), SEC-10 : au-delà de 3 réinitialisations réussies par 24 heures, 429 avec"
+            + " Retry-After ; un refus ne compte pas")
+    void sec10ResetsAreLimited() throws Exception {
+        KeysTestClient account = published("raz_limite");
+        account.reset(account.resetBody(Ed25519.generate(), vault(3, 64, 9))).andExpect(status().isConflict());
+        Ed25519.GeneratedKey last = Ed25519.generate();
+        for (int version = 2; version <= 4; version++) {
+            last = Ed25519.generate();
+            account.reset(account.resetBody(last, vault(version, 64, version))).andExpect(status().isOk());
+        }
+
+        account.reset(account.resetBody(Ed25519.generate(), vault(5, 64, 5)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+                .andExpect(header().exists("Retry-After"));
+
+        assertThat(currentIk(account)).isEqualTo(Base64Url.encode(last.publicKey()));
+        assertThat(storedVault(account).get("vaultVersion").longValue()).isEqualTo(4L);
+    }
+
+    private static byte[] randomBytes(int count) {
+        byte[] bytes = new byte[count];
+        new SecureRandom().nextBytes(bytes);
+        return bytes;
     }
 }

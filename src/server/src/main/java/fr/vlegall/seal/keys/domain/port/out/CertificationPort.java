@@ -13,12 +13,6 @@ public interface CertificationPort {
      */
     Optional<IdentityCertificate> certify(UserId subject, String username, byte[] ikPublic);
 
-    /**
-     * KEY-34, ADR 0036 : certificat de {@code ikPublic} qui remplace celui du compte, révoqué ; vide si c'est déjà la
-     * clé du certificat non révoqué, ou si une publication concurrente l'a devancé.
-     */
-    Optional<IdentityCertificate> supersede(UserId subject, String username, byte[] ikPublic);
-
     /** Certificat non révoqué et non expiré du compte, entier, avec la signature de la CA (KEY-05, KEY-33). */
     Optional<IdentityCertificate> current(UserId subject);
 }
