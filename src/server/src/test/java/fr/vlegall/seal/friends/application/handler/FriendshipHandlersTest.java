@@ -61,5 +61,7 @@ class FriendshipHandlersTest {
                 .isFalse();
         assertThat(handler.areAllFriends(me.user(), List.of(friend.user(), me.user())))
                 .isFalse();
+        // Personne à vérifier : la condition tient (un ajout dont tous les comptes sont déjà membres).
+        assertThat(handler.areAllFriends(me.user(), List.of())).isTrue();
     }
 }

@@ -54,6 +54,21 @@ class GroupMembershipHandlersTest {
     }
 
     @Test
+    @DisplayName(
+            "GRP-04, ADR 0039 (point 3) : un membre déjà là, même non ami de l'appelant, et l'appelant sont ignorés")
+    void grp04ActiveMembersAreIgnoredBeforeTheFriendshipCheck() {
+        add.admit(member, group, Set.of(membersFriend));
+
+        ConversationSummary after = add.admit(admin, group, Set.of(membersFriend, admin, adminsFriend));
+        ConversationSummary unchanged = add.admit(admin, group, Set.of(member, admin));
+
+        assertThat(after.members())
+                .extracting(m -> m.profile().user())
+                .containsExactlyInAnyOrder(admin, member, membersFriend, adminsFriend);
+        assertThat(unchanged.members()).hasSize(4);
+    }
+
+    @Test
     @DisplayName("FRD-21, GRP-03 : un arrivant doit être ami de celui qui l'ajoute")
     void frd21NewcomerMustBeAFriendOfTheCaller() {
         assertThatThrownBy(() -> add.admit(member, group, Set.of(adminsFriend)))

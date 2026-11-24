@@ -245,6 +245,10 @@ class ConversationsIT {
         mvc.perform(member.unsafe(post(path + "/members"), Map.of("userIds", List.of(newcomer.id))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.members.length()").value(3));
+        // GRP-04, ADR 0039 (point 3) : un membre déjà là, même non ami de l'appelant, et l'appelant sont ignorés.
+        mvc.perform(admin.unsafe(post(path + "/members"), Map.of("userIds", List.of(newcomer.id, admin.id))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members.length()").value(3));
         mvc.perform(member.unsafe(delete(path + "/members/" + newcomer.id), null))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));

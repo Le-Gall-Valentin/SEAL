@@ -183,6 +183,7 @@ class FriendsPersistenceIT {
         // FRD-21 : combien de ces comptes sont amis de a, dans un sens ou l'autre, en une requête.
         assertThat(friendships.countAmong(a, List.of(b, user(), a))).isEqualTo(1);
         assertThat(friendships.countAmong(b, List.of(a))).isEqualTo(1);
+        assertThat(friendships.countAmong(a, List.of())).isZero();
         assertThat(friendships.of(a, Optional.empty(), 10)).containsExactly(new Friend(b, NOW));
         assertThat(friendships.of(b, Optional.empty(), 10)).containsExactly(new Friend(a, NOW));
 
