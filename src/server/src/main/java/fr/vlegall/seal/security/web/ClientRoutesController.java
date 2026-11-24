@@ -23,7 +23,7 @@ public class ClientRoutesController {
 
     /** ADR 0034 (point 2) : écran Paramètres, où revient une ré-authentification OAuth (AUTH-55). */
     public static final String SETTINGS = "/parametres";
-    /** ADR 0038 (point 5) : écran Amis ; l'onglet Invitations est un paramètre de requête. */
+    /** FRD-10, ADR 0038 (point 5) : écran Amis ; l'onglet Invitations est un paramètre de requête. */
     private static final String FRIENDS = "/amis";
     /** ADR 0032 (point 2) : retours vers l'écran de connexion, avec un code de la section 14.6 du CDC. */
     public static final String LOGIN_REQUEST_REJECTED = LOGIN + "?erreur=REQUEST_REJECTED";
