@@ -4,6 +4,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.domain.model.Friend;
 import fr.vlegall.seal.friends.domain.model.UserPair;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,4 +21,7 @@ public interface FriendshipRepository {
 
     /** FRD-10 : amis de {@code user} après {@code after}, triés par identifiant d'ami. */
     List<Friend> of(UserId user, Optional<UserId> after, int limit);
+
+    /** FRD-21 : nombre de comptes de {@code others} amis de {@code user}, en une requête ; {@code user} n'y compte pas. */
+    int countAmong(UserId user, Collection<UserId> others);
 }

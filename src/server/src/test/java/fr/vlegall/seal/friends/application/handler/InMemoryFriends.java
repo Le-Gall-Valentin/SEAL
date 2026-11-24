@@ -143,6 +143,14 @@ final class InMemoryFriends {
             }
 
             @Override
+            public int countAmong(UserId user, Collection<UserId> others) {
+                return (int) others.stream()
+                        .distinct()
+                        .filter(other -> !other.equals(user) && friendships.containsKey(UserPair.of(user, other)))
+                        .count();
+            }
+
+            @Override
             public List<Friend> of(UserId user, Optional<UserId> after, int limit) {
                 return friendships.entrySet().stream()
                         .filter(e -> e.getKey().low().equals(user)

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.friends.domain.model.Person;
 import fr.vlegall.seal.friends.domain.model.UserPair;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +42,24 @@ class FriendshipHandlersTest {
         assertThat(handler.areFriends(friend.user(), me.user())).isTrue();
         assertThat(handler.areFriends(me.user(), me.user())).isFalse();
         assertThat(handler.areFriends(me.user(), friends.person("autre").user()))
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("FRD-21, GRP-02 : tous amis d'un compte, en une question ; un tiers ou le compte lui-même, non")
+    void frd21AllFriendsInOneQuestion() {
+        FriendshipQueryHandler handler = new FriendshipQueryHandler(friends.friendships());
+        var second = friends.person("second");
+        friends.friendships.put(UserPair.of(me.user(), friend.user()), InMemoryFriends.NOW);
+        friends.friendships.put(UserPair.of(second.user(), me.user()), InMemoryFriends.NOW);
+
+        assertThat(handler.areAllFriends(me.user(), List.of(friend.user(), second.user())))
+                .isTrue();
+        assertThat(handler.areAllFriends(
+                        me.user(),
+                        List.of(friend.user(), friends.person("tiers").user())))
+                .isFalse();
+        assertThat(handler.areAllFriends(me.user(), List.of(friend.user(), me.user())))
                 .isFalse();
     }
 }

@@ -82,6 +82,11 @@ class SendFriendRequestHandlerTest {
             public List<Friend> of(UserId user, Optional<UserId> after, int limit) {
                 throw new UnsupportedOperationException();
             }
+
+            @Override
+            public int countAmong(UserId user, java.util.Collection<UserId> others) {
+                throw new UnsupportedOperationException();
+            }
         };
         FriendRequestRepository requests = new FriendRequestRepository() {
             @Override

@@ -7,6 +7,7 @@ import fr.vlegall.seal.friends.domain.port.out.FriendshipRepository;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,6 +57,20 @@ public class FriendshipRepositoryAdapter implements FriendshipRepository {
                         .param("high", pair.high().value())
                         .update()
                 == 1;
+    }
+
+    @Override
+    public int countAmong(UserId user, Collection<UserId> others) {
+        if (others.isEmpty()) {
+            return 0;
+        }
+        List<UUID> ids = others.stream().map(UserId::value).distinct().toList();
+        return jdbc.sql("SELECT count(*) FROM friendships WHERE (user_low = :user AND user_high IN (:others))"
+                        + " OR (user_high = :user AND user_low IN (:others))")
+                .param("user", user.value())
+                .param("others", ids)
+                .query(Integer.class)
+                .single();
     }
 
     @Override
