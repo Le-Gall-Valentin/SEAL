@@ -142,4 +142,18 @@ describe('AUTH-10 : nom affiché', () => {
   ])('« %s » est refusé', (_cas, name) => {
     expect(isDisplayNameValid(name)).toBe(false)
   })
+
+  it.each(
+    [0x200b, 0x2060, 0xfeff, 0x00ad, 0xe0001, 0xe0041, 0xe000, 0xf0000, 0x10fffd].map(
+      (code) => [code.toString(16).toUpperCase().padStart(4, '0'), code] as const,
+    ),
+  )('ACC-03, ADR 0040 : U+%s, invisible ou d’usage privé, est refusé', (_hex, code) => {
+    expect(isDisplayNameValid(`S${String.fromCodePoint(code)}ki`)).toBe(false)
+  })
+
+  it('ACC-03, ADR 0040 : ZWJ, ZWNJ et sélecteur de variation restent permis', () => {
+    expect(isDisplayNameValid(String.fromCodePoint(0x1f469, 0x200d, 0x1f467))).toBe(true)
+    expect(isDisplayNameValid(`a${String.fromCodePoint(0x200c)}b`)).toBe(true)
+    expect(isDisplayNameValid(String.fromCodePoint(0x2764, 0xfe0f))).toBe(true)
+  })
 })
