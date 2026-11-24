@@ -636,24 +636,30 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
 })
 
 describe('ADR 0012, point 3 : rigueur', () => {
-  it('QA-10 : un switch sur une union doit en traiter tous les cas', async () => {
-    const SWITCH = (cases: string) =>
-      `type Kind = 'a' | 'b'\nexport function f(k: Kind): number {\n  switch (k) {\n${cases}  }\n}\n`
-    expect(
-      await ruleIds(
-        'src/shared/lib/kind.ts',
-        SWITCH("    case 'a':\n      return 1\n"),
-        typedEslint,
-      ),
-    ).toContain('@typescript-eslint/switch-exhaustiveness-check')
-    expect(
-      await ruleIds(
-        'src/shared/lib/kind.ts',
-        SWITCH("    case 'a':\n      return 1\n    case 'b':\n      return 2\n"),
-        typedEslint,
-      ),
-    ).not.toContain('@typescript-eslint/switch-exhaustiveness-check')
-  })
+  // Le lint typé crée d'abord un programme TypeScript : quelques centaines de millisecondes ici, plus de 5 s sur la CI,
+  // où toute la suite se partage le processeur. Le délai s'ajuste ; les assertions restent les mêmes.
+  it(
+    'QA-10 : un switch sur une union doit en traiter tous les cas',
+    { timeout: 30_000 },
+    async () => {
+      const SWITCH = (cases: string) =>
+        `type Kind = 'a' | 'b'\nexport function f(k: Kind): number {\n  switch (k) {\n${cases}  }\n}\n`
+      expect(
+        await ruleIds(
+          'src/shared/lib/kind.ts',
+          SWITCH("    case 'a':\n      return 1\n"),
+          typedEslint,
+        ),
+      ).toContain('@typescript-eslint/switch-exhaustiveness-check')
+      expect(
+        await ruleIds(
+          'src/shared/lib/kind.ts',
+          SWITCH("    case 'a':\n      return 1\n    case 'b':\n      return 2\n"),
+          typedEslint,
+        ),
+      ).not.toContain('@typescript-eslint/switch-exhaustiveness-check')
+    },
+  )
 })
 
 describe('Audit de la branche : frontières éprouvées par un cas refusé', () => {
