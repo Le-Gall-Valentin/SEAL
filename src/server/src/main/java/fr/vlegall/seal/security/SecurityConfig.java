@@ -186,6 +186,21 @@ class SecurityConfig {
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/friends/*", "/api/v1/friend-requests/*")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        // Section 14.5, ADR 0039 : conversations, pour la seule session complète ; l'appartenance est
+                        // contrôlée par chaque handler (CNV-06, SEC-03). L'historique et les routes P1 restent fermés.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/conversations", "/api/v1/conversations/*")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/conversations/direct",
+                                "/api/v1/conversations/group",
+                                "/api/v1/conversations/*/members",
+                                "/api/v1/conversations/*/leave")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/conversations/*/members/*")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/conversations/*")
+                        .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         // KEY-10, KEY-11, ADR 0025 (point 9) : clé de l'Autorité, pour la seule session complète.
                         .requestMatchers(HttpMethod.GET, "/api/v1/pki/ca")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
@@ -255,12 +270,14 @@ class SecurityConfig {
                 // en-têtes, que le refus porte aussi. FormContentFilter, placé avant, est désactivé (application.yaml).
                 .addFilterAfter(
                         new RequestBodyLimitFilter(
-                                // ADR 0037, point 10 : même borne pour les routes des amis.
+                                // ADR 0037 (point 10) et ADR 0039 (point 1) : même borne pour les amis et les
+                                // conversations.
                                 new OrRequestMatcher(
                                         PathPatternRequestMatcher.withDefaults().matcher("/api/v1/auth/**"),
                                         PathPatternRequestMatcher.withDefaults().matcher("/api/v1/account/**"),
                                         PathPatternRequestMatcher.withDefaults().matcher("/api/v1/friend-requests/**"),
-                                        PathPatternRequestMatcher.withDefaults().matcher("/api/v1/friends/**")),
+                                        PathPatternRequestMatcher.withDefaults().matcher("/api/v1/friends/**"),
+                                        PathPatternRequestMatcher.withDefaults().matcher("/api/v1/conversations/**")),
                                 SMALL_BODY_LIMIT,
                                 problemDetails::rejectTooLarge),
                         HeaderWriterFilter.class)
