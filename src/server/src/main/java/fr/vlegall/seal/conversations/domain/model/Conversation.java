@@ -25,6 +25,9 @@ public record Conversation(
     /** GRP-01 : 2 à 50 membres, créateur compris. */
     public static final int MAX_MEMBERS = 50;
 
+    /** GRP-01 : arrivants d'une seule requête au plus, l'appelant étant déjà membre. */
+    public static final int MAX_NEWCOMERS = MAX_MEMBERS - 1;
+
     /** ADR 0039 (point 4) : le plus tôt arrivé, puis le plus petit identifiant. */
     private static final Comparator<Member> SENIORITY =
             Comparator.comparing(Member::joinedAt).thenComparing(Member::user, UserId.POSTGRES_ORDER);

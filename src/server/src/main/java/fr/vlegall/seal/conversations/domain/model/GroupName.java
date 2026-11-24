@@ -12,6 +12,9 @@ public record GroupName(String value) {
 
     public static final int MAX_LENGTH = 64;
 
+    /** SEC-01 : borne du corps avant normalisation, en unités UTF-16 (le double de {@link #MAX_LENGTH}). */
+    public static final int RAW_MAX_LENGTH = 2 * MAX_LENGTH;
+
     public GroupName {
         Objects.requireNonNull(value, "value");
     }

@@ -181,12 +181,14 @@ class ConversationsIT {
         nullList.put("memberIds", null);
         mvc.perform(me.unsafe(post(CONVERSATIONS + "/group"), nullList))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields[0]").value("memberIds"));
         List<UUID> withNull = new ArrayList<>();
         withNull.add(null);
         mvc.perform(me.unsafe(post(CONVERSATIONS + "/group"), Map.of("name", "Ski", "memberIds", withNull)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields[0]").value("memberIds[0]"));
         List<UUID> fifty = new ArrayList<>();
         for (int i = 0; i < 50; i++) {
             fifty.add(UUID.randomUUID());
@@ -453,7 +455,10 @@ class ConversationsIT {
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
+        Map<String, Object> nullList = new HashMap<>();
+        nullList.put("userIds", null);
         for (var invalid : List.of(
+                Map.entry(mvc.perform(admin.unsafe(post(path + "/members"), nullList)), "userIds"),
                 Map.entry(mvc.perform(admin.unsafe(patch(path), Map.of("name", "x".repeat(65)))), "name"),
                 Map.entry(mvc.perform(admin.unsafe(post(path + "/members"), Map.of("userIds", fifty))), "userIds"),
                 Map.entry(
