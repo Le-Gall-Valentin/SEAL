@@ -54,7 +54,7 @@ describe('features/send-friend-request : formulaire « Ajouter un ami » (Amis-O
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['friends'] })
   })
 
-  it('ADR 0038 (point 1) : la région de statut existe avant tout envoi, pour être annoncée', async () => {
+  it('FRD-01, ADR 0038 (point 1) : la région de statut existe avant tout envoi, pour être annoncée', async () => {
     const { screen } = await mount(() => Promise.resolve(sent))
 
     expect(screen.container.querySelector('[role="status"]')?.textContent).toBe('')
@@ -73,7 +73,7 @@ describe('features/send-friend-request : formulaire « Ajouter un ami » (Amis-O
     expect(screen.container.querySelector('[role="status"]')?.textContent).toBe('')
   })
 
-  it('ADR 0038 (point 2) : une invitation close entre-temps l’annonce dans le formulaire', async () => {
+  it('FRD-01, ADR 0038 (point 2) : une invitation close entre-temps l’annonce dans le formulaire', async () => {
     const { screen } = await mount(
       () => Promise.reject(new ApiError(409, 'INCOMING_REQUEST_EXISTS', { requestId: REQUEST })),
       vi.fn((): Promise<AcceptResult> => Promise.resolve({ kind: 'gone' })),
@@ -157,7 +157,7 @@ describe('features/send-friend-request : formulaire « Ajouter un ami » (Amis-O
   })
 
   describe('ADR 0038 (point 9) : mesures et jetons d’Amis-Ordinateur et d’Amis-Telephone', () => {
-    it('Amis-Ordinateur : 6 px entre « @ » et la saisie', async () => {
+    it('FRD-01, Amis-Ordinateur : 6 px entre « @ » et la saisie', async () => {
       const { screen } = await mount(vi.fn())
 
       const field = screen.getByLabelText('Identifiant').element()
@@ -165,7 +165,7 @@ describe('features/send-friend-request : formulaire « Ajouter un ami » (Amis-O
       expect(field.parentElement && getComputedStyle(field.parentElement).columnGap).toBe('6px')
     })
 
-    it('Amis-Ordinateur : bloc de succès bordé d’olive, hauteur de ligne 1,35', async () => {
+    it('FRD-01, Amis-Ordinateur : bloc de succès bordé d’olive, hauteur de ligne 1,35', async () => {
       const { screen } = await mount(() => Promise.resolve(sent))
 
       await invite(screen, 'sarah.belanger')
@@ -177,7 +177,7 @@ describe('features/send-friend-request : formulaire « Ajouter un ami » (Amis-O
       expect(notice && getComputedStyle(notice).lineHeight).toBe('17.55px')
     })
 
-    it('Amis-Telephone : refus en alerte, écart de 12 px, hauteur de ligne 1,35', async () => {
+    it('FRD-01, Amis-Telephone : refus en alerte, écart de 12 px, hauteur de ligne 1,35', async () => {
       const { screen } = await mount(() => Promise.reject(new ApiError(404, 'USER_NOT_FOUND')))
 
       await invite(screen, 'noa.g')

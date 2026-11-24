@@ -4,7 +4,7 @@ import { AVATAR_TINTS } from '@/shared/config'
 import { Avatar } from './Avatar'
 
 describe('ADR 0038 (point 7) : avatar à initiales, teintes de la maquette', () => {
-  it('ADR 0038 : les initiales sont décoratives, à la taille demandée', async () => {
+  it('FRD-10, ADR 0038 : les initiales sont décoratives, à la taille demandée', async () => {
     const screen = await render(<Avatar initials="SB" tint="heather" size={44} />)
     const avatar = screen.getByText('SB').element()
 
@@ -29,7 +29,7 @@ describe('ADR 0038 (point 7) : avatar à initiales, teintes de la maquette', () 
     })
   })
 
-  it('ADR 0038 : chacune des six teintes a sa couleur de fond', async () => {
+  it('FRD-10, ADR 0038 : chacune des six teintes a sa couleur de fond', async () => {
     const colors = new Set<string>()
     for (const tint of AVATAR_TINTS) {
       const screen = await render(<Avatar initials={tint} tint={tint} size={44} />)

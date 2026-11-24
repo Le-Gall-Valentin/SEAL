@@ -152,7 +152,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
       .toBeVisible()
   })
 
-  it('ADR 0038 (point 6) : la recherche filtre sans diacritiques ; sans résultat, « Effacer la recherche »', async () => {
+  it('FRD-10, ADR 0038 (point 6) : la recherche filtre sans diacritiques ; sans résultat, « Effacer la recherche »', async () => {
     const { screen } = await renderAt('/amis', 1440, 900)
 
     // ADR 0038 (point 9) : pas de croix native de Chromium dans le champ, absente de la maquette.
@@ -198,7 +198,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     expect(screen.getByRole('dialog').elements()).toHaveLength(0)
   })
 
-  it('ADR 0038 (point 9), Etats « Amis · compte neuf » : mesures de la carte', async () => {
+  it('FRD-10, ADR 0038 (point 9), Etats « Amis · compte neuf » : mesures de la carte', async () => {
     const { screen } = await renderAt('/amis', 1440, 900, {
       friends: () => Promise.resolve({ items: [], next: null }),
     })
@@ -217,7 +217,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     expect(button && getComputedStyle(button).paddingLeft).toBe('12px')
   })
 
-  it('ADR 0038 (point 9), Amis-Tablette : 10 px entre le titre d’une section d’invitations et sa liste', async () => {
+  it('FRD-01, ADR 0038 (point 9), Amis-Tablette : 10 px entre le titre d’une section d’invitations et sa liste', async () => {
     const { screen } = await renderAt('/amis?onglet=invitations', 820, 1180)
 
     const title = screen.getByRole('heading', { level: 2, name: /Reçues/ })
@@ -226,7 +226,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     expect(getComputedStyle(title.element()).marginBottom).toBe('10px')
   })
 
-  it('ADR 0038 (point 2) : invitations vides annoncées', async () => {
+  it('FRD-01, ADR 0038 (point 2) : invitations vides annoncées', async () => {
     const { screen } = await renderAt('/amis?onglet=invitations', 820, 1180, { received: [] })
 
     await expect.element(screen.getByText('Aucune invitation reçue.')).toBeVisible()
@@ -313,7 +313,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     })
   })
 
-  it('Etats, Amis-Telephone : compte neuf, « Pas encore d’amis » et sa feuille ; aucun défilement horizontal', async () => {
+  it('FRD-01, Etats, Amis-Telephone : compte neuf, « Pas encore d’amis » et sa feuille ; aucun défilement horizontal', async () => {
     const { screen } = await renderAt('/amis', 390, 844, {
       friends: () => Promise.resolve({ items: [], next: null }),
     })
@@ -336,7 +336,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
       .toBeDisabled()
   })
 
-  it('WCAG 2.4.3 : la confirmation fermée par Échap rend le focus au bouton « Plus d’actions »', async () => {
+  it('FRD-11, WCAG 2.4.3 : la confirmation fermée par Échap rend le focus au bouton « Plus d’actions »', async () => {
     const { screen } = await renderAt('/amis', 1440, 900)
 
     const more = screen.getByRole('button', { name: 'Plus d’actions — Inès Côté' })
@@ -348,7 +348,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await expect.element(more).toHaveFocus()
   })
 
-  it('WCAG 2.4.3 : après un retrait réussi, le focus passe au titre « Amis »', async () => {
+  it('FRD-11, WCAG 2.4.3 : après un retrait réussi, le focus passe au titre « Amis »', async () => {
     let removed = false
     const { screen } = await renderAt('/amis', 1440, 900, {
       friends: () =>
@@ -369,7 +369,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await expect.element(screen.getByRole('heading', { level: 1, name: 'Amis' })).toHaveFocus()
   })
 
-  it('WCAG 2.1.1 : le menu d’un ami se ferme au clic hors de lui et à Tab', async () => {
+  it('FRD-11, WCAG 2.1.1 : le menu d’un ami se ferme au clic hors de lui et à Tab', async () => {
     const { screen } = await renderAt('/amis', 1440, 900)
     const more = screen.getByRole('button', { name: 'Plus d’actions — Inès Côté' })
     const item = screen.getByRole('menuitem', { name: 'Retirer des amis' })
@@ -385,7 +385,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await expect.poll(() => item.elements().length).toBe(0)
   })
 
-  it('A10 : onglet Invitations, une liste en échec donne l’état d’erreur ; « Réessayer » relit les deux listes', async () => {
+  it('FRD-01, A10 : onglet Invitations, une liste en échec donne l’état d’erreur ; « Réessayer » relit les deux listes', async () => {
     let receivedCalls = 0
     let sentCalls = 0
     const { screen } = await renderAt('/amis?onglet=invitations', 820, 1180, {
@@ -408,7 +408,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     expect(sentCalls).toBe(2)
   })
 
-  it('ADR 0038 (point 4) : dès 1024 px, l’aside « Ajouter un ami » est aussi sur l’onglet Invitations', async () => {
+  it('FRD-01, ADR 0038 (point 4) : dès 1024 px, l’aside « Ajouter un ami » est aussi sur l’onglet Invitations', async () => {
     const { screen } = await renderAt('/amis?onglet=invitations', 1440, 900)
 
     await expect
@@ -416,7 +416,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
       .toBeVisible()
   })
 
-  it('ADR 0038 (point 4) : sur tablette, la feuille a la largeur du contenu et reste ouverte après un envoi', async () => {
+  it('FRD-01, ADR 0038 (point 4) : sur tablette, la feuille a la largeur du contenu et reste ouverte après un envoi', async () => {
     const { screen } = await renderAt('/amis', 820, 1180, {
       send: () =>
         Promise.resolve({ id: id(14), userId: id(24), username: 'noa.g', createdAt: new Date() }),
@@ -437,7 +437,65 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await expect.element(sheet).toBeVisible()
   })
 
-  it('A10 : une relecture en échec garde la liste déjà chargée', async () => {
+  it('FRD-01, ADR 0038 (point 2) : « Aucune invitation envoyée. » et « 1 invitation en attente »', async () => {
+    const { screen } = await renderAt('/amis?onglet=invitations', 820, 1180, {
+      received: RECEIVED.slice(0, 1),
+      sentApi: () => Promise.resolve({ items: [], next: null }),
+    })
+
+    await expect.element(screen.getByText('Aucune invitation envoyée.')).toBeVisible()
+    await expect
+      .element(screen.getByRole('link', { name: 'Invitations 1 invitation en attente' }))
+      .toBeVisible()
+  })
+
+  it('FRD-10, ADR 0038 (point 2) : « 1 ami » et la pastille du nombre d’amis', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900, {
+      friends: () => Promise.resolve({ items: FRIENDS.slice(0, 1), next: null }),
+    })
+
+    await expect.element(screen.getByText('1 ami', { exact: true })).toBeVisible()
+    await expect.element(screen.getByRole('link', { name: 'Amis 1' })).toBeVisible()
+  })
+
+  it('FRD-01, ADR 0038 (point 4) : sur ordinateur, « Ajouter un ami » de l’état vide donne le focus au champ', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900, {
+      friends: () => Promise.resolve({ items: [], next: null }),
+    })
+
+    await screen.getByRole('button', { name: 'Ajouter un ami' }).click()
+
+    await expect.element(screen.getByLabelText('Identifiant')).toHaveFocus()
+  })
+
+  it('FRD-01, ADR 0038 (point 9) : sous 1024 px, une invitation acceptée depuis la feuille la ferme', async () => {
+    const { screen } = await renderAt('/amis', 820, 1180, {
+      send: () =>
+        Promise.reject(new ApiError(409, 'INCOMING_REQUEST_EXISTS', { requestId: id(11) })),
+    })
+    await screen.getByRole('button', { name: 'Ajouter un ami' }).first().click()
+    const sheet = screen.getByRole('dialog', { name: 'Ajouter un ami' })
+    await sheet.getByLabelText('Identifiant').fill('sarah.belanger')
+    await sheet.getByRole('button', { name: 'Envoyer l’invitation' }).click()
+
+    await sheet.getByRole('button', { name: 'Accepter l’invitation' }).click()
+
+    await expect.poll(() => screen.getByRole('dialog').elements().length).toBe(0)
+  })
+
+  it('FRD-01, ADR 0038 (point 2) : une invitation close ailleurs, acceptée d’une ligne, s’annonce en haut de la page', async () => {
+    const { screen } = await renderAt('/amis?onglet=invitations', 820, 1180, {
+      accept: () => Promise.reject(new ApiError(404, 'NOT_FOUND')),
+    })
+
+    await screen.getByRole('button', { name: 'Accepter — Sarah Bélanger' }).click()
+
+    await expect
+      .element(screen.getByRole('alert'))
+      .toHaveTextContent('Cette invitation n’existe plus.')
+  })
+
+  it('FRD-10, A10 : une relecture en échec garde la liste déjà chargée', async () => {
     let calls = 0
     const { screen, client } = await renderAt('/amis', 1440, 900, {
       friends: () => {
@@ -469,7 +527,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390)
   })
 
-  it('ADR 0038 (point 4) : la feuille s’ouvre le focus dans le champ Identifiant', async () => {
+  it('FRD-01, ADR 0038 (point 4) : la feuille s’ouvre le focus dans le champ Identifiant', async () => {
     const { screen } = await renderAt('/amis', 820, 1180)
 
     await screen.getByRole('button', { name: 'Ajouter un ami' }).click()
@@ -477,7 +535,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await expect.element(screen.getByLabelText('Identifiant')).toHaveFocus()
   })
 
-  it('A10, Etats : un échec de lecture propose « Réessayer »', async () => {
+  it('FRD-10, A10, Etats : un échec de lecture propose « Réessayer »', async () => {
     const { screen } = await renderAt('/amis', 1440, 900, {
       friends: () => Promise.reject(new ApiError(500, 'INTERNAL_ERROR')),
     })

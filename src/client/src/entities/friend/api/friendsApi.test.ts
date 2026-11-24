@@ -49,7 +49,7 @@ describe('entities/friend : adaptateur des listes d’amis et d’invitations (1
     })
   })
 
-  it('ADR 0037 (point 3) : le curseur reçu part en after, encodé', async () => {
+  it('FRD-10, ADR 0037 (point 3) : le curseur reçu part en after, encodé', async () => {
     request.mockResolvedValue({ items: [], next: null })
 
     await friendsApi.friends(USER)

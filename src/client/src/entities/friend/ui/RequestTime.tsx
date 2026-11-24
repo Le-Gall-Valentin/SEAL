@@ -1,5 +1,5 @@
 import { useMessages } from '@/shared/i18n'
-import { useClock } from '@/shared/lib'
+import { useNow } from '@/shared/lib'
 import { friendMessages } from '../i18n'
 import { relativeAge } from '../model/friends'
 
@@ -10,10 +10,13 @@ interface RequestTimeProps {
 
 const DAY_MONTH = new Intl.DateTimeFormat('fr', { day: 'numeric', month: 'short' })
 
-/** ADR 0038 (point 2) : « Reçue il y a 2 heures », « Envoyée hier »… sur l'horloge injectée. */
+/** Une date relative change au plus une fois par minute. */
+const REFRESH_MS = 60_000
+
+/** ADR 0038 (point 2) : « Reçue il y a 2 heures », « Envoyée hier »… sur l'horloge injectée, relue chaque minute. */
 export function RequestTime({ variant, date }: RequestTimeProps) {
   const t = useMessages(friendMessages)
-  const age = relativeAge(date, new Date(useClock().now()))
+  const age = relativeAge(date, new Date(useNow(REFRESH_MS)))
   const text = (() => {
     switch (age.unit) {
       case 'now':

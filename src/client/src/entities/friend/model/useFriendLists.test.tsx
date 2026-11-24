@@ -29,7 +29,7 @@ function wrapper(
 }
 
 describe('entities/friend : listes complètes (ADR 0037, point 3)', () => {
-  it('ADR 0037 (point 3) : toutes les pages sont lues, même après une page vide, puis triées', async () => {
+  it('FRD-10, ADR 0037 (point 3) : toutes les pages sont lues, même après une page vide, puis triées', async () => {
     const pages: Record<string, Page<Friend>> = {
       start: { items: [friend(1, 'Zoé'), friend(2, 'Adam')], next: id(2) },
       [id(2)]: { items: [], next: id(3) },
@@ -51,7 +51,7 @@ describe('entities/friend : listes complètes (ADR 0037, point 3)', () => {
     expect(afters).toEqual([null, id(2), id(3)])
   })
 
-  it('A10 : un curseur qui revient en boucle arrête la lecture en erreur', async () => {
+  it('FRD-10, A10 : un curseur qui revient en boucle arrête la lecture en erreur', async () => {
     const { wrapper: Wrapper } = wrapper({
       friends: () => Promise.resolve({ items: [friend(1, 'Zoé')], next: id(1) }),
     })
@@ -59,6 +59,26 @@ describe('entities/friend : listes complètes (ADR 0037, point 3)', () => {
     const { result } = await renderHook(() => useFriends(), { wrapper: Wrapper })
 
     await expect.poll(() => result.current.isError).toBe(true)
+  })
+
+  it('FRD-01, ADR 0038 (point 6) : invitations reçues de la plus récente à la plus ancienne', async () => {
+    const older: ReceivedRequest = {
+      id: id(7),
+      userId: id(6),
+      username: 'jade.m',
+      displayName: 'Jade',
+      createdAt: new Date(1_000),
+    }
+    const newer: ReceivedRequest = { ...older, id: id(5), createdAt: new Date(2_000) }
+    const { wrapper: Wrapper } = wrapper({
+      receivedRequests: () => Promise.resolve({ items: [older, newer], next: null }),
+    })
+
+    const { result } = await renderHook(() => useReceivedRequests(), { wrapper: Wrapper })
+
+    await expect
+      .poll(() => result.current.data?.map((request) => request.id))
+      .toEqual([id(5), id(7)])
   })
 
   describe('FRD-04 : relecture des invitations reçues', () => {

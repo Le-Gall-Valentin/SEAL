@@ -27,7 +27,7 @@ describe('features/send-friend-request : issues de 10.1 (ADR 0038, point 1)', ()
     })
   })
 
-  it('ADR 0038 (point 9) : un requestId sur un autre code ne vaut pas invitation reçue', () => {
+  it('FRD-01, ADR 0038 (point 9) : un requestId sur un autre code ne vaut pas invitation reçue', () => {
     expect(
       sendFriendRequestFailureOf(
         new ApiError(409, 'REQUEST_ALREADY_PENDING', { requestId: REQUEST }),

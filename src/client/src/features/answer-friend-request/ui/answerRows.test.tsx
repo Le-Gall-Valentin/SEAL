@@ -113,7 +113,7 @@ describe('features/answer-friend-request : invitations reçues et envoyées (Ami
     expect(revoke).not.toHaveBeenCalled()
   })
 
-  it('ADR 0038 (point 2) : une invitation close ailleurs (404) l’annonce et relit les listes', async () => {
+  it('FRD-01, ADR 0038 (point 2) : une invitation close ailleurs (404) l’annonce et relit les listes', async () => {
     const { screen, invalidate } = await mount({
       accept: () => Promise.reject(new ApiError(404, 'NOT_FOUND')),
     })

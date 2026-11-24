@@ -43,6 +43,7 @@ async function renderAt(
         children: [
           { path: '/', element: <p>Accueil</p> },
           { path: '/parametres', element: <p>Écran des paramètres</p> },
+          { path: '/amis', element: <p>Écran des amis</p> },
         ],
       },
     ],
@@ -158,6 +159,21 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('FRD-04, ADR 0038 : téléphone, la barre du bas nomme l’entrée Amis avec ses invitations', async () => {
+    const { screen } = await renderAt('/', 390, 844, 1)
+
+    const bar = screen.getByRole('navigation', { name: 'Navigation principale' })
+    await expect.element(bar.getByRole('link', { name: 'Amis, 1 invitation' })).toBeVisible()
+  })
+
+  it('FRD-10, ADR 0038 (point 5) : sur /amis, l’entrée Amis est la page courante', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900)
+
+    await expect
+      .element(screen.getByRole('link', { name: 'Amis', exact: true }))
+      .toHaveAttribute('aria-current', 'page')
   })
 
   it('ACC-03, ADR 0038 : téléphone, barre du bas en trois colonnes ; aller aux paramètres', async () => {
