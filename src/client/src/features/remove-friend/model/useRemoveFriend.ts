@@ -36,5 +36,9 @@ export function useRemoveFriend(onDone: () => void) {
     remove: (userId: string) => {
       guard.run(() => mutation.mutateAsync(userId))
     },
+    /** La confirmation reste montée : l'erreur d'un retrait annulé ne doit pas reparaître pour l'ami suivant. */
+    reset: () => {
+      mutation.reset()
+    },
   }
 }

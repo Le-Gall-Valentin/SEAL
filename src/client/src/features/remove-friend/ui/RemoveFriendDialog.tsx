@@ -20,6 +20,7 @@ export function RemoveFriendDialog({ friend, onClose }: RemoveFriendDialogProps)
     onClose(true)
   })
   const cancel = () => {
+    removal.reset()
     onClose(false)
   }
   return (

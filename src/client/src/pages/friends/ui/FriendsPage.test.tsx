@@ -55,6 +55,7 @@ interface Fakes {
   readonly received?: readonly ReceivedRequest[]
   readonly send?: (username: string) => Promise<SentRequest>
   readonly accept?: (requestId: string) => Promise<void>
+  readonly unfriend?: (userId: string) => Promise<void>
   readonly client?: QueryClient
 }
 
@@ -75,7 +76,7 @@ async function renderAt(entry: string, width: number, height: number, fakes: Fak
       <FriendsApiProvider api={friendsApi}>
         <SendFriendRequestApiProvider api={{ send: fakes.send ?? never }}>
           <AnswerFriendRequestApiProvider api={{ accept, decline: never, revoke: never }}>
-            <RemoveFriendApiProvider api={{ unfriend: never }}>
+            <RemoveFriendApiProvider api={{ unfriend: fakes.unfriend ?? never }}>
               <RouterProvider router={router} />
             </RemoveFriendApiProvider>
           </AnswerFriendRequestApiProvider>
@@ -217,6 +218,27 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await userEvent.keyboard('{Escape}')
 
     await expect.element(more).toHaveFocus()
+  })
+
+  it('WCAG 2.4.3 : après un retrait réussi, le focus passe au titre « Amis »', async () => {
+    let removed = false
+    const { screen } = await renderAt('/amis', 1440, 900, {
+      friends: () =>
+        Promise.resolve({
+          items: removed ? FRIENDS.filter((f) => f.displayName !== 'Inès Côté') : FRIENDS,
+          next: null,
+        }),
+      unfriend: () => {
+        removed = true
+        return Promise.resolve()
+      },
+    })
+
+    await screen.getByRole('button', { name: 'Plus d’actions — Inès Côté' }).click()
+    await userEvent.keyboard('{Enter}')
+    await screen.getByRole('button', { name: 'Retirer', exact: true }).click()
+
+    await expect.element(screen.getByRole('heading', { level: 1, name: 'Amis' })).toHaveFocus()
   })
 
   it('A10 : une relecture en échec garde la liste déjà chargée', async () => {

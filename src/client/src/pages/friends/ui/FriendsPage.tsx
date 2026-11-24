@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { type Friend, useFriends, useReceivedRequests, useSentRequests } from '@/entities/friend'
 import { AnswerAlerts, useAnswerFriendRequest } from '@/features/answer-friend-request'
@@ -30,6 +30,15 @@ export function FriendsPage() {
   const [removing, setRemoving] = useState<Friend | null>(null)
   const field = useRef<HTMLInputElement>(null)
   const title = useRef<HTMLHeadingElement>(null)
+  // WCAG 2.4.3 : la ligne retirée avait le focus ; il passe au titre une fois la confirmation fermée, car la page
+  // reste inerte tant que la fenêtre modale est ouverte (ses effets, ceux d'un enfant, la ferment avant celui-ci).
+  const focusTitleOnClose = useRef(false)
+  useEffect(() => {
+    if (removing === null && focusTitleOnClose.current) {
+      focusTitleOnClose.current = false
+      title.current?.focus()
+    }
+  }, [removing])
   const openAdd = () => {
     if (large) {
       field.current?.focus()
@@ -122,11 +131,8 @@ export function FriendsPage() {
       <RemoveFriendDialog
         friend={removing}
         onClose={(removed) => {
+          focusTitleOnClose.current = removed
           setRemoving(null)
-          // La ligne retirée avait le focus : il passe au titre de la page.
-          if (removed) {
-            title.current?.focus()
-          }
         }}
       />
     </main>
