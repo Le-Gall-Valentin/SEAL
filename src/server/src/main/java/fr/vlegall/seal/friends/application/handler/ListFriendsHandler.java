@@ -1,12 +1,12 @@
 package fr.vlegall.seal.friends.application.handler;
 
 import fr.vlegall.seal.common.ApplicationService;
+import fr.vlegall.seal.common.Page;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.application.port.in.ListFriendsQuery;
 import fr.vlegall.seal.friends.domain.model.Friend;
 import fr.vlegall.seal.friends.domain.model.FriendSummary;
 import fr.vlegall.seal.friends.domain.model.InteractionStats;
-import fr.vlegall.seal.friends.domain.model.Page;
 import fr.vlegall.seal.friends.domain.model.Person;
 import fr.vlegall.seal.friends.domain.port.out.DirectoryPort;
 import fr.vlegall.seal.friends.domain.port.out.FriendshipRepository;

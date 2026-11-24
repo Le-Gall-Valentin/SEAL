@@ -1,11 +1,11 @@
 package fr.vlegall.seal.friends.infrastructure.web;
 
 import fr.vlegall.seal.common.ErrorCode;
+import fr.vlegall.seal.common.Page;
 import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.application.port.in.ListFriendsQuery;
 import fr.vlegall.seal.friends.application.port.in.RemoveFriendUseCase;
-import fr.vlegall.seal.friends.domain.model.Page;
 import fr.vlegall.seal.friends.infrastructure.web.dto.FriendView;
 import fr.vlegall.seal.friends.infrastructure.web.dto.PageView;
 import fr.vlegall.seal.security.web.CurrentUser;

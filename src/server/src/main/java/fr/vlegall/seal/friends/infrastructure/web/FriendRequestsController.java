@@ -1,6 +1,7 @@
 package fr.vlegall.seal.friends.infrastructure.web;
 
 import fr.vlegall.seal.common.ErrorCode;
+import fr.vlegall.seal.common.Page;
 import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.application.port.in.AcceptFriendRequestUseCase;
@@ -10,7 +11,6 @@ import fr.vlegall.seal.friends.application.port.in.RevokeFriendRequestUseCase;
 import fr.vlegall.seal.friends.application.port.in.SendFriendRequestUseCase;
 import fr.vlegall.seal.friends.domain.model.Direction;
 import fr.vlegall.seal.friends.domain.model.InvitationOutcome;
-import fr.vlegall.seal.friends.domain.model.Page;
 import fr.vlegall.seal.friends.infrastructure.web.dto.PageView;
 import fr.vlegall.seal.friends.infrastructure.web.dto.ReceivedInvitationView;
 import fr.vlegall.seal.friends.infrastructure.web.dto.SendFriendRequestBody;

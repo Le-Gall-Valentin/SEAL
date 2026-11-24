@@ -1,6 +1,6 @@
 package fr.vlegall.seal.friends.infrastructure.web.dto;
 
-import fr.vlegall.seal.friends.domain.model.Page;
+import fr.vlegall.seal.common.Page;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;

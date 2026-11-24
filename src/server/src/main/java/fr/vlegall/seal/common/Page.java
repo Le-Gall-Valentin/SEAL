@@ -1,4 +1,4 @@
-package fr.vlegall.seal.friends.domain.model;
+package fr.vlegall.seal.common;
 
 import java.util.List;
 import java.util.Objects;
@@ -7,7 +7,8 @@ import java.util.UUID;
 import java.util.function.Function;
 
 /**
- * ADR 0037, point 3 : page d'une liste paginée par curseur. {@code next} est l'identifiant à passer en {@code after}
+ * ADR 0037 (point 3), ADR 0039 (point 9) : page d'une liste paginée par curseur, partagée par {@code friends} et
+ * {@code conversations}. {@code next} est l'identifiant à passer en {@code after}
  * pour la page suivante, vide sur la dernière.
  */
 public record Page<T>(List<T> items, Optional<UUID> next) {

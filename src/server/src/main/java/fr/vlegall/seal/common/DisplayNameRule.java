@@ -14,9 +14,17 @@ public final class DisplayNameRule {
 
     /** Vrai si le nom, déjà normalisé en NFC, respecte la règle : 1 à 50 points de code, visible, sans caractère piégé. */
     public static boolean isValid(String value) {
+        return isValid(value, MAX_LENGTH);
+    }
+
+    /**
+     * Même règle à une autre longueur : GRP-01 et l'ADR 0039 (point 6) la reprennent pour le nom d'un groupe, sur 64
+     * points de code.
+     */
+    public static boolean isValid(String value, int maxLength) {
         int length = value.codePointCount(0, value.length());
         return length >= 1
-                && length <= MAX_LENGTH
+                && length <= maxLength
                 && Unicode.isNfc(value)
                 && value.codePoints().noneMatch(DisplayNameRule::isForbidden)
                 // Un nom fait seulement d'espaces ou de caractères invisibles ne se verrait pas.

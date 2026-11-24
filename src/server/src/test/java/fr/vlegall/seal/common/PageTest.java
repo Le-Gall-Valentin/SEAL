@@ -1,4 +1,4 @@
-package fr.vlegall.seal.friends.domain.model;
+package fr.vlegall.seal.common;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("ADR 0037, point 3 : page d'une liste lue avec une ligne de plus que la limite")
+@DisplayName("ADR 0037 (point 3), ADR 0039 (point 9) : page d'une liste lue avec une ligne de plus que la limite")
 class PageTest {
 
     private final UUID a = UUID.randomUUID();

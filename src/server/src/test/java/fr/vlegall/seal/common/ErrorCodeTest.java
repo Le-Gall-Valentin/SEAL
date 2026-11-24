@@ -31,4 +31,11 @@ class ErrorCodeTest {
     void adr0025CryptographyCodesHaveTheirStatus(ErrorCode code, int status) {
         assertThat(code.status()).isEqualTo(status);
     }
+
+    @ParameterizedTest
+    @CsvSource({"NOT_FRIENDS, 403", "NOT_A_MEMBER, 404", "GROUP_FULL, 409"})
+    @DisplayName("CNV-01, GRP-02, GRP-03, ADR 0039 (points 2 et 3) : chaque code des conversations a son statut")
+    void adr0039ConversationCodesHaveTheirStatus(ErrorCode code, int status) {
+        assertThat(code.status()).isEqualTo(status);
+    }
 }
