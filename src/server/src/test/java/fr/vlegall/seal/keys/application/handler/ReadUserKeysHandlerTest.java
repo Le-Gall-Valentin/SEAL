@@ -37,6 +37,8 @@ class ReadUserKeysHandlerTest {
     /** API-02 : l'appelant est-il ami du titulaire (membre d'une conversation commune à la PR 3) ? */
     private boolean related;
 
+    private boolean sharesConversation;
+
     private Optional<IdentityCertificate> current = Optional.of(new IdentityCertificate(
             SERIAL,
             new byte[8],
@@ -93,11 +95,16 @@ class ReadUserKeysHandlerTest {
                 throw new UnsupportedOperationException();
             }
         };
-        RelationPort relations = (caller, owner) -> {
+        RelationPort friendship = (caller, owner) -> {
             calls.add("related " + caller.value() + " " + owner.value());
             return related;
         };
-        return new ReadUserKeysHandler(certification, subkeys, relations, Clock.fixed(NOW, ZoneOffset.UTC));
+        RelationPort conversation = (caller, owner) -> {
+            calls.add("shares " + caller.value() + " " + owner.value());
+            return sharesConversation;
+        };
+        return new ReadUserKeysHandler(
+                certification, subkeys, List.of(friendship, conversation), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -124,7 +131,18 @@ class ReadUserKeysHandlerTest {
     @DisplayName("API-02 : un compte sans lien avec le titulaire ne lit rien, sans même interroger la PKI")
     void api02UnrelatedCallerReadsNothing() {
         assertThat(handler().read(OTHER, OWNER)).isEmpty();
-        assertThat(calls).containsExactly("related " + OTHER.value() + " " + OWNER.value());
+        assertThat(calls)
+                .containsExactly(
+                        "related " + OTHER.value() + " " + OWNER.value(),
+                        "shares " + OTHER.value() + " " + OWNER.value());
+    }
+
+    @Test
+    @DisplayName("API-02, ADR 0039 (point 7) : un seul lien suffit, l'amitié ou une conversation commune")
+    void api02OneRelationIsEnough() {
+        sharesConversation = true;
+
+        assertThat(handler().read(OTHER, OWNER)).isPresent();
     }
 
     @Test

@@ -274,6 +274,41 @@ class UserKeysIT {
     }
 
     @Test
+    @DisplayName(
+            "API-02, ADR 0039 (point 7) : un membre actif d'une conversation commune lit les clés ; plus après son départ")
+    void api02CommonMemberReadsTheKeysUntilLeaving() throws Exception {
+        KeysTestClient reader = KeysTestClient.account(mvc, mail, "cles_membre");
+        KeysTestClient owner = KeysTestClient.account(mvc, mail, "cles_tit_groupe");
+        KeysTestClient admin = KeysTestClient.account(mvc, mail, "cles_adm_groupe");
+        owner.publishIdentity();
+        UUID group = jdbc.sql(
+                        "INSERT INTO conversations (type, name, created_by) VALUES ('GROUP', 'Ski', ?) RETURNING id")
+                .param(admin.id)
+                .query(UUID.class)
+                .single();
+        for (KeysTestClient member : List.of(admin, reader, owner)) {
+            jdbc.sql(
+                            "INSERT INTO conversation_members (conversation_id, user_id, role, joined_seq) VALUES (?, ?, ?, 0)")
+                    .param(group)
+                    .param(member.id)
+                    .param(member == admin ? "ADMIN" : "MEMBER")
+                    .update();
+        }
+
+        read(reader, owner.id)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.certificate.subjectId").value(owner.id.toString()));
+        jdbc.sql(
+                        "UPDATE conversation_members SET left_at = now(), left_seq = 0 WHERE conversation_id = ? AND user_id = ?")
+                .param(group)
+                .param(reader.id)
+                .update();
+        read(reader, owner.id)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("API-02, A01 : non-ami, ancien ami, ami sans certificat, inconnu : le même 404 KEY_NOT_FOUND")
     void api02OthersGetTheSameNotFound() throws Exception {
         KeysTestClient reader = KeysTestClient.account(mvc, mail, "cles_lecteur");
