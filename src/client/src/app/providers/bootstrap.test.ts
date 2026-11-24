@@ -30,6 +30,10 @@ function apisWith(reloadCsrf: () => Promise<void>): Apis {
     profile: { changeDisplayName: never },
     passwordChange: { changePassword: never },
     emailChange: { request: never, confirm: never },
+    friends: { friends: never, receivedRequests: never, sentRequests: never },
+    sendFriendRequest: { send: never },
+    answerFriendRequest: { accept: never, decline: never, revoke: never },
+    removeFriend: { unfriend: never },
   }
 }
 

@@ -11,6 +11,8 @@ export const ROUTES = {
   CHOOSE_USERNAME: '/inscription/identifiant',
   // ACC-01 à ACC-03, ADR 0034 et 0035 : Paramètres, où revient aussi une ré-authentification OAuth.
   SETTINGS: '/parametres',
+  // ADR 0038 (point 5) : écran Amis ; l'onglet Invitations est un paramètre de requête.
+  FRIENDS: '/amis',
 } as const
 
 /**
@@ -28,3 +30,14 @@ export function settingsSectionOf(params: URLSearchParams): SettingsSection | nu
 
 /** L'adresse de la sous-page Compte. */
 export const SETTINGS_ACCOUNT = `/parametres?${SETTINGS_SECTION_PARAM}=compte`
+
+/** ADR 0038 (point 5) : onglet de l'écran Amis, `?onglet=invitations` ; absent, l'onglet Amis. */
+const FRIENDS_TAB_PARAM = 'onglet'
+
+export type FriendsTab = 'amis' | 'invitations'
+
+export function friendsTabOf(params: URLSearchParams): FriendsTab {
+  return params.get(FRIENDS_TAB_PARAM) === 'invitations' ? 'invitations' : 'amis'
+}
+
+export const FRIENDS_INVITATIONS = `${ROUTES.FRIENDS}?${FRIENDS_TAB_PARAM}=invitations`

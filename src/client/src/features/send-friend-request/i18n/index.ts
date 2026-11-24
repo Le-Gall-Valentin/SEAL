@@ -1,0 +1,1 @@
+export { sendFriendRequestMessages } from './messages'

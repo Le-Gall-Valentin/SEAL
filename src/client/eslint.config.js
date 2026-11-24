@@ -106,6 +106,7 @@ const TEXT_ATTRIBUTES = new Set([
 const TECHNICAL_PROPS = new Set([
   'as',
   'autoComplete',
+  'border',
   'className',
   'dir',
   'heading',
@@ -120,6 +121,7 @@ const TECHNICAL_PROPS = new Set([
   'name',
   'rel',
   'role',
+  'spacing',
   'src',
   'target',
   'to',
@@ -680,6 +682,17 @@ export default defineConfig(
             { from: segment('ui'), disallow: { to: segment('api') } },
             { from: segment('model'), disallow: { to: segment('ui') } },
             { from: segment('api'), disallow: { to: [segment('ui'), segment('model')] } },
+            // Seule l'interface touche les composants de shared/ui : une règle métier ne dépend pas d'un composant.
+            {
+              from: [
+                segment('model'),
+                segment('api'),
+                segment('lib'),
+                segment('config'),
+                sharedSegment('!ui'),
+              ],
+              disallow: { to: sharedSegment('ui') },
+            },
             // ADR 0017 : i18n est une feuille privée de sa tranche. Il n'importe que shared/i18n ; seuls ui et model
             // l'importent, jamais l'index.ts ni le @x qui l'exposeraient ; api, lib et config ne produisent pas de texte.
             {

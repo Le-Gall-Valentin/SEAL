@@ -5,7 +5,8 @@ import { SEAL_PATH } from './sealPath'
 /** Poses de la mascotte utilisées par les écrans (composant Phoque de la maquette). */
 export type PhoqueVariant = 'waving' | 'neutral' | 'searching'
 
-const SIZES = { 64: 'size-16', 88: 'size-22', 200: 'size-50' } as const
+// 96 : état « compte neuf » de l'écran Amis (Etats, ADR 0038).
+const SIZES = { 64: 'size-16', 88: 'size-22', 96: 'size-24', 200: 'size-50' } as const
 
 interface PhoqueProps {
   readonly variant: PhoqueVariant

@@ -137,6 +137,15 @@ describe('ADR 0012 : couches de Feature-Sliced Design', () => {
     await expectAllowed('src/features/sign-in/model/useSignIn.ts', '../api/signInRequest')
   })
 
+  it('QA-10 : seule l’interface importe shared/ui : une règle métier ne dépend pas d’un composant (ADR 0012)', async () => {
+    await expectRefused('src/features/sign-in/model/useSignIn.ts', '@/shared/ui')
+    await expectRefused('src/features/sign-in/api/signInRequest.ts', '@/shared/ui')
+    await expectRefused('src/features/sign-in/lib/format.ts', '@/shared/ui')
+    await expectRefused('src/features/sign-in/config/limits.ts', '@/shared/ui')
+    await expectRefused('src/shared/ws/socket.ts', '@/shared/ui')
+    await expectAllowed('src/features/sign-in/ui/Form.ts', '@/shared/ui')
+  })
+
   it('QA-10 : lib et config sont des feuilles : ui → lib → api ne contourne pas model', async () => {
     await expectRefused('src/features/sign-in/lib/format.ts', '../api/signInRequest')
     await expectRefused('src/features/sign-in/lib/format.ts', '../model/useSignIn')
@@ -558,6 +567,8 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
       '<LoadErrorState heading="h1" onRetry={() => undefined} />',
       '<LanguageProvider language="fr" />',
       '<Card variant="danger" aria-hidden="true" data-testid="carte" />',
+      '<Notice border="olive" />',
+      '<Alert spacing="loose" />',
     ]) {
       await expectPermitted(SHARED_UI, `export const B = () => ${jsx}\n`)
     }
@@ -625,24 +636,30 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
 })
 
 describe('ADR 0012, point 3 : rigueur', () => {
-  it('QA-10 : un switch sur une union doit en traiter tous les cas', async () => {
-    const SWITCH = (cases: string) =>
-      `type Kind = 'a' | 'b'\nexport function f(k: Kind): number {\n  switch (k) {\n${cases}  }\n}\n`
-    expect(
-      await ruleIds(
-        'src/shared/lib/kind.ts',
-        SWITCH("    case 'a':\n      return 1\n"),
-        typedEslint,
-      ),
-    ).toContain('@typescript-eslint/switch-exhaustiveness-check')
-    expect(
-      await ruleIds(
-        'src/shared/lib/kind.ts',
-        SWITCH("    case 'a':\n      return 1\n    case 'b':\n      return 2\n"),
-        typedEslint,
-      ),
-    ).not.toContain('@typescript-eslint/switch-exhaustiveness-check')
-  })
+  // Le lint typé crée d'abord un programme TypeScript : quelques centaines de millisecondes ici, plus de 5 s sur la CI,
+  // où toute la suite se partage le processeur. Le délai s'ajuste ; les assertions restent les mêmes.
+  it(
+    'QA-10 : un switch sur une union doit en traiter tous les cas',
+    { timeout: 30_000 },
+    async () => {
+      const SWITCH = (cases: string) =>
+        `type Kind = 'a' | 'b'\nexport function f(k: Kind): number {\n  switch (k) {\n${cases}  }\n}\n`
+      expect(
+        await ruleIds(
+          'src/shared/lib/kind.ts',
+          SWITCH("    case 'a':\n      return 1\n"),
+          typedEslint,
+        ),
+      ).toContain('@typescript-eslint/switch-exhaustiveness-check')
+      expect(
+        await ruleIds(
+          'src/shared/lib/kind.ts',
+          SWITCH("    case 'a':\n      return 1\n    case 'b':\n      return 2\n"),
+          typedEslint,
+        ),
+      ).not.toContain('@typescript-eslint/switch-exhaustiveness-check')
+    },
+  )
 })
 
 describe('Audit de la branche : frontières éprouvées par un cas refusé', () => {

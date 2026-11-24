@@ -21,3 +21,6 @@ export function useMediaQuery(query: string): boolean {
 
 /** Largeur à partir de laquelle la tablette et l'ordinateur remplacent le téléphone (sm de Tailwind). */
 export const WIDE_SCREEN = '(min-width: 640px)'
+
+/** ADR 0024 et ADR 0038 (point 4) : rail avec libellés et aside « Ajouter un ami » dès 1024 px. */
+export const LARGE_SCREEN = '(min-width: 1024px)'

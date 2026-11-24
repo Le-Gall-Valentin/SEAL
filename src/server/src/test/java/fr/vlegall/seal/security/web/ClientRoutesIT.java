@@ -47,12 +47,15 @@ class ClientRoutesIT {
                 "/mot-de-passe/oublie",
                 "/mot-de-passe/nouveau",
                 "/inscription/identifiant",
-                "/parametres"
+                "/parametres",
+                "/amis",
+                "/amis?onglet=invitations"
             })
     @DisplayName(
-            "AUTH-70, TRN-20, ADR 0034 : chaque écran de l'authentification, et Paramètres, rend le client à un anonyme,"
+            "AUTH-70, TRN-20, FRD-10, ADR 0034, ADR 0038 : chaque écran de l'authentification, Paramètres et Amis, rend le client"
+                    + " à un anonyme,"
                     + " avec la CSP")
-    void auth70EachScreenAddressServesTheClient(String path) throws Exception {
+    void auth70Frd10EachScreenAddressServesTheClient(String path) throws Exception {
         mvc.perform(get(path).secure(true))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl(INDEX))
@@ -83,7 +86,10 @@ class ClientRoutesIT {
                 "/Connexion",
                 "/mot-de-passe",
                 "/mot-de-passe/oublie/x",
-                "/mot-de-passe/autre"
+                "/mot-de-passe/autre",
+                "/amis/",
+                "/amisx",
+                "/amis/invitations"
             })
     @DisplayName("A01 : une adresse voisine garde son comportement, refusée en 401")
     void a01NeighbourAddressesAreStillDenied(String path) throws Exception {

@@ -1,20 +1,23 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { initialsOf } from '@/entities/account'
+import { useReceivedRequests, useReceivedRequestsRefresh } from '@/entities/friend'
 import { useCurrentAccount } from '@/entities/session'
 import { ROUTES, settingsSectionOf } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
-import { PhoqueHead } from '@/shared/ui'
+import { Avatar, PhoqueHead } from '@/shared/ui'
 import { appShellMessages } from '../i18n'
-import { ConversationsIcon, SettingsIcon } from './icons'
+import { ConversationsIcon, FriendsIcon, SettingsIcon } from './icons'
 
 /**
  * Coque du compte actif (ADR 0035, point 3) : navigation principale de la maquette, en rail sur ordinateur (88 px,
- * libellés) et sur tablette (72 px, icônes), en barre du bas sur téléphone. Amis et les pastilles de non-lus
- * attendent le lot 3 : SEAL n'annonce pas une fonction absente (ADR 0024, point 3).
+ * libellés) et sur tablette (72 px, icônes), en barre du bas sur téléphone. Amis porte la pastille des invitations
+ * reçues (FRD-04, ADR 0038) ; les non-lus des conversations attendent le lot 4 (ADR 0024, point 3).
  */
 export function AppShell() {
   const location = useLocation()
+  // FRD-04, ADR 0037 (point 11) : une seule relecture périodique des invitations, pour tous les écrans.
+  useReceivedRequestsRefresh()
   // Parametres-Telephone-Preferences : une sous-page des paramètres occupe tout l'écran, sans la barre du bas.
   const settingsSubpage =
     location.pathname === ROUTES.SETTINGS &&
@@ -31,13 +34,42 @@ export function AppShell() {
 }
 
 const DESTINATIONS = [
-  { to: ROUTES.HOME, label: 'conversations', icon: <ConversationsIcon />, end: true },
-  { to: ROUTES.SETTINGS, label: 'settings', icon: <SettingsIcon />, end: false },
+  {
+    to: ROUTES.HOME,
+    label: 'conversations',
+    icon: <ConversationsIcon />,
+    end: true,
+    counted: false,
+  },
+  { to: ROUTES.FRIENDS, label: 'friends', icon: <FriendsIcon />, end: false, counted: true },
+  { to: ROUTES.SETTINGS, label: 'settings', icon: <SettingsIcon />, end: false, counted: false },
 ] as const
+
+/** FRD-04 : nombre affiché sur la pastille, plafonné à « 99+ » ; rien sans invitation. */
+function badgeOf(count: number): string | null {
+  return count === 0 ? null : count > 99 ? '99+' : String(count)
+}
+
+/** Invitations reçues en attente et nom accessible de l'entrée Amis (« Amis, 2 invitations »). */
+function useFriendsEntry() {
+  const t = useMessages(appShellMessages)
+  const count = useReceivedRequests().data?.length ?? 0
+  const name =
+    count === 0
+      ? t('friends')
+      : count === 1
+        ? t('friendsOne')
+        : t('friendsMany', { count: String(count) })
+  return { badge: badgeOf(count), name }
+}
+
+const BADGE =
+  'absolute grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-on-accent'
 
 /** Ordinateur et tablette : rail vertical à gauche. */
 function Rail() {
   const t = useMessages(appShellMessages)
+  const friends = useFriendsEntry()
   return (
     <nav
       aria-label={t('mainNav')}
@@ -56,8 +88,14 @@ function Rail() {
         </span>
       </Link>
       <div className="flex flex-1 flex-col gap-2 lg:gap-1.5">
-        {DESTINATIONS.map((destination) => (
-          <RailLink key={destination.to} {...destination} label={t(destination.label)} />
+        {DESTINATIONS.map(({ counted, ...destination }) => (
+          <RailLink
+            key={destination.to}
+            {...destination}
+            text={t(destination.label)}
+            name={counted ? friends.name : t(destination.label)}
+            badge={counted ? friends.badge : null}
+          />
         ))}
       </div>
       <ProfileLink />
@@ -67,27 +105,36 @@ function Rail() {
 
 interface DestinationProps {
   readonly to: string
-  readonly label: string
+  /** Libellé visible (ordinateur, barre du bas). */
+  readonly text: string
+  /** Nom accessible : le libellé, et les invitations pour Amis. */
+  readonly name: string
   readonly icon: ReactNode
   readonly end: boolean
+  readonly badge: string | null
 }
 
-function RailLink({ to, label, icon, end }: DestinationProps) {
+function RailLink({ to, text, name, icon, end, badge }: DestinationProps) {
   return (
     <NavLink
       to={to}
       end={end}
-      aria-label={label}
+      aria-label={name}
       className={({ isActive }) =>
-        `grid size-13 place-items-center rounded-[14px] no-underline lg:flex lg:h-auto lg:min-h-15 lg:w-19 lg:flex-col lg:items-center lg:justify-center lg:gap-1 lg:text-[10.5px] lg:font-semibold ${
+        `relative grid size-13 place-items-center rounded-[14px] no-underline lg:flex lg:h-auto lg:min-h-15 lg:w-19 lg:flex-col lg:items-center lg:justify-center lg:gap-1 lg:text-[10.5px] lg:font-semibold ${
           isActive ? 'bg-accent-soft-2 text-accent-text lg:bg-accent-soft' : 'text-ink-3'
         }`
       }
     >
       {icon}
       <span aria-hidden="true" className="hidden lg:inline">
-        {label}
+        {text}
       </span>
+      {badge !== null && (
+        <span aria-hidden="true" className={`${BADGE} top-0.5 right-0 lg:top-1 lg:right-3.5`}>
+          {badge}
+        </span>
+      )}
     </NavLink>
   )
 }
@@ -100,9 +147,9 @@ function ProfileLink() {
     <Link
       to={ROUTES.SETTINGS}
       aria-label={t('profile')}
-      className="grid size-10 place-items-center rounded-full bg-av-moss text-[13px] font-semibold text-ink-2 no-underline"
+      className="grid size-10 place-items-center rounded-full no-underline"
     >
-      <span aria-hidden="true">{account == null ? '' : initialsOf(account.displayName)}</span>
+      <Avatar initials={account == null ? '' : initialsOf(account.displayName)} size={40} />
     </Link>
   )
 }
@@ -110,24 +157,31 @@ function ProfileLink() {
 /** Téléphone : barre du bas, une colonne par destination. */
 function BottomBar() {
   const t = useMessages(appShellMessages)
+  const friends = useFriendsEntry()
   return (
     <nav
       aria-label={t('mainNav')}
-      className="sticky bottom-0 grid h-16 flex-none grid-cols-2 border-t border-line bg-surface sm:hidden"
+      className="sticky bottom-0 grid h-16 flex-none grid-cols-3 border-t border-line bg-surface sm:hidden"
     >
-      {DESTINATIONS.map(({ to, label, icon, end }) => (
+      {DESTINATIONS.map(({ to, label, icon, end, counted }) => (
         <NavLink
           key={to}
           to={to}
           end={end}
+          aria-label={counted && friends.badge !== null ? friends.name : undefined}
           className={({ isActive }) =>
             `group flex flex-col items-center justify-center gap-0.75 text-[11px] font-semibold no-underline ${
               isActive ? 'text-accent-text' : 'text-ink-3'
             }`
           }
         >
-          <span className="grid h-7.5 w-14 place-items-center rounded-full group-aria-[current=page]:bg-accent-soft">
+          <span className="relative grid h-7.5 w-14 place-items-center rounded-full group-aria-[current=page]:bg-accent-soft">
             {icon}
+            {counted && friends.badge !== null && (
+              <span aria-hidden="true" className={`${BADGE} -top-1 right-1.5`}>
+                {friends.badge}
+              </span>
+            )}
           </span>
           {t(label)}
         </NavLink>

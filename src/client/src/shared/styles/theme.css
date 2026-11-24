@@ -42,7 +42,13 @@
   --color-accent-soft-2: var(--accent-soft-2);
   --color-accent-text: var(--accent-text);
   --color-accent-line: var(--accent-line);
+  --color-olive-line: var(--olive-line);
   --color-av-moss: var(--av-moss);
+  --color-av-ice: var(--av-ice);
+  --color-av-birch: var(--av-birch);
+  --color-av-heather: var(--av-heather);
+  --color-av-clay: var(--av-clay);
+  --color-av-lichen: var(--av-lichen);
   --color-switch-off: var(--switch-off);
   --color-thumb-off: var(--thumb-off);
   --color-danger: var(--danger);
@@ -66,4 +72,11 @@
 
   --font-sans: var(--sans);
   --font-mono: var(--mono);
+}
+
+/* ADR 0038 (point 9) : la maquette n'a pas la croix native d'un champ de recherche, que Chromium dessine en bleu. */
+@layer base {
+  input[type='search']::-webkit-search-cancel-button {
+    appearance: none;
+  }
 }

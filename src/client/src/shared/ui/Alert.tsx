@@ -7,17 +7,22 @@ interface AlertProps {
    */
   readonly variant: 'error' | 'rate-limited'
   readonly title?: string
+  /**
+   * « loose » : écart de 12 px et lignes de 1,35, comme une alerte titrée ; c'est celui des refus d'Amis-Telephone.
+   * Par défaut, celui d'une alerte titrée ou non selon `title`.
+   */
+  readonly spacing?: 'loose' | undefined
   readonly children: ReactNode
 }
 
 /** Alerte d'erreur d'un formulaire, annoncée dès son affichage. */
-export function Alert({ variant, title, children }: AlertProps) {
+export function Alert({ variant, title, spacing, children }: AlertProps) {
   return (
     <div
       role="alert"
-      className="flex gap-2.5 rounded-[14px] border border-danger-line bg-danger-soft px-3.5 py-3 text-[13px] leading-[1.4] data-[titled=true]:gap-3 data-[titled=true]:leading-[1.35]"
+      className="flex gap-2.5 rounded-[14px] border border-danger-line bg-danger-soft px-3.5 py-3 text-[13px] leading-[1.4] data-[loose=true]:gap-3 data-[loose=true]:leading-[1.35]"
       data-variant={variant}
-      data-titled={title !== undefined}
+      data-loose={title !== undefined || spacing === 'loose'}
     >
       <svg
         width="18"

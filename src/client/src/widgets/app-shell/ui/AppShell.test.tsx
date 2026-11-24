@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
+import { FriendsApiProvider, type ReceivedRequest } from '@/entities/friend'
 import { type Account, SessionApiProvider } from '@/entities/session'
 import { AppShell } from './AppShell'
 
@@ -15,7 +16,25 @@ const ACTIVE: Account = {
   verification: null,
 }
 
-async function renderAt(path: string, width: number, height: number) {
+function received(count: number): ReceivedRequest[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `0193a1b2-0000-7000-8000-${String(i).padStart(12, '0')}`,
+    userId: `0192f7a1-0000-7000-8000-${String(i).padStart(12, '0')}`,
+    username: `ami.${String(i)}`,
+    displayName: 'Ami',
+    createdAt: new Date(0),
+  }))
+}
+
+const never = () => Promise.reject(new Error('non attendu'))
+
+async function renderAt(
+  path: string,
+  width: number,
+  height: number,
+  invitations = 0,
+  onRead: () => void = () => undefined,
+) {
   await page.viewport(width, height)
   const router = createMemoryRouter(
     [
@@ -24,6 +43,7 @@ async function renderAt(path: string, width: number, height: number) {
         children: [
           { path: '/', element: <p>Accueil</p> },
           { path: '/parametres', element: <p>Écran des paramètres</p> },
+          { path: '/amis', element: <p>Écran des amis</p> },
         ],
       },
     ],
@@ -34,7 +54,18 @@ async function renderAt(path: string, width: number, height: number) {
       <SessionApiProvider
         api={{ me: () => Promise.resolve(ACTIVE), reloadCsrf: () => Promise.resolve() }}
       >
-        <RouterProvider router={router} />
+        <FriendsApiProvider
+          api={{
+            friends: never,
+            sentRequests: never,
+            receivedRequests: () => {
+              onRead()
+              return Promise.resolve({ items: received(invitations), next: null })
+            },
+          }}
+        >
+          <RouterProvider router={router} />
+        </FriendsApiProvider>
       </SessionApiProvider>
     </QueryClientProvider>,
   )
@@ -46,7 +77,7 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
     await page.viewport(1280, 800)
   })
 
-  it('ACC-03, ADR 0035 : ordinateur, rail de 88 px avec libellés ; Paramètres est la page courante ; ni Amis ni pastille', async () => {
+  it('ACC-03, ADR 0035 : ordinateur, rail de 88 px avec libellés ; Paramètres est la page courante', async () => {
     const { screen } = await renderAt('/parametres', 1440, 900)
 
     const nav = screen.getByRole('navigation', { name: 'Navigation principale' })
@@ -59,7 +90,7 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
       .element(nav.getByRole('link', { name: 'Conversations' }))
       .not.toHaveAttribute('aria-current')
     await expect.element(nav.getByText('Paramètres', { exact: true })).toBeVisible()
-    expect(nav.getByRole('link', { name: /Amis/ }).elements()).toHaveLength(0)
+    await expect.element(nav.getByRole('link', { name: 'Amis' })).toHaveAttribute('href', '/amis')
     await expect.element(nav.getByRole('link', { name: 'SEAL' })).toHaveAttribute('href', '/')
     await expect.element(screen.getByText('Écran des paramètres')).toBeVisible()
   })
@@ -84,14 +115,80 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
     await expect.element(nav.getByText('Conversations', { exact: true })).not.toBeVisible()
   })
 
-  it('ACC-03, ADR 0035 : téléphone, barre du bas en deux colonnes ; aller aux paramètres', async () => {
+  it('FRD-04, ADR 0038 : Amis entre Conversations et Paramètres, avec la pastille des invitations reçues', async () => {
+    const { screen } = await renderAt('/', 1440, 900, 2)
+
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' })
+    const friends = nav.getByRole('link', { name: 'Amis, 2 invitations' })
+    await expect.element(friends).toBeVisible()
+    expect(friends.element().textContent).toBe('Amis2')
+    const names = nav
+      .getByRole('link')
+      .elements()
+      .map((link) => link.getAttribute('aria-label'))
+    expect(names.slice(1, 4)).toEqual(['Conversations', 'Amis, 2 invitations', 'Paramètres'])
+  })
+
+  it('FRD-04, ADR 0038 : une invitation au singulier ; au-delà de 99, « 99+ »', async () => {
+    const one = await renderAt('/', 820, 1180, 1)
+    await expect.element(one.screen.getByRole('link', { name: 'Amis, 1 invitation' })).toBeVisible()
+    await one.screen.unmount()
+
+    const many = await renderAt('/', 820, 1180, 120)
+    const link = many.screen.getByRole('link', { name: 'Amis, 120 invitations' })
+    await expect.element(link).toBeVisible()
+    expect(link.element().textContent).toContain('99+')
+  })
+
+  it('FRD-04, AUTH-52, ADR 0037 (point 11) : la coque relit les invitations toutes les 60 s, seulement après une action', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      let reads = 0
+      const { screen } = await renderAt('/', 1440, 900, 1, () => {
+        reads += 1
+      })
+      await expect.element(screen.getByRole('link', { name: 'Amis, 1 invitation' })).toBeVisible()
+      const first = reads
+
+      vi.advanceTimersByTime(2 * 60_000)
+      expect(reads).toBe(first)
+
+      window.dispatchEvent(new KeyboardEvent('keydown'))
+      vi.advanceTimersByTime(60_000)
+      await expect.poll(() => reads).toBe(first + 1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('FRD-04, ADR 0038 : téléphone, la barre du bas nomme l’entrée Amis avec ses invitations', async () => {
+    const { screen } = await renderAt('/', 390, 844, 1)
+
+    const bar = screen.getByRole('navigation', { name: 'Navigation principale' })
+    await expect.element(bar.getByRole('link', { name: 'Amis, 1 invitation' })).toBeVisible()
+  })
+
+  it('FRD-10, ADR 0038 (point 5) : sur /amis, l’entrée Amis est la page courante', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900)
+
+    await expect
+      .element(screen.getByRole('link', { name: 'Amis', exact: true }))
+      .toHaveAttribute('aria-current', 'page')
+  })
+
+  it('ACC-03, ADR 0038 : téléphone, barre du bas en trois colonnes ; aller aux paramètres', async () => {
     const { router, screen } = await renderAt('/', 390, 844)
 
     const nav = screen.getByRole('navigation', { name: 'Navigation principale' })
     const bar = nav.element().getBoundingClientRect()
     expect(bar.height).toBe(64)
     expect(Math.round(bar.bottom)).toBe(844)
-    expect(nav.getByRole('link').elements()).toHaveLength(2)
+    expect(nav.getByRole('link').elements()).toHaveLength(3)
+    const widths = nav
+      .getByRole('link')
+      .elements()
+      .map((link) => Math.round(link.getBoundingClientRect().width))
+    expect(widths).toEqual([130, 130, 130])
     await nav.getByRole('link', { name: 'Paramètres' }).click()
     expect(router.state.location.pathname).toBe('/parametres')
     await expect

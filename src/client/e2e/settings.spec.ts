@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { type Browser, expect, type Page, test } from '@playwright/test'
 import { mailMatch, registerAccount } from './support/account'
 
 // Écran Paramètres contre SEAL lancé par docker compose (ACC-01 à ACC-03, ADR 0035). La ré-authentification exige
@@ -8,11 +8,34 @@ const EMAIL = `parametres.${RUN}@exemple.ca`
 const NEW_EMAIL = `parametres.neuf.${RUN}@exemple.ca`
 const PASSWORD = 'fjord-tuque-raquette'
 const NEW_PASSWORD = 'raquette-sous-la-neige'
+const PHONE_USERNAME = `telephone.${RUN}`
+
+// ADR 0038 : la suite crée déjà 5 comptes, la limite d'inscription est de 5 par heure et par IP. Le parcours des amis
+// réutilise donc les deux comptes de ce fichier : les tests partagent leurs pages, dans l'ordre.
+test.describe.configure({ mode: 'serial' })
+
+let desktop: Page
+let phone: Page
+
+async function newPage(browser: Browser, baseURL: string | undefined): Promise<Page> {
+  const context = await browser.newContext(baseURL === undefined ? {} : { baseURL })
+  return context.newPage()
+}
+
+test.beforeAll(async ({ browser }, testInfo) => {
+  desktop = await newPage(browser, testInfo.project.use.baseURL)
+  phone = await newPage(browser, testInfo.project.use.baseURL)
+})
+
+test.afterAll(async () => {
+  await desktop.context().close()
+  await phone.context().close()
+})
 
 test('ACC-03, ACC-02, ACC-01, AUTH-53 : nom affiché, courriel par code, mot de passe, puis reconnexion avec les nouveaux', async ({
-  page,
   request,
 }) => {
+  const page = desktop
   await registerAccount(page, request, {
     email: EMAIL,
     displayName: 'Paramètres Essai',
@@ -79,12 +102,12 @@ test('ACC-03, ACC-02, ACC-01, AUTH-53 : nom affiché, courriel par code, mot de 
 })
 
 test('ACC-03, ADR 0035 : sur téléphone, la liste des sections puis la sous-page Compte, sans barre du bas', async ({
-  page,
   request,
 }) => {
+  const page = phone
   await page.setViewportSize({ width: 390, height: 844 })
   await registerAccount(page, request, {
-    email: `telephone.${RUN}@exemple.ca`,
+    email: `${PHONE_USERNAME}@exemple.ca`,
     displayName: 'Essai Téléphone',
     password: PASSWORD,
   })
@@ -104,4 +127,40 @@ test('ACC-03, ADR 0035 : sur téléphone, la liste des sections puis la sous-pag
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   await page.getByRole('link', { name: 'Paramètres' }).click()
   await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible()
+})
+
+test('FRD-01, FRD-04, FRD-11, ADR 0038 : inviter, voir le compteur, accepter, retirer ; feuille du téléphone', async () => {
+  // L'ordinateur invite le téléphone depuis l'aside.
+  await desktop.goto('/amis')
+  await expect(desktop.getByRole('heading', { name: 'Pas encore d’amis' })).toBeVisible()
+  await desktop.getByLabel('Identifiant').fill(`@${PHONE_USERNAME.toUpperCase()}`)
+  await desktop.getByRole('button', { name: 'Envoyer l’invitation' }).click()
+  await expect(desktop.getByRole('status')).toContainText(
+    `Invitation envoyée à @${PHONE_USERNAME}.`,
+  )
+
+  // Le téléphone voit la pastille, puis accepte dans l'onglet Invitations.
+  await phone.goto('/amis')
+  await expect(phone.getByRole('link', { name: 'Amis, 1 invitation' })).toBeVisible()
+  await phone.goto('/amis?onglet=invitations')
+  await phone.getByRole('button', { name: 'Accepter — Léa Tremblay-Roy' }).click()
+  await expect(phone.getByText('Aucune invitation reçue.')).toBeVisible()
+
+  // L'ordinateur voit son ami, puis le retire après confirmation.
+  await desktop.goto('/amis')
+  await desktop.getByRole('button', { name: 'Plus d’actions — Essai Téléphone' }).click()
+  await desktop.getByRole('menuitem', { name: 'Retirer des amis' }).click()
+  await desktop.getByRole('button', { name: 'Retirer', exact: true }).click()
+  await expect(desktop.getByRole('heading', { name: 'Pas encore d’amis' })).toBeVisible()
+
+  // Feuille du téléphone : identifiant inexistant, sans défilement horizontal.
+  await phone.goto('/amis')
+  await phone.getByRole('button', { name: 'Ajouter un ami' }).first().click()
+  const sheet = phone.getByRole('dialog', { name: 'Ajouter un ami' })
+  await sheet.getByLabel('Identifiant').fill('personne.inconnue')
+  await sheet.getByRole('button', { name: 'Envoyer l’invitation' }).click()
+  await expect(sheet.getByRole('alert')).toContainText(
+    'Aucun utilisateur ne porte l’identifiant @personne.inconnue.',
+  )
+  expect(await phone.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
 })

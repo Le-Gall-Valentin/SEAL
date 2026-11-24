@@ -1,0 +1,1 @@
+export { friendsPageMessages } from './messages'

@@ -19,7 +19,28 @@ const CSRF_HEADER = 'X-XSRF-TOKEN'
 const PROBLEM = z.object({
   code: z.string().max(64),
   fields: z.array(z.string().max(200)).max(100).optional(),
+  requestId: z.string().max(64).optional(),
 })
+
+/** UUID textuel, comme les identifiants du serveur. */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/**
+ * FRD-01, ADR 0038 (points 8 et 9) : un requestId est gardé s'il est un UUID ; la feature d'invitation ne s'en sert
+ * que pour INCOMING_REQUEST_EXISTS.
+ */
+function requestIdOf(requestId: string | undefined): string | null {
+  return requestId !== undefined && UUID_PATTERN.test(requestId) ? requestId : null
+}
+
+/** A01, A05 : le chemin reste sous /api/v1/ ; un segment « . » ou « .. » le déplacerait une fois résolu. */
+function isApiPath(path: string): boolean {
+  const pathname = path.split(/[?#]/, 1)[0] ?? ''
+  return (
+    pathname.startsWith(API_PREFIX) &&
+    !pathname.split('/').some((segment) => segment === '.' || segment === '..')
+  )
+}
 
 function csrfToken(): string | null {
   for (const cookie of document.cookie.split(';')) {
@@ -47,11 +68,12 @@ async function problemOf(response: Response): Promise<ApiError> {
   return new ApiError(response.status, toErrorCode(parsed.data.code), {
     fields: parsed.data.fields ?? [],
     retryAfterSeconds: retryAfterSeconds(response),
+    requestId: requestIdOf(parsed.data.requestId),
   })
 }
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
-  if (!path.startsWith(API_PREFIX)) {
+  if (!isApiPath(path)) {
     throw new Error(`Adresse hors de l'API : ${path}`)
   }
   const method = options.method ?? 'GET'

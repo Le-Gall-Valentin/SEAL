@@ -6,10 +6,15 @@ import {
   UsernameAvailabilityApiProvider,
 } from '@/entities/account'
 import { AuthorityApiProvider, type IAuthorityApi } from '@/entities/authority'
+import { FriendsApiProvider, type IFriendsApi } from '@/entities/friend'
 import { type IKeysApi, KeysApiProvider } from '@/entities/keyring'
 import { type IOAuthProvidersApi, OAuthProvidersApiProvider } from '@/entities/oauth-provider'
 import { type IPasswordBlocklist, PasswordBlocklistProvider } from '@/entities/password'
 import { type ISessionApi, SessionApiProvider } from '@/entities/session'
+import {
+  AnswerFriendRequestApiProvider,
+  type IAnswerFriendRequestApi,
+} from '@/features/answer-friend-request'
 import { type IProfileApi, ProfileApiProvider } from '@/features/change-display-name'
 import { EmailChangeApiProvider, type IEmailChangeApi } from '@/features/change-email'
 import { type IPasswordChangeApi, PasswordChangeApiProvider } from '@/features/change-password'
@@ -22,6 +27,11 @@ import {
 import { type IPasswordResetApi, PasswordResetApiProvider } from '@/features/password-reset'
 import { type IReauthApi, ReauthApiProvider } from '@/features/reauthenticate'
 import { type IRegisterApi, RegisterApiProvider } from '@/features/register'
+import { type IRemoveFriendApi, RemoveFriendApiProvider } from '@/features/remove-friend'
+import {
+  type ISendFriendRequestApi,
+  SendFriendRequestApiProvider,
+} from '@/features/send-friend-request'
 import { type IVerifyEmailApi, VerifyEmailApiProvider } from '@/features/verify-email'
 
 /** Les ports des tranches ; la racine de composition leur donne leurs adaptateurs, les tests des doublures. */
@@ -43,6 +53,10 @@ export interface Apis {
   readonly profile: IProfileApi
   readonly passwordChange: IPasswordChangeApi
   readonly emailChange: IEmailChangeApi
+  readonly friends: IFriendsApi
+  readonly sendFriendRequest: ISendFriendRequestApi
+  readonly answerFriendRequest: IAnswerFriendRequestApi
+  readonly removeFriend: IRemoveFriendApi
 }
 
 interface ApiProvidersProps {
@@ -88,6 +102,18 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
       <PasswordChangeApiProvider api={apis.passwordChange}>{inner}</PasswordChangeApiProvider>
     ),
     (inner) => <EmailChangeApiProvider api={apis.emailChange}>{inner}</EmailChangeApiProvider>,
+    (inner) => <FriendsApiProvider api={apis.friends}>{inner}</FriendsApiProvider>,
+    (inner) => (
+      <SendFriendRequestApiProvider api={apis.sendFriendRequest}>
+        {inner}
+      </SendFriendRequestApiProvider>
+    ),
+    (inner) => (
+      <AnswerFriendRequestApiProvider api={apis.answerFriendRequest}>
+        {inner}
+      </AnswerFriendRequestApiProvider>
+    ),
+    (inner) => <RemoveFriendApiProvider api={apis.removeFriend}>{inner}</RemoveFriendApiProvider>,
   ]
   return layers.reduceRight<ReactNode>((inner, layer) => layer(inner), children)
 }

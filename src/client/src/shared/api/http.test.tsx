@@ -143,6 +143,40 @@ describe('shared/api : client HTTP de SEAL', () => {
     expect(String(error)).not.toContain('texte du serveur')
   })
 
+  it('FRD-01, ADR 0038 (point 8) : un 409 INCOMING_REQUEST_EXISTS garde le requestId de l’invitation reçue', async () => {
+    const requestId = '0193a1b2-0000-7000-8000-00000000c0de'
+    stubFetch(() => problem(409, { status: 409, code: 'INCOMING_REQUEST_EXISTS', requestId }))
+
+    const error = await rejection(
+      requestNoContent('/api/v1/friend-requests', { method: 'POST', body: {} }),
+    )
+
+    expect(error).toMatchObject({ status: 409, code: 'INCOMING_REQUEST_EXISTS', requestId })
+  })
+
+  it('FRD-01, ADR 0038 (point 8) : un requestId qui n’est pas un UUID est ignoré', async () => {
+    stubFetch(() =>
+      problem(409, { status: 409, code: 'INCOMING_REQUEST_EXISTS', requestId: 'pas-un-uuid' }),
+    )
+
+    const error = await rejection(
+      requestNoContent('/api/v1/friend-requests', { method: 'POST', body: {} }),
+    )
+
+    expect(error).toMatchObject({ code: 'INCOMING_REQUEST_EXISTS', requestId: null })
+  })
+
+  it('FRD-01, ADR 0038 (point 9) : un requestId UUID est gardé quel que soit le code ; la feature décide', async () => {
+    const requestId = '0193a1b2-0000-7000-8000-00000000c0de'
+    stubFetch(() => problem(409, { status: 409, code: 'REQUEST_ALREADY_PENDING', requestId }))
+
+    const error = await rejection(
+      requestNoContent('/api/v1/friend-requests', { method: 'POST', body: {} }),
+    )
+
+    expect(error).toMatchObject({ code: 'REQUEST_ALREADY_PENDING', requestId })
+  })
+
   it.each([
     [
       'un corps qui n’est pas du JSON',
@@ -215,5 +249,28 @@ describe('shared/api : client HTTP de SEAL', () => {
     await expect(request('https://exemple.ca/api/v1/auth/me', ACCOUNT)).rejects.toThrow()
     await expect(request('/autre', ACCOUNT)).rejects.toThrow()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    '/api/v1/../../connexion',
+    '/api/v1/friends/..',
+    '/api/v1/./auth/me',
+    '/api/v1/friends/.?x=1',
+  ])(
+    'A01, A05 : %s, qui sortirait de /api/v1/ ou y reviendrait une fois résolu, est refusé avant tout appel',
+    async (path) => {
+      const fetchMock = stubFetch(() => json({}))
+
+      await expect(requestNoContent(path, { method: 'DELETE' })).rejects.toThrow()
+      expect(fetchMock).not.toHaveBeenCalled()
+    },
+  )
+
+  it('A01 : un segment encodé qui contient des points reste permis', async () => {
+    const fetchMock = stubFetch(() => new Response(null, { status: 204 }))
+
+    await requestNoContent(`/api/v1/friends/${encodeURIComponent('a.b')}`, { method: 'DELETE' })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

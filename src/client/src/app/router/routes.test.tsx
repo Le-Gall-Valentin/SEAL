@@ -70,6 +70,14 @@ function fakeApis(account: Account | null): Apis {
     profile: { changeDisplayName: never },
     passwordChange: { changePassword: never },
     emailChange: { request: never, confirm: never },
+    friends: {
+      friends: () => Promise.resolve({ items: [], next: null }),
+      receivedRequests: () => Promise.resolve({ items: [], next: null }),
+      sentRequests: () => Promise.resolve({ items: [], next: null }),
+    },
+    sendFriendRequest: { send: never },
+    answerFriendRequest: { accept: never, decline: never, revoke: never },
+    removeFriend: { unfriend: never },
   }
 }
 
@@ -150,6 +158,9 @@ describe('ADR 0012 : routeur de la couche app', () => {
     // ADR 0035 : Paramètres, réservé au compte actif.
     ['/parametres', null, '/connexion', 'Connexion'],
     ['/parametres', PENDING, '/verification-courriel', 'Vérifiez votre courriel'],
+    // ADR 0038 (point 5) : Amis, réservé au compte actif.
+    ['/amis', null, '/connexion', 'Connexion'],
+    ['/amis', PENDING, '/verification-courriel', 'Vérifiez votre courriel'],
   ] as const)(
     'ADR 0024, point 5 : %s, compte %o → %s',
     async (path, account, expected, heading) => {

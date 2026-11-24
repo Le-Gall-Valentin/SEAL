@@ -56,6 +56,8 @@ interface ApiErrorDetails {
   readonly fields?: readonly string[]
   /** Délai d'un RATE_LIMITED, en secondes (SEC-10). */
   readonly retryAfterSeconds?: number | null
+  /** Invitation reçue d'un INCOMING_REQUEST_EXISTS (FRD-01, ADR 0038, point 8). */
+  readonly requestId?: string | null
 }
 
 /** Réponse d'erreur du serveur. Son message est son code : le texte du serveur n'est ni gardé ni affiché. */
@@ -64,6 +66,7 @@ export class ApiError extends Error {
   readonly code: ErrorCode
   readonly fields: readonly string[]
   readonly retryAfterSeconds: number | null
+  readonly requestId: string | null
 
   constructor(status: number, code: ErrorCode, details: ApiErrorDetails = {}) {
     super(code)
@@ -72,6 +75,7 @@ export class ApiError extends Error {
     this.code = code
     this.fields = details.fields ?? []
     this.retryAfterSeconds = details.retryAfterSeconds ?? null
+    this.requestId = details.requestId ?? null
   }
 }
 

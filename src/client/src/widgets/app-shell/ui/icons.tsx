@@ -1,3 +1,5 @@
+import { PersonGlyph } from '@/shared/ui'
+
 // Icônes de la navigation principale, reprises de la maquette (22 px, trait de 1,7) ; décoratives.
 
 const STROKE = {
@@ -26,6 +28,16 @@ export function SettingsIcon() {
       <path d="M4 7h9.5M18.5 7H20M4 17h1.5M10.5 17H20" />
       <circle cx="16" cy="7" r="2.3" />
       <circle cx="8" cy="17" r="2.3" />
+    </svg>
+  )
+}
+
+export function FriendsIcon() {
+  return (
+    <svg {...STROKE}>
+      <PersonGlyph />
+      <path d="M15.5 4.6a3.4 3.4 0 0 1 0 6.4" />
+      <path d="M17.6 14.7c2.1.7 3.5 2.6 3.9 5.3" />
     </svg>
   )
 }
