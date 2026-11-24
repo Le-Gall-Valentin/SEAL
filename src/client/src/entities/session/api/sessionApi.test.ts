@@ -58,6 +58,16 @@ describe('entities/session : adaptateur de GET /api/v1/auth/me', () => {
     })
   })
 
+  it.each([
+    ['un identifiant hors AUTH-01', { username: 'Valentin Dupont' }],
+    ['un nom affiché avec un caractère de direction', { displayName: 'Val\u202Eentin' }],
+    ['un nom affiché de plus de 50 caractères', { displayName: 'é'.repeat(51) }],
+  ])('SEC-01, AUTH-01, ACC-03 : une réponse avec %s est refusée', async (_, override) => {
+    respond(200, { ...PENDING, ...override })
+
+    await expect(sessionApi.me()).rejects.toThrow()
+  })
+
   it('AUTH-16 : 401 signifie « anonyme », sans erreur', async () => {
     respond(401, { status: 401, code: 'UNAUTHENTICATED' })
 

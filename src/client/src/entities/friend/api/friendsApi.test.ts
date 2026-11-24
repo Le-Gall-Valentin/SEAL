@@ -63,6 +63,29 @@ describe('entities/friend : adaptateur des listes d’amis et d’invitations (1
     ])
   })
 
+  it.each([
+    ['un identifiant hors AUTH-01', { username: '<img src=x>' }],
+    ['un identifiant avec un caractère de contrôle', { username: 'ab\u0007cd' }],
+    ['un nom affiché avec un caractère de direction', { displayName: 'Bob\u202Enimda' }],
+    ['un nom affiché de plus de 50 caractères', { displayName: 'é'.repeat(51) }],
+  ])('SEC-01, AUTH-01, ACC-03 : une invitation reçue avec %s est refusée', async (_, override) => {
+    request.mockResolvedValueOnce({
+      items: [
+        {
+          id: REQUEST,
+          userId: USER,
+          username: 'sarah.b',
+          displayName: 'Sarah',
+          createdAt: '2026-11-22T10:00:00Z',
+          ...override,
+        },
+      ],
+      next: null,
+    })
+
+    await expect(friendsApi.receivedRequests(null)).rejects.toThrow()
+  })
+
   it('API-01 : invitations reçues avec le nom affiché, envoyées sans', async () => {
     request.mockResolvedValueOnce({
       items: [

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import type { Friend } from '@/entities/friend'
-import { ApiError, NetworkError } from '@/shared/lib'
+import { ApiError, isolate, NetworkError } from '@/shared/lib'
 import { RemoveFriendApiProvider } from '../model/removeFriendPort'
 import { RemoveFriendDialog } from './RemoveFriendDialog'
 
@@ -33,8 +33,12 @@ describe('features/remove-friend : confirmation du retrait (FRD-11, ADR 0038)', 
   it('FRD-11, ADR 0038 (point 2) : la confirmation nomme l’ami et annonce l’effet', async () => {
     const { screen } = await mount(vi.fn())
 
-    const dialog = screen.getByRole('alertdialog', { name: 'Retirer Inès Côté de vos amis ?' })
+    const dialog = screen.getByRole('alertdialog')
     await expect.element(dialog).toBeVisible()
+    // ADR 0017, ADR 0038 (point 9) : le nom, texte libre, est isolé dans la phrase.
+    expect(dialog.element().querySelector('h2')?.textContent).toBe(
+      'Retirer \u2068Inès Côté\u2069 de vos amis ?',
+    )
     await expect
       .element(
         screen.getByText('Vous ne pourrez plus lui écrire. Vos groupes communs ne changent pas.'),
@@ -136,7 +140,9 @@ describe('features/remove-friend : confirmation du retrait (FRD-11, ADR 0038)', 
     await screen.getByRole('button', { name: 'Ouvrir Jade' }).click()
 
     await expect
-      .element(screen.getByRole('alertdialog', { name: 'Retirer Jade Morin de vos amis ?' }))
+      .element(
+        screen.getByRole('alertdialog', { name: `Retirer ${isolate('Jade Morin')} de vos amis ?` }),
+      )
       .toBeVisible()
     expect(screen.container.querySelector('[role="alert"]')).toBeNull()
   })

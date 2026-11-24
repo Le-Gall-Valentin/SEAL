@@ -1,13 +1,17 @@
 import { z } from 'zod'
+import { isDisplayNameValid, isUsernameWellFormed } from '@/entities/account/@x/session'
 import { reloadCsrf, request } from '@/shared/api'
 import { ApiError } from '@/shared/lib'
 import type { Account, ISessionApi } from './ISessionApi'
 
-/** SEC-01 : réponse de /me bornée et typée ; les bornes du texte suivent le CDC, en unités UTF-16. */
+/**
+ * SEC-01 : réponse de /me bornée et typée ; les bornes du texte suivent le CDC, en unités UTF-16, et les noms les règles
+ * d'écriture d'AUTH-01 et d'ACC-03 (ADR 0038, point 9).
+ */
 const ACCOUNT = z.object({
   id: z.uuid(),
-  username: z.string().min(3).max(20),
-  displayName: z.string().min(1).max(200),
+  username: z.string().max(20).refine(isUsernameWellFormed),
+  displayName: z.string().max(200).refine(isDisplayNameValid),
   email: z.string().min(3).max(254),
   status: z.enum(['PENDING_EMAIL', 'ACTIVE']),
   verification: z

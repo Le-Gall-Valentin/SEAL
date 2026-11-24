@@ -13,7 +13,7 @@ import {
 import { AnswerFriendRequestApiProvider } from '@/features/answer-friend-request'
 import { RemoveFriendApiProvider } from '@/features/remove-friend'
 import { SendFriendRequestApiProvider } from '@/features/send-friend-request'
-import { ApiError, NetworkError } from '@/shared/lib'
+import { ApiError, isolate, NetworkError } from '@/shared/lib'
 import { FriendsPage } from './FriendsPage'
 
 const id = (n: number) => `0192f7a1-0000-7000-8000-${String(n).padStart(12, '0')}`
@@ -131,7 +131,9 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await more.click()
     await screen.getByRole('menuitem', { name: 'Retirer des amis' }).click()
     await expect
-      .element(screen.getByRole('alertdialog', { name: 'Retirer Inès Côté de vos amis ?' }))
+      .element(
+        screen.getByRole('alertdialog', { name: `Retirer ${isolate('Inès Côté')} de vos amis ?` }),
+      )
       .toBeVisible()
   })
 

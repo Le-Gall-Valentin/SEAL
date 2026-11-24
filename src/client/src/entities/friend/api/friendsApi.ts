@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isDisplayNameValid, isUsernameWellFormed } from '@/entities/account/@x/friend'
 import { request } from '@/shared/api'
 import type { IFriendsApi, Page, SentRequest } from './IFriendsApi'
 
@@ -6,8 +7,9 @@ import type { IFriendsApi, Page, SentRequest } from './IFriendsApi'
 const PAGE_LIMIT = 50
 
 const UUID = z.uuid()
-const USERNAME = z.string().min(3).max(20)
-const DISPLAY_NAME = z.string().min(1).max(200)
+// SEC-01, AUTH-01, ACC-03 : le nom d'un autre compte qui ne suit pas les règles d'écriture est refusé (échec fermé).
+const USERNAME = z.string().max(20).refine(isUsernameWellFormed)
+const DISPLAY_NAME = z.string().max(200).refine(isDisplayNameValid)
 
 /** SEC-01 : réponses de la section 14.4 (ADR 0037, points 3, 7 et 9), champs inconnus refusés. */
 const FRIEND = z.strictObject({

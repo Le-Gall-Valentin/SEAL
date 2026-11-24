@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import type { Friend } from '@/entities/friend'
 import { useMessages } from '@/shared/i18n'
+import { isolate } from '@/shared/lib'
 import { DialogBody, DialogFooter, FormAlert, ModalDialog } from '@/shared/ui'
 import { removeFriendMessages } from '../i18n'
 import { useRemoveFriend } from '../model/useRemoveFriend'
@@ -28,7 +29,7 @@ export function RemoveFriendDialog({ friend, onClose }: RemoveFriendDialogProps)
       open={friend !== null}
       onClose={cancel}
       closable={!removal.pending}
-      title={t('title', { name: friend?.displayName ?? '' })}
+      title={t('title', { name: isolate(friend?.displayName ?? '') })}
       danger
       describedBy={textId}
     >
