@@ -76,6 +76,15 @@ class ExternalIdentityTest {
     }
 
     @Test
+    @DisplayName("ACC-03, ADR 0040 : le nom proposé perd les caractères invisibles et l'usage privé")
+    void acc03SuggestedNameLosesInvisibleCharacters() {
+        String name =
+                "S" + Character.toString(0x200B) + "k" + Character.toString(0xFEFF) + "i" + Character.toString(0xE000);
+
+        assertThat(google("1", "v@exemple.ca", name).displayName()).isEqualTo("Ski");
+    }
+
+    @Test
     @DisplayName("AUTH-30 : aucun nom du fournisseur ne refuse l'identité ; le nom proposé est stable (idempotent)")
     void auth30SuggestedNameNeverBlocksAndIsIdempotent() {
         String[] names = {

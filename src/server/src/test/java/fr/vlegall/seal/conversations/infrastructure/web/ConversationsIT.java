@@ -210,6 +210,28 @@ class ConversationsIT {
 
     @Test
     @DisplayName(
+            "ACC-03, GRP-01, ADR 0040 : un nom de groupe avec un caractère invisible est refusé, à la création et au"
+                    + " renommage")
+    void grp01InvisibleCharacterInGroupNameIsRefused() throws Exception {
+        TestAccount me = account("grpi");
+        TestAccount friend = account("grpj");
+        TestRelations.befriend(jdbc, me.id, friend.id);
+        String path = CONVERSATIONS + "/" + groupOk(me, List.of(friend.id));
+        String hidden = "S" + Character.toString(0x200B) + "ki";
+
+        group(me, hidden, List.of(friend.id))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields[0]").value("name"));
+        mvc.perform(me.unsafe(patch(path), Map.of("name", hidden)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields[0]").value("name"));
+        assertThat(read(me, path).get("name").asString()).isEqualTo("Ski du dimanche");
+    }
+
+    @Test
+    @DisplayName(
             "GRP-03 : ajout par un membre, droits de l'administrateur, NOT_A_MEMBER, renommage, départ et successeur")
     void grp03GroupActions() throws Exception {
         TestAccount admin = account("grad");

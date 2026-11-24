@@ -2,13 +2,20 @@ package fr.vlegall.seal.common;
 
 /**
  * ACC-03, AUTH-10, SEC-01 : règle du nom affiché, partagée par {@code identity}, qui la garde à l'inscription et aux
- * paramètres, et par {@code authentication}, qui en tire le nom proposé d'une inscription OAuth (ADR 0032). La règle
- * n'est écrite qu'une fois, comme {@link EmailFormat}.
+ * paramètres, par {@code authentication}, qui en tire le nom proposé d'une inscription OAuth (ADR 0032), et par
+ * {@code conversations}, qui l'applique au nom d'un groupe sur 64 points de code (GRP-01, ADR 0039, point 6). La règle
+ * n'est écrite qu'une fois, comme {@link EmailFormat} ; le client en garde la copie dans
+ * {@code entities/account/model/displayName.ts} (ADR 0040).
  */
 public final class DisplayNameRule {
 
     /** AUTH-10, en points de code, comme {@code char_length} de PostgreSQL. */
     public static final int MAX_LENGTH = 50;
+
+    /** ZERO WIDTH NON-JOINER et ZERO WIDTH JOINER, seuls caractères de format permis (ADR 0040). */
+    private static final int ZWNJ = 0x200C;
+
+    private static final int ZWJ = 0x200D;
 
     private DisplayNameRule() {}
 
@@ -61,23 +68,24 @@ public final class DisplayNameRule {
     }
 
     /**
-     * SEC-01 : caractères de contrôle, séparateurs de ligne et de paragraphe, et caractères de direction (U+061C,
-     * U+200E, U+200F, U+202A à U+202E, U+2066 à U+2069), qui pourraient faire lire un nom à l'envers. S'y ajoutent les
-     * demi-paires de substitution isolées, que l'encodage UTF-8 vers la base remplacerait par « ? », et les points de
-     * code non attribués. Les autres caractères de format restent permis : ZWJ compose les émojis, ZWNJ sert aux
-     * écritures persane et indiennes.
+     * SEC-01, ACC-03 : caractères de contrôle, séparateurs de ligne et de paragraphe, demi-paires de substitution
+     * isolées (que l'encodage UTF-8 vers la base remplacerait par « ? ») et points de code non attribués. S'y ajoutent
+     * (ADR 0040) tous les caractères de format sauf ZWNJ (U+200C, écritures persane et indiennes) et ZWJ (U+200D,
+     * émojis composés) : les caractères de direction (U+061C, U+200E, U+200F, U+202A à U+202E, U+2066 à U+2069), qui
+     * pourraient faire lire un nom à l'envers, mais aussi U+200B, U+2060, U+FEFF, U+00AD et les étiquettes, qui ne
+     * s'affichent pas ; et l'usage privé, dont l'affichage dépend de la police. Un nom ne peut ainsi pas en imiter un
+     * autre par un caractère invisible.
      */
     public static boolean isForbidden(int c) {
-        int type = Character.getType(c);
-        return type == Character.CONTROL
-                || type == Character.SURROGATE
-                || type == Character.UNASSIGNED
-                || type == Character.LINE_SEPARATOR
-                || type == Character.PARAGRAPH_SEPARATOR
-                || c == 0x061C
-                || c == 0x200E
-                || c == 0x200F
-                || (c >= 0x202A && c <= 0x202E)
-                || (c >= 0x2066 && c <= 0x2069);
+        return switch (Character.getType(c)) {
+            case Character.CONTROL,
+                    Character.SURROGATE,
+                    Character.UNASSIGNED,
+                    Character.LINE_SEPARATOR,
+                    Character.PARAGRAPH_SEPARATOR,
+                    Character.PRIVATE_USE -> true;
+            case Character.FORMAT -> c != ZWNJ && c != ZWJ;
+            default -> false;
+        };
     }
 }

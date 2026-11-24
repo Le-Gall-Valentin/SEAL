@@ -26,6 +26,28 @@ class DisplayNameRuleTest {
     }
 
     @Test
+    @DisplayName("ACC-03, ADR 0040 : caractères de format invisibles et usage privé refusés ; ZWJ, ZWNJ et VS16 permis")
+    void acc03InvisibleFormatAndPrivateUseAreRefused() {
+        // U+200B, U+2060, U+FEFF, U+00AD, étiquettes U+E0001 et U+E0041, usage privé des trois plages.
+        for (int invisible : new int[] {0x200B, 0x2060, 0xFEFF, 0x00AD, 0xE0001, 0xE0041, 0xE000, 0xF0000, 0x10FFFD}) {
+            String name = "S" + Character.toString(invisible) + "ki";
+            assertThat(DisplayNameRule.isForbidden(invisible))
+                    .as("U+%04X", invisible)
+                    .isTrue();
+            assertThat(DisplayNameRule.isValid(name)).as("U+%04X", invisible).isFalse();
+            assertThat(DisplayNameRule.isValid(name, 64))
+                    .as("U+%04X", invisible)
+                    .isFalse();
+        }
+        String family = Character.toString(0x1F469) + Character.toString(0x200D) + Character.toString(0x1F467);
+        assertThat(DisplayNameRule.isValid(family)).isTrue();
+        assertThat(DisplayNameRule.isValid("a" + Character.toString(0x200C) + "b"))
+                .isTrue();
+        assertThat(DisplayNameRule.isValid(Character.toString(0x2764) + Character.toString(0xFE0F)))
+                .isTrue();
+    }
+
+    @Test
     @DisplayName("AUTH-10 : sans longueur donnée, le nom affiché garde ses 50 points de code")
     void auth10DisplayNameKeepsFiftyCodePoints() {
         assertThat(DisplayNameRule.isValid("x".repeat(50))).isTrue();
