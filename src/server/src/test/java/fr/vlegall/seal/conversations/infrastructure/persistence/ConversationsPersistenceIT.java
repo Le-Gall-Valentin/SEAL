@@ -11,6 +11,7 @@ import fr.vlegall.seal.conversations.domain.model.GroupName;
 import fr.vlegall.seal.conversations.domain.model.Member;
 import fr.vlegall.seal.conversations.domain.model.Role;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
+import fr.vlegall.seal.support.LockWaits;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import fr.vlegall.seal.support.TestRelations;
 import java.time.Instant;
@@ -155,7 +156,7 @@ class ConversationsPersistenceIT {
 
     @Test
     @DisplayName(
-            "GRP-03, CNV-07 : l'administrateur parti redevient MEMBER ; un arrivant n'a pas de non-lus d'avant lui")
+            "GRP-03, CNV-04 : l'administrateur parti redevient MEMBER ; un arrivant n'a pas de non-lus d'avant lui")
     void grp03DepartedAdminIsMemberAndNewcomerReadsFromArrival() {
         UserId creator = user();
         UserId b = user();
@@ -257,41 +258,18 @@ class ConversationsPersistenceIT {
             Conversation before =
                     conversations.lockForMember(created.id(), admin).orElseThrow();
             locked.countDown();
-            awaitQuietly(release);
+            LockWaits.awaitQuietly(release);
             conversations.save(before, before.exclude(admin, member), T1);
         }));
         assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
         CompletableFuture<Optional<Conversation>> waiting = CompletableFuture.supplyAsync(() ->
                 Objects.requireNonNull(transactions.execute(s -> conversations.lockForMember(created.id(), member))));
-        awaitLockWaiter();
+        LockWaits.awaitWaiter(jdbc, "FOR UPDATE OF c");
         release.countDown();
         holder.get(10, TimeUnit.SECONDS);
 
         // READ COMMITTED : la sous-requête d'appartenance a vu l'instantané d'avant l'attente ; les membres relus, non.
         assertThat(waiting.get(10, TimeUnit.SECONDS)).isEmpty();
-    }
-
-    /** Attend qu'une transaction soit bloquée sur le verrou d'une conversation. */
-    private void awaitLockWaiter() throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (jdbc.sql("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
-                                + " AND query LIKE '%FOR UPDATE OF c%'")
-                        .query(Long.class)
-                        .single()
-                == 0) {
-            if (System.nanoTime() > deadline) {
-                throw new IllegalStateException("aucune transaction n'attend le verrou");
-            }
-            Thread.sleep(10);
-        }
-    }
-
-    private static void awaitQuietly(CountDownLatch latch) {
-        try {
-            latch.await(10, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     @Test
@@ -313,7 +291,7 @@ class ConversationsPersistenceIT {
 
     @Test
     @DisplayName("API-02 : deux membres actifs d'un même groupe le partagent ; plus après un départ")
-    void api02ActiveMembersShareAConversation() {
+    void api02ActiveMembersShareAGroup() {
         UserId a = user();
         UserId b = user();
         Conversation created = group(a, b);

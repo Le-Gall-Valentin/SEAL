@@ -71,10 +71,10 @@ public final class TestRelations {
         return id;
     }
 
-    /** GRP-03 : {@code user} quitte {@code conversation}. */
+    /** GRP-03 : {@code user} quitte {@code conversation} et perd son rôle, comme en production. */
     public static void leave(JdbcClient jdbc, UUID conversation, UUID user) {
         jdbc.sql(
-                        "UPDATE conversation_members SET left_at = now(), left_seq = 0 WHERE conversation_id = ? AND user_id = ?")
+                        "UPDATE conversation_members SET left_at = now(), left_seq = 0, role = 'MEMBER' WHERE conversation_id = ? AND user_id = ?")
                 .param(conversation)
                 .param(user)
                 .update();

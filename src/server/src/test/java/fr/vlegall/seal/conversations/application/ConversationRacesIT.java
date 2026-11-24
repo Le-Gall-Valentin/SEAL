@@ -1,6 +1,7 @@
 package fr.vlegall.seal.conversations.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.conversations.application.port.in.AddMembersUseCase;
@@ -9,19 +10,28 @@ import fr.vlegall.seal.conversations.application.port.in.ExcludeMemberUseCase;
 import fr.vlegall.seal.conversations.application.port.in.LeaveConversationUseCase;
 import fr.vlegall.seal.conversations.domain.model.ConversationException;
 import fr.vlegall.seal.conversations.domain.model.ConversationId;
+import fr.vlegall.seal.support.LockWaits;
 import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import fr.vlegall.seal.support.TestRelations;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.support.TransactionTemplate;
 
-/** GRP-01, GRP-03, A06 : courses entre actions de groupe, sous le verrou de la conversation (ADR 0039). */
+/**
+ * GRP-01, GRP-03, CNV-06, A06 : courses entre actions de groupe, sous le verrou de la conversation (ADR 0039). Chacune
+ * échoue sans le verrou.
+ */
 @SealIntegrationTest
 class ConversationRacesIT {
 
@@ -39,6 +49,9 @@ class ConversationRacesIT {
 
     @Autowired
     private LeaveConversationUseCase leave;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     private UserId user() {
         return new UserId(TestRelations.activeUser(jdbc));
@@ -109,29 +122,31 @@ class ConversationRacesIT {
         assertThat(isActive(id, last)).isTrue();
     }
 
-    @RepeatedTest(3)
-    @DisplayName("GRP-03, A06 : un membre retiré pendant son ajout n'ajoute personne après son retrait")
-    void grp03ExclusionDuringAdditionLeavesNoLateNewcomer() throws Exception {
+    @Test
+    @DisplayName("CNV-06, GRP-03, A06 : un membre retiré pendant qu'il attend le verrou n'ajoute personne")
+    void cnv06MemberExcludedWhileWaitingToAddAddsNobody() throws Exception {
         UserId admin = user();
         UserId member = friendsOf(admin, 1).iterator().next();
         UserId newcomer = friendsOf(member, 1).iterator().next();
         ConversationId id = groups.create(admin, "Ski", Set.of(member)).id();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
 
-        List<Boolean> added = Race.run(2, i -> {
-            if (i == 0) {
-                exclude.exclude(admin, id, member);
-                return false;
-            }
-            try {
-                add.admit(member, id, Set.of(newcomer));
-                return true;
-            } catch (ConversationException.NotFound e) {
-                return false;
-            }
-        });
+        CompletableFuture<Void> exclusion = CompletableFuture.runAsync(() -> transactions.executeWithoutResult(s -> {
+            exclude.exclude(admin, id, member);
+            locked.countDown();
+            LockWaits.awaitQuietly(release);
+        }));
+        assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+        CompletableFuture<Void> addition = CompletableFuture.runAsync(() -> add.admit(member, id, Set.of(newcomer)));
+        // Sans verrou, l'ajout n'attendrait pas : le test échoue ici.
+        LockWaits.awaitWaiter(jdbc, "FOR UPDATE OF c");
+        release.countDown();
+        exclusion.get(10, TimeUnit.SECONDS);
 
+        assertThatThrownBy(() -> addition.get(10, TimeUnit.SECONDS))
+                .hasCauseInstanceOf(ConversationException.NotFound.class);
         assertThat(isActive(id, member)).isFalse();
-        assertThat(isActive(id, newcomer)).isEqualTo(added.get(1));
-        assertThat(activeRoles(id)).hasSize(added.get(1) ? 2 : 1);
+        assertThat(isActive(id, newcomer)).isFalse();
     }
 }

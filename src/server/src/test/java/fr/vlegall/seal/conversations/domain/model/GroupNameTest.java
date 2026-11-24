@@ -24,4 +24,13 @@ class GroupNameTest {
         assertThatThrownBy(() -> GroupName.parse("Ski\u202E")).isInstanceOf(ConversationException.InvalidName.class);
         assertThatThrownBy(() -> GroupName.parse("Ski\u0007")).isInstanceOf(ConversationException.InvalidName.class);
     }
+
+    @Test
+    @DisplayName("ACC-03, ADR 0040 : caractère invisible ou d'usage privé refusé dans un nom de groupe")
+    void acc03InvisibleCharacterIsRefused() {
+        for (int invisible : new int[] {0x200B, 0xFEFF, 0xE000}) {
+            assertThatThrownBy(() -> GroupName.parse("S" + Character.toString(invisible) + "ki"))
+                    .isInstanceOf(ConversationException.InvalidName.class);
+        }
+    }
 }

@@ -208,7 +208,7 @@ class ConversationsIT {
     void cnv03WriteResponsesMatchTheRead() throws Exception {
         TestAccount me = account("rspm");
         List<UUID> friends = new ArrayList<>();
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 10; i++) {
             TestAccount friend = account("rspf");
             TestRelations.befriend(jdbc, me.id, friend.id);
             friends.add(friend.id);
@@ -220,7 +220,7 @@ class ConversationsIT {
         assertThat(created).isEqualTo(read(me, path));
 
         JsonNode added = AuthClient.body(mvc.perform(
-                        me.unsafe(post(path + "/members"), Map.of("userIds", friends.subList(4, 7))))
+                        me.unsafe(post(path + "/members"), Map.of("userIds", friends.subList(4, 10))))
                 .andExpect(status().isOk())
                 .andReturn());
 

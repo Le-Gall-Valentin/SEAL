@@ -11,7 +11,7 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("CNV-04, CNV-06, API-02 : liste, détail et conversation commune")
+@DisplayName("CNV-04, CNV-06, API-02 : liste, détail et groupe commun")
 class ConversationQueriesHandlerTest {
 
     private final InMemoryConversations store = new InMemoryConversations();

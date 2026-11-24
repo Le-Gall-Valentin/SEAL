@@ -139,7 +139,7 @@ class ReadUserKeysHandlerTest {
     }
 
     @Test
-    @DisplayName("API-02, ADR 0039 (point 7) : un seul lien suffit, l'amitié ou une conversation commune")
+    @DisplayName("API-02, ADR 0039 (point 7) : un seul lien suffit, l'amitié ou un groupe commun")
     void api02OneRelationIsEnough() {
         sharesGroup = true;
 
