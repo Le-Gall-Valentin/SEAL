@@ -127,7 +127,7 @@ class ConversationTest {
     @Test
     @DisplayName("GRP-01, ADR 0039 (point 3) : une directe refuse ajout, retrait, départ et renommage")
     void grp01DirectRefusesGroupActions() {
-        Conversation direct = Conversation.direct(ID, admin, small, T0);
+        Conversation direct = TestConversations.direct(ID, admin, small, T0);
 
         assertThat(direct.type()).isEqualTo(ConversationType.DIRECT);
         assertThat(direct.name()).isEmpty();

@@ -4,8 +4,9 @@ import fr.vlegall.seal.common.UserId;
 import java.util.Collection;
 
 /**
- * API-02, FRD-21 : deux comptes sont-ils amis ? Demandé par le contexte {@code keys} (ADR 0008, règle 7) ; la signature
- * ne porte que {@link UserId}.
+ * API-02, FRD-21 : deux comptes sont-ils amis ? Demandé par les contextes {@code keys} (lecture des clés) et
+ * {@code conversations} (directe, création et ajout, ADR 0039) (ADR 0008, règle 7) ; la signature ne porte que
+ * {@link UserId}.
  */
 public interface FriendshipQuery {
 

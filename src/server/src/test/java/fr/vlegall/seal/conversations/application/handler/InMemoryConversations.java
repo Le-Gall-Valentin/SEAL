@@ -6,6 +6,7 @@ import fr.vlegall.seal.conversations.domain.model.ConversationId;
 import fr.vlegall.seal.conversations.domain.model.ConversationType;
 import fr.vlegall.seal.conversations.domain.model.DirectKey;
 import fr.vlegall.seal.conversations.domain.model.MemberProfile;
+import fr.vlegall.seal.conversations.domain.model.TestConversations;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationActivityPort;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
 import fr.vlegall.seal.conversations.domain.port.out.FriendshipPort;
@@ -71,7 +72,7 @@ final class InMemoryConversations {
                     return false;
                 }
                 ConversationId id = nextId();
-                byId.put(id, Conversation.direct(id, a, b, at));
+                byId.put(id, TestConversations.direct(id, a, b, at));
                 directs.put(key, id);
                 return true;
             }

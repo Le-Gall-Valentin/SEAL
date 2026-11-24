@@ -29,8 +29,9 @@ public class ReadUserKeysHandler implements UserKeysQuery {
     }
 
     /**
-     * SEC-03, API-02 : l'appelant lui-même ou un ami du titulaire, contrôlé avant toute lecture ; médiation complète,
-     * sans cache (ADR 0025). Tout autre appelant reçoit la même absence qu'un compte sans certificat (A01).
+     * SEC-03, API-02 : l'appelant lui-même, un ami du titulaire ou un membre actif d'un groupe commun (ADR 0037, point
+     * 7 ; ADR 0039, point 7), contrôlé avant toute lecture ; médiation complète, sans cache (ADR 0025). Tout autre
+     * appelant, ancien ami avec une directe compris, reçoit la même absence qu'un compte sans certificat (A01).
      */
     @Override
     @Transactional(readOnly = true)

@@ -41,19 +41,6 @@ public record Conversation(
         activeMembers = List.copyOf(activeMembers);
     }
 
-    /** CNV-01 : directe entre deux comptes distincts, sans nom ni administrateur. */
-    public static Conversation direct(ConversationId id, UserId a, UserId b, Instant at) {
-        DirectKey.of(a, b);
-        return new Conversation(
-                id,
-                ConversationType.DIRECT,
-                Optional.empty(),
-                a,
-                at,
-                0,
-                List.of(new Member(a, Role.MEMBER, at), new Member(b, Role.MEMBER, at)));
-    }
-
     /** GRP-01, CNV-03 : groupe, créateur administrateur, 1 à 49 autres membres. */
     public static Conversation group(
             ConversationId id, UserId creator, GroupName name, Set<UserId> others, Instant at) {

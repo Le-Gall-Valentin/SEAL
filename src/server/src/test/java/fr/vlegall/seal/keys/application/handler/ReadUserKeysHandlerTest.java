@@ -23,8 +23,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * KEY-33, API-02 : le compte relit son certificat courant et ses sous-clés valides ; un ami les lit aussi, tout autre
- * compte ne lit rien (ADR 0037, point 7).
+ * KEY-33, API-02 : le compte relit son certificat courant et ses sous-clés valides ; un ami ou un membre d'un groupe
+ * commun les lit aussi, tout autre compte ne lit rien (ADR 0037 et 0039, point 7).
  */
 class ReadUserKeysHandlerTest {
 
@@ -34,10 +34,11 @@ class ReadUserKeysHandlerTest {
     private static final byte[] SERIAL = new byte[16];
 
     private final List<String> calls = new ArrayList<>();
-    /** API-02 : l'appelant est-il ami du titulaire (membre d'une conversation commune à la PR 3) ? */
+    /** API-02 : l'appelant est-il ami du titulaire ? */
     private boolean related;
 
-    private boolean sharesConversation;
+    /** API-02 : l'appelant est-il membre actif d'un groupe commun (ADR 0039, point 7) ? */
+    private boolean sharesGroup;
 
     private Optional<IdentityCertificate> current = Optional.of(new IdentityCertificate(
             SERIAL,
@@ -101,7 +102,7 @@ class ReadUserKeysHandlerTest {
         };
         RelationPort conversation = (caller, owner) -> {
             calls.add("shares " + caller.value() + " " + owner.value());
-            return sharesConversation;
+            return sharesGroup;
         };
         return new ReadUserKeysHandler(
                 certification, subkeys, List.of(friendship, conversation), Clock.fixed(NOW, ZoneOffset.UTC));
@@ -140,7 +141,7 @@ class ReadUserKeysHandlerTest {
     @Test
     @DisplayName("API-02, ADR 0039 (point 7) : un seul lien suffit, l'amitié ou une conversation commune")
     void api02OneRelationIsEnough() {
-        sharesConversation = true;
+        sharesGroup = true;
 
         assertThat(handler().read(OTHER, OWNER)).isPresent();
     }

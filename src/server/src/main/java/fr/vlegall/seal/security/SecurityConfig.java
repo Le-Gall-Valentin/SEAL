@@ -54,8 +54,8 @@ class SecurityConfig {
 
     /**
      * SEC-01, A06 : 16 Kio au plus pour un corps sous {@code /api/v1/auth/} (ADR 0019, point 5), sous
-     * {@code /api/v1/account/}, qui reçoit aussi des mots de passe (ADR 0034), et sous les routes des amis (ADR 0037,
-     * point 10).
+     * {@code /api/v1/account/}, qui reçoit aussi des mots de passe (ADR 0034), sous les routes des amis (ADR 0037,
+     * point 10) et sous {@code /api/v1/conversations/} (ADR 0039, point 1).
      */
     static final int SMALL_BODY_LIMIT = 16 * 1024;
 
@@ -220,8 +220,9 @@ class SecurityConfig {
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         .requestMatchers(HttpMethod.PUT, "/api/v1/keys/vault")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
-                        // KEY-33, API-02 : certificat et sous-clés valides d'un compte, lus par lui-même ou par un ami
-                        // (ADR 0029, point 4 ; ADR 0037, point 7), session complète ; contrôle dans le handler.
+                        // KEY-33, API-02 : certificat et sous-clés valides d'un compte, lus par lui-même, un ami ou un
+                        // membre d'un groupe commun (ADR 0029, point 4 ; ADR 0037 et 0039, point 7), session complète ;
+                        // contrôle dans le handler.
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/*/keys")
                         .hasAuthority(SealAuthorities.ACCOUNT_ACTIVE)
                         .requestMatchers("/error")

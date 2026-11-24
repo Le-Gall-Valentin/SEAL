@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * GRP-01, ADR 0039 (point 6) : nom d'un groupe, normalisé en NFC, sous la règle du nom affiché (ni caractère de
- * contrôle ni de direction, un caractère visible), sur 1 à 64 points de code.
+ * contrôle, de direction ou invisible selon l'ADR 0040, un caractère visible), sur 1 à 64 points de code.
  */
 public record GroupName(String value) {
 
