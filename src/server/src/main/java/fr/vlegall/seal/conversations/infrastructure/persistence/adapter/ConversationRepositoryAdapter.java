@@ -53,12 +53,14 @@ public class ConversationRepositoryAdapter implements ConversationRepository {
             + " ORDER BY joined_at, user_id";
 
     /**
-     * GRP-03 : un arrivant lit à partir de son arrivée ({@code last_read_seq}, CNV-04) ; un ancien membre qui revient
-     * retrouve sa ligne, remise à neuf. Un membre encore actif garde la sienne, même vu d'un état périmé.
+     * GRP-03 : tous les arrivants d'une écriture en une instruction ({@code unnest}). Un arrivant lit à partir de son
+     * arrivée ({@code last_read_seq}, CNV-04) ; un ancien membre qui revient retrouve sa ligne, remise à neuf. Un membre
+     * encore actif garde la sienne, même vu d'un état périmé.
      */
     private static final String JOIN = "INSERT INTO conversation_members"
             + " (conversation_id, user_id, role, joined_at, joined_seq, last_read_seq)"
-            + " VALUES (:id, :user, :role, :joinedAt, :seq, :seq)"
+            + " SELECT :id, m.user_id, m.role, m.joined_at, :seq, :seq FROM unnest(CAST(:users AS uuid[]),"
+            + " CAST(:roles AS text[]), CAST(:joinedAts AS timestamptz[])) AS m(user_id, role, joined_at)"
             + " ON CONFLICT (conversation_id, user_id) DO UPDATE SET role = EXCLUDED.role,"
             + " joined_at = EXCLUDED.joined_at, joined_seq = EXCLUDED.joined_seq, left_at = NULL, left_seq = NULL,"
             + " last_read_seq = EXCLUDED.joined_seq WHERE conversation_members.left_at IS NOT NULL";
@@ -103,7 +105,7 @@ public class ConversationRepositoryAdapter implements ConversationRepository {
                 .param("createdBy", group.createdBy().value())
                 .param("at", Timestamp.from(group.createdAt()))
                 .update();
-        group.activeMembers().forEach(member -> join(group.id(), member, group.lastServerSeq()));
+        join(group.id(), group.activeMembers(), group.lastServerSeq());
     }
 
     @Override
@@ -127,11 +129,15 @@ public class ConversationRepositoryAdapter implements ConversationRepository {
         Map<UserId, Member> was = byUser(before);
         Map<UserId, Member> now = byUser(after);
         was.keySet().stream().filter(user -> !now.containsKey(user)).forEach(user -> depart(after, user, at));
+        join(
+                after.id(),
+                now.values().stream()
+                        .filter(member -> !was.containsKey(member.user()))
+                        .toList(),
+                after.lastServerSeq());
         now.values().forEach(member -> {
             Member previous = was.get(member.user());
-            if (previous == null) {
-                join(after.id(), member, after.lastServerSeq());
-            } else if (previous.role() != member.role()) {
+            if (previous != null && previous.role() != member.role()) {
                 jdbc.sql("UPDATE conversation_members SET role = :role WHERE conversation_id = :id AND user_id = :user")
                         .param("role", member.role().name())
                         .param("id", after.id().value())
@@ -180,12 +186,20 @@ public class ConversationRepositoryAdapter implements ConversationRepository {
                 .findFirst();
     }
 
-    private void join(ConversationId id, Member member, long seq) {
+    /** Les tableaux passent en texte, convertis par PostgreSQL ; un tableau n'est pas développé en liste. */
+    private void join(ConversationId id, List<Member> members, long seq) {
+        if (members.isEmpty()) {
+            return;
+        }
         jdbc.sql(JOIN)
                 .param("id", id.value())
-                .param("user", member.user().value())
-                .param("role", member.role().name())
-                .param("joinedAt", Timestamp.from(member.joinedAt()))
+                .param(
+                        "users",
+                        members.stream().map(m -> m.user().value().toString()).toArray(String[]::new))
+                .param("roles", members.stream().map(m -> m.role().name()).toArray(String[]::new))
+                .param(
+                        "joinedAts",
+                        members.stream().map(m -> m.joinedAt().toString()).toArray(String[]::new))
                 .param("seq", seq)
                 .update();
     }
