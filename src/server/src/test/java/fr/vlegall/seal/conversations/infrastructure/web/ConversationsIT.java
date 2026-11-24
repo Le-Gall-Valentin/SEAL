@@ -117,12 +117,24 @@ class ConversationsIT {
                 .param(me.id)
                 .update();
 
+        List<String> bodies = new ArrayList<>();
         for (UUID other : List.of(friend.id, me.id, account("frds").id, UUID.randomUUID())) {
-            direct(me, other)
+            bodies.add(direct(me, other)
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("NOT_FRIENDS"));
+                    .andExpect(jsonPath("$.code").value("NOT_FRIENDS"))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString());
         }
+        // Octet pour octet : rien ne distingue un ancien ami, soi-même, un tiers ou un compte inconnu.
+        assertThat(bodies).containsOnly(bodies.getFirst());
         assertThat(read(me, CONVERSATIONS + "/" + id).get("id").asString()).isEqualTo(id);
+        // FRD-11 : la directe d'un ancien ami reste listée.
+        assertThat(read(me, CONVERSATIONS)
+                        .get("items")
+                        .valueStream()
+                        .map(item -> item.get("id").asString()))
+                .contains(id);
     }
 
     @Test
@@ -154,11 +166,16 @@ class ConversationsIT {
                 .andExpect(jsonPath("$.code").value("NOT_FRIENDS"));
         group(me, "Ski", List.of(a.id, a.id))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields[0]").value("memberIds"));
         group(me, "x".repeat(65), List.of(a.id))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
-        group(me, "Ski", List.of()).andExpect(status().isBadRequest());
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields[0]").value("name"));
+        group(me, "Ski", List.of())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields[0]").value("memberIds"));
         Map<String, Object> nullList = new HashMap<>();
         nullList.put("name", "Ski");
         nullList.put("memberIds", null);
@@ -174,7 +191,10 @@ class ConversationsIT {
         for (int i = 0; i < 50; i++) {
             fifty.add(UUID.randomUUID());
         }
-        group(me, "Ski", fifty).andExpect(status().isBadRequest());
+        group(me, "Ski", fifty)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fields[0]").value("memberIds"));
         mvc.perform(me.unsafe(
                         post(CONVERSATIONS + "/group"), Map.of("name", "Ski", "memberIds", List.of(a.id), "x", 1)))
                 .andExpect(status().isBadRequest())
@@ -265,7 +285,9 @@ class ConversationsIT {
         JsonNode after = read(member, path);
         assertThat(after.get("members")).hasSize(1);
         assertThat(after.get("members").get(0).get("role").asString()).isEqualTo("ADMIN");
-        mvc.perform(admin.safe(get(path))).andExpect(status().isNotFound());
+        mvc.perform(admin.safe(get(path)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
@@ -295,7 +317,9 @@ class ConversationsIT {
         mvc.perform(admin.unsafe(post(pair + "/leave"), null))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-        mvc.perform(admin.unsafe(patch(pair), Map.of("name", "Autre"))).andExpect(status().isForbidden());
+        mvc.perform(admin.unsafe(patch(pair), Map.of("name", "Autre")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
     @Test
@@ -335,15 +359,20 @@ class ConversationsIT {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
         mvc.perform(anonymous.unsafe(post(CONVERSATIONS + "/direct"), null, Map.of("userId", friend.id)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
         mvc.perform(me.client.from(post(CONVERSATIONS + "/direct")).cookie(me.session))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-        mvc.perform(me.client.from(post(path + "/leave")).cookie(me.session)).andExpect(status().isForbidden());
+        mvc.perform(me.client.from(post(path + "/leave")).cookie(me.session))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         mvc.perform(me.unsafe(put(path), Map.of("name", "Autre")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-        mvc.perform(me.safe(get(path + "/messages"))).andExpect(status().isForbidden());
+        mvc.perform(me.safe(get(path + "/messages")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
     @Test
@@ -374,7 +403,9 @@ class ConversationsIT {
                     .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
         }
         mvc.perform(stranger.safe(get(CONVERSATIONS))).andExpect(status().isOk());
-        mvc.perform(stranger.safe(get(path))).andExpect(status().isNotFound());
+        mvc.perform(stranger.safe(get(path)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
         for (Route route : unsafeRoutes) {
             var anonymousRequest = request(route.method(), route.path());
             mvc.perform(anonymous.unsafe(anonymousRequest, null, route.body()))
@@ -418,11 +449,21 @@ class ConversationsIT {
         for (ResultActions result : List.of(
                 mvc.perform(admin.unsafe(post(CONVERSATIONS + "/direct"), Map.of("userId", member.id, "x", 1))),
                 mvc.perform(admin.unsafe(post(path + "/members"), Map.of("userIds", List.of(member.id), "x", 1))),
-                mvc.perform(admin.unsafe(patch(path), Map.of("name", "Autre", "x", 1))),
-                mvc.perform(admin.unsafe(patch(path), Map.of("name", "x".repeat(65)))),
-                mvc.perform(admin.unsafe(post(path + "/members"), Map.of("userIds", fifty))))) {
+                mvc.perform(admin.unsafe(patch(path), Map.of("name", "Autre", "x", 1))))) {
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+        for (var invalid : List.of(
+                Map.entry(mvc.perform(admin.unsafe(patch(path), Map.of("name", "x".repeat(65)))), "name"),
+                Map.entry(mvc.perform(admin.unsafe(post(path + "/members"), Map.of("userIds", fifty))), "userIds"),
+                Map.entry(
+                        mvc.perform(admin.unsafe(
+                                post(path + "/members"), Map.of("userIds", List.of(member.id, member.id)))),
+                        "userIds"))) {
+            invalid.getKey()
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                    .andExpect(jsonPath("$.fields[0]").value(invalid.getValue()));
         }
         mvc.perform(admin.unsafe(post(path + "/members"), Map.of("userIds", fortyNine)))
                 .andExpect(status().isForbidden())

@@ -113,8 +113,8 @@ class ConversationTest {
     }
 
     @Test
-    @DisplayName("ADR 0039 (point 5) : un groupe vit avec un seul membre ; vide, il n'a plus d'administrateur")
-    void groupLivesWithOneMemberAndHasNoAdminWhenEmpty() {
+    @DisplayName("GRP-03, ADR 0039 (point 5) : un groupe vit avec un seul membre ; vide, il n'a plus d'administrateur")
+    void grp03GroupLivesWithOneMemberAndHasNoAdminWhenEmpty() {
         Conversation alone = group(small).depart(admin);
 
         assertThat(alone.admin()).contains(small);
@@ -125,8 +125,8 @@ class ConversationTest {
     }
 
     @Test
-    @DisplayName("ADR 0039 (point 3) : une directe refuse ajout, retrait, départ et renommage")
-    void directRefusesGroupActions() {
+    @DisplayName("GRP-01, ADR 0039 (point 3) : une directe refuse ajout, retrait, départ et renommage")
+    void grp01DirectRefusesGroupActions() {
         Conversation direct = Conversation.direct(ID, admin, small, T0);
 
         assertThat(direct.type()).isEqualTo(ConversationType.DIRECT);

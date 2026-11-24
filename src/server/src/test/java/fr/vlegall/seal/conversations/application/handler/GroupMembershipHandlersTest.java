@@ -69,6 +69,16 @@ class GroupMembershipHandlersTest {
     }
 
     @Test
+    @DisplayName(
+            "FRD-21, ADR 0039 (point 2) : un ajout mêlant un ami et un non-ami est refusé en entier, sans écriture")
+    void frd21MixedAdditionIsRefusedWhole() {
+        assertThatThrownBy(() -> add.admit(member, group, Set.of(membersFriend, adminsFriend)))
+                .isInstanceOf(ConversationException.NotFriends.class);
+        assertThat(store.byId.get(group).isActiveMember(membersFriend)).isFalse();
+        assertThat(store.byId.get(group).activeMembers()).hasSize(2);
+    }
+
+    @Test
     @DisplayName("FRD-21, GRP-03 : un arrivant doit être ami de celui qui l'ajoute")
     void frd21NewcomerMustBeAFriendOfTheCaller() {
         assertThatThrownBy(() -> add.admit(member, group, Set.of(adminsFriend)))
@@ -144,8 +154,8 @@ class GroupMembershipHandlersTest {
     }
 
     @Test
-    @DisplayName("ADR 0039 (point 3) : une directe refuse ajout, retrait, départ et renommage")
-    void directRefusesGroupActions() {
+    @DisplayName("GRP-01, ADR 0039 (point 3) : une directe refuse ajout, retrait, départ et renommage")
+    void grp01DirectRefusesGroupActions() {
         ConversationId pair = direct.open(admin, member).conversation().id();
 
         assertThatThrownBy(() -> add.admit(admin, pair, Set.of(adminsFriend)))
