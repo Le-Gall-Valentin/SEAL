@@ -8,7 +8,6 @@ import fr.vlegall.seal.conversations.domain.model.ConversationException;
 import fr.vlegall.seal.conversations.domain.model.ConversationId;
 import fr.vlegall.seal.conversations.domain.model.ConversationSummary;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
-import fr.vlegall.seal.conversations.domain.port.out.FriendshipPort;
 import java.time.Clock;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -18,24 +17,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class AddMembersHandler implements AddMembersUseCase {
 
     private final ConversationRepository conversations;
-    private final FriendshipPort friendships;
+    private final ActiveFriends friends;
     private final ConversationSummaries summaries;
     private final Clock clock;
 
     public AddMembersHandler(
-            ConversationRepository conversations,
-            FriendshipPort friendships,
-            ConversationSummaries summaries,
-            Clock clock) {
+            ConversationRepository conversations, ActiveFriends friends, ConversationSummaries summaries, Clock clock) {
         this.conversations = conversations;
-        this.friendships = friendships;
+        this.friends = friends;
         this.summaries = summaries;
         this.clock = clock;
     }
 
     /**
-     * GRP-03 : sous le verrou de la conversation, les arrivants (hors membres actifs, ignorés) doivent tous être amis de
-     * l'appelant (FRD-21) ; deux ajouts simultanés ne dépassent jamais 50 membres.
+     * GRP-03 : sous le verrou de la conversation, les membres actifs (appelant compris) sont ignorés avant le contrôle
+     * d'amitié (ADR 0039, point 3) ; les arrivants doivent tous être amis actifs de l'appelant (FRD-21). Deux ajouts
+     * simultanés ne dépassent jamais 50 membres.
      */
     @Override
     @Transactional
@@ -44,9 +41,7 @@ public class AddMembersHandler implements AddMembersUseCase {
         before.ensureGroup();
         Set<UserId> arriving =
                 newcomers.stream().filter(user -> !before.isActiveMember(user)).collect(Collectors.toSet());
-        if (!friendships.areAllFriends(caller, arriving)) {
-            throw new ConversationException.NotFriends();
-        }
+        friends.require(caller, arriving);
         Conversation after = before.join(caller, arriving, clock.instant());
         conversations.save(before, after, clock.instant());
         return summaries.of(caller, after);

@@ -182,6 +182,33 @@ class ConversationsIT {
     }
 
     @Test
+    @DisplayName("FRD-21, ADR 0039 (point 2) : un ami au compte inactif reçoit 403 NOT_FRIENDS partout, sans écriture")
+    void frd21InactiveFriendIsRefusedEverywhere() throws Exception {
+        TestAccount me = account("frim");
+        TestAccount friend = account("frif");
+        TestAccount gone = account("frig");
+        TestRelations.befriend(jdbc, me.id, friend.id);
+        TestRelations.befriend(jdbc, me.id, gone.id);
+        String path = CONVERSATIONS + "/" + groupOk(me, List.of(friend.id));
+        TestRelations.deactivate(jdbc, gone.id);
+
+        List<ResultActions> refusals = List.of(
+                direct(me, gone.id),
+                group(me, "Ski", List.of(friend.id, gone.id)),
+                mvc.perform(me.unsafe(post(path + "/members"), Map.of("userIds", List.of(gone.id)))));
+
+        for (ResultActions refusal : refusals) {
+            refusal.andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_FRIENDS"));
+        }
+        assertThat(jdbc.sql("SELECT count(*) FROM conversation_members WHERE user_id = ?")
+                        .param(gone.id)
+                        .query(Long.class)
+                        .single())
+                .isZero();
+    }
+
+    @Test
     @DisplayName(
             "GRP-03 : ajout par un membre, droits de l'administrateur, NOT_A_MEMBER, renommage, départ et successeur")
     void grp03GroupActions() throws Exception {

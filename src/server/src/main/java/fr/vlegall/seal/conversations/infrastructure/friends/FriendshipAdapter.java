@@ -17,11 +17,6 @@ public class FriendshipAdapter implements FriendshipPort {
     }
 
     @Override
-    public boolean areFriends(UserId a, UserId b) {
-        return friendships.areFriends(a, b);
-    }
-
-    @Override
     public boolean areAllFriends(UserId user, Collection<UserId> others) {
         return friendships.areAllFriends(user, others);
     }

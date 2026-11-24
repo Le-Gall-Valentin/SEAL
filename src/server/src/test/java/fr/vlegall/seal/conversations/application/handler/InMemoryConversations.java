@@ -124,13 +124,9 @@ final class InMemoryConversations {
     FriendshipPort friendshipPort() {
         return new FriendshipPort() {
             @Override
-            public boolean areFriends(UserId a, UserId b) {
-                return !a.equals(b) && friendships.contains(Set.of(a, b));
-            }
-
-            @Override
             public boolean areAllFriends(UserId user, Collection<UserId> others) {
-                return others.stream().allMatch(other -> areFriends(user, other));
+                return others.stream()
+                        .allMatch(other -> !user.equals(other) && friendships.contains(Set.of(user, other)));
             }
         };
     }
@@ -142,6 +138,10 @@ final class InMemoryConversations {
 
     ConversationActivityPort activity() {
         return (member, conversations) -> Map.of();
+    }
+
+    ActiveFriends activeFriends() {
+        return new ActiveFriends(friendshipPort(), directory());
     }
 
     ConversationSummaries summaries() {

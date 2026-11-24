@@ -20,11 +20,11 @@ class GroupMembershipHandlersTest {
 
     private final InMemoryConversations store = new InMemoryConversations();
     private final CreateGroupHandler groups =
-            new CreateGroupHandler(store.repository(), store.friendshipPort(), store.summaries(), store.clock);
+            new CreateGroupHandler(store.repository(), store.activeFriends(), store.summaries(), store.clock);
     private final OpenDirectConversationHandler direct = new OpenDirectConversationHandler(
-            store.repository(), store.friendshipPort(), store.summaries(), store.clock);
+            store.repository(), store.activeFriends(), store.summaries(), store.clock);
     private final AddMembersHandler add =
-            new AddMembersHandler(store.repository(), store.friendshipPort(), store.summaries(), store.clock);
+            new AddMembersHandler(store.repository(), store.activeFriends(), store.summaries(), store.clock);
     private final ExcludeMemberHandler exclude = new ExcludeMemberHandler(store.repository(), store.clock);
     private final LeaveConversationHandler leave = new LeaveConversationHandler(store.repository(), store.clock);
     private final RenameGroupHandler rename =
@@ -59,6 +59,16 @@ class GroupMembershipHandlersTest {
         assertThatThrownBy(() -> add.admit(member, group, Set.of(adminsFriend)))
                 .isInstanceOf(ConversationException.NotFriends.class);
         assertThat(get.get(admin, group).members()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("FRD-21, ADR 0039 (point 2) : un ami au compte inactif n'est pas ajouté")
+    void frd21InactiveFriendIsNotAdmitted() {
+        store.deactivate(adminsFriend);
+
+        assertThatThrownBy(() -> add.admit(admin, group, Set.of(adminsFriend)))
+                .isInstanceOf(ConversationException.NotFriends.class);
+        assertThat(store.byId.get(group).activeMembers()).hasSize(2);
     }
 
     @Test

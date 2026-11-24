@@ -16,9 +16,9 @@ class ConversationQueriesHandlerTest {
 
     private final InMemoryConversations store = new InMemoryConversations();
     private final CreateGroupHandler groups =
-            new CreateGroupHandler(store.repository(), store.friendshipPort(), store.summaries(), store.clock);
+            new CreateGroupHandler(store.repository(), store.activeFriends(), store.summaries(), store.clock);
     private final OpenDirectConversationHandler direct = new OpenDirectConversationHandler(
-            store.repository(), store.friendshipPort(), store.summaries(), store.clock);
+            store.repository(), store.activeFriends(), store.summaries(), store.clock);
     private final LeaveConversationHandler leave = new LeaveConversationHandler(store.repository(), store.clock);
     private final ListConversationsHandler list = new ListConversationsHandler(store.repository(), store.summaries());
     private final ConversationMembershipHandler membership = new ConversationMembershipHandler(store.repository());

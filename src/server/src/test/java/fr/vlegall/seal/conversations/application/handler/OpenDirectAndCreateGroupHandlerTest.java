@@ -20,9 +20,9 @@ class OpenDirectAndCreateGroupHandlerTest {
 
     private final InMemoryConversations store = new InMemoryConversations();
     private final OpenDirectConversationHandler direct = new OpenDirectConversationHandler(
-            store.repository(), store.friendshipPort(), store.summaries(), store.clock);
+            store.repository(), store.activeFriends(), store.summaries(), store.clock);
     private final CreateGroupHandler groups =
-            new CreateGroupHandler(store.repository(), store.friendshipPort(), store.summaries(), store.clock);
+            new CreateGroupHandler(store.repository(), store.activeFriends(), store.summaries(), store.clock);
     private final GetConversationHandler get = new GetConversationHandler(store.repository(), store.summaries());
     private final UserId me = store.person("moi");
     private final UserId friend = store.person("ami");
@@ -63,6 +63,17 @@ class OpenDirectAndCreateGroupHandlerTest {
         // FRD-11 : la directe d'un ancien ami reste lisible.
         assertThat(get.get(me, opened.conversation().id()).id())
                 .isEqualTo(opened.conversation().id());
+    }
+
+    @Test
+    @DisplayName("FRD-21, ADR 0039 (point 2) : un ami au compte inactif reçoit le même NOT_FRIENDS, sans écriture")
+    void frd21InactiveFriendIsRefusedLikeAStranger() {
+        store.deactivate(friend);
+
+        assertThatThrownBy(() -> direct.open(me, friend)).isInstanceOf(ConversationException.NotFriends.class);
+        assertThatThrownBy(() -> groups.create(me, "Ski", Set.of(friend, other)))
+                .isInstanceOf(ConversationException.NotFriends.class);
+        assertThat(store.byId).isEmpty();
     }
 
     @Test
