@@ -11,6 +11,7 @@ export {
   SENT_REQUESTS_KEY,
   useFriends,
   useReceivedRequests,
+  useReceivedRequestsRefresh,
   useSentRequests,
 } from './model/useFriendLists'
 export { RequestTime } from './ui/RequestTime'

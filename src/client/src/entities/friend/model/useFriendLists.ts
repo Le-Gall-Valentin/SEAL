@@ -1,4 +1,5 @@
-import { type QueryClient, useQuery } from '@tanstack/react-query'
+import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useActivityGatedInterval } from '@/shared/lib'
 import type { Page } from '../api/IFriendsApi'
 import { newestFirst, sortFriends } from './friends'
 import { useFriendsApi } from './friendsPort'
@@ -9,7 +10,7 @@ export const FRIENDS_KEY = ['friends', 'list'] as const
 export const RECEIVED_REQUESTS_KEY = ['friends', 'received'] as const
 export const SENT_REQUESTS_KEY = ['friends', 'sent'] as const
 
-/** ADR 0037 (point 2) : jusqu'à la WebSocket du lot 4, le compteur se relit toutes les 60 secondes. */
+/** ADR 0037 (points 2 et 11) : jusqu'à la WebSocket du lot 4, le compteur se relit toutes les 60 secondes. */
 const RECEIVED_REFRESH_MS = 60_000
 
 /** Garde-fou : 200 pages de 50, bien au-delà d'une liste d'amis réelle. */
@@ -48,15 +49,30 @@ export function useFriends() {
   })
 }
 
-/** FRD-04 : invitations reçues en attente, la plus récente d'abord, relues toutes les 60 secondes et au focus. */
+/**
+ * FRD-04 : invitations reçues en attente, la plus récente d'abord, relues au retour du focus (ADR 0037, point 2) ; la
+ * relecture périodique est celle de `useReceivedRequestsRefresh`.
+ */
 export function useReceivedRequests() {
   const api = useFriendsApi()
   return useQuery({
     queryKey: RECEIVED_REQUESTS_KEY,
     queryFn: async ({ signal }) =>
       newestFirst(await allPages((after) => api.receivedRequests(after, signal))),
-    refetchInterval: RECEIVED_REFRESH_MS,
+    refetchOnWindowFocus: true,
   })
+}
+
+/**
+ * FRD-04, ADR 0037 (point 11) : relit les invitations reçues toutes les 60 secondes, seulement si l'utilisateur a agi
+ * depuis l'échéance précédente, pour qu'une relecture ne prolonge pas une session inactive (AUTH-52). La coque la
+ * monte une fois pour tous les écrans.
+ */
+export function useReceivedRequestsRefresh(): void {
+  const client = useQueryClient()
+  useActivityGatedInterval(() => {
+    void client.refetchQueries({ queryKey: RECEIVED_REQUESTS_KEY, type: 'active' })
+  }, RECEIVED_REFRESH_MS)
 }
 
 /** Invitations envoyées en attente, la plus récente d'abord. */

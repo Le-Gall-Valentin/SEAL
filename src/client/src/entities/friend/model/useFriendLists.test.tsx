@@ -1,10 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { Friend, IFriendsApi, Page, ReceivedRequest } from '../api/IFriendsApi'
 import { FriendsApiProvider } from './friendsPort'
-import { RECEIVED_REQUESTS_KEY, useFriends, useReceivedRequests } from './useFriendLists'
+import { useFriends, useReceivedRequests, useReceivedRequestsRefresh } from './useFriendLists'
 
 const never = () => Promise.reject(new Error('non attendu'))
 const id = (n: number) => `0192f7a1-0000-7000-8000-${String(n).padStart(12, '0')}`
@@ -61,7 +61,7 @@ describe('entities/friend : listes complètes (ADR 0037, point 3)', () => {
     await expect.poll(() => result.current.isError).toBe(true)
   })
 
-  it('FRD-04, ADR 0037 (point 2) : les invitations reçues sont relues toutes les 60 secondes', async () => {
+  describe('FRD-04 : relecture des invitations reçues', () => {
     const received: ReceivedRequest = {
       id: id(9),
       userId: id(8),
@@ -69,14 +69,53 @@ describe('entities/friend : listes complètes (ADR 0037, point 3)', () => {
       displayName: 'Sarah',
       createdAt: new Date(0),
     }
-    const { client, wrapper: Wrapper } = wrapper({
-      receivedRequests: () => Promise.resolve({ items: [received], next: null }),
+    afterEach(() => {
+      vi.useRealTimers()
+      focusManager.setFocused(undefined)
     })
 
-    const { result } = await renderHook(() => useReceivedRequests(), { wrapper: Wrapper })
+    it('FRD-04, AUTH-52, ADR 0037 (point 11) : toutes les 60 s, seulement après une action de l’utilisateur', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+      let calls = 0
+      const { wrapper: Wrapper } = wrapper({
+        receivedRequests: () => {
+          calls += 1
+          return Promise.resolve({ items: [received], next: null })
+        },
+      })
+      const { result } = await renderHook(
+        () => {
+          useReceivedRequestsRefresh()
+          return useReceivedRequests()
+        },
+        { wrapper: Wrapper },
+      )
+      await expect.poll(() => result.current.data).toEqual([received])
+      expect(calls).toBe(1)
 
-    await expect.poll(() => result.current.data).toEqual([received])
-    const query = client.getQueryCache().find({ queryKey: RECEIVED_REQUESTS_KEY })
-    expect(query?.observers[0]?.options.refetchInterval).toBe(60_000)
+      vi.advanceTimersByTime(3 * 60_000)
+      expect(calls).toBe(1)
+
+      window.dispatchEvent(new Event('pointerdown'))
+      vi.advanceTimersByTime(60_000)
+      await expect.poll(() => calls).toBe(2)
+    })
+
+    it('FRD-04, ADR 0037 (point 2) : relues au retour du focus', async () => {
+      let calls = 0
+      const { wrapper: Wrapper } = wrapper({
+        receivedRequests: () => {
+          calls += 1
+          return Promise.resolve({ items: [received], next: null })
+        },
+      })
+      const { result } = await renderHook(() => useReceivedRequests(), { wrapper: Wrapper })
+      await expect.poll(() => result.current.data).toEqual([received])
+
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+
+      await expect.poll(() => calls).toBe(2)
+    })
   })
 })

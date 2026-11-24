@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { initialsOf } from '@/entities/account'
-import { useReceivedRequests } from '@/entities/friend'
+import { useReceivedRequests, useReceivedRequestsRefresh } from '@/entities/friend'
 import { useCurrentAccount } from '@/entities/session'
 import { ROUTES, settingsSectionOf } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
@@ -16,6 +16,8 @@ import { ConversationsIcon, FriendsIcon, SettingsIcon } from './icons'
  */
 export function AppShell() {
   const location = useLocation()
+  // FRD-04, ADR 0037 (point 11) : une seule relecture périodique des invitations, pour tous les écrans.
+  useReceivedRequestsRefresh()
   // Parametres-Telephone-Preferences : une sous-page des paramètres occupe tout l'écran, sans la barre du bas.
   const settingsSubpage =
     location.pathname === ROUTES.SETTINGS &&

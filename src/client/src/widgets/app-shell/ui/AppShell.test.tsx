@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { FriendsApiProvider, type ReceivedRequest } from '@/entities/friend'
@@ -28,7 +28,13 @@ function received(count: number): ReceivedRequest[] {
 
 const never = () => Promise.reject(new Error('non attendu'))
 
-async function renderAt(path: string, width: number, height: number, invitations = 0) {
+async function renderAt(
+  path: string,
+  width: number,
+  height: number,
+  invitations = 0,
+  onRead: () => void = () => undefined,
+) {
   await page.viewport(width, height)
   const router = createMemoryRouter(
     [
@@ -51,7 +57,10 @@ async function renderAt(path: string, width: number, height: number, invitations
           api={{
             friends: never,
             sentRequests: never,
-            receivedRequests: () => Promise.resolve({ items: received(invitations), next: null }),
+            receivedRequests: () => {
+              onRead()
+              return Promise.resolve({ items: received(invitations), next: null })
+            },
           }}
         >
           <RouterProvider router={router} />
@@ -128,6 +137,27 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
     const link = many.screen.getByRole('link', { name: 'Amis, 120 invitations' })
     await expect.element(link).toBeVisible()
     expect(link.element().textContent).toContain('99+')
+  })
+
+  it('FRD-04, AUTH-52, ADR 0037 (point 11) : la coque relit les invitations toutes les 60 s, seulement après une action', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      let reads = 0
+      const { screen } = await renderAt('/', 1440, 900, 1, () => {
+        reads += 1
+      })
+      await expect.element(screen.getByRole('link', { name: 'Amis, 1 invitation' })).toBeVisible()
+      const first = reads
+
+      vi.advanceTimersByTime(2 * 60_000)
+      expect(reads).toBe(first)
+
+      window.dispatchEvent(new KeyboardEvent('keydown'))
+      vi.advanceTimersByTime(60_000)
+      await expect.poll(() => reads).toBe(first + 1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('ACC-03, ADR 0038 : téléphone, barre du bas en trois colonnes ; aller aux paramètres', async () => {
