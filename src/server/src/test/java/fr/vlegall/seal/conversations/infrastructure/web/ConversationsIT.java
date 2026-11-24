@@ -288,6 +288,102 @@ class ConversationsIT {
     }
 
     @Test
+    @DisplayName(
+            "QA-05 : chaque route exige la session (401) et le jeton CSRF (403, sans écriture), puis atteint son handler")
+    void qa05EachRouteRequiresSessionAndCsrfThenReachesItsHandler() throws Exception {
+        ConversationsTestClient admin = account("qrad");
+        ConversationsTestClient member = account("qrme");
+        ConversationsTestClient stranger = account("qrst");
+        ConversationsTestClient.befriend(jdbc, admin, member);
+        String path = CONVERSATIONS + "/" + groupOk(admin, List.of(member.id));
+        AuthClient anonymous = new AuthClient(mvc, mail);
+        record Route(org.springframework.http.HttpMethod method, String path, Map<String, ?> body) {}
+        List<Route> unsafeRoutes = List.of(
+                new Route(
+                        org.springframework.http.HttpMethod.POST,
+                        CONVERSATIONS + "/direct",
+                        Map.of("userId", admin.id)),
+                new Route(
+                        org.springframework.http.HttpMethod.POST,
+                        CONVERSATIONS + "/group",
+                        Map.of("name", "Ski", "memberIds", List.of(admin.id))),
+                new Route(
+                        org.springframework.http.HttpMethod.POST,
+                        path + "/members",
+                        Map.of("userIds", List.of(admin.id))),
+                new Route(org.springframework.http.HttpMethod.DELETE, path + "/members/" + member.id, Map.of()),
+                new Route(org.springframework.http.HttpMethod.POST, path + "/leave", Map.of()),
+                new Route(org.springframework.http.HttpMethod.PATCH, path, Map.of("name", "Autre")));
+
+        for (String safe : List.of(CONVERSATIONS, path)) {
+            mvc.perform(anonymous.from(get(safe)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        }
+        mvc.perform(stranger.safe(get(CONVERSATIONS))).andExpect(status().isOk());
+        mvc.perform(stranger.safe(get(path))).andExpect(status().isNotFound());
+        for (Route route : unsafeRoutes) {
+            var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(
+                    route.method(), route.path());
+            mvc.perform(anonymous.unsafe(request, null, route.body()))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+            mvc.perform(admin.client
+                            .from(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(
+                                    route.method(), route.path()))
+                            .cookie(admin.session))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+            // Le matcher de la route existe : avec le jeton, un tiers atteint le handler, qui refuse avec son propre
+            // code.
+            var reached = mvc.perform(stranger.unsafe(
+                            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(
+                                    route.method(), route.path()),
+                            route.body()))
+                    .andReturn()
+                    .getResponse();
+            assertThat(reached.getStatus())
+                    .as(route.method() + " " + route.path())
+                    .isIn(403, 404);
+            assertThat(reached.getContentAsString())
+                    .as(route.method() + " " + route.path())
+                    .doesNotContain("\"FORBIDDEN\"");
+        }
+        JsonNode unchanged = read(admin, path);
+        assertThat(unchanged.get("name").asString()).isEqualTo("Ski du dimanche");
+        assertThat(unchanged.get("members")).hasSize(2);
+    }
+
+    @Test
+    @DisplayName(
+            "SEC-01 : champ inconnu, nom de 65 caractères, 50 identifiants refusés en 400 ; 49 passent la validation")
+    void sec01BodiesOfEveryRouteAreValidated() throws Exception {
+        ConversationsTestClient admin = account("vlad");
+        ConversationsTestClient member = account("vlme");
+        ConversationsTestClient.befriend(jdbc, admin, member);
+        String path = CONVERSATIONS + "/" + groupOk(admin, List.of(member.id));
+        List<UUID> fortyNine = new ArrayList<>();
+        for (int i = 0; i < 49; i++) {
+            fortyNine.add(UUID.randomUUID());
+        }
+        List<UUID> fifty = new ArrayList<>(fortyNine);
+        fifty.add(UUID.randomUUID());
+
+        for (ResultActions result : List.of(
+                mvc.perform(admin.unsafe(post(CONVERSATIONS + "/direct"), Map.of("userId", member.id, "x", 1))),
+                mvc.perform(admin.unsafe(post(path + "/members"), Map.of("userIds", List.of(member.id), "x", 1))),
+                mvc.perform(admin.unsafe(patch(path), Map.of("name", "Autre", "x", 1))),
+                mvc.perform(admin.unsafe(patch(path), Map.of("name", "x".repeat(65)))),
+                mvc.perform(admin.unsafe(post(path + "/members"), Map.of("userIds", fifty))))) {
+            result.andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+        mvc.perform(admin.unsafe(post(path + "/members"), Map.of("userIds", fortyNine)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("NOT_FRIENDS"));
+    }
+
+    @Test
     @DisplayName("SEC-01, ADR 0039 (point 1) : plus de 16 Kio sous /conversations répond 413 REQUEST_REJECTED")
     void sec01BodyAbove16KiBIsRejected() throws Exception {
         ConversationsTestClient me = account("bigm");
