@@ -35,6 +35,8 @@ public class CreateGroupHandler implements CreateGroupUseCase {
         friends.require(creator, memberIds);
         Conversation group = Conversation.group(conversations.nextId(), creator, groupName, memberIds, clock.instant());
         conversations.createGroup(group);
-        return summaries.of(creator, group);
+        // Relu tel que GET le rendra : ordre des membres et instants à la précision de la base.
+        return summaries.of(
+                creator, conversations.findForMember(group.id(), creator).orElseThrow());
     }
 }

@@ -204,6 +204,30 @@ class ConversationsIT {
     }
 
     @Test
+    @DisplayName("CNV-03, GRP-03 : la réponse d'une création ou d'un ajout est celle que GET rend ensuite")
+    void cnv03WriteResponsesMatchTheRead() throws Exception {
+        TestAccount me = account("rspm");
+        List<UUID> friends = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            TestAccount friend = account("rspf");
+            TestRelations.befriend(jdbc, me.id, friend.id);
+            friends.add(friend.id);
+        }
+        JsonNode created = AuthClient.body(group(me, "Ski", friends.subList(0, 4))
+                .andExpect(status().isCreated())
+                .andReturn());
+        String path = CONVERSATIONS + "/" + created.get("id").asString();
+        assertThat(created).isEqualTo(read(me, path));
+
+        JsonNode added = AuthClient.body(mvc.perform(
+                        me.unsafe(post(path + "/members"), Map.of("userIds", friends.subList(4, 7))))
+                .andExpect(status().isOk())
+                .andReturn());
+
+        assertThat(added).isEqualTo(read(me, path));
+    }
+
+    @Test
     @DisplayName("FRD-21, ADR 0039 (point 2) : un ami au compte inactif reçoit 403 NOT_FRIENDS partout, sans écriture")
     void frd21InactiveFriendIsRefusedEverywhere() throws Exception {
         TestAccount me = account("frim");

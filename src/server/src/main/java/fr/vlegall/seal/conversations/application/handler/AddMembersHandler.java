@@ -9,6 +9,7 @@ import fr.vlegall.seal.conversations.domain.model.ConversationId;
 import fr.vlegall.seal.conversations.domain.model.ConversationSummary;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,8 +43,9 @@ public class AddMembersHandler implements AddMembersUseCase {
         Set<UserId> arriving =
                 newcomers.stream().filter(user -> !before.isActiveMember(user)).collect(Collectors.toSet());
         friends.require(caller, arriving);
-        Conversation after = before.join(caller, arriving, clock.instant());
-        conversations.save(before, after, clock.instant());
-        return summaries.of(caller, after);
+        Instant at = clock.instant();
+        conversations.save(before, before.join(caller, arriving, at), at);
+        // Relu tel que GET le rendra : ordre des membres et instants à la précision de la base.
+        return summaries.of(caller, conversations.findForMember(id, caller).orElseThrow());
     }
 }
