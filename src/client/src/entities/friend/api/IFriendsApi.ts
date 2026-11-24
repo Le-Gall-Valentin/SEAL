@@ -1,11 +1,16 @@
 import type { Page } from '@/shared/lib'
 
-/** FRD-10 : un ami, vu par le compte de la session ; les statistiques d'interaction attendent le lot 4 (ADR 0037). */
+/**
+ * FRD-10 : un ami, vu par le compte de la session. Les statistiques d'interaction nourrissent l'affinité du sélecteur
+ * (FRD-20) ; elles valent `null` et 0 jusqu'aux messages du lot 4 (ADR 0037, point 4).
+ */
 export interface Friend {
   readonly userId: string
   readonly username: string
   readonly displayName: string
   readonly friendsSince: Date
+  readonly lastInteractionAt: Date | null
+  readonly interactionCount30d: number
 }
 
 /** Invitation reçue : l'émetteur a dévoilé son nom affiché en invitant (API-01, ADR 0037, point 9). */

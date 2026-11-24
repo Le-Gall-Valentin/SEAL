@@ -13,6 +13,8 @@ const friend = (displayName: string, username: string) => ({
   username,
   displayName,
   friendsSince: new Date('2026-11-01T00:00:00Z'),
+  lastInteractionAt: null,
+  interactionCount30d: 0,
 })
 
 /** Instants en heure locale : les jours se comptent dans le calendrier local (fuseau du poste). */

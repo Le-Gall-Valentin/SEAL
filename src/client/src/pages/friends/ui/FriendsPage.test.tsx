@@ -22,6 +22,8 @@ const friend = (n: number, displayName: string, username: string): Friend => ({
   username,
   displayName,
   friendsSince: new Date(0),
+  lastInteractionAt: null,
+  interactionCount30d: 0,
 })
 const FRIENDS = [
   friend(1, 'Thomas Lavoie', 'thomas.lavoie'),

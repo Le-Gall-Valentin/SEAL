@@ -47,7 +47,30 @@ describe('entities/friend : adaptateur des listes d’amis et d’invitations (1
       username: 'chloe.f',
       displayName: 'Chloé Fortin',
       friendsSince: new Date('2026-11-20T10:00:00.123Z'),
+      lastInteractionAt: null,
+      interactionCount30d: 0,
     })
+  })
+
+  it('FRD-20, ADR 0041 (point 9) : les statistiques d’interaction restent pour l’affinité du sélecteur', async () => {
+    request.mockResolvedValue({
+      items: [
+        {
+          userId: USER,
+          username: 'chloe.f',
+          displayName: 'Chloé Fortin',
+          friendsSince: '2026-11-20T10:00:00.123Z',
+          lastInteractionAt: '2026-11-23T08:30:00Z',
+          interactionCount30d: 4,
+        },
+      ],
+      next: null,
+    })
+
+    const page = await friendsApi.friends(null)
+
+    expect(page.items[0]?.lastInteractionAt).toEqual(new Date('2026-11-23T08:30:00Z'))
+    expect(page.items[0]?.interactionCount30d).toBe(4)
   })
 
   it('FRD-10, ADR 0037 (point 3) : le curseur reçu part en after, encodé', async () => {

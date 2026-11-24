@@ -10,7 +10,14 @@ const never = () => Promise.reject(new Error('non attendu'))
 const id = (n: number) => `0192f7a1-0000-7000-8000-${String(n).padStart(12, '0')}`
 
 function friend(n: number, displayName: string): Friend {
-  return { userId: id(n), username: `ami.${String(n)}`, displayName, friendsSince: new Date(0) }
+  return {
+    userId: id(n),
+    username: `ami.${String(n)}`,
+    displayName,
+    friendsSince: new Date(0),
+    lastInteractionAt: null,
+    interactionCount30d: 0,
+  }
 }
 
 function wrapper(

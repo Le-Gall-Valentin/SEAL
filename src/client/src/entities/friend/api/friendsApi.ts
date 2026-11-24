@@ -60,6 +60,8 @@ export const friendsApi: IFriendsApi = {
         username: dto.username,
         displayName: dto.displayName,
         friendsSince: new Date(dto.friendsSince),
+        lastInteractionAt: dto.lastInteractionAt === null ? null : new Date(dto.lastInteractionAt),
+        interactionCount30d: dto.interactionCount30d,
       })),
     }
   },
