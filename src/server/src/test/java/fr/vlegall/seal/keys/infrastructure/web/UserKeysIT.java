@@ -16,6 +16,7 @@ import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.MutableClock;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import fr.vlegall.seal.support.TestRelations;
 import jakarta.servlet.http.Cookie;
 import java.security.SecureRandom;
 import java.sql.Timestamp;
@@ -240,20 +241,6 @@ class UserKeysIT {
                 .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"));
     }
 
-    private void befriend(KeysTestClient a, KeysTestClient b) {
-        jdbc.sql("INSERT INTO friendships (user_low, user_high) VALUES (LEAST(:a, :b), GREATEST(:a, :b))")
-                .param("a", a.id)
-                .param("b", b.id)
-                .update();
-    }
-
-    private void unfriend(KeysTestClient a, KeysTestClient b) {
-        jdbc.sql("DELETE FROM friendships WHERE user_low = LEAST(:a, :b) AND user_high = GREATEST(:a, :b)")
-                .param("a", a.id)
-                .param("b", b.id)
-                .update();
-    }
-
     @Test
     @DisplayName("API-02 : un ami lit le certificat et les sous-clés valides du titulaire")
     void api02FriendReadsTheKeys() throws Exception {
@@ -261,7 +248,7 @@ class UserKeysIT {
         KeysTestClient owner = KeysTestClient.account(mvc, mail, "cles_titulaire");
         byte[] serial = owner.publishIdentity();
         byte[] ekId = publishSubkey(owner, serial);
-        befriend(reader, owner);
+        TestRelations.befriend(jdbc, reader.id, owner.id);
 
         JsonNode body = AuthClient.body(read(reader, owner.id)
                 .andExpect(status().isOk())
@@ -281,28 +268,12 @@ class UserKeysIT {
         KeysTestClient owner = KeysTestClient.account(mvc, mail, "cles_tit_groupe");
         KeysTestClient admin = KeysTestClient.account(mvc, mail, "cles_adm_groupe");
         owner.publishIdentity();
-        UUID group = jdbc.sql(
-                        "INSERT INTO conversations (type, name, created_by) VALUES ('GROUP', 'Ski', ?) RETURNING id")
-                .param(admin.id)
-                .query(UUID.class)
-                .single();
-        for (KeysTestClient member : List.of(admin, reader, owner)) {
-            jdbc.sql(
-                            "INSERT INTO conversation_members (conversation_id, user_id, role, joined_seq) VALUES (?, ?, ?, 0)")
-                    .param(group)
-                    .param(member.id)
-                    .param(member == admin ? "ADMIN" : "MEMBER")
-                    .update();
-        }
+        UUID group = TestRelations.group(jdbc, admin.id, reader.id, owner.id);
 
         read(reader, owner.id)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.certificate.subjectId").value(owner.id.toString()));
-        jdbc.sql(
-                        "UPDATE conversation_members SET left_at = now(), left_seq = 0 WHERE conversation_id = ? AND user_id = ?")
-                .param(group)
-                .param(reader.id)
-                .update();
+        TestRelations.leave(jdbc, group, reader.id);
         read(reader, owner.id)
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"));
@@ -316,10 +287,10 @@ class UserKeysIT {
         stranger.publishIdentity();
         KeysTestClient former = KeysTestClient.account(mvc, mail, "cles_ancien");
         former.publishIdentity();
-        befriend(reader, former);
-        unfriend(reader, former);
+        TestRelations.befriend(jdbc, reader.id, former.id);
+        TestRelations.unfriend(jdbc, reader.id, former.id);
         KeysTestClient uncertified = KeysTestClient.account(mvc, mail, "cles_sans_cert");
-        befriend(reader, uncertified);
+        TestRelations.befriend(jdbc, reader.id, uncertified.id);
 
         List<String> bodies = new ArrayList<>();
         for (UUID owner : List.of(stranger.id, former.id, uncertified.id, UUID.randomUUID())) {

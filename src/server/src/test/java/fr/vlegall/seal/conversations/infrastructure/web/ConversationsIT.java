@@ -1,19 +1,22 @@
 package fr.vlegall.seal.conversations.infrastructure.web;
 
-import static fr.vlegall.seal.conversations.infrastructure.web.ConversationsTestClient.CONVERSATIONS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import fr.vlegall.seal.support.TestAccount;
+import fr.vlegall.seal.support.TestRelations;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -21,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -29,6 +33,8 @@ import tools.jackson.databind.JsonNode;
 /** CNV-01, CNV-03, CNV-04, CNV-06, GRP-01 à GRP-03, FRD-21, SEC-01, QA-05 : routes des conversations (ADR 0039). */
 @SealIntegrationTest
 class ConversationsIT {
+
+    private static final String CONVERSATIONS = "/api/v1/conversations";
 
     @Autowired
     private MockMvc mvc;
@@ -44,19 +50,19 @@ class ConversationsIT {
         mail.reset();
     }
 
-    private ConversationsTestClient account(String prefix) throws Exception {
-        return ConversationsTestClient.fresh(mvc, mail, prefix);
+    private TestAccount account(String prefix) throws Exception {
+        return TestAccount.fresh(mvc, mail, prefix);
     }
 
-    private ResultActions direct(ConversationsTestClient caller, UUID other) throws Exception {
+    private ResultActions direct(TestAccount caller, UUID other) throws Exception {
         return mvc.perform(caller.unsafe(post(CONVERSATIONS + "/direct"), Map.of("userId", other)));
     }
 
-    private ResultActions group(ConversationsTestClient caller, String name, List<UUID> members) throws Exception {
+    private ResultActions group(TestAccount caller, String name, List<UUID> members) throws Exception {
         return mvc.perform(caller.unsafe(post(CONVERSATIONS + "/group"), Map.of("name", name, "memberIds", members)));
     }
 
-    private String groupOk(ConversationsTestClient caller, List<UUID> members) throws Exception {
+    private String groupOk(TestAccount caller, List<UUID> members) throws Exception {
         return AuthClient.body(group(caller, "Ski du dimanche", members)
                         .andExpect(status().isCreated())
                         .andReturn())
@@ -64,7 +70,7 @@ class ConversationsIT {
                 .asString();
     }
 
-    private JsonNode read(ConversationsTestClient caller, String path) throws Exception {
+    private JsonNode read(TestAccount caller, String path) throws Exception {
         return AuthClient.body(
                 mvc.perform(caller.safe(get(path))).andExpect(status().isOk()).andReturn());
     }
@@ -72,9 +78,9 @@ class ConversationsIT {
     @Test
     @DisplayName("CNV-01 : 201 et created true à la création, puis 200 et created false, dans l'autre sens")
     void cnv01DirectIsCreatedThenFound() throws Exception {
-        ConversationsTestClient me = account("cnvd");
-        ConversationsTestClient friend = account("cnvf");
-        ConversationsTestClient.befriend(jdbc, me, friend);
+        TestAccount me = account("cnvd");
+        TestAccount friend = account("cnvf");
+        TestRelations.befriend(jdbc, me.id, friend.id);
 
         JsonNode created = AuthClient.body(
                 direct(me, friend.id).andExpect(status().isCreated()).andReturn());
@@ -100,9 +106,9 @@ class ConversationsIT {
     @DisplayName(
             "FRD-21, ADR 0039 (point 2) : non-ami, soi-même, ancien ami : 403 NOT_FRIENDS ; la directe reste lisible")
     void frd21NonFriendsAreRefusedAlike() throws Exception {
-        ConversationsTestClient me = account("frdm");
-        ConversationsTestClient friend = account("frdf");
-        ConversationsTestClient.befriend(jdbc, me, friend);
+        TestAccount me = account("frdm");
+        TestAccount friend = account("frdf");
+        TestRelations.befriend(jdbc, me.id, friend.id);
         String id = AuthClient.body(direct(me, friend.id).andReturn())
                 .get("conversation")
                 .get("id")
@@ -123,11 +129,11 @@ class ConversationsIT {
     @DisplayName(
             "CNV-03, GRP-02 : groupe d'amis créé (201) ; un non-ami, un doublon, un nom ou une liste hors bornes refusés")
     void cnv03GroupCreationAndRefusals() throws Exception {
-        ConversationsTestClient me = account("grpm");
-        ConversationsTestClient a = account("grpa");
-        ConversationsTestClient b = account("grpb");
-        ConversationsTestClient.befriend(jdbc, me, a);
-        ConversationsTestClient.befriend(jdbc, me, b);
+        TestAccount me = account("grpm");
+        TestAccount a = account("grpa");
+        TestAccount b = account("grpb");
+        TestRelations.befriend(jdbc, me.id, a.id);
+        TestRelations.befriend(jdbc, me.id, b.id);
 
         JsonNode created = AuthClient.body(group(me, "Ski du dimanche", List.of(a.id, b.id))
                 .andExpect(status().isCreated())
@@ -153,13 +159,13 @@ class ConversationsIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         group(me, "Ski", List.of()).andExpect(status().isBadRequest());
-        java.util.Map<String, Object> nullList = new java.util.HashMap<>();
+        Map<String, Object> nullList = new HashMap<>();
         nullList.put("name", "Ski");
         nullList.put("memberIds", null);
         mvc.perform(me.unsafe(post(CONVERSATIONS + "/group"), nullList))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
-        java.util.List<UUID> withNull = new java.util.ArrayList<>();
+        List<UUID> withNull = new ArrayList<>();
         withNull.add(null);
         mvc.perform(me.unsafe(post(CONVERSATIONS + "/group"), Map.of("name", "Ski", "memberIds", withNull)))
                 .andExpect(status().isBadRequest())
@@ -179,11 +185,11 @@ class ConversationsIT {
     @DisplayName(
             "GRP-03 : ajout par un membre, droits de l'administrateur, NOT_A_MEMBER, renommage, départ et successeur")
     void grp03GroupActions() throws Exception {
-        ConversationsTestClient admin = account("grad");
-        ConversationsTestClient member = account("grme");
-        ConversationsTestClient newcomer = account("grne");
-        ConversationsTestClient.befriend(jdbc, admin, member);
-        ConversationsTestClient.befriend(jdbc, member, newcomer);
+        TestAccount admin = account("grad");
+        TestAccount member = account("grme");
+        TestAccount newcomer = account("grne");
+        TestRelations.befriend(jdbc, admin.id, member.id);
+        TestRelations.befriend(jdbc, member.id, newcomer.id);
         String id = groupOk(admin, List.of(member.id));
         String path = CONVERSATIONS + "/" + id;
 
@@ -213,10 +219,10 @@ class ConversationsIT {
     @DisplayName(
             "CNV-06, ADR 0039 (point 3) : un non-membre reçoit 404 partout ; une directe refuse les actions de groupe")
     void cnv06NonMembersGetNotFoundAndDirectRefusesGroupActions() throws Exception {
-        ConversationsTestClient admin = account("nmad");
-        ConversationsTestClient member = account("nmme");
-        ConversationsTestClient stranger = account("nmst");
-        ConversationsTestClient.befriend(jdbc, admin, member);
+        TestAccount admin = account("nmad");
+        TestAccount member = account("nmme");
+        TestAccount stranger = account("nmst");
+        TestRelations.befriend(jdbc, admin.id, member.id);
         String path = CONVERSATIONS + "/" + groupOk(admin, List.of(member.id));
 
         for (ResultActions result : List.of(
@@ -242,9 +248,9 @@ class ConversationsIT {
     @Test
     @DisplayName("CNV-04 : liste paginée par identifiant ; limit hors de 1 à 50 ou after mal formé : 400")
     void cnv04ListIsPaginated() throws Exception {
-        ConversationsTestClient me = account("lstm");
-        ConversationsTestClient friend = account("lstf");
-        ConversationsTestClient.befriend(jdbc, me, friend);
+        TestAccount me = account("lstm");
+        TestAccount friend = account("lstf");
+        TestRelations.befriend(jdbc, me.id, friend.id);
         String first = groupOk(me, List.of(friend.id));
         String second = groupOk(me, List.of(friend.id));
 
@@ -266,9 +272,9 @@ class ConversationsIT {
     @DisplayName(
             "QA-05 : 401 sans session, 403 sans jeton CSRF ; méthode hors de 14.5 et historique refusés par défaut")
     void qa05AccessControl() throws Exception {
-        ConversationsTestClient me = account("qacm");
-        ConversationsTestClient friend = account("qacf");
-        ConversationsTestClient.befriend(jdbc, me, friend);
+        TestAccount me = account("qacm");
+        TestAccount friend = account("qacf");
+        TestRelations.befriend(jdbc, me.id, friend.id);
         String path = CONVERSATIONS + "/" + groupOk(me, List.of(friend.id));
         AuthClient anonymous = new AuthClient(mvc, mail);
 
@@ -291,29 +297,23 @@ class ConversationsIT {
     @DisplayName(
             "QA-05 : chaque route exige la session (401) et le jeton CSRF (403, sans écriture), puis atteint son handler")
     void qa05EachRouteRequiresSessionAndCsrfThenReachesItsHandler() throws Exception {
-        ConversationsTestClient admin = account("qrad");
-        ConversationsTestClient member = account("qrme");
-        ConversationsTestClient stranger = account("qrst");
-        ConversationsTestClient.befriend(jdbc, admin, member);
+        TestAccount admin = account("qrad");
+        TestAccount member = account("qrme");
+        TestAccount stranger = account("qrst");
+        TestRelations.befriend(jdbc, admin.id, member.id);
         String path = CONVERSATIONS + "/" + groupOk(admin, List.of(member.id));
         AuthClient anonymous = new AuthClient(mvc, mail);
-        record Route(org.springframework.http.HttpMethod method, String path, Map<String, ?> body) {}
+        record Route(HttpMethod method, String path, Map<String, ?> body) {}
         List<Route> unsafeRoutes = List.of(
+                new Route(HttpMethod.POST, CONVERSATIONS + "/direct", Map.of("userId", admin.id)),
                 new Route(
-                        org.springframework.http.HttpMethod.POST,
-                        CONVERSATIONS + "/direct",
-                        Map.of("userId", admin.id)),
-                new Route(
-                        org.springframework.http.HttpMethod.POST,
+                        HttpMethod.POST,
                         CONVERSATIONS + "/group",
                         Map.of("name", "Ski", "memberIds", List.of(admin.id))),
-                new Route(
-                        org.springframework.http.HttpMethod.POST,
-                        path + "/members",
-                        Map.of("userIds", List.of(admin.id))),
-                new Route(org.springframework.http.HttpMethod.DELETE, path + "/members/" + member.id, Map.of()),
-                new Route(org.springframework.http.HttpMethod.POST, path + "/leave", Map.of()),
-                new Route(org.springframework.http.HttpMethod.PATCH, path, Map.of("name", "Autre")));
+                new Route(HttpMethod.POST, path + "/members", Map.of("userIds", List.of(admin.id))),
+                new Route(HttpMethod.DELETE, path + "/members/" + member.id, Map.of()),
+                new Route(HttpMethod.POST, path + "/leave", Map.of()),
+                new Route(HttpMethod.PATCH, path, Map.of("name", "Autre")));
 
         for (String safe : List.of(CONVERSATIONS, path)) {
             mvc.perform(anonymous.from(get(safe)))
@@ -323,23 +323,16 @@ class ConversationsIT {
         mvc.perform(stranger.safe(get(CONVERSATIONS))).andExpect(status().isOk());
         mvc.perform(stranger.safe(get(path))).andExpect(status().isNotFound());
         for (Route route : unsafeRoutes) {
-            var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(
-                    route.method(), route.path());
-            mvc.perform(anonymous.unsafe(request, null, route.body()))
+            var anonymousRequest = request(route.method(), route.path());
+            mvc.perform(anonymous.unsafe(anonymousRequest, null, route.body()))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
-            mvc.perform(admin.client
-                            .from(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(
-                                    route.method(), route.path()))
-                            .cookie(admin.session))
+            mvc.perform(admin.client.from(request(route.method(), route.path())).cookie(admin.session))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("FORBIDDEN"));
             // Le matcher de la route existe : avec le jeton, un tiers atteint le handler, qui refuse avec son propre
             // code.
-            var reached = mvc.perform(stranger.unsafe(
-                            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(
-                                    route.method(), route.path()),
-                            route.body()))
+            var reached = mvc.perform(stranger.unsafe(request(route.method(), route.path()), route.body()))
                     .andReturn()
                     .getResponse();
             assertThat(reached.getStatus())
@@ -358,9 +351,9 @@ class ConversationsIT {
     @DisplayName(
             "SEC-01 : champ inconnu, nom de 65 caractères, 50 identifiants refusés en 400 ; 49 passent la validation")
     void sec01BodiesOfEveryRouteAreValidated() throws Exception {
-        ConversationsTestClient admin = account("vlad");
-        ConversationsTestClient member = account("vlme");
-        ConversationsTestClient.befriend(jdbc, admin, member);
+        TestAccount admin = account("vlad");
+        TestAccount member = account("vlme");
+        TestRelations.befriend(jdbc, admin.id, member.id);
         String path = CONVERSATIONS + "/" + groupOk(admin, List.of(member.id));
         List<UUID> fortyNine = new ArrayList<>();
         for (int i = 0; i < 49; i++) {
@@ -386,7 +379,7 @@ class ConversationsIT {
     @Test
     @DisplayName("SEC-01, ADR 0039 (point 1) : plus de 16 Kio sous /conversations répond 413 REQUEST_REJECTED")
     void sec01BodyAbove16KiBIsRejected() throws Exception {
-        ConversationsTestClient me = account("bigm");
+        TestAccount me = account("bigm");
 
         mvc.perform(me.unsafe(
                         post(CONVERSATIONS + "/group"), Map.of("name", "x".repeat(17 * 1024), "memberIds", List.of())))

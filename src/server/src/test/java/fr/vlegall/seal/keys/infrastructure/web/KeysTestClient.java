@@ -11,12 +11,14 @@ import fr.vlegall.seal.keys.domain.model.ProofOfPossession;
 import fr.vlegall.seal.keys.domain.model.SubkeyBinding;
 import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.RecordingMailSender;
+import fr.vlegall.seal.support.TestAccount;
 import jakarta.servlet.http.Cookie;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -39,25 +41,26 @@ final class KeysTestClient {
     final Ed25519.GeneratedKey ik;
 
     private final MockMvc mvc;
+    private final TestAccount account;
 
-    private KeysTestClient(MockMvc mvc, AuthClient client, UUID id, Cookie session, Ed25519.GeneratedKey ik) {
+    private KeysTestClient(MockMvc mvc, TestAccount account, Ed25519.GeneratedKey ik) {
         this.mvc = mvc;
-        this.client = client;
-        this.id = id;
-        this.session = session;
+        this.account = account;
+        this.client = account.client;
+        this.id = account.id;
+        this.session = account.session;
         this.ik = ik;
     }
 
     /** Compte inscrit et vérifié, en session complète, sans clé publiée. */
     static KeysTestClient account(MockMvc mvc, RecordingMailSender mail, String name) throws Exception {
-        AuthClient client = new AuthClient(mvc, mail);
-        AuthClient.Registered registered = client.register(name + "@exemple.ca", name);
-        return new KeysTestClient(mvc, client, registered.id(), client.verify(registered), Ed25519.generate());
+        return new KeysTestClient(mvc, TestAccount.register(mvc, mail, name), Ed25519.generate());
     }
 
     /** Requête non sûre de ce compte, jeton CSRF compris. */
-    MockHttpServletRequestBuilder unsafe(MockHttpServletRequestBuilder request, Map<String, ?> body) throws Exception {
-        return client.unsafe(request, session, body);
+    MockHttpServletRequestBuilder unsafe(MockHttpServletRequestBuilder request, @Nullable Map<String, ?> body)
+            throws Exception {
+        return account.unsafe(request, body);
     }
 
     /** KEY-03 : nouveau défi, qui remplace le précédent. */

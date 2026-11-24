@@ -12,6 +12,7 @@ import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import fr.vlegall.seal.support.TestRelations;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -229,7 +230,7 @@ class FriendRequestTransitionsIT {
         FriendsTestClient sender = account("ina");
         FriendsTestClient receiver = account("inr");
         UUID request = sender.inviteOk(receiver);
-        FriendsTestClient.deactivate(jdbc, sender.id);
+        TestRelations.deactivate(jdbc, sender.id);
 
         assertNotFound(as(receiver, accept(request)));
         assertNotFound(as(receiver, decline(request)));
@@ -242,7 +243,7 @@ class FriendRequestTransitionsIT {
         FriendsTestClient sender = account("rvi");
         FriendsTestClient receiver = account("rvd");
         UUID request = sender.inviteOk(receiver);
-        FriendsTestClient.deactivate(jdbc, receiver.id);
+        TestRelations.deactivate(jdbc, receiver.id);
 
         assertNotFound(as(sender, revoke(request)));
         assertThat(statusOf(request)).isEqualTo("PENDING");

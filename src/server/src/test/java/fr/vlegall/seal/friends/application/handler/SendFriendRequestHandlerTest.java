@@ -84,7 +84,7 @@ class SendFriendRequestHandlerTest {
             }
 
             @Override
-            public int countAmong(UserId user, java.util.Collection<UserId> others) {
+            public int countAmong(UserId user, Collection<UserId> others) {
                 throw new UnsupportedOperationException();
             }
         };

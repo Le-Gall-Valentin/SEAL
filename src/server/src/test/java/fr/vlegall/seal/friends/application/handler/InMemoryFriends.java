@@ -37,7 +37,7 @@ final class InMemoryFriends {
     static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
     /** Ordre des {@code uuid} de PostgreSQL, celui des paires appliqué aux identifiants d'invitation. */
-    private static final Comparator<UUID> UUID_ORDER = Comparator.comparing(UserId::new, UserPair.POSTGRES_ORDER);
+    private static final Comparator<UUID> UUID_ORDER = Comparator.comparing(UserId::new, UserId.POSTGRES_ORDER);
 
     final List<String> calls = new ArrayList<>();
     final List<String> events = new ArrayList<>();
@@ -156,9 +156,9 @@ final class InMemoryFriends {
                         .filter(e -> e.getKey().low().equals(user)
                                 || e.getKey().high().equals(user))
                         .map(e -> new Friend(e.getKey().other(user), e.getValue()))
-                        .filter(f -> after.map(a -> UserPair.POSTGRES_ORDER.compare(f.user(), a) > 0)
+                        .filter(f -> after.map(a -> UserId.POSTGRES_ORDER.compare(f.user(), a) > 0)
                                 .orElse(true))
-                        .sorted(Comparator.comparing(Friend::user, UserPair.POSTGRES_ORDER))
+                        .sorted(Comparator.comparing(Friend::user, UserId.POSTGRES_ORDER))
                         .limit(limit)
                         .toList();
             }

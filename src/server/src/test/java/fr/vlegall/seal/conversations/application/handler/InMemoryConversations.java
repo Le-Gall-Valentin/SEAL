@@ -29,10 +29,8 @@ final class InMemoryConversations {
 
     static final Instant NOW = Instant.parse("2026-11-24T10:00:00Z");
 
-    /** Ordre des {@code uuid} de PostgreSQL : octets non signés. */
-    private static final Comparator<UUID> UUID_ORDER = Comparator.comparing(
-                    UUID::getMostSignificantBits, Long::compareUnsigned)
-            .thenComparing(UUID::getLeastSignificantBits, Long::compareUnsigned);
+    /** Ordre des {@code uuid} de PostgreSQL ({@link UserId#POSTGRES_ORDER}), appliqué aux identifiants de conversation. */
+    private static final Comparator<UUID> UUID_ORDER = Comparator.comparing(UserId::new, UserId.POSTGRES_ORDER);
 
     final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     final Map<ConversationId, Conversation> byId = new LinkedHashMap<>();

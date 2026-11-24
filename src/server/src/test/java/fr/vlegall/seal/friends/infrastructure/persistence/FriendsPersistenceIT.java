@@ -16,6 +16,7 @@ import fr.vlegall.seal.support.SealIntegrationTest;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -60,7 +61,7 @@ class FriendsPersistenceIT {
 
     private Optional<FriendRequest> lockPending(UUID id) {
         Optional<FriendRequest> locked = transactions.execute(status -> requests.lockPending(id));
-        return java.util.Objects.requireNonNull(locked);
+        return Objects.requireNonNull(locked);
     }
 
     /** Ordre des {@code uuid} de PostgreSQL : octets non signés. */
@@ -180,8 +181,8 @@ class FriendsPersistenceIT {
         assertThat(friendships.create(pair, NOW.plusSeconds(5))).isFalse();
         assertThat(friendships.exists(UserPair.of(b, a))).isTrue();
         // FRD-21 : combien de ces comptes sont amis de a, dans un sens ou l'autre, en une requête.
-        assertThat(friendships.countAmong(a, java.util.List.of(b, user(), a))).isEqualTo(1);
-        assertThat(friendships.countAmong(b, java.util.List.of(a))).isEqualTo(1);
+        assertThat(friendships.countAmong(a, List.of(b, user(), a))).isEqualTo(1);
+        assertThat(friendships.countAmong(b, List.of(a))).isEqualTo(1);
         assertThat(friendships.of(a, Optional.empty(), 10)).containsExactly(new Friend(b, NOW));
         assertThat(friendships.of(b, Optional.empty(), 10)).containsExactly(new Friend(a, NOW));
 
