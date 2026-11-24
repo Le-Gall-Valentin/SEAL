@@ -6,8 +6,8 @@ import fr.vlegall.seal.keys.domain.port.out.RelationPort;
 import org.springframework.stereotype.Component;
 
 /**
- * API-02, ADR 0039 (point 7) : demande la conversation commune au contexte {@code conversations}, par son port d'entrée
- * (ADR 0008, règle 7) ; seuls les membres actifs comptent.
+ * API-02, ADR 0039 (point 7) : demande le groupe commun au contexte {@code conversations}, par son port d'entrée (ADR
+ * 0008, règle 7) ; seuls les membres actifs d'un groupe comptent, une directe reposant sur l'amitié.
  */
 @Component
 public class ConversationRelationAdapter implements RelationPort {
@@ -20,6 +20,6 @@ public class ConversationRelationAdapter implements RelationPort {
 
     @Override
     public boolean related(UserId caller, UserId owner) {
-        return memberships.shareConversation(caller, owner);
+        return memberships.shareGroup(caller, owner);
     }
 }

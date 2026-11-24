@@ -214,15 +214,26 @@ class ConversationsPersistenceIT {
     }
 
     @Test
-    @DisplayName("API-02 : deux membres actifs d'une même conversation la partagent ; plus après un départ")
+    @DisplayName("API-02 : deux membres actifs d'un même groupe le partagent ; plus après un départ")
     void api02ActiveMembersShareAConversation() {
         UserId a = user();
         UserId b = user();
         Conversation created = group(a, b);
 
-        assertThat(conversations.shareActiveConversation(a, b)).isTrue();
-        assertThat(conversations.shareActiveConversation(a, user())).isFalse();
+        assertThat(conversations.shareActiveGroup(a, b)).isTrue();
+        assertThat(conversations.shareActiveGroup(a, user())).isFalse();
         conversations.save(created, created.depart(b), T1);
-        assertThat(conversations.shareActiveConversation(a, b)).isFalse();
+        assertThat(conversations.shareActiveGroup(a, b)).isFalse();
+    }
+
+    @Test
+    @DisplayName("API-02, ADR 0039 (point 7) : une conversation directe ne compte pas comme groupe commun")
+    void api02DirectConversationIsNotACommonGroup() {
+        UserId a = user();
+        UserId b = user();
+        conversations.createDirect(DirectKey.of(a, b), a, b, T0);
+
+        assertThat(conversations.shareActiveGroup(a, b)).isFalse();
+        assertThat(conversations.shareActiveGroup(b, a)).isFalse();
     }
 }

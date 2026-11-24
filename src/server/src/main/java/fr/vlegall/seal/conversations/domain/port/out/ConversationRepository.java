@@ -34,6 +34,6 @@ public interface ConversationRepository {
     /** CNV-04 : conversations où {@code member} est actif, après {@code after}, triées par identifiant. */
     List<Conversation> pageForMember(UserId member, Optional<ConversationId> after, int limit);
 
-    /** API-02 : vrai si les deux comptes sont membres actifs d'une même conversation. */
-    boolean shareActiveConversation(UserId a, UserId b);
+    /** API-02 : vrai si les deux comptes sont membres actifs d'un même groupe ; une directe ne compte pas. */
+    boolean shareActiveGroup(UserId a, UserId b);
 }

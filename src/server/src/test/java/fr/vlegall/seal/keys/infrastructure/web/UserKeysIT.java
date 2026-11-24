@@ -261,8 +261,7 @@ class UserKeysIT {
     }
 
     @Test
-    @DisplayName(
-            "API-02, ADR 0039 (point 7) : un membre actif d'une conversation commune lit les clés ; plus après son départ")
+    @DisplayName("API-02, ADR 0039 (point 7) : un membre actif d'un groupe commun lit les clés ; plus après son départ")
     void api02CommonMemberReadsTheKeysUntilLeaving() throws Exception {
         KeysTestClient reader = KeysTestClient.account(mvc, mail, "cles_membre");
         KeysTestClient owner = KeysTestClient.account(mvc, mail, "cles_tit_groupe");
@@ -274,6 +273,23 @@ class UserKeysIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.certificate.subjectId").value(owner.id.toString()));
         TestRelations.leave(jdbc, group, reader.id);
+        read(reader, owner.id)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("API-02, ADR 0039 (point 7) : un ancien ami qui garde leur conversation directe ne lit plus les clés")
+    void api02FormerFriendWithADirectGetsNotFound() throws Exception {
+        KeysTestClient reader = KeysTestClient.account(mvc, mail, "cles_ex_direct");
+        KeysTestClient owner = KeysTestClient.account(mvc, mail, "cles_tit_direct");
+        owner.publishIdentity();
+        TestRelations.befriend(jdbc, reader.id, owner.id);
+        TestRelations.direct(jdbc, reader.id, owner.id);
+        read(reader, owner.id).andExpect(status().isOk());
+
+        TestRelations.unfriend(jdbc, reader.id, owner.id);
+
         read(reader, owner.id)
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("KEY_NOT_FOUND"));

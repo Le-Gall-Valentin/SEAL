@@ -69,13 +69,16 @@ class ConversationQueriesHandlerTest {
     }
 
     @Test
-    @DisplayName("API-02, ADR 0039 (point 7) : deux membres actifs partagent une conversation ; un ancien membre non")
-    void api02ActiveMembersShareAConversation() {
+    @DisplayName(
+            "API-02, ADR 0039 (point 7) : deux membres actifs partagent un groupe ; ni un ancien membre ni une directe ne comptent")
+    void api02ActiveMembersShareAGroup() {
+        direct.open(me, friend);
+        assertThat(membership.shareGroup(me, friend)).isFalse();
         ConversationId group = groups.create(me, "Ski", Set.of(friend)).id();
 
-        assertThat(membership.shareConversation(me, friend)).isTrue();
-        assertThat(membership.shareConversation(me, other)).isFalse();
+        assertThat(membership.shareGroup(me, friend)).isTrue();
+        assertThat(membership.shareGroup(me, other)).isFalse();
         leave.leave(friend, group);
-        assertThat(membership.shareConversation(me, friend)).isFalse();
+        assertThat(membership.shareGroup(me, friend)).isFalse();
     }
 }

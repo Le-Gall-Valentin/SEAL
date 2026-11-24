@@ -3,6 +3,7 @@ package fr.vlegall.seal.conversations.application.handler;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.conversations.domain.model.Conversation;
 import fr.vlegall.seal.conversations.domain.model.ConversationId;
+import fr.vlegall.seal.conversations.domain.model.ConversationType;
 import fr.vlegall.seal.conversations.domain.model.DirectKey;
 import fr.vlegall.seal.conversations.domain.model.MemberProfile;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationActivityPort;
@@ -112,8 +113,10 @@ final class InMemoryConversations {
             }
 
             @Override
-            public boolean shareActiveConversation(UserId a, UserId b) {
-                return byId.values().stream().anyMatch(c -> c.isActiveMember(a) && c.isActiveMember(b));
+            public boolean shareActiveGroup(UserId a, UserId b) {
+                return byId.values().stream()
+                        .anyMatch(
+                                c -> c.type() == ConversationType.GROUP && c.isActiveMember(a) && c.isActiveMember(b));
             }
         };
     }

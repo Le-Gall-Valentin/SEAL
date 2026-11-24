@@ -149,9 +149,10 @@ public class ConversationRepositoryAdapter implements ConversationRepository {
     }
 
     @Override
-    public boolean shareActiveConversation(UserId a, UserId b) {
+    public boolean shareActiveGroup(UserId a, UserId b) {
         return jdbc.sql("SELECT EXISTS (SELECT 1 FROM conversation_members x JOIN conversation_members y"
-                        + " ON x.conversation_id = y.conversation_id WHERE x.user_id = :a AND y.user_id = :b"
+                        + " ON x.conversation_id = y.conversation_id JOIN conversations c ON c.id = x.conversation_id"
+                        + " WHERE x.user_id = :a AND y.user_id = :b AND c.type = 'GROUP'"
                         + " AND x.left_at IS NULL AND y.left_at IS NULL)")
                 .param("a", a.value())
                 .param("b", b.value())

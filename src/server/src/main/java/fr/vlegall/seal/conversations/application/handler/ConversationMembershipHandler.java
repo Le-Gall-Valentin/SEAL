@@ -15,10 +15,10 @@ public class ConversationMembershipHandler implements ConversationMembershipQuer
         this.conversations = conversations;
     }
 
-    /** API-02 : membres actifs d'une même conversation ; un ancien membre ne compte pas (ADR 0039, point 7). */
+    /** API-02 : membres actifs d'un même groupe ; ni un ancien membre ni une directe ne comptent (ADR 0039, point 7). */
     @Override
     @Transactional(readOnly = true)
-    public boolean shareConversation(UserId a, UserId b) {
-        return !a.equals(b) && conversations.shareActiveConversation(a, b);
+    public boolean shareGroup(UserId a, UserId b) {
+        return !a.equals(b) && conversations.shareActiveGroup(a, b);
     }
 }
