@@ -4,7 +4,7 @@ import fr.vlegall.seal.common.UserId;
 
 /**
  * API-02 : un lien qui autorise {@code caller} à lire les clés de {@code owner} : l'amitié (contexte {@code friends}) ou
- * une conversation commune (contexte {@code conversations}, ADR 0039, point 7). Un seul lien suffit.
+ * un groupe commun (contexte {@code conversations}, ADR 0039, point 7). Un seul lien suffit.
  */
 @FunctionalInterface
 public interface RelationPort {

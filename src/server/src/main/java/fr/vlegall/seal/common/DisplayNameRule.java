@@ -73,8 +73,9 @@ public final class DisplayNameRule {
      * (ADR 0040) tous les caractères de format sauf ZWNJ (U+200C, écritures persane et indiennes) et ZWJ (U+200D,
      * émojis composés) : les caractères de direction (U+061C, U+200E, U+200F, U+202A à U+202E, U+2066 à U+2069), qui
      * pourraient faire lire un nom à l'envers, mais aussi U+200B, U+2060, U+FEFF, U+00AD et les étiquettes, qui ne
-     * s'affichent pas ; et l'usage privé, dont l'affichage dépend de la police. Un nom ne peut ainsi pas en imiter un
-     * autre par un caractère invisible.
+     * s'affichent pas ; et l'usage privé, dont l'affichage dépend de la police. Restent permis, comme le veut l'ADR
+     * 0040, les marques combinantes (sélecteurs de variation des émojis, U+034F) et les caractères de remplissage au
+     * milieu d'un nom : ni le nom affiché ni le nom d'un groupe ne sont uniques, l'identifiant départage les comptes.
      */
     public static boolean isForbidden(int c) {
         return switch (Character.getType(c)) {
