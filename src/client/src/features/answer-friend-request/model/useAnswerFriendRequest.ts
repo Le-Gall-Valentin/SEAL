@@ -1,13 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { invalidateFriends } from '@/entities/friend'
+import { type AcceptResult, invalidateFriends } from '@/entities/friend'
 import { failureOf, type FormFailure, isFormFailure, useSubmitGuard } from '@/shared/lib'
 import { useAnswerFriendRequestApi } from './answerFriendRequestPort'
 
 type Action = 'accept' | 'decline' | 'revoke'
-
-/** Issue d'une acceptation demandée par le formulaire d'invitation. */
-export type AcceptResult = { readonly kind: 'accepted' } | { readonly kind: 'gone' } | FormFailure
 
 /**
  * Section 10.1 : accepter, refuser, révoquer. Après chaque réponse, les listes et le compteur sont relus (ADR 0037,

@@ -1,14 +1,14 @@
 import { useEffect, useId, useRef } from 'react'
-import type { IncomingAcceptResult } from './AddFriendForm'
 import { useMessages } from '@/shared/i18n'
 import { sendFriendRequestMessages } from '../i18n'
+import type { AcceptResult } from '@/entities/friend'
 import { AddFriendForm } from './AddFriendForm'
 import { CloseIcon } from './icons'
 
 interface AddFriendSheetProps {
   readonly open: boolean
   readonly onClose: () => void
-  readonly onAccept: (requestId: string) => Promise<IncomingAcceptResult>
+  readonly onAccept: (requestId: string) => Promise<AcceptResult>
   /** ADR 0038 (point 9) : une réponse de ligne est en cours. */
   readonly answering?: boolean | undefined
 }

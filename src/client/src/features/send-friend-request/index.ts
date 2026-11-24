@@ -2,6 +2,6 @@
 export type { ISendFriendRequestApi } from './api/ISendFriendRequestApi'
 export { sendFriendRequestApi } from './api/sendFriendRequestApi'
 export { SendFriendRequestApiProvider } from './model/sendFriendRequestPort'
-export { AddFriendForm, type IncomingAcceptResult } from './ui/AddFriendForm'
+export { AddFriendForm } from './ui/AddFriendForm'
 export { AddFriendSheet } from './ui/AddFriendSheet'
 export { PersonPlusIcon } from './ui/icons'

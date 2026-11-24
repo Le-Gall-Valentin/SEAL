@@ -73,3 +73,10 @@
   --font-sans: var(--sans);
   --font-mono: var(--mono);
 }
+
+/* ADR 0038 (point 9) : la maquette n'a pas la croix native d'un champ de recherche, que Chromium dessine en bleu. */
+@layer base {
+  input[type='search']::-webkit-search-cancel-button {
+    appearance: none;
+  }
+}

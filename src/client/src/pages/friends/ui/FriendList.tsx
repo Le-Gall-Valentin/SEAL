@@ -15,6 +15,8 @@ interface FriendListProps {
 }
 
 const CARD = 'rounded-[18px] bg-surface inset-ring inset-ring-line'
+/** SEC-01 : saisie de recherche bornée, comme celle d'un identifiant à inviter (ADR 0037, point 6). */
+const SEARCH_MAX_LENGTH = 64
 // ADR 0038 (point 9) : cartes d'Etats, « Amis · compte neuf » et « Conversations · recherche ».
 const STATE = 'flex flex-col items-center px-5.5 pt-5.5 pb-6 text-center'
 const STATE_TITLE = 'm-0 mt-3 text-[18px] font-bold tracking-[-0.01em]'
@@ -52,7 +54,7 @@ export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
           <SearchIcon />
           <input
             type="search"
-            maxLength={64}
+            maxLength={SEARCH_MAX_LENGTH}
             aria-label={t('search')}
             placeholder={t('search')}
             value={query}

@@ -3,7 +3,6 @@ export { AVATAR_TINTS } from './avatar'
 export type { AvatarTint } from './avatar'
 export {
   FRIENDS_INVITATIONS,
-  FRIENDS_TAB_PARAM,
   friendsTabOf,
   ROUTES,
   SETTINGS_ACCOUNT,

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useMessages } from '@/shared/i18n'
 import { FRIENDS_INVITATIONS, type FriendsTab, ROUTES } from '@/shared/config'
@@ -27,12 +28,16 @@ export function FriendsTabs({ tab, friendCount, receivedCount }: FriendsTabsProp
       </TabLink>
       <TabLink to={FRIENDS_INVITATIONS} current={tab === 'invitations'} label={t('tabInvitations')}>
         {receivedCount > 0 && (
-          <span
-            aria-label={pending}
-            className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-on-accent"
-          >
-            {receivedCount}
-          </span>
+          <>
+            <span
+              aria-hidden="true"
+              className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-on-accent"
+            >
+              {receivedCount}
+            </span>
+            {/* WAI-ARIA 1.2 : pas d'aria-label sur un span ; le nombre se dit en texte masqué. */}
+            <span className="sr-only"> {pending}</span>
+          </>
         )}
       </TabLink>
     </nav>
@@ -43,7 +48,7 @@ interface TabLinkProps {
   readonly to: string
   readonly current: boolean
   readonly label: string
-  readonly children: React.ReactNode
+  readonly children: ReactNode
 }
 
 function TabLink({ to, current, label, children }: TabLinkProps) {

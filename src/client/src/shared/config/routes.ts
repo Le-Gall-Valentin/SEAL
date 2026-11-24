@@ -32,7 +32,7 @@ export function settingsSectionOf(params: URLSearchParams): SettingsSection | nu
 export const SETTINGS_ACCOUNT = `/parametres?${SETTINGS_SECTION_PARAM}=compte`
 
 /** ADR 0038 (point 5) : onglet de l'écran Amis, `?onglet=invitations` ; absent, l'onglet Amis. */
-export const FRIENDS_TAB_PARAM = 'onglet'
+const FRIENDS_TAB_PARAM = 'onglet'
 
 export type FriendsTab = 'amis' | 'invitations'
 
@@ -40,4 +40,4 @@ export function friendsTabOf(params: URLSearchParams): FriendsTab {
   return params.get(FRIENDS_TAB_PARAM) === 'invitations' ? 'invitations' : 'amis'
 }
 
-export const FRIENDS_INVITATIONS = `/amis?${FRIENDS_TAB_PARAM}=invitations`
+export const FRIENDS_INVITATIONS = `${ROUTES.FRIENDS}?${FRIENDS_TAB_PARAM}=invitations`

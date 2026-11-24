@@ -1,20 +1,17 @@
-import { type Ref, useId, useState } from 'react'
+import { type Ref, useId } from 'react'
+import type { AcceptResult } from '@/entities/friend'
 import { useMessages } from '@/shared/i18n'
-import type { FormFailure } from '@/shared/lib'
 import { Alert, FieldError, FieldLabel, FormAlert, Notice } from '@/shared/ui'
 import { sendFriendRequestMessages } from '../i18n'
 import { INVITED_USERNAME_MAX_LENGTH } from '../model/invitedUsername'
+import { useIncomingAcceptance } from '../model/useIncomingAcceptance'
 import { type SendOutcome, useSendFriendRequest } from '../model/useSendFriendRequest'
 import { PersonPlusIcon } from './icons'
 import { UsernameInText } from './UsernameInText'
 
-/** Issue de l'acceptation demandée à la page après un 409 INCOMING_REQUEST_EXISTS. */
-export type IncomingAcceptResult =
-  { readonly kind: 'accepted' } | { readonly kind: 'gone' } | FormFailure
-
 interface AddFriendFormProps {
   /** FRD-01 : « Accepter l’invitation » après un 409 ; la page fournit l'acceptation et en rend l'issue. */
-  readonly onAccept: (requestId: string) => Promise<IncomingAcceptResult>
+  readonly onAccept: (requestId: string) => Promise<AcceptResult>
   /** Appelé quand l'invitation reçue est acceptée depuis le formulaire (la feuille se ferme). */
   readonly onAccepted?: (() => void) | undefined
   /** ADR 0038 (point 9) : une réponse de ligne est en cours ; « Accepter l’invitation » attend. */
@@ -37,39 +34,26 @@ export function AddFriendForm({
   const form = useSendFriendRequest()
   const id = useId()
   const errorId = `${id}-erreur`
-  const [accepting, setAccepting] = useState(false)
-  const [acceptIssue, setAcceptIssue] = useState<Exclude<
-    IncomingAcceptResult,
-    { kind: 'accepted' }
-  > | null>(null)
-  const accept = async (requestId: string) => {
-    if (accepting) {
-      return
-    }
-    setAccepting(true)
-    setAcceptIssue(null)
-    const result = await onAccept(requestId)
-    setAccepting(false)
-    // ADR 0038 (point 9) : acceptée, le champ se vide ; close ailleurs, le bloc 409 part ; un échec réseau ou 429 le
-    // garde pour réessayer.
-    if (result.kind === 'accepted') {
+  // ADR 0038 (point 9) : acceptée, le champ se vide ; close ailleurs, le bloc 409 part.
+  const acceptance = useIncomingAcceptance({
+    accept: onAccept,
+    onAccepted: () => {
       form.clearOutcome()
       form.setValue('')
       onAccepted?.()
-    } else {
-      if (result.kind === 'gone') {
-        form.clearOutcome()
-      }
-      setAcceptIssue(result)
-    }
-  }
+    },
+    onGone: () => {
+      form.clearOutcome()
+    },
+  })
+  const acceptIssue = acceptance.issue
   return (
     <form
       noValidate
       className="flex flex-col gap-3.5"
       onSubmit={(event) => {
         event.preventDefault()
-        setAcceptIssue(null)
+        acceptance.clearIssue()
         form.submit()
       }}
     >
@@ -111,10 +95,8 @@ export function AddFriendForm({
       <FieldError id={errorId} error={form.formatInvalid ? t('invalidUsername') : null} />
       <Outcome
         outcome={form.outcome}
-        onAccept={(requestId) => {
-          void accept(requestId)
-        }}
-        accepting={accepting || answering}
+        onAccept={acceptance.accept}
+        accepting={acceptance.accepting || answering}
       />
       {acceptIssue?.kind === 'gone' && (
         <Alert variant="error" spacing="loose">

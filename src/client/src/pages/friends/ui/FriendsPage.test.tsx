@@ -50,6 +50,13 @@ const SENT: SentRequest[] = [
 
 const never = () => Promise.reject(new Error('non attendu'))
 
+/** Règles de style d'une feuille, y compris celles des couches (@layer). */
+function cssRulesOf(sheet: CSSStyleSheet | CSSGroupingRule): CSSStyleRule[] {
+  return Array.from(sheet.cssRules).flatMap((rule) =>
+    rule instanceof CSSStyleRule ? [rule] : rule instanceof CSSGroupingRule ? cssRulesOf(rule) : [],
+  )
+}
+
 interface Fakes {
   readonly friends?: IFriendsApi['friends']
   readonly received?: readonly ReceivedRequest[]
@@ -104,7 +111,11 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await expect
       .element(tabs.getByRole('link', { name: /^Amis/ }))
       .toHaveAttribute('aria-current', 'page')
-    await expect.element(tabs.getByLabelText('2 invitations en attente')).toBeVisible()
+    await expect
+      .element(tabs.getByRole('link', { name: 'Invitations 2 invitations en attente' }))
+      .toBeVisible()
+    // WAI-ARIA 1.2 : aria-label est interdit sur un span générique ; le nombre se dit en texte masqué.
+    expect(tabs.element().querySelector('span[aria-label]')).toBeNull()
     await expect.element(screen.getByText('3 amis')).toBeVisible()
     const names = screen
       .getByRole('listitem')
@@ -144,6 +155,16 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
   it('ADR 0038 (point 6) : la recherche filtre sans diacritiques ; sans résultat, « Effacer la recherche »', async () => {
     const { screen } = await renderAt('/amis', 1440, 900)
 
+    // ADR 0038 (point 9) : pas de croix native de Chromium dans le champ, absente de la maquette.
+    // Chromium ne calcule pas le style de ce pseudo-élément : on vérifie la règle chargée par la page.
+    const rules = Array.from(document.styleSheets).flatMap((sheet) => cssRulesOf(sheet))
+    expect(
+      rules.some(
+        (rule) =>
+          rule.selectorText.includes('::-webkit-search-cancel-button') &&
+          rule.style.getPropertyValue('appearance') === 'none',
+      ),
+    ).toBe(true)
     await screen.getByRole('searchbox', { name: 'Rechercher un ami' }).fill('ines')
     await expect.poll(() => screen.getByRole('listitem').elements().length).toBe(1)
     await screen.getByRole('searchbox', { name: 'Rechercher un ami' }).fill('zzz')

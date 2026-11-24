@@ -1,3 +1,5 @@
+import { PersonGlyph } from '@/shared/ui'
+
 /** Personne et « + » du bouton d'envoi et du bouton d'ajout (Amis-Ordinateur, Amis-Telephone), 18 px. */
 export function PersonPlusIcon() {
   return (
@@ -12,8 +14,7 @@ export function PersonPlusIcon() {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <circle cx="9" cy="7.8" r="3.6" />
-      <path d="M2.5 20c.6-3.5 3.2-5.6 6.5-5.6s5.9 2.1 6.5 5.6" />
+      <PersonGlyph />
       <path d="M19 8v6M16 11h6" />
     </svg>
   )
