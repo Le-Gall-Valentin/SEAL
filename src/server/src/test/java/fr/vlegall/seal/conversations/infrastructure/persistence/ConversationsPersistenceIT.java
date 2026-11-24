@@ -154,6 +154,63 @@ class ConversationsPersistenceIT {
     }
 
     @Test
+    @DisplayName(
+            "GRP-03, CNV-07 : l'administrateur parti redevient MEMBER ; un arrivant n'a pas de non-lus d'avant lui")
+    void grp03DepartedAdminIsMemberAndNewcomerReadsFromArrival() {
+        UserId creator = user();
+        UserId b = user();
+        UserId c = user();
+        Conversation created = group(creator, b);
+        jdbc.sql("UPDATE conversations SET last_server_seq = 7 WHERE id = ?")
+                .param(created.id().value())
+                .update();
+        Conversation current = reload(created.id(), creator);
+        conversations.save(current, current.join(creator, Set.of(c), T1), T1);
+        Conversation withC = reload(created.id(), creator);
+
+        conversations.save(withC, withC.depart(creator), T2);
+
+        MemberRow departed = row(created.id(), creator);
+        assertThat(departed.role()).isEqualTo("MEMBER");
+        assertThat(departed.leftSeq()).isEqualTo(7L);
+        assertThat(row(created.id(), c).lastReadSeq()).isEqualTo(7);
+        assertThat(row(created.id(), c).joinedSeq()).isEqualTo(7);
+    }
+
+    @Test
+    @DisplayName("GRP-03 : un arrivant déjà actif, vu d'un état périmé, garde sa ligne")
+    void grp03StaleArrivalOfAnActiveMemberKeepsItsRow() {
+        UserId creator = user();
+        UserId b = user();
+        Conversation created = group(creator, b);
+        Conversation stale = created.depart(b);
+
+        conversations.save(stale, stale.join(creator, Set.of(b), T2), T2);
+
+        assertThat(reload(created.id(), b).activeMembers())
+                .filteredOn(m -> m.user().equals(b))
+                .singleElement()
+                .extracting(Member::joinedAt)
+                .isEqualTo(T0);
+    }
+
+    /** Ligne de {@code conversation_members}, lue telle quelle. */
+    private record MemberRow(String role, long joinedSeq, Long leftSeq, long lastReadSeq) {}
+
+    private MemberRow row(ConversationId id, UserId user) {
+        return jdbc.sql("SELECT role, joined_seq, left_seq, last_read_seq FROM conversation_members"
+                        + " WHERE conversation_id = ? AND user_id = ?")
+                .param(id.value())
+                .param(user.value())
+                .query((rs, n) -> new MemberRow(
+                        rs.getString("role"),
+                        rs.getLong("joined_seq"),
+                        rs.getObject("left_seq", Long.class),
+                        rs.getLong("last_read_seq")))
+                .single();
+    }
+
+    @Test
     @DisplayName("GRP-03 : la conversation verrouillée par une transaction attend la fin de celle-ci")
     void grp03LockedConversationWaitsForTheHolder() throws Exception {
         UserId creator = user();

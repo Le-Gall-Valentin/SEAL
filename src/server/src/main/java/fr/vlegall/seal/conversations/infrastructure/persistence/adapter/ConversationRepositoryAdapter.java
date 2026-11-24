@@ -52,12 +52,16 @@ public class ConversationRepositoryAdapter implements ConversationRepository {
             + " FROM conversation_members WHERE conversation_id IN (:ids) AND left_at IS NULL"
             + " ORDER BY joined_at, user_id";
 
-    /** GRP-03 : un ancien membre qui revient retrouve sa ligne, remise à neuf. */
+    /**
+     * GRP-03 : un arrivant lit à partir de son arrivée ({@code last_read_seq}, CNV-04) ; un ancien membre qui revient
+     * retrouve sa ligne, remise à neuf. Un membre encore actif garde la sienne, même vu d'un état périmé.
+     */
     private static final String JOIN = "INSERT INTO conversation_members"
-            + " (conversation_id, user_id, role, joined_at, joined_seq) VALUES (:id, :user, :role, :joinedAt, :seq)"
+            + " (conversation_id, user_id, role, joined_at, joined_seq, last_read_seq)"
+            + " VALUES (:id, :user, :role, :joinedAt, :seq, :seq)"
             + " ON CONFLICT (conversation_id, user_id) DO UPDATE SET role = EXCLUDED.role,"
             + " joined_at = EXCLUDED.joined_at, joined_seq = EXCLUDED.joined_seq, left_at = NULL, left_seq = NULL,"
-            + " last_read_seq = EXCLUDED.joined_seq";
+            + " last_read_seq = EXCLUDED.joined_seq WHERE conversation_members.left_at IS NOT NULL";
 
     private final JdbcClient jdbc;
 
@@ -186,8 +190,9 @@ public class ConversationRepositoryAdapter implements ConversationRepository {
                 .update();
     }
 
+    /** GRP-03 : la ligne quittée perd le rôle d'administrateur, que la succession a transmis. */
     private void depart(Conversation conversation, UserId user, Instant at) {
-        jdbc.sql("UPDATE conversation_members SET left_at = :at, left_seq = :seq"
+        jdbc.sql("UPDATE conversation_members SET left_at = :at, left_seq = :seq, role = 'MEMBER'"
                         + " WHERE conversation_id = :id AND user_id = :user AND left_at IS NULL")
                 .param("at", Timestamp.from(at))
                 .param("seq", conversation.lastServerSeq())
