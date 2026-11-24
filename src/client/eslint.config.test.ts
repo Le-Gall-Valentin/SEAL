@@ -137,6 +137,15 @@ describe('ADR 0012 : couches de Feature-Sliced Design', () => {
     await expectAllowed('src/features/sign-in/model/useSignIn.ts', '../api/signInRequest')
   })
 
+  it('QA-10 : seule l’interface importe shared/ui : une règle métier ne dépend pas d’un composant (ADR 0012)', async () => {
+    await expectRefused('src/features/sign-in/model/useSignIn.ts', '@/shared/ui')
+    await expectRefused('src/features/sign-in/api/signInRequest.ts', '@/shared/ui')
+    await expectRefused('src/features/sign-in/lib/format.ts', '@/shared/ui')
+    await expectRefused('src/features/sign-in/config/limits.ts', '@/shared/ui')
+    await expectRefused('src/shared/ws/socket.ts', '@/shared/ui')
+    await expectAllowed('src/features/sign-in/ui/Form.ts', '@/shared/ui')
+  })
+
   it('QA-10 : lib et config sont des feuilles : ui → lib → api ne contourne pas model', async () => {
     await expectRefused('src/features/sign-in/lib/format.ts', '../api/signInRequest')
     await expectRefused('src/features/sign-in/lib/format.ts', '../model/useSignIn')

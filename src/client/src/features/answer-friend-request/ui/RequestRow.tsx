@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { type AvatarTint, Avatar } from '@/shared/ui'
+import type { AvatarTint } from '@/shared/config'
+import { Avatar } from '@/shared/ui'
 
 interface RequestRowProps {
   readonly initials: string

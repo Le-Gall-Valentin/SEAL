@@ -1,5 +1,4 @@
-import type { AvatarTint } from '@/shared/ui'
-import { AVATAR_TINTS } from '@/shared/ui'
+import { AVATAR_TINTS, type AvatarTint } from '@/shared/config'
 import type { Friend } from '../api/IFriendsApi'
 
 const COLLATOR = new Intl.Collator('fr', { sensitivity: 'base' })

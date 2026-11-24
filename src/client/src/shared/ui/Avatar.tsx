@@ -1,7 +1,4 @@
-/** ADR 0038 (point 7) : les six teintes d'avatar de la maquette (Amis-Ordinateur). */
-export const AVATAR_TINTS = ['ice', 'moss', 'birch', 'heather', 'clay', 'lichen'] as const
-
-export type AvatarTint = (typeof AVATAR_TINTS)[number]
+import type { AvatarTint } from '@/shared/config'
 
 const TINT_CLASS: Record<AvatarTint, string> = {
   ice: 'bg-av-ice',

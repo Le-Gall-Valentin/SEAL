@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { Avatar, AVATAR_TINTS } from './Avatar'
+import { AVATAR_TINTS } from '@/shared/config'
+import { Avatar } from './Avatar'
 
 describe('ADR 0038 (point 7) : avatar à initiales, teintes de la maquette', () => {
   it('ADR 0038 : les initiales sont décoratives, à la taille demandée', async () => {
