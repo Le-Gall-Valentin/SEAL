@@ -21,6 +21,7 @@ export const friendsPageMessages = defineMessages({
     sent: 'Envoyées',
     noReceived: 'Aucune invitation reçue.',
     noSent: 'Aucune invitation envoyée.',
+    noMatchTitle: 'Aucun résultat',
     noMatch: 'Aucun ami ne correspond à « {query} ».',
     clearSearch: 'Effacer la recherche',
     emptyTitle: 'Pas encore d’amis',

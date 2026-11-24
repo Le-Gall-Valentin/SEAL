@@ -48,3 +48,21 @@ export function PersonMinusIcon() {
     </svg>
   )
 }
+
+/** Croix du bouton « Effacer la recherche » (Etats, « Conversations · recherche »). */
+export function ClearIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
+    </svg>
+  )
+}

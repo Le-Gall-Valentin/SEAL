@@ -106,6 +106,7 @@ const TEXT_ATTRIBUTES = new Set([
 const TECHNICAL_PROPS = new Set([
   'as',
   'autoComplete',
+  'border',
   'className',
   'dir',
   'heading',
@@ -120,6 +121,7 @@ const TECHNICAL_PROPS = new Set([
   'name',
   'rel',
   'role',
+  'spacing',
   'src',
   'target',
   'to',

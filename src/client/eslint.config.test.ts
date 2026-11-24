@@ -567,6 +567,8 @@ describe('ADR 0012, point 2 : puits XSS, styles en ligne et fuites, interdits pa
       '<LoadErrorState heading="h1" onRetry={() => undefined} />',
       '<LanguageProvider language="fr" />',
       '<Card variant="danger" aria-hidden="true" data-testid="carte" />',
+      '<Notice border="olive" />',
+      '<Alert spacing="loose" />',
     ]) {
       await expectPermitted(SHARED_UI, `export const B = () => ${jsx}\n`)
     }

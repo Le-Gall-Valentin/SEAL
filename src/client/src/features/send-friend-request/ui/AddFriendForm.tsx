@@ -78,7 +78,7 @@ export function AddFriendForm({
           className={`flex min-w-0 flex-col gap-1.5 ${variant === 'sheet' ? 'basis-full' : 'flex-[1_1_192px]'}`}
         >
           <FieldLabel htmlFor={id}>{t('username')}</FieldLabel>
-          <div className="flex h-11 items-center rounded-[10px] bg-surface px-3 inset-ring inset-ring-line-strong focus-within:ring-3 focus-within:ring-focus-glow focus-within:inset-ring-accent">
+          <div className="flex h-11 items-center gap-1.5 rounded-[10px] bg-surface px-3 inset-ring inset-ring-line-strong focus-within:ring-3 focus-within:ring-focus-glow focus-within:inset-ring-accent">
             <span aria-hidden="true" className="font-mono text-[15px] text-ink-3">
               @
             </span>
@@ -116,7 +116,11 @@ export function AddFriendForm({
         }}
         accepting={accepting || answering}
       />
-      {acceptIssue?.kind === 'gone' && <Alert variant="error">{t('gone')}</Alert>}
+      {acceptIssue?.kind === 'gone' && (
+        <Alert variant="error" spacing="loose">
+          {t('gone')}
+        </Alert>
+      )}
       <FormAlert
         failure={
           acceptIssue !== null && acceptIssue.kind !== 'gone' ? acceptIssue : form.formFailure
@@ -142,7 +146,7 @@ function Outcome({ outcome, onAccept, accepting }: OutcomeProps) {
     // Région toujours présente, pour qu'un lecteur d'écran annonce le texte qui y paraît.
     <div role="status" className="empty:hidden">
       {success && (
-        <Notice variant="success">
+        <Notice variant="success" border="olive">
           <span className="flex flex-col gap-1.5">
             <span>
               {outcome.kind === 'sent'
@@ -188,7 +192,9 @@ function Outcome({ outcome, onAccept, accepting }: OutcomeProps) {
   return (
     <>
       {status}
-      <Alert variant="error">{text}</Alert>
+      <Alert variant="error" spacing="loose">
+        {text}
+      </Alert>
     </>
   )
 }

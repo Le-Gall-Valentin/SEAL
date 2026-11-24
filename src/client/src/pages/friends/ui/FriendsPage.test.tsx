@@ -144,6 +144,11 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await expect.poll(() => screen.getByRole('listitem').elements().length).toBe(1)
     await screen.getByRole('searchbox', { name: 'Rechercher un ami' }).fill('zzz')
     await expect.element(screen.getByText('Aucun ami ne correspond à « zzz ».')).toBeVisible()
+    // ADR 0038 (point 9) : la carte « Conversations · recherche » d'Etats.
+    await expect
+      .element(screen.getByRole('heading', { level: 2, name: 'Aucun résultat' }))
+      .toBeVisible()
+    await expect.element(screen.getByRole('img', { name: 'Le phoque SEAL cherche' })).toBeVisible()
     await screen.getByRole('button', { name: 'Effacer la recherche' }).click()
     await expect.poll(() => screen.getByRole('listitem').elements().length).toBe(3)
   })
@@ -166,6 +171,34 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await expect.element(screen.getByRole('dialog', { name: 'Ajouter un ami' })).toBeVisible()
     await screen.getByRole('button', { name: 'Fermer' }).click()
     expect(screen.getByRole('dialog').elements()).toHaveLength(0)
+  })
+
+  it('ADR 0038 (point 9), Etats « Amis · compte neuf » : mesures de la carte', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900, {
+      friends: () => Promise.resolve({ items: [], next: null }),
+    })
+    const title = screen.getByRole('heading', { name: 'Pas encore d’amis' })
+    await expect.element(title).toBeVisible()
+
+    const card = title.element().parentElement
+    const text = title.element().nextElementSibling
+    const button = text?.nextElementSibling
+    expect(card && getComputedStyle(card).padding).toBe('22px 22px 24px')
+    expect(getComputedStyle(title.element()).marginTop).toBe('12px')
+    expect(getComputedStyle(title.element()).letterSpacing).toBe('-0.18px')
+    expect(text && getComputedStyle(text).marginTop).toBe('6px')
+    expect(text && getComputedStyle(text).maxWidth).toBe('260px')
+    expect(button && getComputedStyle(button).marginTop).toBe('16px')
+    expect(button && getComputedStyle(button).paddingLeft).toBe('12px')
+  })
+
+  it('ADR 0038 (point 9), Amis-Tablette : 10 px entre le titre d’une section d’invitations et sa liste', async () => {
+    const { screen } = await renderAt('/amis?onglet=invitations', 820, 1180)
+
+    const title = screen.getByRole('heading', { level: 2, name: /Reçues/ })
+    await expect.element(title).toBeVisible()
+
+    expect(getComputedStyle(title.element()).marginBottom).toBe('10px')
   })
 
   it('ADR 0038 (point 2) : invitations vides annoncées', async () => {

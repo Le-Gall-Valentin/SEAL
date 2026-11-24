@@ -155,4 +155,37 @@ describe('features/send-friend-request : formulaire « Ajouter un ami » (Amis-O
       .element(screen.getByRole('button', { name: 'Envoyer l’invitation' }))
       .toBeDisabled()
   })
+
+  describe('ADR 0038 (point 9) : mesures et jetons d’Amis-Ordinateur et d’Amis-Telephone', () => {
+    it('Amis-Ordinateur : 6 px entre « @ » et la saisie', async () => {
+      const { screen } = await mount(vi.fn())
+
+      const field = screen.getByLabelText('Identifiant').element()
+
+      expect(field.parentElement && getComputedStyle(field.parentElement).columnGap).toBe('6px')
+    })
+
+    it('Amis-Ordinateur : bloc de succès bordé d’olive, hauteur de ligne 1,35', async () => {
+      const { screen } = await mount(() => Promise.resolve(sent))
+
+      await invite(screen, 'sarah.belanger')
+      const status = screen.container.querySelector('[role="status"]')
+      await expect.poll(() => status?.textContent).toContain('Invitation envoyée')
+
+      const notice = status?.firstElementChild
+      expect(notice && getComputedStyle(notice).boxShadow).toContain('rgb(214, 221, 186)')
+      expect(notice && getComputedStyle(notice).lineHeight).toBe('17.55px')
+    })
+
+    it('Amis-Telephone : refus en alerte, écart de 12 px, hauteur de ligne 1,35', async () => {
+      const { screen } = await mount(() => Promise.reject(new ApiError(404, 'USER_NOT_FOUND')))
+
+      await invite(screen, 'noa.g')
+      const alert = screen.getByRole('alert')
+      await expect.element(alert).toBeVisible()
+
+      expect(getComputedStyle(alert.element()).columnGap).toBe('12px')
+      expect(getComputedStyle(alert.element()).lineHeight).toBe('17.55px')
+    })
+  })
 })

@@ -4,13 +4,17 @@ interface NoticeProps {
   /** « mail » : lien envoyé (Mot-de-passe-oublie) ; « success » : action réussie. */
   readonly variant: 'mail' | 'success'
   readonly title?: string
+  /** « olive » : bloc de l'écran Amis (Amis-Ordinateur), bordure olive et lignes plus serrées. */
+  readonly border?: 'accent' | 'olive'
   readonly children: ReactNode
 }
 
 /** Encart de confirmation de Mot-de-passe-oublie ; à placer dans une région role="status". */
-export function Notice({ variant, title, children }: NoticeProps) {
+export function Notice({ variant, title, border = 'accent', children }: NoticeProps) {
   return (
-    <div className="flex gap-3 rounded-[14px] bg-accent-soft px-3.5 py-3 text-[13px] leading-[1.4] inset-ring inset-ring-accent-line">
+    <div
+      className={`flex gap-3 rounded-[14px] bg-accent-soft px-3.5 py-3 text-[13px] inset-ring ${border === 'olive' ? 'leading-[1.35] inset-ring-olive-line' : 'leading-[1.4] inset-ring-accent-line'}`}
+    >
       <svg
         width="18"
         height="18"

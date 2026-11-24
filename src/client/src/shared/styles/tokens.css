@@ -32,6 +32,8 @@
   --thumb-off: #ffffff;
   --accent-text: #525e15;
   --accent-line: rgba(102, 116, 28, 0.28);
+  /* Amis-Ordinateur : bordure du bloc « @x vous a déjà invité ». */
+  --olive-line: #d6ddba;
   --danger: #b3261e;
   --on-danger: #ffffff;
   --danger-soft: #fbedea;
@@ -82,6 +84,7 @@
     --thumb-off: #99a187;
     --accent-text: #c2d26a;
     --accent-line: rgba(180, 198, 90, 0.3);
+    --olive-line: #26301a;
     --danger: #f2867a;
     --on-danger: #1a0b09;
     --danger-soft: #2b1512;

@@ -6,7 +6,7 @@ import { useMessages } from '@/shared/i18n'
 import { Avatar, Phoque } from '@/shared/ui'
 import { friendsPageMessages } from '../i18n'
 import { FriendMenu } from './FriendMenu'
-import { SearchIcon } from './icons'
+import { ClearIcon, SearchIcon } from './icons'
 
 interface FriendListProps {
   readonly friends: readonly Friend[]
@@ -15,6 +15,13 @@ interface FriendListProps {
 }
 
 const CARD = 'rounded-[18px] bg-surface inset-ring inset-ring-line'
+// ADR 0038 (point 9) : cartes d'Etats, « Amis · compte neuf » et « Conversations · recherche ».
+const STATE = 'flex flex-col items-center px-5.5 pt-5.5 pb-6 text-center'
+const STATE_TITLE = 'm-0 mt-3 text-[18px] font-bold tracking-[-0.01em]'
+const STATE_TEXT =
+  'm-0 mt-1.5 min-h-[41px] max-w-65 text-[14px] leading-[1.45] text-pretty text-ink-2'
+const STATE_BUTTON =
+  'mt-4 inline-flex h-11 items-center gap-2 rounded-[10px] pr-4 pl-3 text-[14.5px] font-semibold'
 
 /** FRD-10 : carte de la liste d'Amis-Ordinateur, recherche locale (ADR 0038, point 6), état « compte neuf » d'Etats. */
 export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
@@ -22,14 +29,14 @@ export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
   const [query, setQuery] = useState('')
   if (friends.length === 0) {
     return (
-      <section className={`flex flex-col items-center gap-3 px-6 py-10 text-center ${CARD}`}>
+      <section className={`${STATE} ${CARD}`}>
         <Phoque variant="waving" size={96} />
-        <h2 className="m-0 text-[18px] font-bold">{t('emptyTitle')}</h2>
-        <p className="m-0 max-w-90 text-[14px] leading-[1.45] text-ink-2">{t('emptyText')}</p>
+        <h2 className={STATE_TITLE}>{t('emptyTitle')}</h2>
+        <p className={STATE_TEXT}>{t('emptyText')}</p>
         <button
           type="button"
           onClick={onAdd}
-          className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent pr-4 pl-3.5 text-[14.5px] font-semibold text-on-accent hover:bg-accent-hover"
+          className={`${STATE_BUTTON} bg-accent text-on-accent hover:bg-accent-hover`}
         >
           <PersonPlusIcon />
           {t('addFriend')}
@@ -62,15 +69,18 @@ export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
         </span>
       </div>
       {shown.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 border-t border-line px-4 py-6 text-center">
-          <p className="m-0 text-[14px] wrap-anywhere text-ink-2">{t('noMatch', { query })}</p>
+        <div className={`${STATE} border-t border-line`}>
+          <Phoque variant="searching" size={96} />
+          <h2 className={STATE_TITLE}>{t('noMatchTitle')}</h2>
+          <p className={`${STATE_TEXT} wrap-anywhere`}>{t('noMatch', { query })}</p>
           <button
             type="button"
             onClick={() => {
               setQuery('')
             }}
-            className="min-h-11 rounded-lg px-3 text-[14px] font-semibold text-accent-text underline underline-offset-[0.2em]"
+            className={`${STATE_BUTTON} bg-surface text-ink inset-ring inset-ring-line-strong`}
           >
+            <ClearIcon />
             {t('clearSearch')}
           </button>
         </div>

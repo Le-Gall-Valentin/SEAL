@@ -17,7 +17,7 @@ const CARD = 'm-0 list-none rounded-[18px] bg-surface p-0 inset-ring inset-ring-
 const EMPTY =
   'm-0 rounded-[18px] bg-surface px-4 py-3.5 text-[14px] text-ink-3 inset-ring inset-ring-line'
 const TITLE =
-  'm-0 mb-2 flex items-center gap-2 text-[12px] font-bold tracking-[0.08em] text-ink-3 uppercase'
+  'm-0 mb-2.5 flex items-center gap-2 text-[12px] font-bold tracking-[0.08em] text-ink-3 uppercase'
 
 /** Onglet Invitations d'Amis-Tablette : « Reçues » puis « Envoyées », la plus récente d'abord. */
 export function InvitationsPanel({
