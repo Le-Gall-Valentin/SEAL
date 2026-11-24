@@ -12,10 +12,8 @@ import java.util.UUID;
  */
 public record UserPair(UserId low, UserId high) {
 
-    /** Ordre des {@code uuid} de PostgreSQL. */
-    public static final Comparator<UserId> POSTGRES_ORDER = Comparator.comparing(
-                    (UserId id) -> id.value().getMostSignificantBits(), Long::compareUnsigned)
-            .thenComparing(id -> id.value().getLeastSignificantBits(), Long::compareUnsigned);
+    /** Ordre des {@code uuid} de PostgreSQL ({@link UserId#POSTGRES_ORDER}). */
+    public static final Comparator<UserId> POSTGRES_ORDER = UserId.POSTGRES_ORDER;
 
     public UserPair {
         Objects.requireNonNull(low, "low");
