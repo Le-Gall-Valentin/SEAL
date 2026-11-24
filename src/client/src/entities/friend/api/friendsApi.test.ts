@@ -4,7 +4,8 @@ import type { z } from 'zod'
 const calls: string[] = []
 const request = vi.fn<(path: string, schema: z.ZodType, options?: unknown) => Promise<unknown>>()
 
-vi.mock('@/shared/api', () => ({
+vi.mock('@/shared/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/shared/api')>()),
   request: async (path: string, schema: z.ZodType, options?: unknown) => {
     calls.push(path)
     return schema.parse(await request(path, schema, options))

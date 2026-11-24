@@ -1,4 +1,5 @@
 import { AVATAR_TINTS, type AvatarTint } from '@/shared/config'
+import { normalizeSearch } from '@/shared/lib'
 import type { Friend } from '../api/IFriendsApi'
 
 const COLLATOR = new Intl.Collator('fr', { sensitivity: 'base' })
@@ -14,16 +15,6 @@ export function sortFriends(friends: readonly Friend[]): Friend[] {
 /** ADR 0038 (point 6) : de la plus récente à la plus ancienne. */
 export function newestFirst<T extends { readonly createdAt: Date }>(items: readonly T[]): T[] {
   return [...items].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-}
-
-/** 10.3, étape 1 : NFKD, diacritiques retirés, minuscules, espaces et `@` initial retirés. */
-export function normalizeSearch(text: string): string {
-  return text
-    .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/\s+/gu, '')
-    .replace(/^@/u, '')
 }
 
 /** ADR 0038 (point 6) : l'identifiant ou le nom affiché contient la saisie ; une saisie vide garde tout le monde. */

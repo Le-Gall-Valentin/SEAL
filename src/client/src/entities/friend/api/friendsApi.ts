@@ -1,10 +1,7 @@
 import { z } from 'zod'
 import { isDisplayNameValid, isUsernameWellFormed } from '@/entities/account/@x/friend'
-import { request } from '@/shared/api'
+import { pagePath, pageSchema, request } from '@/shared/api'
 import type { IFriendsApi, Page, SentRequest } from './IFriendsApi'
-
-/** Taille de page demandée, le plafond du serveur (ADR 0037, point 3). */
-const PAGE_LIMIT = 50
 
 const UUID = z.uuid()
 // SEC-01, AUTH-01, ACC-03 : le nom d'un autre compte qui ne suit pas les règles d'écriture est refusé (échec fermé).
@@ -44,16 +41,6 @@ export function sentRequestOf(dto: z.infer<typeof SENT_REQUEST_RESPONSE>): SentR
   return { ...dto, createdAt: new Date(dto.createdAt) }
 }
 
-function pageOf<T extends z.ZodType>(item: T) {
-  return z.strictObject({ items: z.array(item).max(PAGE_LIMIT), next: UUID.nullable() })
-}
-
-function path(base: string, after: string | null): string {
-  const separator = base.includes('?') ? '&' : '?'
-  const cursor = after === null ? '' : `&after=${encodeURIComponent(after)}`
-  return `${base}${separator}limit=${String(PAGE_LIMIT)}${cursor}`
-}
-
 function options(signal: AbortSignal | undefined) {
   return signal ? { signal } : {}
 }
@@ -61,7 +48,11 @@ function options(signal: AbortSignal | undefined) {
 /** Adaptateur HTTP du port IFriendsApi. */
 export const friendsApi: IFriendsApi = {
   async friends(after, signal) {
-    const page = await request(path('/api/v1/friends', after), pageOf(FRIEND), options(signal))
+    const page = await request(
+      pagePath('/api/v1/friends', after),
+      pageSchema(FRIEND),
+      options(signal),
+    )
     return {
       next: page.next,
       items: page.items.map((dto) => ({
@@ -75,8 +66,8 @@ export const friendsApi: IFriendsApi = {
 
   async receivedRequests(after, signal) {
     const page = await request(
-      path('/api/v1/friend-requests?direction=incoming', after),
-      pageOf(RECEIVED),
+      pagePath('/api/v1/friend-requests?direction=incoming', after),
+      pageSchema(RECEIVED),
       options(signal),
     )
     return withDates(page)
@@ -84,8 +75,8 @@ export const friendsApi: IFriendsApi = {
 
   async sentRequests(after, signal) {
     const page = await request(
-      path('/api/v1/friend-requests?direction=outgoing', after),
-      pageOf(SENT),
+      pagePath('/api/v1/friend-requests?direction=outgoing', after),
+      pageSchema(SENT),
       options(signal),
     )
     return withDates(page)

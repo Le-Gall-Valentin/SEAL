@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   matchFriend,
   newestFirst,
-  normalizeSearch,
   relativeAge,
   sortFriends,
   tintOf,
@@ -42,11 +41,6 @@ describe('entities/friend : règles de l’écran Amis (ADR 0038)', () => {
     const newer = { createdAt: new Date('2026-11-22T10:00:00Z') }
 
     expect(newestFirst([older, newer])).toEqual([newer, older])
-  })
-
-  it('FRD-10, ADR 0038 (point 6), 10.3 (étape 1) : saisie normalisée sans diacritiques, espaces ni @ initial', () => {
-    expect(normalizeSearch('  @Chloé  Fortin ')).toBe('chloefortin')
-    expect(normalizeSearch('Ｃｈｌｏé')).toBe('chloe')
   })
 
   it('FRD-10, ADR 0038 (point 6) : un ami reste s’il a la saisie dans son identifiant ou son nom affiché', () => {

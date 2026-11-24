@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isDisplayNameValid } from './displayName'
+import { isDisplayNameValid, isNameValid } from './displayName'
 import { isEmailWellFormed, localPartOf } from './email'
 import { isReservedUsername, isUsernameWellFormed, usernameSuggestionFrom } from './username'
 
@@ -155,5 +155,15 @@ describe('AUTH-10 : nom affiché', () => {
     expect(isDisplayNameValid(String.fromCodePoint(0x1f469, 0x200d, 0x1f467))).toBe(true)
     expect(isDisplayNameValid(`a${String.fromCodePoint(0x200c)}b`)).toBe(true)
     expect(isDisplayNameValid(String.fromCodePoint(0x2764, 0xfe0f))).toBe(true)
+  })
+})
+
+describe('GRP-01, ADR 0040 : règle du nom à une autre longueur', () => {
+  it('GRP-01, ADR 0040 : un nom de groupe compte 1 à 64 points de code, sans caractère invisible', () => {
+    expect(isNameValid('é'.repeat(64), 64)).toBe(true)
+    expect(isNameValid('é'.repeat(65), 64)).toBe(false)
+    expect(isNameValid('', 64)).toBe(false)
+    expect(isNameValid(`S${String.fromCodePoint(0x200b)}ki`, 64)).toBe(false)
+    expect(isNameValid('é'.repeat(51), 50)).toBe(false)
   })
 })

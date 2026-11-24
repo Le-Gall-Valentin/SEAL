@@ -31,11 +31,19 @@ export function isDisplayNameShownInvalid({
 
 /** Comme DisplayNameRule côté serveur : 1 à 50 points de code, rien de piégé, un caractère visible au moins. */
 export function isDisplayNameValid(raw: string): boolean {
+  return isNameValid(raw, DISPLAY_NAME_MAX_LENGTH)
+}
+
+/**
+ * Même règle à une autre longueur, comme `DisplayNameRule.isValid(value, maxLength)` : GRP-01 et l'ADR 0041 (point 9)
+ * la reprennent pour le nom d'un groupe, sur 64 points de code.
+ */
+export function isNameValid(raw: string, maxLength: number): boolean {
   const name = raw.normalize('NFC')
   const length = Array.from(name).length
   return (
     length >= 1 &&
-    length <= DISPLAY_NAME_MAX_LENGTH &&
+    length <= maxLength &&
     !FORBIDDEN.test(name) &&
     !hasHiddenFormat(name) &&
     VISIBLE.test(name.replace(FILLERS, ''))

@@ -1,3 +1,5 @@
+import type { Page } from '@/shared/lib'
+
 /** FRD-10 : un ami, vu par le compte de la session ; les statistiques d'interaction attendent le lot 4 (ADR 0037). */
 export interface Friend {
   readonly userId: string
@@ -23,11 +25,7 @@ export interface SentRequest {
   readonly createdAt: Date
 }
 
-/** ADR 0037, point 3 : une page et le curseur de la suivante, `null` sur la dernière. */
-export interface Page<T> {
-  readonly items: readonly T[]
-  readonly next: string | null
-}
+export type { Page }
 
 /** Port des listes de la section 14.4 : amis, invitations reçues et envoyées, page par page. */
 export interface IFriendsApi {
