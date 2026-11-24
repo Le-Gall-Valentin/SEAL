@@ -114,7 +114,11 @@ export function FriendsPage() {
           <aside aria-label={t('addFriend')} className="sticky top-4 w-88 flex-none">
             <section className="flex flex-col gap-3.5 rounded-[18px] bg-surface p-5 inset-ring inset-ring-line">
               <h2 className="m-0 text-[16px] font-bold">{t('addFriend')}</h2>
-              <AddFriendForm onAccept={answers.acceptNow} inputRef={field} />
+              <AddFriendForm
+                onAccept={answers.acceptNow}
+                answering={answers.busyId !== null}
+                inputRef={field}
+              />
             </section>
           </aside>
         )}
@@ -126,6 +130,7 @@ export function FriendsPage() {
             setSheetOpen(false)
           }}
           onAccept={answers.acceptNow}
+          answering={answers.busyId !== null}
         />
       )}
       <RemoveFriendDialog

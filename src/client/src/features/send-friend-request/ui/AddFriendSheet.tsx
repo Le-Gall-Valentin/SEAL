@@ -9,13 +9,15 @@ interface AddFriendSheetProps {
   readonly open: boolean
   readonly onClose: () => void
   readonly onAccept: (requestId: string) => Promise<IncomingAcceptResult>
+  /** ADR 0038 (point 9) : une réponse de ligne est en cours. */
+  readonly answering?: boolean | undefined
 }
 
 /**
  * Feuille « Ajouter un ami » d'Amis-Telephone, ancrée en bas ; sur tablette, à la largeur du contenu (ADR 0038,
  * point 4). Modale native : focus piégé, Échap ferme.
  */
-export function AddFriendSheet({ open, onClose, onAccept }: AddFriendSheetProps) {
+export function AddFriendSheet({ open, onClose, onAccept, answering }: AddFriendSheetProps) {
   const t = useMessages(sendFriendRequestMessages)
   const titleId = useId()
   const ref = useRef<HTMLDialogElement>(null)
@@ -65,6 +67,7 @@ export function AddFriendSheet({ open, onClose, onAccept }: AddFriendSheetProps)
             <AddFriendForm
               onAccept={onAccept}
               onAccepted={onClose}
+              answering={answering}
               variant="sheet"
               inputRef={field}
             />

@@ -13,7 +13,7 @@ import {
 import { AnswerFriendRequestApiProvider } from '@/features/answer-friend-request'
 import { RemoveFriendApiProvider } from '@/features/remove-friend'
 import { SendFriendRequestApiProvider } from '@/features/send-friend-request'
-import { ApiError } from '@/shared/lib'
+import { ApiError, NetworkError } from '@/shared/lib'
 import { FriendsPage } from './FriendsPage'
 
 const id = (n: number) => `0192f7a1-0000-7000-8000-${String(n).padStart(12, '0')}`
@@ -183,6 +183,74 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await screen.getByRole('button', { name: 'Accepter l’invitation' }).click()
 
     await expect.poll(() => accept.mock.calls).toEqual([[id(11)]])
+  })
+
+  describe('FRD-01 : acceptation depuis le formulaire', () => {
+    const incoming = () =>
+      Promise.reject(new ApiError(409, 'INCOMING_REQUEST_EXISTS', { requestId: id(11) }))
+
+    async function sendAndAccept(screen: Awaited<ReturnType<typeof renderAt>>['screen']) {
+      await screen.getByLabelText('Identifiant').fill('sarah.belanger')
+      await screen.getByRole('button', { name: 'Envoyer l’invitation' }).click()
+      await screen.getByRole('button', { name: 'Accepter l’invitation' }).click()
+    }
+
+    async function announcedOnce(
+      screen: Awaited<ReturnType<typeof renderAt>>['screen'],
+      text: string,
+    ) {
+      await expect.poll(() => screen.getByText(text).elements().length).toBeGreaterThan(0)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(screen.getByText(text).elements()).toHaveLength(1)
+    }
+
+    it('FRD-01, ADR 0038 (point 9) : acceptée, le champ se vide', async () => {
+      const { screen } = await renderAt('/amis', 1440, 900, { send: incoming })
+
+      await sendAndAccept(screen)
+
+      await expect.element(screen.getByLabelText('Identifiant')).toHaveValue('')
+    })
+
+    it('FRD-01, ADR 0038 (point 9) : une invitation close entre-temps n’est annoncée qu’une fois', async () => {
+      const { screen } = await renderAt('/amis', 1440, 900, {
+        send: incoming,
+        accept: () => Promise.reject(new ApiError(404, 'NOT_FOUND')),
+      })
+
+      await sendAndAccept(screen)
+
+      await announcedOnce(screen, 'Cette invitation n’existe plus.')
+    })
+
+    it('FRD-01, ADR 0038 (point 9) : un échec réseau s’annonce une fois et garde « Accepter l’invitation »', async () => {
+      const { screen } = await renderAt('/amis', 1440, 900, {
+        send: incoming,
+        accept: () => Promise.reject(new NetworkError()),
+      })
+
+      await sendAndAccept(screen)
+
+      await announcedOnce(screen, 'Connexion impossible. Vérifiez votre réseau puis réessayez.')
+      await expect
+        .element(screen.getByRole('button', { name: 'Accepter l’invitation' }))
+        .toBeEnabled()
+    })
+
+    it('FRD-01, ADR 0038 (point 9) : pendant la réponse d’une ligne, « Accepter l’invitation » est inactif', async () => {
+      const { screen } = await renderAt('/amis?onglet=invitations', 1440, 900, {
+        send: incoming,
+        accept: () => new Promise<void>(() => undefined),
+      })
+      await screen.getByLabelText('Identifiant').fill('sarah.belanger')
+      await screen.getByRole('button', { name: 'Envoyer l’invitation' }).click()
+
+      await screen.getByRole('button', { name: 'Accepter — Sarah Bélanger' }).click()
+
+      await expect
+        .element(screen.getByRole('button', { name: 'Accepter l’invitation' }))
+        .toBeDisabled()
+    })
   })
 
   it('Etats, Amis-Telephone : compte neuf, « Pas encore d’amis » et sa feuille ; aucun défilement horizontal', async () => {

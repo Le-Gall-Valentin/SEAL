@@ -34,6 +34,17 @@ export function useAnswerFriendRequest() {
       }
     },
   })
+  // ADR 0038 (point 9) : l'acceptation du formulaire a sa propre mutation ; son issue n'est annoncée que par lui.
+  const formAccept = useMutation({
+    mutationFn: (requestId: string) => api.accept(requestId),
+    onSuccess: () => invalidateFriends(client),
+    onError: async (error) => {
+      const failure = failureOf(error)
+      if (failure.kind === 'refused' && failure.code === 'NOT_FOUND') {
+        await invalidateFriends(client)
+      }
+    },
+  })
   const respond = (action: Action) => (requestId: string) => {
     guard.run(() => mutation.mutateAsync({ action, requestId }))
   }
@@ -42,7 +53,7 @@ export function useAnswerFriendRequest() {
     new Promise((resolve) => {
       const started = guard.run(async () => {
         try {
-          await mutation.mutateAsync({ action: 'accept', requestId })
+          await formAccept.mutateAsync(requestId)
           resolve({ kind: 'accepted' })
         } catch (error) {
           const failure = failureOf(error)
@@ -67,7 +78,11 @@ export function useAnswerFriendRequest() {
     acceptNow,
     decline: respond('decline'),
     revoke: respond('revoke'),
-    busyId: mutation.isPending ? mutation.variables.requestId : null,
+    busyId: mutation.isPending
+      ? mutation.variables.requestId
+      : formAccept.isPending
+        ? formAccept.variables
+        : null,
     gone,
     formFailure,
   }

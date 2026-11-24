@@ -17,6 +17,8 @@ interface AddFriendFormProps {
   readonly onAccept: (requestId: string) => Promise<IncomingAcceptResult>
   /** Appelé quand l'invitation reçue est acceptée depuis le formulaire (la feuille se ferme). */
   readonly onAccepted?: (() => void) | undefined
+  /** ADR 0038 (point 9) : une réponse de ligne est en cours ; « Accepter l’invitation » attend. */
+  readonly answering?: boolean | undefined
   /** Feuille du téléphone : champ et bouton sur toute la largeur (Amis-Telephone). */
   readonly variant?: 'aside' | 'sheet' | undefined
   /** Pour placer le focus sur le champ (feuille ouverte, « Ajouter un ami » de l'état vide). */
@@ -27,6 +29,7 @@ interface AddFriendFormProps {
 export function AddFriendForm({
   onAccept,
   onAccepted,
+  answering = false,
   variant = 'aside',
   inputRef,
 }: AddFriendFormProps) {
@@ -47,11 +50,16 @@ export function AddFriendForm({
     setAcceptIssue(null)
     const result = await onAccept(requestId)
     setAccepting(false)
+    // ADR 0038 (point 9) : acceptée, le champ se vide ; close ailleurs, le bloc 409 part ; un échec réseau ou 429 le
+    // garde pour réessayer.
     if (result.kind === 'accepted') {
       form.clearOutcome()
+      form.setValue('')
       onAccepted?.()
     } else {
-      form.clearOutcome()
+      if (result.kind === 'gone') {
+        form.clearOutcome()
+      }
       setAcceptIssue(result)
     }
   }
@@ -106,7 +114,7 @@ export function AddFriendForm({
         onAccept={(requestId) => {
           void accept(requestId)
         }}
-        accepting={accepting}
+        accepting={accepting || answering}
       />
       {acceptIssue?.kind === 'gone' && <Alert variant="error">{t('gone')}</Alert>}
       <FormAlert
