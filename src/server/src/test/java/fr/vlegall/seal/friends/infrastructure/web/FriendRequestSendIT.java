@@ -11,9 +11,12 @@ import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.Race;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import fr.vlegall.seal.support.TestRelations;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -95,7 +98,7 @@ class FriendRequestSendIT {
         String receiver = FriendsTestClient.name("sarah.b");
         target(receiver);
 
-        sender.invite("  @" + receiver.toUpperCase(java.util.Locale.ROOT) + " ")
+        sender.invite("  @" + receiver.toUpperCase(Locale.ROOT) + " ")
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.username").value(receiver));
     }
@@ -159,7 +162,7 @@ class FriendRequestSendIT {
                 .param(closed)
                 .update();
 
-        List<String> bodies = new java.util.ArrayList<>();
+        List<String> bodies = new ArrayList<>();
         for (UUID target : List.of(blockedBySender, blockingSender, closed)) {
             String username = jdbc.sql("SELECT username FROM users WHERE id = ?")
                     .param(target)
@@ -192,7 +195,7 @@ class FriendRequestSendIT {
                 .asString();
         String closedFriend = FriendsTestClient.name("fami");
         UUID closedFriendId = target(closedFriend);
-        FriendsTestClient.befriend(jdbc, me.id, closedFriendId);
+        TestRelations.befriend(jdbc, me.id, closedFriendId);
         jdbc.sql("INSERT INTO user_settings (user_id, invitation_policy) VALUES (?, 'NOBODY')")
                 .param(closedFriendId)
                 .update();
@@ -211,7 +214,7 @@ class FriendRequestSendIT {
     void frd01AlreadyFriendsIsRejected() throws Exception {
         FriendsTestClient sender = account("ami");
         String friend = FriendsTestClient.name("deja");
-        FriendsTestClient.befriend(jdbc, sender.id, target(friend));
+        TestRelations.befriend(jdbc, sender.id, target(friend));
 
         sender.invite(friend)
                 .andExpect(status().isConflict())

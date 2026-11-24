@@ -54,7 +54,14 @@ public enum ErrorCode {
     /** FRD-01 : ce compte a déjà invité l'appelant ; la propriété {@code requestId} désigne son invitation. */
     INCOMING_REQUEST_EXISTS(409),
     /** FRD-03 : blocage dans un sens ou l'autre, ou invitations fermées, sans dire lequel. */
-    CANNOT_INVITE(403);
+    CANNOT_INVITE(403),
+    // Conversations : statuts fixés par l'ADR 0039 (points 2 et 3).
+    /** CNV-01, GRP-02, GRP-03, FRD-21 : un identifiant n'est pas un ami actif de l'appelant, sans dire pourquoi. */
+    NOT_FRIENDS(403),
+    /** ADR 0039 (point 3) : le compte visé n'est pas membre actif de la conversation. */
+    NOT_A_MEMBER(404),
+    /** GRP-01 : un groupe compte 50 membres actifs au plus. */
+    GROUP_FULL(409);
 
     private final int status;
 

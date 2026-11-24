@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
+import fr.vlegall.seal.common.Page;
 import fr.vlegall.seal.common.UserId;
-import fr.vlegall.seal.friends.domain.model.Page;
 import fr.vlegall.seal.friends.infrastructure.web.dto.SendFriendRequestBody;
 import fr.vlegall.seal.security.journal.SecurityJournal;
 import fr.vlegall.seal.security.ratelimit.RateLimit;

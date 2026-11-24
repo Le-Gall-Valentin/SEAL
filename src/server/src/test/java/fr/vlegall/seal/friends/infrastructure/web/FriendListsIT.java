@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import fr.vlegall.seal.support.AuthClient;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import fr.vlegall.seal.support.TestRelations;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,7 +104,7 @@ class FriendListsIT {
         }
         FriendsTestClient gone = account("parti");
         gone.inviteOk(me);
-        FriendsTestClient.deactivate(jdbc, gone.id);
+        TestRelations.deactivate(jdbc, gone.id);
         FriendsTestClient declined = account("non");
         UUID refused = declined.inviteOk(me);
         mvc.perform(me.unsafe(post(REQUESTS + "/" + refused + "/decline"), null))
@@ -158,7 +159,7 @@ class FriendListsIT {
         // Créé d'abord, donc premier dans l'ordre des UUIDv7 : il tombe dans la première page.
         FriendsTestClient gone = account("disparu");
         befriend(gone, me);
-        FriendsTestClient.deactivate(jdbc, gone.id);
+        TestRelations.deactivate(jdbc, gone.id);
         List<String> expected = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             FriendsTestClient friend = account("li");

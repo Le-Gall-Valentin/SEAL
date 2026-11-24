@@ -93,6 +93,11 @@
         <Class name="fr.vlegall.seal.friends.infrastructure.web.FriendRequestsController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- /api/v1/conversations (session complète, ADR 0039) : ConversationsIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.conversations.infrastructure.web.ConversationsController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /api/v1/friends (session complète, ADR 0037) : FriendListsIT. -->
     <Match>
         <Class name="fr.vlegall.seal.friends.infrastructure.web.FriendsController"/>
@@ -159,8 +164,9 @@
         <Class name="fr.vlegall.seal.keys.infrastructure.web.KeysController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
-    <!-- GET /api/v1/users/{userId}/keys : clés de l'appelant seul, session complète seulement ; 404 pour tout autre
-         compte, contrôlé dans le handler (ADR 0029, point 4) : UserKeysIT, ReadOwnKeysHandlerTest. -->
+    <!-- GET /api/v1/users/{userId}/keys : clés de l'appelant, d'un ami ou d'un membre d'un groupe commun, session
+         complète seulement ; 404 pour tout autre compte, contrôlé dans le handler (ADR 0029, point 4 ; ADR 0037,
+         point 7 ; ADR 0039, point 7) : UserKeysIT, ReadUserKeysHandlerTest. -->
     <Match>
         <Class name="fr.vlegall.seal.keys.infrastructure.web.UserKeysController"/>
         <Bug pattern="SPRING_ENDPOINT"/>

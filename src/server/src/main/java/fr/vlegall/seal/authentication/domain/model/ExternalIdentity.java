@@ -60,9 +60,9 @@ public record ExternalIdentity(
 
     /**
      * ACC-03 : le nom du fournisseur, privé des caractères que la règle du nom affiché interdit (contrôle, séparateurs,
-     * direction), puis normalisé en NFC, sans espace autour et tronqué à 50 points de code. Le nettoyage précède la
-     * normalisation : retirer un caractère après coup pourrait rapprocher une lettre et un accent, et le nom ne serait
-     * plus en NFC. Un nom qui ne respecte pas la règle donne un nom vide : ce n'est qu'une proposition, que
+     * format dont la direction, usage privé ; ADR 0040), puis normalisé en NFC, sans espace autour et tronqué à 50
+     * points de code. Le nettoyage précède la normalisation : retirer un caractère après coup pourrait rapprocher une
+     * lettre et un accent, et le nom ne serait plus en NFC. Un nom qui ne respecte pas la règle donne un nom vide : ce n'est qu'une proposition, que
      * l'utilisateur complète ; elle ne refuse jamais l'identité. Un nom de plus de {@link #RAW_MAX_LENGTH} caractères
      * n'est pas même lu.
      */

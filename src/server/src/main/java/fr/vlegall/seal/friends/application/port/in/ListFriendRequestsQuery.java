@@ -1,9 +1,9 @@
 package fr.vlegall.seal.friends.application.port.in;
 
+import fr.vlegall.seal.common.Page;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.domain.model.Direction;
 import fr.vlegall.seal.friends.domain.model.Invitation;
-import fr.vlegall.seal.friends.domain.model.Page;
 import java.util.Optional;
 import java.util.UUID;
 

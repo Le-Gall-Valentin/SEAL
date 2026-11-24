@@ -2,13 +2,13 @@ package fr.vlegall.seal.friends.application.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import fr.vlegall.seal.common.Page;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.domain.model.Direction;
 import fr.vlegall.seal.friends.domain.model.FriendRequest;
 import fr.vlegall.seal.friends.domain.model.FriendSummary;
 import fr.vlegall.seal.friends.domain.model.InteractionStats;
 import fr.vlegall.seal.friends.domain.model.Invitation;
-import fr.vlegall.seal.friends.domain.model.Page;
 import fr.vlegall.seal.friends.domain.model.Person;
 import fr.vlegall.seal.friends.domain.model.UserPair;
 import java.time.Instant;

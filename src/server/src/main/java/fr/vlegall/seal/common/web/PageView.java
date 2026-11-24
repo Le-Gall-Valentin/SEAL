@@ -1,12 +1,12 @@
-package fr.vlegall.seal.friends.infrastructure.web.dto;
+package fr.vlegall.seal.common.web;
 
-import fr.vlegall.seal.friends.domain.model.Page;
+import fr.vlegall.seal.common.Page;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
-/** ADR 0037, point 3 : {@code {"items": [...], "next": "<identifiant>" | null}}. */
+/** ADR 0037 (point 3), ADR 0039 (point 6) : {@code {"items": [...], "next": "<identifiant>" | null}}. */
 public record PageView<T>(List<T> items, @Nullable UUID next) {
 
     public PageView {

@@ -7,11 +7,11 @@ import org.springframework.stereotype.Component;
 
 /** API-02 : demande l'amitié au contexte {@code friends}, par son port d'entrée (ADR 0008, règle 7). */
 @Component
-public class RelationAdapter implements RelationPort {
+public class FriendRelationAdapter implements RelationPort {
 
     private final FriendshipQuery friendships;
 
-    public RelationAdapter(FriendshipQuery friendships) {
+    public FriendRelationAdapter(FriendshipQuery friendships) {
         this.friendships = friendships;
     }
 
