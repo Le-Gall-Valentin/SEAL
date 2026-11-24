@@ -25,7 +25,10 @@ public interface ConversationRepository {
     /** CNV-06 : la conversation dont {@code member} est membre actif, sans verrou ; vide sinon. */
     Optional<Conversation> findForMember(ConversationId id, UserId member);
 
-    /** GRP-03 : comme {@link #findForMember}, verrouillée jusqu'à la fin de la transaction ({@code FOR UPDATE}). */
+    /**
+     * GRP-03 : comme {@link #findForMember}, verrouillée jusqu'à la fin de la transaction ({@code FOR UPDATE}) ;
+     * l'appartenance est jugée une fois le verrou obtenu : un membre exclu pendant l'attente reçoit vide.
+     */
     Optional<Conversation> lockForMember(ConversationId id, UserId member);
 
     /** Enregistre le passage de {@code before} à {@code after} : arrivées, départs (à {@code at}), rôles et nom. */

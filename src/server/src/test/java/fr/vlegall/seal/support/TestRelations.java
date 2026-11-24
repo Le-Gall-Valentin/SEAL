@@ -11,6 +11,17 @@ public final class TestRelations {
 
     private TestRelations() {}
 
+    /** Compte actif écrit en base, sans inscription ni session : pour les tests qui n'appellent pas les routes. */
+    public static UUID activeUser(JdbcClient jdbc) {
+        String username = "rel" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        return jdbc.sql("INSERT INTO users (username, display_name, email, status)"
+                        + " VALUES (?, 'Nom', CAST(? AS citext), 'ACTIVE') RETURNING id")
+                .param(username)
+                .param(username + "@exemple.ca")
+                .query(UUID.class)
+                .single();
+    }
+
     /** Amitié entre {@code a} et {@code b}, sans invitation. */
     public static void befriend(JdbcClient jdbc, UUID a, UUID b) {
         jdbc.sql("INSERT INTO friendships (user_low, user_high) VALUES (LEAST(:a, :b), GREATEST(:a, :b))")

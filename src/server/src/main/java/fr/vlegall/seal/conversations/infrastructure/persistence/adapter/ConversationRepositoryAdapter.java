@@ -160,13 +160,20 @@ public class ConversationRepositoryAdapter implements ConversationRepository {
                 .single();
     }
 
+    /**
+     * CNV-06 : l'appartenance est revérifiée sur les membres relus. Sous READ COMMITTED, le {@code EXISTS} de
+     * {@link #FOR_MEMBER} voit l'instantané d'avant l'attente du verrou : un membre exclu pendant qu'il attendait
+     * passerait ; la lecture des membres, faite après, voit l'exclusion.
+     */
     private Optional<Conversation> forMember(String sql, ConversationId id, UserId member) {
         List<Row> rows = jdbc.sql(sql)
                 .param("id", id.value())
                 .param("member", member.value())
                 .query(ConversationRepositoryAdapter::row)
                 .list();
-        return withMembers(rows).stream().findFirst();
+        return withMembers(rows).stream()
+                .filter(conversation -> conversation.isActiveMember(member))
+                .findFirst();
     }
 
     private void join(ConversationId id, Member member, long seq) {

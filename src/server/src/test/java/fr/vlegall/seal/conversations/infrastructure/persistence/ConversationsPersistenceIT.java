@@ -12,16 +12,15 @@ import fr.vlegall.seal.conversations.domain.model.Member;
 import fr.vlegall.seal.conversations.domain.model.Role;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
 import fr.vlegall.seal.support.SealIntegrationTest;
+import fr.vlegall.seal.support.TestRelations;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +32,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SealIntegrationTest
 class ConversationsPersistenceIT {
 
-    private static final AtomicInteger SEQUENCE = new AtomicInteger();
     private static final Instant T0 = Instant.parse("2026-11-24T10:00:00Z");
     private static final Instant T1 = T0.plusSeconds(60);
     private static final Instant T2 = T0.plusSeconds(120);
@@ -48,14 +46,7 @@ class ConversationsPersistenceIT {
     private TransactionTemplate transactions;
 
     private UserId user() {
-        String username = "conv.p" + SEQUENCE.incrementAndGet() + "."
-                + UUID.randomUUID().toString().substring(0, 6);
-        return new UserId(jdbc.sql("INSERT INTO users (username, display_name, email, status) "
-                        + "VALUES (?, 'Nom', CAST(? AS citext), 'ACTIVE') RETURNING id")
-                .param(username)
-                .param(username + "@exemple.ca")
-                .query(UUID.class)
-                .single());
+        return new UserId(TestRelations.activeUser(jdbc));
     }
 
     private Conversation group(UserId creator, UserId... others) {
@@ -194,6 +185,56 @@ class ConversationsPersistenceIT {
         assertThat(Objects.requireNonNull(afterRelease)).isPresent();
         Optional<Conversation> stranger = transactions.execute(s -> conversations.lockForMember(created.id(), user()));
         assertThat(Objects.requireNonNull(stranger)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("CNV-06 : un membre exclu pendant qu'il attendait le verrou ne reçoit pas la conversation")
+    void cnv06MemberExcludedWhileWaitingForTheLockGetsNothing() throws Exception {
+        UserId admin = user();
+        UserId member = user();
+        Conversation created = group(admin, member);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+
+        CompletableFuture<Void> holder = CompletableFuture.runAsync(() -> transactions.executeWithoutResult(s -> {
+            Conversation before =
+                    conversations.lockForMember(created.id(), admin).orElseThrow();
+            locked.countDown();
+            awaitQuietly(release);
+            conversations.save(before, before.exclude(admin, member), T1);
+        }));
+        assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+        CompletableFuture<Optional<Conversation>> waiting = CompletableFuture.supplyAsync(() ->
+                Objects.requireNonNull(transactions.execute(s -> conversations.lockForMember(created.id(), member))));
+        awaitLockWaiter();
+        release.countDown();
+        holder.get(10, TimeUnit.SECONDS);
+
+        // READ COMMITTED : la sous-requête d'appartenance a vu l'instantané d'avant l'attente ; les membres relus, non.
+        assertThat(waiting.get(10, TimeUnit.SECONDS)).isEmpty();
+    }
+
+    /** Attend qu'une transaction soit bloquée sur le verrou d'une conversation. */
+    private void awaitLockWaiter() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (jdbc.sql("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
+                                + " AND query LIKE '%FOR UPDATE OF c%'")
+                        .query(Long.class)
+                        .single()
+                == 0) {
+            if (System.nanoTime() > deadline) {
+                throw new IllegalStateException("aucune transaction n'attend le verrou");
+            }
+            Thread.sleep(10);
+        }
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Test
