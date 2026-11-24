@@ -53,6 +53,8 @@ const never = () => Promise.reject(new Error('non attendu'))
 interface Fakes {
   readonly friends?: IFriendsApi['friends']
   readonly received?: readonly ReceivedRequest[]
+  readonly receivedApi?: IFriendsApi['receivedRequests']
+  readonly sentApi?: IFriendsApi['sentRequests']
   readonly send?: (username: string) => Promise<SentRequest>
   readonly accept?: (requestId: string) => Promise<void>
   readonly unfriend?: (userId: string) => Promise<void>
@@ -67,8 +69,10 @@ async function renderAt(entry: string, width: number, height: number, fakes: Fak
   const client = fakes.client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const friendsApi: IFriendsApi = {
     friends: fakes.friends ?? (() => Promise.resolve({ items: FRIENDS, next: null })),
-    receivedRequests: () => Promise.resolve({ items: fakes.received ?? RECEIVED, next: null }),
-    sentRequests: () => Promise.resolve({ items: SENT, next: null }),
+    receivedRequests:
+      fakes.receivedApi ??
+      (() => Promise.resolve({ items: fakes.received ?? RECEIVED, next: null })),
+    sentRequests: fakes.sentApi ?? (() => Promise.resolve({ items: SENT, next: null })),
   }
   const accept = vi.fn(fakes.accept ?? (() => Promise.resolve()))
   const screen = await render(
@@ -342,6 +346,74 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await screen.getByRole('button', { name: 'Retirer', exact: true }).click()
 
     await expect.element(screen.getByRole('heading', { level: 1, name: 'Amis' })).toHaveFocus()
+  })
+
+  it('WCAG 2.1.1 : le menu d’un ami se ferme au clic hors de lui et à Tab', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900)
+    const more = screen.getByRole('button', { name: 'Plus d’actions — Inès Côté' })
+    const item = screen.getByRole('menuitem', { name: 'Retirer des amis' })
+
+    await more.click()
+    await expect.element(item).toBeVisible()
+    await screen.getByRole('heading', { level: 1, name: 'Amis' }).click()
+    await expect.poll(() => item.elements().length).toBe(0)
+
+    await more.click()
+    await expect.element(item).toHaveFocus()
+    await userEvent.keyboard('{Tab}')
+    await expect.poll(() => item.elements().length).toBe(0)
+  })
+
+  it('A10 : onglet Invitations, une liste en échec donne l’état d’erreur ; « Réessayer » relit les deux listes', async () => {
+    let receivedCalls = 0
+    let sentCalls = 0
+    const { screen } = await renderAt('/amis?onglet=invitations', 820, 1180, {
+      receivedApi: () => {
+        receivedCalls += 1
+        return receivedCalls === 1
+          ? Promise.reject(new NetworkError())
+          : Promise.resolve({ items: RECEIVED, next: null })
+      },
+      sentApi: () => {
+        sentCalls += 1
+        return Promise.resolve({ items: SENT, next: null })
+      },
+    })
+
+    await screen.getByRole('button', { name: 'Réessayer' }).click()
+
+    await expect.element(screen.getByText('Sarah Bélanger')).toBeVisible()
+    expect(receivedCalls).toBe(2)
+    expect(sentCalls).toBe(2)
+  })
+
+  it('ADR 0038 (point 4) : dès 1024 px, l’aside « Ajouter un ami » est aussi sur l’onglet Invitations', async () => {
+    const { screen } = await renderAt('/amis?onglet=invitations', 1440, 900)
+
+    await expect
+      .element(screen.getByRole('complementary', { name: 'Ajouter un ami' }))
+      .toBeVisible()
+  })
+
+  it('ADR 0038 (point 4) : sur tablette, la feuille a la largeur du contenu et reste ouverte après un envoi', async () => {
+    const { screen } = await renderAt('/amis', 820, 1180, {
+      send: () =>
+        Promise.resolve({ id: id(14), userId: id(24), username: 'noa.g', createdAt: new Date() }),
+    })
+
+    await screen.getByRole('button', { name: 'Ajouter un ami' }).first().click()
+    const sheet = screen.getByRole('dialog', { name: 'Ajouter un ami' })
+    await expect.element(sheet).toBeVisible()
+    expect(sheet.element().getBoundingClientRect().width).toBe(
+      document.querySelector('main')?.getBoundingClientRect().width,
+    )
+    await sheet.getByLabelText('Identifiant').fill('noa.g')
+    await sheet.getByRole('button', { name: 'Envoyer l’invitation' }).click()
+
+    await expect
+      .poll(() => sheet.element().querySelector('[role="status"]')?.textContent)
+      .toContain('Invitation envoyée à @noa.g.')
+    await expect.element(sheet).toBeVisible()
   })
 
   it('A10 : une relecture en échec garde la liste déjà chargée', async () => {
