@@ -153,6 +153,17 @@ class ConversationsIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         group(me, "Ski", List.of()).andExpect(status().isBadRequest());
+        java.util.Map<String, Object> nullList = new java.util.HashMap<>();
+        nullList.put("name", "Ski");
+        nullList.put("memberIds", null);
+        mvc.perform(me.unsafe(post(CONVERSATIONS + "/group"), nullList))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        java.util.List<UUID> withNull = new java.util.ArrayList<>();
+        withNull.add(null);
+        mvc.perform(me.unsafe(post(CONVERSATIONS + "/group"), Map.of("name", "Ski", "memberIds", withNull)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         List<UUID> fifty = new ArrayList<>();
         for (int i = 0; i < 50; i++) {
             fifty.add(UUID.randomUUID());

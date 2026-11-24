@@ -8,5 +8,6 @@ import java.util.Set;
 /** GRP-03, FRD-21 : tout membre ajoute ses propres amis ; 50 membres actifs au plus. */
 public interface AddMembersUseCase {
 
-    ConversationSummary add(UserId caller, ConversationId id, Set<UserId> newcomers);
+    /** {@code admit} plutôt que {@code add} : SpotBugs prend une méthode {@code add…} pour celle d'une collection. */
+    ConversationSummary admit(UserId caller, ConversationId id, Set<UserId> newcomers);
 }

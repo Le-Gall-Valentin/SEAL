@@ -48,7 +48,7 @@ class GroupMembershipHandlersTest {
     @Test
     @DisplayName("GRP-03, GRP-04 : un membre ajoute ses propres amis, qui n'ont pas à être amis des autres")
     void grp03MemberAddsOwnFriends() {
-        ConversationSummary after = add.add(member, group, Set.of(membersFriend));
+        ConversationSummary after = add.admit(member, group, Set.of(membersFriend));
 
         assertThat(after.members()).extracting(m -> m.profile().user()).contains(membersFriend);
     }
@@ -56,7 +56,7 @@ class GroupMembershipHandlersTest {
     @Test
     @DisplayName("FRD-21, GRP-03 : un arrivant doit être ami de celui qui l'ajoute")
     void frd21NewcomerMustBeAFriendOfTheCaller() {
-        assertThatThrownBy(() -> add.add(member, group, Set.of(adminsFriend)))
+        assertThatThrownBy(() -> add.admit(member, group, Set.of(adminsFriend)))
                 .isInstanceOf(ConversationException.NotFriends.class);
         assertThat(get.get(admin, group).members()).hasSize(2);
     }
@@ -71,9 +71,9 @@ class GroupMembershipHandlersTest {
             friends.add(user);
         });
         Set<UserId> first = new LinkedHashSet<>(friends.stream().limit(48).toList());
-        add.add(admin, group, first);
+        add.admit(admin, group, first);
 
-        assertThatThrownBy(() -> add.add(
+        assertThatThrownBy(() -> add.admit(
                         admin,
                         group,
                         Set.of(
@@ -86,7 +86,7 @@ class GroupMembershipHandlersTest {
     @Test
     @DisplayName("GRP-03 : seul l'administrateur retire et renomme ; à son départ, un successeur est désigné")
     void grp03AdminRightsAndSuccession() {
-        add.add(member, group, Set.of(membersFriend));
+        add.admit(member, group, Set.of(membersFriend));
 
         assertThatThrownBy(() -> exclude.exclude(member, group, membersFriend))
                 .isInstanceOf(ConversationException.Forbidden.class);
@@ -108,7 +108,7 @@ class GroupMembershipHandlersTest {
     @Test
     @DisplayName("CNV-06 : un non-membre reçoit NOT_FOUND pour toute action")
     void cnv06NonMemberGetsNotFound() {
-        assertThatThrownBy(() -> add.add(stranger, group, Set.of(member)))
+        assertThatThrownBy(() -> add.admit(stranger, group, Set.of(member)))
                 .isInstanceOf(ConversationException.NotFound.class);
         assertThatThrownBy(() -> exclude.exclude(stranger, group, member))
                 .isInstanceOf(ConversationException.NotFound.class);
@@ -123,7 +123,7 @@ class GroupMembershipHandlersTest {
     void directRefusesGroupActions() {
         ConversationId pair = direct.open(admin, member).conversation().id();
 
-        assertThatThrownBy(() -> add.add(admin, pair, Set.of(adminsFriend)))
+        assertThatThrownBy(() -> add.admit(admin, pair, Set.of(adminsFriend)))
                 .isInstanceOf(ConversationException.Forbidden.class);
         assertThatThrownBy(() -> exclude.exclude(admin, pair, member))
                 .isInstanceOf(ConversationException.Forbidden.class);

@@ -110,7 +110,7 @@ public class ConversationsController {
     @PostMapping("/{id}/members")
     public ConversationView add(
             @CurrentUser UserId user, @PathVariable UUID id, @Valid @RequestBody AddMembersBody body) {
-        return ConversationView.of(additions.add(user, new ConversationId(id), distinct(body.userIds(), "userIds")));
+        return ConversationView.of(additions.admit(user, new ConversationId(id), distinct(body.userIds(), "userIds")));
     }
 
     /** GRP-03 : 204 ; réservé à l'administrateur. */

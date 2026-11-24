@@ -93,6 +93,11 @@
         <Class name="fr.vlegall.seal.friends.infrastructure.web.FriendRequestsController"/>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
+    <!-- /api/v1/conversations (session complète, ADR 0039) : ConversationsIT. -->
+    <Match>
+        <Class name="fr.vlegall.seal.conversations.infrastructure.web.ConversationsController"/>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
     <!-- /api/v1/friends (session complète, ADR 0037) : FriendListsIT. -->
     <Match>
         <Class name="fr.vlegall.seal.friends.infrastructure.web.FriendsController"/>

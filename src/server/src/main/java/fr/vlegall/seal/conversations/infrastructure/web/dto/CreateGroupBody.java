@@ -11,4 +11,9 @@ import java.util.UUID;
  */
 public record CreateGroupBody(
         @NotNull @Size(min = 1, max = 128) String name,
-        @NotNull @Size(min = 1, max = 49) List<@NotNull UUID> memberIds) {}
+        @NotNull @Size(min = 1, max = 49) List<@NotNull UUID> memberIds) {
+
+    public CreateGroupBody {
+        memberIds = List.copyOf(memberIds);
+    }
+}

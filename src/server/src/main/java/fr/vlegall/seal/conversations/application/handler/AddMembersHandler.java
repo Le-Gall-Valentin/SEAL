@@ -39,7 +39,7 @@ public class AddMembersHandler implements AddMembersUseCase {
      */
     @Override
     @Transactional
-    public ConversationSummary add(UserId caller, ConversationId id, Set<UserId> newcomers) {
+    public ConversationSummary admit(UserId caller, ConversationId id, Set<UserId> newcomers) {
         Conversation before = conversations.lockForMember(id, caller).orElseThrow(ConversationException.NotFound::new);
         before.ensureGroup();
         Set<UserId> arriving =
