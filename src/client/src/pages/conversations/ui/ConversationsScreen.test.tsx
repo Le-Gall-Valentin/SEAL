@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
-import { page } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import {
   type Conversation,
@@ -39,6 +39,11 @@ const SKI: Conversation = {
   createdAt: new Date('2026-11-20T00:00:00Z'),
   lastServerSeq: 0,
 }
+const RAQUETTE: Conversation = {
+  ...SKI,
+  id: '0193a1b2-0000-7000-8000-000000000002',
+  name: 'Raquette au fjord',
+}
 
 interface Fakes {
   readonly get?: IConversationsApi['get']
@@ -47,7 +52,7 @@ interface Fakes {
 }
 
 async function renderAt(
-  entry: string,
+  entry: string | { readonly pathname: string; readonly search?: string; readonly state: unknown },
   width: number,
   fakes: Fakes | IConversationsApi['get'] = {},
 ) {
@@ -234,5 +239,96 @@ describe('pages/conversations : écran Conversations (CNV-04, ADR 0041)', () => 
     await expect
       .element(screen.getByRole('heading', { level: 2, name: 'Ski du dimanche' }))
       .toBeVisible()
+  })
+
+  it('CNV-06, ADR 0041 (point 4) : l’alerte d’une conversation disparue ne revient pas au rechargement', async () => {
+    // Un rechargement garde l'état de l'historique : l'alerte ne doit pas en dépendre.
+    const screen = await renderAt({ pathname: '/', state: { conversationGone: true } }, 1440)
+
+    await expect.element(screen.getByRole('link', { name: 'Ski du dimanche' })).toBeVisible()
+    await expect.element(screen.getByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('CNV-06 : l’alerte d’une conversation disparue s’efface quand une autre s’ouvre', async () => {
+    const screen = await renderAt(`/?conversation=${SKI.id}`, 1440, (id) =>
+      id === SKI.id ? Promise.reject(new ApiError(404, 'NOT_FOUND')) : Promise.resolve(RAQUETTE),
+    )
+    await expect
+      .element(screen.getByRole('alert'))
+      .toHaveTextContent('Cette conversation n’est plus disponible.')
+
+    await screen.router.navigate(`/?conversation=${RAQUETTE.id}`)
+
+    await expect
+      .element(screen.getByRole('heading', { level: 2, name: 'Raquette au fjord' }))
+      .toBeVisible()
+    await expect.element(screen.getByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('CNV-04, maquette Conv-Tablette : à 820 px, « Infos du groupe » ouvre le tiroir, Échap le ferme et rend le focus', async () => {
+    const screen = await renderAt(`/?conversation=${SKI.id}`, 820)
+    await expect
+      .element(screen.getByRole('complementary', { name: 'Infos du groupe' }))
+      .not.toBeInTheDocument()
+    const info = screen.getByRole('button', { name: 'Infos du groupe' })
+
+    await info.click()
+    await expect.element(screen.getByRole('dialog', { name: 'Infos du groupe' })).toBeVisible()
+    await expect.element(info).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.keyboard('{Escape}')
+
+    await expect
+      .element(screen.getByRole('dialog', { name: 'Infos du groupe' }))
+      .not.toBeInTheDocument()
+    await expect.element(info).toHaveFocus()
+    await expect.element(info).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('CNV-04 : à 820 px, le tiroir ouvert se referme quand une autre conversation s’ouvre', async () => {
+    const screen = await renderAt(`/?conversation=${SKI.id}`, 820, (id) =>
+      Promise.resolve(id === SKI.id ? SKI : RAQUETTE),
+    )
+    await screen.getByRole('button', { name: 'Infos du groupe' }).click()
+    await expect.element(screen.getByRole('dialog', { name: 'Infos du groupe' })).toBeVisible()
+
+    await screen.router.navigate(`/?conversation=${RAQUETTE.id}`)
+
+    await expect
+      .element(screen.getByRole('heading', { level: 2, name: 'Raquette au fjord' }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('dialog', { name: 'Infos du groupe' }))
+      .not.toBeInTheDocument()
+  })
+
+  it('CNV-04, WCAG 2.4.3 : « Fermer le panneau » rend le focus à « Infos du groupe »', async () => {
+    const screen = await renderAt(`/?conversation=${SKI.id}`, 1440)
+
+    await screen.getByRole('button', { name: 'Fermer le panneau' }).click()
+
+    await expect.element(screen.getByRole('button', { name: 'Infos du groupe' })).toHaveFocus()
+  })
+
+  it('CNV-04, maquette Etats : pendant la lecture d’une conversation, le squelette du fil', async () => {
+    const screen = await renderAt(
+      `/?conversation=${SKI.id}`,
+      1440,
+      () => new Promise(() => undefined),
+    )
+
+    await expect
+      .element(screen.getByRole('img', { name: 'Fil de messages en cours de chargement' }))
+      .toBeVisible()
+  })
+
+  it('CNV-04, maquette Etats : sans aucune conversation, pas de « Vos conversations sont scellées » en plus de « Aucune conversation »', async () => {
+    const screen = await renderAt('/', 1440, {
+      list: () => Promise.resolve({ items: [], next: null }),
+    })
+
+    await expect.element(screen.getByRole('heading', { name: 'Aucune conversation' })).toBeVisible()
+    await expect
+      .element(screen.getByRole('heading', { name: 'Vos conversations sont scellées' }))
+      .not.toBeInTheDocument()
   })
 })

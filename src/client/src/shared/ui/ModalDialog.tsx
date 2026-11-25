@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, use, useEffect, useId, useRef } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { formMessages } from './formMessages'
+import { CrossIcon } from './icons'
 
 interface ModalDialogProps {
   readonly open: boolean
@@ -94,9 +95,11 @@ export function ModalDialog({
                   {eyebrow}
                 </span>
               )}
+              {/* ACC-03 : un nom d'un autre compte chargé de marques combinantes reste dans le titre ; le rembourrage,
+                  repris par la marge, laisse la place aux accents. */}
               <h2
                 id={titleId}
-                className="m-0 text-[20px] leading-[1.2] font-bold tracking-[-0.015em]"
+                className="-my-1 overflow-hidden py-1 text-[20px] leading-[1.2] font-bold tracking-[-0.015em] wrap-anywhere"
               >
                 {title}
               </h2>
@@ -115,18 +118,7 @@ export function ModalDialog({
               className="grid size-11 flex-none place-items-center rounded-[10px] bg-transparent text-ink-2 disabled:opacity-55"
               onClick={onClose}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
-              </svg>
+              <CrossIcon />
             </button>
           </div>
           {children}

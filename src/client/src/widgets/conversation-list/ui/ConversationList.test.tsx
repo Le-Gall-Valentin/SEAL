@@ -150,4 +150,23 @@ describe('widgets/conversation-list : liste des conversations (CNV-04, CNV-10, m
       .element(desktop.getByRole('button', { name: 'Nouvelle conversation' }))
       .toHaveTextContent('Nouvelle')
   })
+
+  it('CNV-10, WCAG 2.4.3 : « Effacer la recherche » rend le focus au champ de recherche', async () => {
+    const screen = await show(both)
+    const search = screen.getByRole('searchbox', { name: 'Rechercher une conversation' })
+    await search.fill('zz')
+
+    await screen.getByRole('button', { name: 'Effacer la recherche' }).click()
+
+    await expect.element(search).toHaveFocus()
+    await expect.element(search).toHaveValue('')
+  })
+
+  it('CNV-04, WCAG 4.1.2 : une directe sans interlocuteur n’a pas de ligne, faute de nom', async () => {
+    const alone: Conversation = { ...MATHIS, members: [member(ME, 'moi', 'Moi')] }
+    const screen = await show(() => Promise.resolve({ items: [SKI, alone], next: null }))
+
+    await expect.element(screen.getByRole('link', { name: 'Ski du dimanche' })).toBeVisible()
+    expect(screen.getByRole('link').all()).toHaveLength(1)
+  })
 })

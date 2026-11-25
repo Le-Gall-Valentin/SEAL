@@ -1,32 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import {
   ConversationAlert,
   conversationFailureOf,
   counterpartOf,
   useConversation,
+  useConversations,
 } from '@/entities/conversation'
 import { conversationOf, conversationPath, ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { LARGE_SCREEN, useMediaQuery, WIDE_SCREEN } from '@/shared/lib'
 import { LoadErrorState } from '@/shared/ui'
 import { ConversationList } from '@/widgets/conversation-list'
-import { ConversationPanel } from '@/widgets/conversation-panel'
+import { ConversationPanel, ConversationPanelSkeleton } from '@/widgets/conversation-panel'
 import { GroupDetails } from '@/widgets/group-details'
 import { NewConversationDialog } from '@/widgets/new-conversation'
 import { conversationsPageMessages } from '../i18n'
-
-/** État d'historique porté par le retour à la liste : la conversation demandée a disparu (ADR 0041, point 4). */
-const GONE_STATE = { conversationGone: true } as const
-
-function isGoneState(state: unknown): boolean {
-  return (
-    typeof state === 'object' &&
-    state !== null &&
-    'conversationGone' in state &&
-    state.conversationGone === true
-  )
-}
 
 /**
  * CNV-04 : écran Conversations (Conv-Ordinateur, Conv-Tablette, Conv-Telephone-Liste, Conv-Telephone-Fil). La
@@ -37,16 +26,17 @@ function isGoneState(state: unknown): boolean {
 export function ConversationsScreen({ me }: { readonly me: string }) {
   const t = useMessages(conversationsPageMessages)
   const navigate = useNavigate()
-  const location = useLocation()
   const [params] = useSearchParams()
   const large = useMediaQuery(LARGE_SCREEN)
   const wide = useMediaQuery(WIDE_SCREEN)
   const variant = large ? 'large' : wide ? 'medium' : 'small'
   const requested = conversationOf(params)
   const [creating, setCreating] = useState(false)
-  // Conv-Ordinateur montre les infos ouvertes ; le tiroir de Conv-Tablette s'ouvre à la demande.
+  // Conv-Ordinateur montre les infos ouvertes ; le tiroir de Conv-Tablette s'ouvre à la demande, pour la conversation
+  // où il a été ouvert : en changer le referme.
   const [asideOpen, setAsideOpen] = useState(true)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerId, setDrawerId] = useState<string | null>(null)
+  const infoButton = useRef<HTMLButtonElement>(null)
   // GRP-03 : le groupe que l'utilisateur vient de quitter n'est pas « disparu » : son 404 est attendu, et l'adresse
   // revient à la liste par une transition que la relecture peut devancer.
   const [leftId, setLeftId] = useState<string | null>(null)
@@ -65,16 +55,27 @@ export function ConversationsScreen({ me }: { readonly me: string }) {
       (opened?.type === 'DIRECT' && counterpartOf(opened, me) === undefined))
   const conversation = selectedId === null || gone ? null : (opened ?? null)
   const loading = selectedId !== null && !gone && conversation === null && failure === null
-  const infoOpen = variant === 'large' ? asideOpen : drawerOpen
+  const infoOpen =
+    variant === 'large' ? asideOpen : drawerId !== null && drawerId === conversation?.id
   const showList = variant !== 'small' || selectedId === null || gone
   const showPanel = variant !== 'small' || (selectedId !== null && !gone)
-  const notice = gone || isGoneState(location.state)
+  // Etats : « Vos conversations sont scellées » invite à choisir ; sans conversation, la liste invite déjà à en créer.
+  const hasConversations = (useConversations().data?.length ?? 0) > 0
 
-  // CNV-06 : l'adresse d'une conversation disparue revient à la liste, l'alerte portée par l'historique ; sur
-  // téléphone, la barre du bas reparaît (ADR 0041, point 4).
+  // CNV-06, ADR 0041 (point 4) : l'alerte d'une conversation disparue reste à l'écran, pas dans l'historique, pour ne
+  // pas revenir à chaque rechargement ; elle s'efface quand une autre conversation s'ouvre.
+  const [goneId, setGoneId] = useState<string | null>(null)
+  if (gone && goneId !== selectedId) {
+    setGoneId(selectedId)
+  } else if (!gone && requested !== null && goneId !== null) {
+    setGoneId(null)
+  }
+  const notice = gone || goneId !== null
+
+  // CNV-06 : l'adresse d'une conversation disparue revient à la liste ; sur téléphone, la barre du bas reparaît.
   useEffect(() => {
     if (gone) {
-      void navigate(ROUTES.HOME, { replace: true, state: GONE_STATE })
+      void navigate(ROUTES.HOME, { replace: true })
     }
   }, [gone, navigate])
 
@@ -94,8 +95,11 @@ export function ConversationsScreen({ me }: { readonly me: string }) {
   const closeInfo = () => {
     if (variant === 'large') {
       setAsideOpen(false)
+      // WCAG 2.4.3 : l'aside qui avait le focus disparaît ; il revient au bouton qui le rouvre.
+      infoButton.current?.focus()
     } else {
-      setDrawerOpen(false)
+      // Le tiroir modal rend lui-même le focus à son déclencheur en se fermant.
+      setDrawerId(null)
     }
   }
 
@@ -148,18 +152,21 @@ export function ConversationsScreen({ me }: { readonly me: string }) {
                 </button>
               )}
             </div>
+          ) : loading ? (
+            <ConversationPanelSkeleton />
           ) : (
-            !loading && (
+            (conversation !== null || hasConversations) && (
               <ConversationPanel
                 me={me}
                 conversation={conversation}
                 variant={variant}
                 infoOpen={infoOpen}
+                infoRef={infoButton}
                 onToggleInfo={() => {
                   if (variant === 'large') {
                     setAsideOpen((open) => !open)
                   } else {
-                    setDrawerOpen((open) => !open)
+                    setDrawerId(infoOpen ? null : (conversation?.id ?? null))
                   }
                 }}
                 onBack={toList}

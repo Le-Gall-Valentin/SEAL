@@ -1,6 +1,6 @@
 import { defineMessages } from '@/shared/i18n'
 
-// Maquettes Conv-Ordinateur, Conv-Telephone-Fil et Etats ; fil vide et annonce GRP-05 : ADR 0041 (point 4).
+// Maquettes Conv-Ordinateur, Conv-Telephone-Fil et Etats ; fil vide, annonce GRP-05 et squelette : ADR 0041 (point 4).
 export const conversationPanelMessages = defineMessages({
   fr: {
     info: 'Infos du groupe',
@@ -12,5 +12,6 @@ export const conversationPanelMessages = defineMessages({
     sealedTitle: 'Vos conversations sont scellées',
     sealedText: 'Choisissez une conversation, ou commencez-en une nouvelle avec un ami.',
     newConversation: 'Nouvelle conversation',
+    loading: 'Fil de messages en cours de chargement',
   },
 })

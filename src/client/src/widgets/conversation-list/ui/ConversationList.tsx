@@ -1,4 +1,4 @@
-import { type Ref, useState } from 'react'
+import { type Ref, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import {
   type Conversation,
@@ -10,9 +10,8 @@ import {
 import { conversationPath } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { isolate } from '@/shared/lib'
-import { LoadErrorState, Phoque } from '@/shared/ui'
+import { CrossIcon, LoadErrorState, Phoque, PlusIcon, SearchIcon } from '@/shared/ui'
 import { conversationListMessages } from '../i18n'
-import { ClearIcon, PlusIcon, SearchIcon } from './icons'
 
 /** Ordinateur (dès 1024 px), tablette (dès 640 px) ou téléphone. */
 export type ListVariant = 'large' | 'medium' | 'small'
@@ -51,49 +50,52 @@ export function ConversationList({
   const t = useMessages(conversationListMessages)
   const conversations = useConversations()
   const [query, setQuery] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
   const searchLabel = variant === 'medium' ? t('searchShort') : t('search')
-  const loaded = conversations.data
+  // WCAG 4.1.2 : une directe sans interlocuteur n'a pas de nom ; le serveur l'exclut déjà (ADR 0039, point 6).
+  const loaded = conversations.data?.filter(
+    (conversation) => titleOf(conversation, me) !== undefined,
+  )
   const shown = loaded?.filter((conversation) => matchConversation(conversation, me, query))
 
   return (
     <section aria-label={t('list')} className="flex min-h-0 flex-1 flex-col">
-      <div
-        className={`flex items-center justify-between gap-3 ${variant === 'small' ? 'px-4 pt-4 pb-3' : 'px-4 pt-5 pb-3'}`}
-      >
-        <h1
-          ref={titleRef}
-          tabIndex={-1}
-          className={`m-0 font-bold tracking-[-0.025em] outline-none ${variant === 'small' ? 'text-[26px]' : 'text-[20px]'}`}
-        >
-          {t('title')}
-        </h1>
-        {variant === 'large' ? (
-          <button
-            type="button"
-            aria-label={t('newConversation')}
-            onClick={onNew}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent pr-3 pl-2.5 text-[14px] font-semibold text-on-accent hover:bg-accent-hover"
+      <div className={`flex flex-col gap-3 pt-4 pb-3 ${variant === 'medium' ? 'px-3.5' : 'px-4'}`}>
+        <div className="flex min-h-11 items-center justify-between gap-3">
+          <h1
+            ref={titleRef}
+            tabIndex={-1}
+            className={`m-0 font-bold tracking-[-0.025em] outline-none ${variant === 'small' ? 'text-[26px]' : 'text-[20px]'}`}
           >
-            <PlusIcon />
-            {t('newShort')}
-          </button>
-        ) : (
-          <button
-            type="button"
-            aria-label={t('newConversation')}
-            onClick={onNew}
-            className="grid size-11 place-items-center rounded-full bg-accent text-on-accent hover:bg-accent-hover"
-          >
-            <PlusIcon size={20} />
-          </button>
-        )}
-      </div>
-      <div className="px-4 pb-2">
+            {t('title')}
+          </h1>
+          {variant === 'large' ? (
+            <button
+              type="button"
+              aria-label={t('newConversation')}
+              onClick={onNew}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-semibold text-on-accent hover:bg-accent-hover"
+            >
+              <PlusIcon size={16} />
+              {t('newShort')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label={t('newConversation')}
+              onClick={onNew}
+              className="grid size-11 place-items-center rounded-full bg-accent text-on-accent hover:bg-accent-hover"
+            >
+              <PlusIcon size={20} />
+            </button>
+          )}
+        </div>
         <label
-          className={`flex items-center gap-2 rounded-[10px] bg-sunken px-3 text-ink-3 inset-ring inset-ring-line focus-within:ring-3 focus-within:ring-focus-glow focus-within:inset-ring-accent ${variant === 'medium' ? 'h-11' : 'h-10'}`}
+          className={`flex items-center gap-2 rounded-[10px] bg-sunken px-3 text-ink-3 inset-ring inset-ring-line focus-within:ring-3 focus-within:ring-focus-glow focus-within:inset-ring-accent ${variant === 'large' ? 'h-10' : 'h-11'}`}
         >
-          <SearchIcon />
+          <SearchIcon className="flex-none" />
           <input
+            ref={searchRef}
             type="search"
             maxLength={SEARCH_MAX_LENGTH}
             aria-label={searchLabel}
@@ -142,15 +144,17 @@ export function ConversationList({
             type="button"
             onClick={() => {
               setQuery('')
+              // WCAG 2.4.3 : le bouton disparaît avec l'état « Aucun résultat » ; le focus revient à la recherche.
+              searchRef.current?.focus()
             }}
             className={`${STATE_BUTTON} bg-surface text-ink inset-ring inset-ring-line-strong`}
           >
-            <ClearIcon />
+            <CrossIcon size={18} strokeWidth={1.8} />
             {t('clearSearch')}
           </button>
         </div>
       ) : (
-        <ul className="m-0 flex min-h-0 list-none flex-col gap-0.5 overflow-y-auto px-2 pb-3">
+        <ul className="m-0 flex min-h-0 list-none flex-col overflow-y-auto px-2 pt-0.5 pb-4">
           {shown?.map((conversation) => (
             <Row
               key={conversation.id}
@@ -192,14 +196,26 @@ function Row({
   )
 }
 
+/** Lignes du squelette d'Etats : largeur du nom, de l'aperçu et de l'heure. */
+const SKELETON_ROWS = [
+  { name: 'w-[52%]', preview: 'w-[84%]', time: 'w-8' },
+  { name: 'w-[38%]', preview: 'w-[72%]', time: 'w-6.5' },
+  { name: 'w-[60%]', preview: 'w-[66%]', time: 'w-7.5' },
+] as const
+
 /** Etats : squelette de la liste, sans scintillement quand les animations sont réduites. */
 function ListSkeleton({ label }: { readonly label: string }) {
+  const block = 'rounded-md bg-sunken motion-safe:animate-pulse'
   return (
-    <div role="img" aria-label={label} className="flex flex-col gap-1 px-4 py-2">
-      {[0, 1, 2, 3].map((line) => (
-        <div key={line} className="flex h-14 items-center gap-3">
+    <div role="img" aria-label={label} className="flex flex-col gap-2 px-3 py-0.5">
+      {SKELETON_ROWS.map((row) => (
+        <div key={row.name} className="flex h-14 flex-none items-center gap-3 px-1.5">
           <span className="size-10 flex-none rounded-full bg-sunken motion-safe:animate-pulse" />
-          <span className="h-3 flex-1 rounded-full bg-sunken motion-safe:animate-pulse" />
+          <span className="flex flex-1 flex-col gap-2">
+            <span className={`h-2.75 ${row.name} ${block}`} />
+            <span className={`h-2.25 ${row.preview} ${block}`} />
+          </span>
+          <span className={`mt-3.75 h-2.25 flex-none self-start ${row.time} ${block}`} />
         </div>
       ))}
     </div>

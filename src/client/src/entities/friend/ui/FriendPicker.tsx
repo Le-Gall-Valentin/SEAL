@@ -2,7 +2,7 @@ import { type KeyboardEvent, useId, useRef, useState } from 'react'
 import { initialsOf } from '@/entities/account/@x/friend'
 import { useMessages } from '@/shared/i18n'
 import { isolate, useClock } from '@/shared/lib'
-import { Avatar, LoadErrorState } from '@/shared/ui'
+import { Avatar, CrossIcon, LoadErrorState, PlusIcon, SearchIcon } from '@/shared/ui'
 import { friendMessages } from '../i18n'
 import { tintOf } from '../model/friends'
 import { type Friend, type MatchRange, rankFriends } from '../model/friendPicker'
@@ -141,12 +141,12 @@ export function FriendPicker({
               }}
               className="grid size-7 place-items-center rounded-full text-ink-2 hover:bg-accent-soft-2"
             >
-              <CrossIcon />
+              <CrossIcon size={14} strokeWidth={2} />
             </button>
           </span>
         ))}
         <span className="inline-flex h-8 min-w-25 flex-1 items-center gap-1.5">
-          <SearchIcon />
+          <SearchIcon className="flex-none text-ink-3" />
           <input
             role="combobox"
             aria-labelledby={labelId}
@@ -224,7 +224,9 @@ export function FriendPicker({
                     @<Highlighted text={friend.username} range={usernameMatch} />
                   </span>
                 </span>
-                {index === activeIndex ? <PlusIcon /> : null}
+                {index === activeIndex ? (
+                  <PlusIcon strokeWidth={1.7} className="flex-none text-ink-3" />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -257,59 +259,5 @@ function Highlighted({
       <mark className="rounded-[3px] bg-accent-soft-2 text-inherit">{text.slice(start, end)}</mark>
       {text.slice(end)}
     </>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      aria-hidden="true"
-      className="flex-none text-ink-3"
-    >
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="M20 20l-4.3-4.3" />
-    </svg>
-  )
-}
-
-function CrossIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
-    </svg>
-  )
-}
-
-function PlusIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      aria-hidden="true"
-      className="flex-none text-ink-3"
-    >
-      <path d="M12 5v14M5 12h14" />
-    </svg>
   )
 }
