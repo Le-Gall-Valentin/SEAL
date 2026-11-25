@@ -51,4 +51,25 @@ describe('features/start-direct-conversation : adaptateur de direct (CNV-01)', (
 
     await expect(startDirectApi.openDirect(FRIEND)).rejects.toThrow()
   })
+
+  it.each([
+    ['un groupe', { ...DIRECT, type: 'GROUP', name: 'Ski' }],
+    [
+      'la directe d’un autre ami',
+      {
+        ...DIRECT,
+        members: [
+          DIRECT.members[0],
+          { ...DIRECT.members[1], userId: '0192f7a1-0000-7000-8000-000000000009' },
+        ],
+      },
+    ],
+  ])(
+    'A08, CDC 3 : un serveur qui rend %s au lieu de la directe demandée est refusé',
+    async (_cas, conversation) => {
+      request.mockResolvedValue({ created: false, conversation })
+
+      await expect(startDirectApi.openDirect(FRIEND)).rejects.toThrow()
+    },
+  )
 })

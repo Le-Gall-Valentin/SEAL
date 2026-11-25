@@ -123,4 +123,10 @@ describe('entities/conversation : adaptateur de la liste et du détail (14.5, AD
     expect(conversation.name).toBe(`Ski ${unknown}`)
     expect(conversation.members[1]?.displayName).toBe(`Camille ${unknown}`)
   })
+
+  it('A08, CDC 3 : un serveur qui rend une autre conversation que celle demandée est refusé', async () => {
+    request.mockResolvedValue({ ...group, id: '0193a1b2-0000-7000-8000-000000000009' })
+
+    await expect(conversationsApi.get(CONVERSATION)).rejects.toThrow()
+  })
 })

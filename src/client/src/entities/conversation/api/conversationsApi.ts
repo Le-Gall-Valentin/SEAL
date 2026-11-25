@@ -78,7 +78,8 @@ export const conversationsApi: IConversationsApi = {
     return conversationOf(
       await request(
         `/api/v1/conversations/${encodeURIComponent(id)}`,
-        CONVERSATION_RESPONSE,
+        // A08, CDC 3 : la vue rendue doit être celle de la conversation demandée (échec fermé).
+        CONVERSATION_RESPONSE.refine((conversation) => conversation.id === id),
         options(signal),
       ),
     )
