@@ -14,6 +14,7 @@ describe('AUTH-20 : composants de marque des écrans d’authentification (Phoqu
     ['waving', 'Le phoque SEAL vous salue'],
     ['neutral', 'Le phoque SEAL'],
     ['searching', 'Le phoque SEAL cherche'],
+    ['sleeping', 'Le phoque SEAL dort'],
   ] as const)(
     'AUTH-20 : Phoque, la pose %s porte le libellé de la maquette',
     async (variant, label) => {

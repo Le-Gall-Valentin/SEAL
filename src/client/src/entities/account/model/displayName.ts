@@ -1,8 +1,10 @@
 /** AUTH-10, en points de code après NFC. */
 export const DISPLAY_NAME_MAX_LENGTH = 50
 
-/** SEC-01 : contrôle, demi-paire, non attribué, usage privé (ADR 0040), séparateurs de ligne et de paragraphe. */
-const FORBIDDEN = /[\p{Cc}\p{Cs}\p{Cn}\p{Co}\p{Zl}\p{Zp}]/u
+/** SEC-01 : contrôle, demi-paire, usage privé (ADR 0040), séparateurs de ligne et de paragraphe. */
+const FORBIDDEN = /[\p{Cc}\p{Cs}\p{Co}\p{Zl}\p{Zp}]/u
+/** Point non attribué dans les tables d'Unicode du navigateur, qui peuvent être plus anciennes que celles du serveur. */
+const UNASSIGNED = /\p{Cn}/u
 /**
  * ADR 0040 : caractères de format, dont ceux de direction (SEC-01) et les invisibles (U+200B, U+FEFF, étiquettes…) ;
  * seuls ZWNJ (U+200C) et ZWJ (U+200D) restent permis.
@@ -31,15 +33,44 @@ export function isDisplayNameShownInvalid({
 
 /** Comme DisplayNameRule côté serveur : 1 à 50 points de code, rien de piégé, un caractère visible au moins. */
 export function isDisplayNameValid(raw: string): boolean {
+  return isNameValid(raw, DISPLAY_NAME_MAX_LENGTH)
+}
+
+/**
+ * Même règle à une autre longueur, comme `DisplayNameRule.isValid(value, maxLength)` : GRP-01 et l'ADR 0041 (point 9)
+ * la reprennent pour le nom d'un groupe, sur 64 points de code.
+ */
+export function isNameValid(raw: string, maxLength: number): boolean {
   const name = raw.normalize('NFC')
+  return !UNASSIGNED.test(name) && followsStableRule(name, maxLength, hasVisibleCharacter(name))
+}
+
+/** ADR 0042 : nom affiché reçu du serveur, à la règle de lecture. */
+export function isDisplayNameReadable(raw: string): boolean {
+  return isNameReadable(raw, DISPLAY_NAME_MAX_LENGTH)
+}
+
+/**
+ * ADR 0042 : un nom reçu du serveur (ami, membre, session, nom de groupe) garde les refus qui ne dépendent pas de la
+ * version d'Unicode ; un point que le navigateur ne connaît pas encore compte comme visible, le serveur l'ayant vérifié
+ * dans des tables plus récentes.
+ */
+export function isNameReadable(raw: string, maxLength: number): boolean {
+  const name = raw.normalize('NFC')
+  return followsStableRule(name, maxLength, hasVisibleCharacter(name) || UNASSIGNED.test(name))
+}
+
+/** Longueur en points de code, et ni contrôle, ni séparateur, ni demi-paire, ni usage privé, ni format caché. */
+function followsStableRule(name: string, maxLength: number, visible: boolean): boolean {
   const length = Array.from(name).length
   return (
-    length >= 1 &&
-    length <= DISPLAY_NAME_MAX_LENGTH &&
-    !FORBIDDEN.test(name) &&
-    !hasHiddenFormat(name) &&
-    VISIBLE.test(name.replace(FILLERS, ''))
+    visible && length >= 1 && length <= maxLength && !FORBIDDEN.test(name) && !hasHiddenFormat(name)
   )
+}
+
+/** Au moins une lettre, un chiffre, un symbole ou une ponctuation, hors des caractères de remplissage (ADR 0040). */
+export function hasVisibleCharacter(text: string): boolean {
+  return VISIBLE.test(text.replace(FILLERS, ''))
 }
 
 function hasHiddenFormat(name: string): boolean {

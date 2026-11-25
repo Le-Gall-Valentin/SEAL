@@ -13,6 +13,8 @@ const friend: Friend = {
   username: 'ines.cote',
   displayName: 'Inès Côté',
   friendsSince: new Date(0),
+  lastInteractionAt: null,
+  interactionCount30d: 0,
 }
 
 async function mount(unfriend: (userId: string) => Promise<void>) {

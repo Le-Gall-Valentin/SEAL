@@ -98,7 +98,7 @@ test('ACC-03, ACC-02, ACC-01, AUTH-53 : nom affiché, courriel par code, mot de 
   await page.getByLabel('Identifiant ou courriel').fill(NEW_EMAIL)
   await page.getByLabel('Mot de passe', { exact: true }).fill(NEW_PASSWORD)
   await page.getByRole('button', { name: 'Se connecter' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'seal' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Conversations' })).toBeVisible()
 })
 
 test('ACC-03, ADR 0035 : sur téléphone, la liste des sections puis la sous-page Compte, sans barre du bas', async ({
@@ -163,4 +163,90 @@ test('FRD-01, FRD-04, FRD-11, ADR 0038 : inviter, voir le compteur, accepter, re
     'Aucun utilisateur ne porte l’identifiant @personne.inconnue.',
   )
   expect(await phone.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+})
+
+test('CNV-01, CNV-03, GRP-03, ADR 0041 : directe depuis Amis, groupe, renommage, rechargement, départ', async () => {
+  // Le parcours précédent a retiré l'amitié : les deux comptes redeviennent amis.
+  await desktop.goto('/amis')
+  await desktop.getByLabel('Identifiant').fill(PHONE_USERNAME)
+  await desktop.getByRole('button', { name: 'Envoyer l’invitation' }).click()
+  await expect(desktop.getByRole('status')).toContainText(
+    `Invitation envoyée à @${PHONE_USERNAME}.`,
+  )
+  await phone.goto('/amis?onglet=invitations')
+  await phone.getByRole('button', { name: 'Accepter — Léa Tremblay-Roy' }).click()
+  await expect(phone.getByText('Aucune invitation reçue.')).toBeVisible()
+
+  // CNV-01 : la directe s'ouvre depuis Amis, à l'adresse de la conversation.
+  await desktop.goto('/amis')
+  // ADR 0017 : le nom de l'ami est isolé (U+2068, U+2069) dans le libellé.
+  await desktop.getByRole('button', { name: /^Envoyer un message — .Essai Téléphone.$/u }).click()
+  await expect(desktop).toHaveURL(/\/\?conversation=[0-9a-f-]{36}$/u)
+  await expect(desktop.getByRole('heading', { level: 2, name: 'Essai Téléphone' })).toBeVisible()
+
+  // CNV-03, GRP-01 : un groupe à deux, depuis « Nouvelle conversation ».
+  await desktop.getByRole('button', { name: 'Nouvelle conversation' }).first().click()
+  const dialog = desktop.getByRole('dialog', { name: 'Nouvelle conversation' })
+  await dialog.getByRole('radio', { name: 'Groupe' }).click()
+  await dialog.getByLabel('Nom du groupe').fill('Raquette du dimanche')
+  await dialog.getByRole('combobox', { name: 'Membres' }).fill('essai')
+  await dialog.getByRole('option', { name: /Essai Téléphone/u }).click()
+  await dialog.getByRole('button', { name: 'Créer le groupe (2)' }).click()
+  await expect(
+    desktop.getByRole('heading', { level: 2, name: 'Raquette du dimanche' }),
+  ).toBeVisible()
+  await expect(
+    desktop.getByText(
+      'Vous ne voyez que les messages envoyés depuis votre arrivée dans le groupe.',
+    ),
+  ).toBeVisible()
+
+  // GRP-03 : l'administrateur renomme, puis la conversation se rouvre au rechargement (ADR 0041, point 1).
+  const info = desktop.getByRole('complementary', { name: 'Infos du groupe' })
+  await info.getByRole('button', { name: 'Renommer le groupe' }).click()
+  const rename = desktop.getByRole('dialog', { name: 'Renommer le groupe' })
+  await rename.getByLabel('Nom du groupe').fill('Raquette au fjord')
+  await rename.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(desktop.getByRole('heading', { level: 2, name: 'Raquette au fjord' })).toBeVisible()
+  await desktop.reload()
+  await expect(desktop.getByRole('heading', { level: 2, name: 'Raquette au fjord' })).toBeVisible()
+
+  // GRP-03 : le membre ouvre le groupe sur téléphone, puis le quitte depuis le tiroir.
+  await phone.goto('/')
+  await phone.getByRole('link', { name: 'Raquette au fjord' }).click()
+  await phone.getByRole('button', { name: 'Infos du groupe' }).click()
+  await phone
+    .getByRole('dialog', { name: 'Infos du groupe' })
+    .getByRole('button', { name: 'Quitter le groupe' })
+    .click()
+  await phone.getByRole('alertdialog').getByRole('button', { name: 'Quitter le groupe' }).click()
+  await expect(phone.getByRole('heading', { level: 1, name: 'Conversations' })).toBeVisible()
+  await expect(phone.getByRole('link', { name: 'Raquette au fjord' })).toHaveCount(0)
+  expect(await phone.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+})
+
+test('CNV-04, ADR 0041 : en thème sombre, l’écran Conversations prend les jetons sombres de la maquette', async () => {
+  await desktop.emulateMedia({ colorScheme: 'dark' })
+  try {
+    await desktop.goto('/')
+    const title = desktop.getByRole('heading', { level: 1, name: 'Conversations' })
+    await expect(title).toBeVisible()
+    // tokens.css, thème sombre : --ink #e9eddf, --surface #151a10.
+    await expect(title).toHaveCSS('color', 'rgb(233, 237, 223)')
+    const surface = await title.evaluate((element) => {
+      let node: Element | null = element
+      while (node !== null && getComputedStyle(node).backgroundColor === 'rgba(0, 0, 0, 0)') {
+        node = node.parentElement
+      }
+      return node === null ? null : getComputedStyle(node).backgroundColor
+    })
+    expect(surface).toBe('rgb(21, 26, 16)')
+    await desktop.getByRole('link', { name: 'Raquette au fjord' }).click()
+    await expect(desktop.getByRole('heading', { level: 2, name: 'Raquette au fjord' })).toHaveCSS(
+      'color',
+      'rgb(233, 237, 223)',
+    )
+  } finally {
+    await desktop.emulateMedia({ colorScheme: 'light' })
+  }
 })

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { isDisplayNameValid, isUsernameWellFormed } from '@/entities/account/@x/session'
+import { isDisplayNameReadable, isUsernameWellFormed } from '@/entities/account/@x/session'
 import { reloadCsrf, request } from '@/shared/api'
 import { ApiError } from '@/shared/lib'
 import type { Account, ISessionApi } from './ISessionApi'
@@ -11,7 +11,7 @@ import type { Account, ISessionApi } from './ISessionApi'
 const ACCOUNT = z.object({
   id: z.uuid(),
   username: z.string().max(20).refine(isUsernameWellFormed),
-  displayName: z.string().max(200).refine(isDisplayNameValid),
+  displayName: z.string().max(200).refine(isDisplayNameReadable),
   email: z.string().min(3).max(254),
   status: z.enum(['PENDING_EMAIL', 'ACTIVE']),
   verification: z

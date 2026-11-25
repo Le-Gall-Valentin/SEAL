@@ -34,6 +34,13 @@ function apisWith(reloadCsrf: () => Promise<void>): Apis {
     sendFriendRequest: { send: never },
     answerFriendRequest: { accept: never, decline: never, revoke: never },
     removeFriend: { unfriend: never },
+    conversations: { list: never, get: never },
+    startDirect: { openDirect: never },
+    createGroup: { createGroup: never },
+    addMembers: { admit: never },
+    renameGroup: { rename: never },
+    removeMember: { exclude: never },
+    leaveGroup: { leave: never },
   }
 }
 

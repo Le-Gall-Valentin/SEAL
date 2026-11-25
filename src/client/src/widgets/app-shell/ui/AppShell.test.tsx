@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
+import { ConversationsApiProvider, useConversations } from '@/entities/conversation'
 import { FriendsApiProvider, type ReceivedRequest } from '@/entities/friend'
 import { type Account, SessionApiProvider } from '@/entities/session'
 import { AppShell } from './AppShell'
@@ -212,5 +213,79 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
     await expect
       .element(screen.getByRole('navigation', { name: 'Navigation principale' }))
       .toBeVisible()
+  })
+
+  it('CNV-04, ADR 0041 (point 1), maquette Conv-Telephone-Fil : un fil ouvert sur téléphone retire la barre du bas', async () => {
+    const { screen } = await renderAt(
+      '/?conversation=0193a1b2-0000-7000-8000-000000000001',
+      390,
+      844,
+    )
+
+    await expect.element(screen.getByText('Accueil')).toBeVisible()
+    expect(
+      screen.getByRole('navigation', { name: 'Navigation principale' }).elements(),
+    ).toHaveLength(0)
+  })
+
+  it('CNV-04, ADR 0041 (point 1) : un identifiant de conversation mal formé n’ouvre rien ; la barre du bas reste', async () => {
+    const { screen } = await renderAt('/?conversation=pas-un-uuid', 390, 844)
+
+    await expect
+      .element(screen.getByRole('navigation', { name: 'Navigation principale' }))
+      .toBeVisible()
+  })
+
+  it('CNV-04, AUTH-52, ADR 0041 (point 8) : la coque relit les conversations toutes les 60 s, seulement après une action', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      let reads = 0
+      function Conversations() {
+        const count = useConversations().data?.length
+        return <p>Conversations lues : {count ?? '…'}</p>
+      }
+      const router = createMemoryRouter(
+        [{ element: <AppShell />, children: [{ path: '/', element: <Conversations /> }] }],
+        { initialEntries: ['/'] },
+      )
+      const screen = await render(
+        <QueryClientProvider client={new QueryClient()}>
+          <SessionApiProvider
+            api={{ me: () => Promise.resolve(ACTIVE), reloadCsrf: () => Promise.resolve() }}
+          >
+            <FriendsApiProvider
+              api={{
+                friends: never,
+                sentRequests: never,
+                receivedRequests: () => Promise.resolve({ items: [], next: null }),
+              }}
+            >
+              <ConversationsApiProvider
+                api={{
+                  list: () => {
+                    reads += 1
+                    return Promise.resolve({ items: [], next: null })
+                  },
+                  get: never,
+                }}
+              >
+                <RouterProvider router={router} />
+              </ConversationsApiProvider>
+            </FriendsApiProvider>
+          </SessionApiProvider>
+        </QueryClientProvider>,
+      )
+      await expect.element(screen.getByText('Conversations lues : 0')).toBeVisible()
+      const first = reads
+
+      vi.advanceTimersByTime(2 * 60_000)
+      expect(reads).toBe(first)
+
+      window.dispatchEvent(new KeyboardEvent('keydown'))
+      vi.advanceTimersByTime(60_000)
+      await expect.poll(() => reads).toBe(first + 1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

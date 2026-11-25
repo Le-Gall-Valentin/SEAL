@@ -108,6 +108,6 @@ export async function registerAccount(
 
   const recoveryKey = await confirmRecoveryKey(page)
   await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByRole('heading', { level: 1, name: 'seal' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Conversations' })).toBeVisible()
   return recoveryKey
 }

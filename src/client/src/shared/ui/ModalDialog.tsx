@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, use, useEffect, useId, useRef } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { formMessages } from './formMessages'
+import { CrossIcon } from './icons'
 
 interface ModalDialogProps {
   readonly open: boolean
@@ -20,6 +21,10 @@ interface ModalDialogProps {
   readonly danger?: boolean
   /** Identifiant du texte qui décrit la fenêtre. */
   readonly describedBy?: string | undefined
+  /** 528 px au lieu de 500 : Nouvelle-Conversation, qui loge le sélecteur d'amis. */
+  readonly wide?: boolean
+  /** Feuille plein écran sur téléphone, sous 640 px (Nouvelle-Conversation, ADR 0041 point 3). */
+  readonly sheet?: boolean
   readonly children: ReactNode
 }
 
@@ -41,6 +46,8 @@ export function ModalDialog({
   subtitle,
   danger = false,
   describedBy,
+  wide = false,
+  sheet = false,
   children,
 }: ModalDialogProps) {
   const t = useMessages(formMessages)
@@ -65,10 +72,12 @@ export function ModalDialog({
       role={danger ? 'alertdialog' : undefined}
       aria-labelledby={titleId}
       aria-describedby={describedBy}
-      className={`m-auto mt-10 w-[calc(100%-32px)] overflow-y-auto rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay ${danger ? 'max-w-[520px]' : 'max-w-[500px]'}`}
+      className={`m-auto mt-10 w-[calc(100%-32px)] overflow-y-auto rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay ${danger ? 'max-w-[520px]' : wide ? 'max-w-[528px]' : 'max-w-[500px]'} ${sheet ? 'max-sm:m-0 max-sm:h-full max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:rounded-none' : ''}`}
       onCancel={(event) => {
-        // Échap : la fenêtre ne se ferme que si l'écran le permet, et par lui.
+        // Échap : la fenêtre ne se ferme que si l'écran le permet, et par lui. React fait remonter l'annulation : une
+        // fenêtre ouverte depuis une autre (le tiroir des infos d'un groupe) ne doit pas fermer aussi celle-ci.
         event.preventDefault()
+        event.stopPropagation()
         if (closable) {
           onClose()
         }
@@ -86,9 +95,11 @@ export function ModalDialog({
                   {eyebrow}
                 </span>
               )}
+              {/* ACC-03 : un nom d'un autre compte chargé de marques combinantes reste dans le titre ; le rembourrage,
+                  repris par la marge, laisse la place aux accents. */}
               <h2
                 id={titleId}
-                className="m-0 text-[20px] leading-[1.2] font-bold tracking-[-0.015em]"
+                className="-my-1 overflow-hidden py-1 text-[20px] leading-[1.2] font-bold tracking-[-0.015em] wrap-anywhere"
               >
                 {title}
               </h2>
@@ -107,18 +118,7 @@ export function ModalDialog({
               className="grid size-11 flex-none place-items-center rounded-[10px] bg-transparent text-ink-2 disabled:opacity-55"
               onClick={onClose}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
-              </svg>
+              <CrossIcon />
             </button>
           </div>
           {children}

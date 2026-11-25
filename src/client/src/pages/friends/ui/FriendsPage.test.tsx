@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { createMemoryRouter, RouterProvider, useSearchParams } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
@@ -13,6 +13,7 @@ import {
 import { AnswerFriendRequestApiProvider } from '@/features/answer-friend-request'
 import { RemoveFriendApiProvider } from '@/features/remove-friend'
 import { SendFriendRequestApiProvider } from '@/features/send-friend-request'
+import { type OpenedDirect, StartDirectApiProvider } from '@/features/start-direct-conversation'
 import { ApiError, isolate, NetworkError } from '@/shared/lib'
 import { FriendsPage } from './FriendsPage'
 
@@ -22,6 +23,8 @@ const friend = (n: number, displayName: string, username: string): Friend => ({
   username,
   displayName,
   friendsSince: new Date(0),
+  lastInteractionAt: null,
+  interactionCount30d: 0,
 })
 const FRIENDS = [
   friend(1, 'Thomas Lavoie', 'thomas.lavoie'),
@@ -65,14 +68,25 @@ interface Fakes {
   readonly send?: (username: string) => Promise<SentRequest>
   readonly accept?: (requestId: string) => Promise<void>
   readonly unfriend?: (userId: string) => Promise<void>
+  readonly openDirect?: (userId: string) => Promise<OpenedDirect>
   readonly client?: QueryClient
+}
+
+/** Écran d'arrivée : montre la conversation de l'adresse (ADR 0041, point 1). */
+function OpenedConversation() {
+  const [params] = useSearchParams()
+  return <p>{`conversation ${params.get('conversation') ?? ''}`}</p>
 }
 
 async function renderAt(entry: string, width: number, height: number, fakes: Fakes = {}) {
   await page.viewport(width, height)
-  const router = createMemoryRouter([{ path: '/amis', element: <FriendsPage /> }], {
-    initialEntries: [entry],
-  })
+  const router = createMemoryRouter(
+    [
+      { path: '/amis', element: <FriendsPage /> },
+      { path: '/', element: <OpenedConversation /> },
+    ],
+    { initialEntries: [entry] },
+  )
   const client = fakes.client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const friendsApi: IFriendsApi = {
     friends: fakes.friends ?? (() => Promise.resolve({ items: FRIENDS, next: null })),
@@ -88,7 +102,9 @@ async function renderAt(entry: string, width: number, height: number, fakes: Fak
         <SendFriendRequestApiProvider api={{ send: fakes.send ?? never }}>
           <AnswerFriendRequestApiProvider api={{ accept, decline: never, revoke: never }}>
             <RemoveFriendApiProvider api={{ unfriend: fakes.unfriend ?? never }}>
-              <RouterProvider router={router} />
+              <StartDirectApiProvider api={{ openDirect: fakes.openDirect ?? never }}>
+                <RouterProvider router={router} />
+              </StartDirectApiProvider>
             </RemoveFriendApiProvider>
           </AnswerFriendRequestApiProvider>
         </SendFriendRequestApiProvider>
@@ -126,10 +142,13 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
       .element(screen.getByRole('heading', { level: 2, name: 'Ajouter un ami' }))
       .toBeVisible()
     await expect.element(screen.getByLabelText('Identifiant')).toBeVisible()
-    expect(screen.getByRole('button', { name: /Envoyer un message/ }).elements()).toHaveLength(0)
+    // CNV-01, ADR 0038 (point 3) : « Envoyer un message » arrive avec les conversations (ADR 0041).
+    await expect
+      .element(screen.getByRole('button', { name: `Envoyer un message — ${isolate('Inès Côté')}` }))
+      .toBeVisible()
   })
 
-  it('FRD-11, ADR 0038 (point 3) : le menu d’un ami n’offre que « Retirer des amis », qui demande confirmation', async () => {
+  it('CNV-01, FRD-11, ADR 0038 (point 3) : le menu offre « Envoyer un message » puis « Retirer des amis », qui demande confirmation', async () => {
     const { screen } = await renderAt('/amis', 1440, 900)
 
     const more = screen.getByRole('button', { name: 'Plus d’actions — Inès Côté' })
@@ -137,7 +156,14 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
 
     const menu = screen.getByRole('menu', { name: 'Actions — Inès Côté' })
     await expect.element(menu).toBeVisible()
-    expect(menu.getByRole('menuitem').elements()).toHaveLength(1)
+    expect(
+      menu
+        .getByRole('menuitem')
+        .elements()
+        .map((item) => item.textContent),
+    ).toEqual(['Envoyer un message', 'Retirer des amis'])
+    await expect.element(menu.getByRole('menuitem', { name: 'Envoyer un message' })).toHaveFocus()
+    await userEvent.keyboard('{ArrowDown}')
     await expect.element(menu.getByRole('menuitem', { name: 'Retirer des amis' })).toHaveFocus()
     await userEvent.keyboard('{Escape}')
     await expect.element(more).toHaveFocus()
@@ -341,7 +367,8 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
 
     const more = screen.getByRole('button', { name: 'Plus d’actions — Inès Côté' })
     await more.click()
-    await userEvent.keyboard('{Enter}')
+    // « Envoyer un message » vient d'abord (Amis-Ordinateur) : la flèche mène à « Retirer des amis ».
+    await userEvent.keyboard('{ArrowDown}{Enter}')
     await expect.element(screen.getByRole('alertdialog')).toBeVisible()
     await userEvent.keyboard('{Escape}')
 
@@ -363,7 +390,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     })
 
     await screen.getByRole('button', { name: 'Plus d’actions — Inès Côté' }).click()
-    await userEvent.keyboard('{Enter}')
+    await userEvent.keyboard('{ArrowDown}{Enter}')
     await screen.getByRole('button', { name: 'Retirer', exact: true }).click()
 
     await expect.element(screen.getByRole('heading', { level: 1, name: 'Amis' })).toHaveFocus()
@@ -372,7 +399,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
   it('FRD-11, WCAG 2.1.1 : le menu d’un ami se ferme au clic hors de lui et à Tab', async () => {
     const { screen } = await renderAt('/amis', 1440, 900)
     const more = screen.getByRole('button', { name: 'Plus d’actions — Inès Côté' })
-    const item = screen.getByRole('menuitem', { name: 'Retirer des amis' })
+    const item = screen.getByRole('menuitem', { name: 'Envoyer un message' })
 
     await more.click()
     await expect.element(item).toBeVisible()
@@ -541,5 +568,95 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     })
 
     await expect.element(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible()
+  })
+
+  it('CNV-01, ADR 0041 (point 1) : « Envoyer un message » ouvre la directe, trouvée ou créée', async () => {
+    const openDirect = vi.fn(() =>
+      Promise.resolve({
+        created: false,
+        conversation: {
+          id: 'd-1',
+          type: 'DIRECT' as const,
+          name: null,
+          members: [],
+          createdAt: new Date(0),
+          lastServerSeq: 0,
+        },
+      }),
+    )
+    const { screen } = await renderAt('/amis', 1440, 900, { openDirect })
+
+    await screen
+      .getByRole('button', { name: `Envoyer un message — ${isolate('Inès Côté')}` })
+      .click()
+
+    await expect.element(screen.getByText('conversation d-1')).toBeVisible()
+    expect(openDirect).toHaveBeenCalledWith(
+      FRIENDS.find((f) => f.displayName === 'Inès Côté')?.userId,
+    )
+  })
+
+  it('FRD-21, ADR 0041 (point 4) : un ami retiré entre-temps, le refus s’annonce', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900, {
+      openDirect: () => Promise.reject(new ApiError(403, 'NOT_FRIENDS')),
+    })
+
+    await screen
+      .getByRole('button', { name: `Envoyer un message — ${isolate('Inès Côté')}` })
+      .click()
+
+    await expect
+      .element(screen.getByRole('alert'))
+      .toHaveTextContent(
+        'Vous ne pouvez ajouter que vos amis. Leur liste vient d’être mise à jour.',
+      )
+  })
+
+  it('CNV-01 : pendant l’ouverture de la directe, « Envoyer un message » est marqué occupé', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900, {
+      openDirect: () => new Promise(() => undefined),
+    })
+    const button = screen.getByRole('button', {
+      name: `Envoyer un message — ${isolate('Inès Côté')}`,
+    })
+
+    await button.click()
+
+    await expect.element(button).toHaveAttribute('aria-busy', 'true')
+    await expect
+      .element(
+        screen.getByRole('button', { name: `Envoyer un message — ${isolate('Camille Tremblay')}` }),
+      )
+      .not.toHaveAttribute('aria-busy')
+  })
+
+  it('FRD-21 : l’alerte d’un refus s’efface quand une autre action commence', async () => {
+    const { screen } = await renderAt('/amis', 390, 844, {
+      openDirect: () => Promise.reject(new ApiError(403, 'NOT_FRIENDS')),
+    })
+    await screen
+      .getByRole('button', { name: `Envoyer un message — ${isolate('Inès Côté')}` })
+      .click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Ajouter un ami' }).click()
+
+    await expect
+      .element(
+        screen.getByText(
+          'Vous ne pouvez ajouter que vos amis. Leur liste vient d’être mise à jour.',
+        ),
+      )
+      .not.toBeInTheDocument()
+  })
+
+  it('FRD-10, WCAG 2.4.3 : « Effacer la recherche » rend le focus au champ de recherche', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900)
+    const search = screen.getByRole('searchbox', { name: 'Rechercher un ami' })
+    await search.fill('zz')
+
+    await screen.getByRole('button', { name: 'Effacer la recherche' }).click()
+
+    await expect.element(search).toHaveFocus()
   })
 })

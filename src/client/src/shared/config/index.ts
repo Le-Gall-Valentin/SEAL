@@ -2,6 +2,8 @@
 export { AVATAR_TINTS } from './avatar'
 export type { AvatarTint } from './avatar'
 export {
+  conversationIdOf,
+  conversationPath,
   FRIENDS_INVITATIONS,
   friendsTabOf,
   ROUTES,

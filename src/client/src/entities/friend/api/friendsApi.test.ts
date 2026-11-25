@@ -4,7 +4,8 @@ import type { z } from 'zod'
 const calls: string[] = []
 const request = vi.fn<(path: string, schema: z.ZodType, options?: unknown) => Promise<unknown>>()
 
-vi.mock('@/shared/api', () => ({
+vi.mock('@/shared/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/shared/api')>()),
   request: async (path: string, schema: z.ZodType, options?: unknown) => {
     calls.push(path)
     return schema.parse(await request(path, schema, options))
@@ -46,7 +47,30 @@ describe('entities/friend : adaptateur des listes d’amis et d’invitations (1
       username: 'chloe.f',
       displayName: 'Chloé Fortin',
       friendsSince: new Date('2026-11-20T10:00:00.123Z'),
+      lastInteractionAt: null,
+      interactionCount30d: 0,
     })
+  })
+
+  it('FRD-20, ADR 0041 (point 9) : les statistiques d’interaction restent pour l’affinité du sélecteur', async () => {
+    request.mockResolvedValue({
+      items: [
+        {
+          userId: USER,
+          username: 'chloe.f',
+          displayName: 'Chloé Fortin',
+          friendsSince: '2026-11-20T10:00:00.123Z',
+          lastInteractionAt: '2026-11-23T08:30:00Z',
+          interactionCount30d: 4,
+        },
+      ],
+      next: null,
+    })
+
+    const page = await friendsApi.friends(null)
+
+    expect(page.items[0]?.lastInteractionAt).toEqual(new Date('2026-11-23T08:30:00Z'))
+    expect(page.items[0]?.interactionCount30d).toBe(4)
   })
 
   it('FRD-10, ADR 0037 (point 3) : le curseur reçu part en after, encodé', async () => {
@@ -152,5 +176,26 @@ describe('entities/friend : adaptateur des listes d’amis et d’invitations (1
     request.mockResolvedValue(body)
 
     await expect(friendsApi.sentRequests(null)).rejects.toThrow()
+  })
+
+  it('SEC-01, ADR 0042 : un nom avec un caractère inconnu des tables du navigateur se lit quand même', async () => {
+    const displayName = `Chloé ${String.fromCodePoint(0x378)}`
+    request.mockResolvedValue({
+      items: [
+        {
+          userId: USER,
+          username: 'chloe.f',
+          displayName,
+          friendsSince: '2026-11-20T10:00:00.123Z',
+          lastInteractionAt: null,
+          interactionCount30d: 0,
+        },
+      ],
+      next: null,
+    })
+
+    const page = await friendsApi.friends(null)
+
+    expect(page.items[0]?.displayName).toBe(displayName)
   })
 })

@@ -1,16 +1,20 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { initialsOf } from '@/entities/account'
 import { type Friend, matchFriend, tintOf } from '@/entities/friend'
 import { PersonPlusIcon } from '@/features/send-friend-request'
 import { useMessages } from '@/shared/i18n'
-import { Avatar, Phoque } from '@/shared/ui'
+import { isolate } from '@/shared/lib'
+import { Avatar, CrossIcon, Phoque, SearchIcon } from '@/shared/ui'
 import { friendsPageMessages } from '../i18n'
 import { FriendMenu } from './FriendMenu'
-import { ClearIcon, SearchIcon } from './icons'
+import { MessageIcon } from './icons'
 
 interface FriendListProps {
   readonly friends: readonly Friend[]
   readonly onAdd: () => void
+  readonly onMessage: (friend: Friend) => void
+  /** Ami dont la directe est en cours d'ouverture (CNV-01). */
+  readonly messagingId?: string | null | undefined
   readonly onRemove: (friend: Friend) => void
 }
 
@@ -26,9 +30,16 @@ const STATE_BUTTON =
   'mt-4 inline-flex h-11 items-center gap-2 rounded-[10px] pr-4 pl-3 text-[14.5px] font-semibold'
 
 /** FRD-10 : carte de la liste d'Amis-Ordinateur, recherche locale (ADR 0038, point 6), état « compte neuf » d'Etats. */
-export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
+export function FriendList({
+  friends,
+  onAdd,
+  onMessage,
+  messagingId = null,
+  onRemove,
+}: FriendListProps) {
   const t = useMessages(friendsPageMessages)
   const [query, setQuery] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
   if (friends.length === 0) {
     return (
       <section className={`${STATE} ${CARD}`}>
@@ -51,8 +62,9 @@ export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
     <div className={CARD}>
       <div className="flex items-center gap-3 p-3">
         <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[10px] px-3 text-ink-3 inset-ring inset-ring-line-strong focus-within:ring-3 focus-within:ring-focus-glow focus-within:inset-ring-accent">
-          <SearchIcon />
+          <SearchIcon className="flex-none" />
           <input
+            ref={searchRef}
             type="search"
             maxLength={SEARCH_MAX_LENGTH}
             aria-label={t('search')}
@@ -79,10 +91,12 @@ export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
             type="button"
             onClick={() => {
               setQuery('')
+              // WCAG 2.4.3 : le bouton disparaît avec l'état « Aucun résultat » ; le focus revient à la recherche.
+              searchRef.current?.focus()
             }}
             className={`${STATE_BUTTON} bg-surface text-ink inset-ring inset-ring-line-strong`}
           >
-            <ClearIcon />
+            <CrossIcon size={18} strokeWidth={1.8} />
             {t('clearSearch')}
           </button>
         </div>
@@ -104,7 +118,19 @@ export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
                   @{friend.username}
                 </span>
               </div>
-              <FriendMenu friend={friend} onRemove={onRemove} />
+              <button
+                type="button"
+                // ADR 0017 : le nom vient d'un autre compte et garde sa direction d'écriture.
+                aria-label={t('messageTo', { name: isolate(friend.displayName) })}
+                aria-busy={messagingId === friend.userId || undefined}
+                onClick={() => {
+                  onMessage(friend)
+                }}
+                className="grid size-11 flex-none place-items-center rounded-[10px] text-ink-2 hover:bg-sunken aria-busy:opacity-55"
+              >
+                <MessageIcon size={20} />
+              </button>
+              <FriendMenu friend={friend} onMessage={onMessage} onRemove={onRemove} />
             </li>
           ))}
         </ul>

@@ -1,6 +1,7 @@
 import type { AvatarTint } from '@/shared/config'
 
-const TINT_CLASS: Record<AvatarTint, string> = {
+/** Fond de chaque teinte, partagé par l'avatar et la mosaïque d'un groupe (ADR 0038, point 7). */
+export const TINT_CLASS: Record<AvatarTint, string> = {
   ice: 'bg-av-ice',
   moss: 'bg-av-moss',
   birch: 'bg-av-birch',
@@ -9,8 +10,11 @@ const TINT_CLASS: Record<AvatarTint, string> = {
   lichen: 'bg-av-lichen',
 }
 
-// Tailles de la maquette : profil de la navigation (40), ligne d'ami (44), paramètres (56 et 64).
+// Tailles de la maquette : jeton (24) et option (36) du sélecteur d'amis, profil de la navigation (40), ligne d'ami
+// (44), paramètres (56 et 64).
 const SIZE_CLASS: Record<AvatarProps['size'], string> = {
+  24: 'size-6 text-[10px]',
+  36: 'size-9 text-[13px]',
   40: 'size-10 text-[13px]',
   44: 'size-11 text-[16px]',
   56: 'size-14 text-[20px]',
@@ -21,7 +25,7 @@ interface AvatarProps {
   readonly initials: string
   /** Sans teinte : celle du compte de la session dans la maquette (moss). */
   readonly tint?: AvatarTint | undefined
-  readonly size: 40 | 44 | 56 | 64
+  readonly size: 24 | 36 | 40 | 44 | 56 | 64
 }
 
 /** Pastille ronde à initiales, décorative : le nom de la personne est lu à côté. */

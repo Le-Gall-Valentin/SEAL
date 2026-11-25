@@ -17,11 +17,11 @@ async function restore(page: Page, key: string) {
 
 /**
  * KEY-33 : la restauration a abouti. « Se déconnecter » ne le prouve pas, Restauration-Appareil l'affiche aussi à la
- * même adresse : son titre doit disparaître, et l'accueil (logo « seal ») s'afficher.
+ * même adresse : son titre doit disparaître, et l'écran Conversations s'afficher (ADR 0041).
  */
 async function expectRestored(page: Page) {
   await expect(page.getByRole('heading', { name: 'Restaurer vos clés' })).toBeHidden()
-  await expect(page.getByRole('heading', { level: 1, name: 'seal' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Conversations' })).toBeVisible()
   expect(new URL(page.url()).pathname).toBe('/')
 }
 
@@ -42,6 +42,8 @@ test.describe.serial('AUTH-10 à AUTH-70 : parcours d’authentification du lot 
       displayName: 'Bout en bout',
       password: PASSWORD,
     })
+    // ADR 0041 : l'écran Conversations remplace l'accueil provisoire ; la déconnexion est dans Paramètres.
+    await page.goto('/parametres')
     await page.getByRole('button', { name: 'Se déconnecter' }).click()
     await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible()
   })

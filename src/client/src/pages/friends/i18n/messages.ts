@@ -16,6 +16,9 @@ export const friendsPageMessages = defineMessages({
     moreActions: 'Plus d’actions — {name}',
     actions: 'Actions — {name}',
     remove: 'Retirer des amis',
+    // CNV-01, ADR 0038 (point 3) : arrive avec les conversations (ADR 0041).
+    message: 'Envoyer un message',
+    messageTo: 'Envoyer un message — {name}',
     addFriend: 'Ajouter un ami',
     received: 'Reçues',
     sent: 'Envoyées',

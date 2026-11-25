@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { initialsOf } from '@/entities/account'
+import { useConversationsRefresh } from '@/entities/conversation'
 import { useReceivedRequests, useReceivedRequestsRefresh } from '@/entities/friend'
 import { useCurrentAccount } from '@/entities/session'
-import { ROUTES, settingsSectionOf } from '@/shared/config'
+import { conversationIdOf, ROUTES, settingsSectionOf } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { Avatar, PhoqueHead } from '@/shared/ui'
 import { appShellMessages } from '../i18n'
@@ -12,23 +13,27 @@ import { ConversationsIcon, FriendsIcon, SettingsIcon } from './icons'
 /**
  * Coque du compte actif (ADR 0035, point 3) : navigation principale de la maquette, en rail sur ordinateur (88 px,
  * libellés) et sur tablette (72 px, icônes), en barre du bas sur téléphone. Amis porte la pastille des invitations
- * reçues (FRD-04, ADR 0038) ; les non-lus des conversations attendent le lot 4 (ADR 0024, point 3).
+ * reçues (FRD-04, ADR 0038) ; les non-lus des conversations attendent le lot 4 (ADR 0041, point 7).
  */
 export function AppShell() {
   const location = useLocation()
   // FRD-04, ADR 0037 (point 11) : une seule relecture périodique des invitations, pour tous les écrans.
   useReceivedRequestsRefresh()
-  // Parametres-Telephone-Preferences : une sous-page des paramètres occupe tout l'écran, sans la barre du bas.
-  const settingsSubpage =
-    location.pathname === ROUTES.SETTINGS &&
-    settingsSectionOf(new URLSearchParams(location.search)) !== null
+  // ADR 0041 (point 8), AUTH-52 : de même pour la liste des conversations, jusqu'à la trame conv.update du lot 4.
+  useConversationsRefresh()
+  const params = new URLSearchParams(location.search)
+  // Parametres-Telephone-Preferences : une sous-page des paramètres occupe tout l'écran, sans la barre du bas ;
+  // Conv-Telephone-Fil de même pour un fil ouvert (ADR 0041, point 1).
+  const fullScreen =
+    (location.pathname === ROUTES.SETTINGS && settingsSectionOf(params) !== null) ||
+    (location.pathname === ROUTES.HOME && conversationIdOf(params) !== null)
   return (
     <div className="flex min-h-screen flex-col bg-bg font-sans text-ink sm:flex-row">
       <Rail />
       <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
       </div>
-      {!settingsSubpage && <BottomBar />}
+      {!fullScreen && <BottomBar />}
     </div>
   )
 }

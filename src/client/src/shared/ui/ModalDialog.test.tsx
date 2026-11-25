@@ -207,4 +207,20 @@ describe('ACC-01, ACC-02, ADR 0035 (point 1) : fenêtre modale des paramètres',
     await expect.element(screen.getByRole('dialog')).toBeVisible()
     await expect.element(screen.getByText('Fermetures : 0')).toBeInTheDocument()
   })
+
+  it('ACC-03 : un titre chargé de marques combinantes (nom d’un autre compte) reste dans son cadre', async () => {
+    const screen = await render(
+      <ModalDialog
+        open
+        onClose={() => undefined}
+        closable
+        title={`Quitter Z${'\u0301'.repeat(60)} ?`}
+      >
+        <p>Corps</p>
+      </ModalDialog>,
+    )
+
+    const title = screen.getByRole('heading', { level: 2 }).element()
+    expect(getComputedStyle(title).overflowY).toBe('hidden')
+  })
 })
