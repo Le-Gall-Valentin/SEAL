@@ -144,6 +144,30 @@ class SessionWatchIT {
     }
 
     @Test
+    @DisplayName(
+            "TRN-12, A10 : une trame sans action après l'expiration n'est pas traitée non plus ; la connexion est fermée")
+    void trn12NonActionFrameAfterExpiryIsRefused() throws Exception {
+        TestWebSocketClient.Connection connection = connect(account.session);
+
+        clock.advance(Duration.ofMinutes(31));
+        connection.send("{\"type\":\"test.peek\",\"id\":\"tard\",\"payload\":{}}");
+
+        expectRevokedThenClosed(connection);
+    }
+
+    @Test
+    @DisplayName("AUTH-52, ADR 0043 : une trame sans action de l'utilisateur ne prolonge jamais la session")
+    void auth52NonActionFrameNeverExtendsTheSession() throws Exception {
+        TestWebSocketClient.Connection connection = connect(account.session);
+        Instant before = lastAccess(account.session);
+
+        clock.advance(Duration.ofSeconds(61));
+        assertThat(send(connection, "test.peek", "v1")).isEqualTo("ack");
+
+        assertThat(lastAccess(account.session)).isEqualTo(before);
+    }
+
+    @Test
     @DisplayName("AUTH-52, A10 : une trame d'action après l'expiration n'est pas traitée ; la connexion est fermée")
     void auth52UserActionAfterExpiryIsRefused() throws Exception {
         TestWebSocketClient.Connection connection = connect(account.session);

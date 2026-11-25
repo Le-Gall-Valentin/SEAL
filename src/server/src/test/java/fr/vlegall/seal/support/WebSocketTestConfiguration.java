@@ -13,20 +13,32 @@ import tools.jackson.databind.JsonNode;
 @TestConfiguration(proxyBeanMethods = false)
 public class WebSocketTestConfiguration {
 
-    /** Type de la trame d'essai, absent du protocole. */
+    /** Type de la trame d'essai, née d'une action de l'utilisateur (AUTH-52), absent du protocole. */
     public static final String ECHO = "test.echo";
+
+    /** Type de la trame d'essai sans action de l'utilisateur (comme {@code typing}), absent du protocole. */
+    public static final String PEEK = "test.peek";
 
     @Bean
     InboundFrameHandler echoFrameHandler() {
+        return echo(ECHO, true);
+    }
+
+    @Bean
+    InboundFrameHandler peekFrameHandler() {
+        return echo(PEEK, false);
+    }
+
+    private static InboundFrameHandler echo(String type, boolean userAction) {
         return new InboundFrameHandler() {
             @Override
             public String type() {
-                return ECHO;
+                return type;
             }
 
             @Override
             public boolean userAction() {
-                return true;
+                return userAction;
             }
 
             @Override

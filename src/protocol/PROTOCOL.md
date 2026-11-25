@@ -551,8 +551,9 @@ JSON :
   compte (ré-authentification, AUTH-23, AUTH-55) ; elle se ferme quand la session finit ou ne porte plus la session
   complète de ce compte.
 - Une trame née d'une action de l'utilisateur (`msg.send`, puis `read`) prolonge la session HTTP si son dernier accès
-  date d'une minute au moins ; `ping` ne la prolonge jamais (AUTH-52, ADR 0043). Sur une session finie, elle n'est
-  pas traitée : le serveur envoie `session.revoked`, puis ferme en 4401.
+  date d'une minute au moins ; `ping` et les autres trames ne la prolongent jamais (AUTH-52, ADR 0043). Sur une
+  session finie, aucune trame autre que `ping` n'est traitée : le serveur envoie `session.revoked`, puis ferme en
+  4401.
 - Les trames du serveur (`session.revoked`, puis les événements) portent un `id` qu'il choisit.
 
 | Code de fermeture | Cause |

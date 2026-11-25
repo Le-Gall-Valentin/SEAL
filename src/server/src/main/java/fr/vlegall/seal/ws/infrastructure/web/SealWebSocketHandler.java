@@ -132,9 +132,10 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
         if (handler == null) {
             return frames.error(frame.id(), ErrorCode.VALIDATION_FAILED.name());
         }
-        // AUTH-52, ADR 0043 (point 4) : seule une action de l'utilisateur prolonge la session ; sur une session
-        // finie, la trame n'est pas traitée (A10).
-        if (handler.userAction() && !sessions.userActed(connection)) {
+        // TRN-12, A10 : sur une session finie, aucune trame n'est traitée, sans attendre la ronde. AUTH-52, ADR 0043
+        // (point 4) : seule une action de l'utilisateur prolonge la session.
+        boolean alive = handler.userAction() ? sessions.userActed(connection) : sessions.alive(connection);
+        if (!alive) {
             connection.close(CloseReason.SESSION_ENDED);
             return null;
         }
