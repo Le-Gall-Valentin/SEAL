@@ -9,7 +9,7 @@ import { useLeaveGroupApi } from './leaveGroupPort'
 
 /**
  * GRP-03 : tout membre part d'un groupe ; la liste est relue. Un groupe déjà quitté (404 NOT_FOUND, CNV-06) se traite
- * comme quitté : l'état voulu est atteint.
+ * comme quitté : l'état voulu est atteint (ADR 0041, point 4).
  */
 export function useLeaveGroup(onDone: () => void) {
   const client = useQueryClient()

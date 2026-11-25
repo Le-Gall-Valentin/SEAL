@@ -49,7 +49,7 @@ describe('features/leave-group : quitter un groupe (GRP-03, ADR 0041)', () => {
     expect(leave).toHaveBeenCalledWith('g-1')
   })
 
-  it('CNV-06 : un groupe déjà quitté (NOT_FOUND) vaut un départ réussi', async () => {
+  it('GRP-03, CNV-06, ADR 0041 (point 4) : un groupe déjà quitté (NOT_FOUND) vaut un départ réussi', async () => {
     const { screen, onClose } = await open({
       leave: () => Promise.reject(new ApiError(404, 'NOT_FOUND')),
     })
