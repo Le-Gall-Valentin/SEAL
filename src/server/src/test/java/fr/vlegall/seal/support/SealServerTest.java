@@ -28,6 +28,7 @@ import org.springframework.test.context.ActiveProfiles;
     MutableClockConfiguration.class,
     MailTestConfiguration.class,
     BackgroundTestConfiguration.class,
-    PasswordHashingProbeConfiguration.class
+    PasswordHashingProbeConfiguration.class,
+    WebSocketTestConfiguration.class
 })
 public @interface SealServerTest {}

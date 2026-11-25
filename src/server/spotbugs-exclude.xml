@@ -212,6 +212,17 @@
     </Match>
 
     <!--
+      CRLF_INJECTION_LOGS : l'échec inattendu d'une trame WebSocket ne journalise que son type, déjà validé par
+      WireFrames (minuscules et points, 64 caractères au plus) et assaini par LogValues.sanitize (TRN-14, ADR 0043).
+      Exclusion limitée à cette méthode.
+    -->
+    <Match>
+        <Class name="fr.vlegall.seal.ws.infrastructure.web.SealWebSocketHandler"/>
+        <Method name="answer"/>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+
+    <!--
       SERVLET_HEADER_USER_AGENT : l'agent peut être falsifié, et SEAL ne s'en sert pour aucune décision. Il est
       rangé assaini et tronqué à 512 caractères dans security_events (SEC-20, colonne user_agent du CDC), comme
       simple indication (ADR 0011). Exclusion limitée à cette méthode.

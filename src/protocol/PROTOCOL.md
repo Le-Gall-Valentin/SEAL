@@ -531,3 +531,27 @@ nonce, de `enc` ou de `wrappedCek` ; en-tête déplacé dans une autre conversat
 dans une autre conversation (transfert subreptice), sous un autre `messageId`, sous un autre émetteur annoncé ou sous
 un autre numéro de certificat ; signature d'une autre IK ; signature altérée ; Bob absent des
 destinataires signés ; destinataires non triés, pourtant signés.
+
+## 7. Trames WebSocket (CDC 12.2 ; TRN-10 à TRN-15, ADR 0043)
+
+`/ws` est une WebSocket brute (pas de STOMP), ouverte à la seule session complète d'un compte actif dont la
+poignée de main porte un en-tête `Origin` égal à l'origine de SEAL ; sinon 403 (TRN-11). Chaque trame est un texte
+JSON :
+
+```json
+{ "type": "ping", "id": "choisi-par-le-client", "payload": {} }
+```
+
+- `type` : nom de la trame, en minuscules et points (`msg.send`) ; `id` : 1 à 64 caractères `[A-Za-z0-9_-]`,
+  choisi par l'émetteur de la trame ; `payload` : un objet, vide s'il est absent. Tout autre champ est refusé.
+- Le serveur répond à chaque trame du client au même `id` : `pong` à `ping`, `ack` (charge propre au type) ou
+  `error` (`{ "code" }`, code de la section 14.6 du CDC). Un type inconnu reçoit `error` `VALIDATION_FAILED`.
+- Une trame de plus de 64 Kio, comptés en octets UTF-8, ferme la connexion (TRN-13).
+
+| Code de fermeture | Cause |
+| --- | --- |
+| 4401 | Session finie : déconnexion, révocation, expiration (TRN-12), précédée de `session.revoked` |
+| 4408 | Aucune trame depuis 60 secondes |
+| 4429 | Sixième connexion d'un même compte |
+| 1009 | Trame de plus de 64 Kio |
+| 1008 | Trame illisible, à champ inconnu ou binaire |
