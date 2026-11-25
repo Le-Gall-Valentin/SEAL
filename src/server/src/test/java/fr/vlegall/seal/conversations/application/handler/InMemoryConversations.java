@@ -8,12 +8,14 @@ import fr.vlegall.seal.conversations.domain.model.DirectKey;
 import fr.vlegall.seal.conversations.domain.model.MemberProfile;
 import fr.vlegall.seal.conversations.domain.model.TestConversations;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationActivityPort;
+import fr.vlegall.seal.conversations.domain.port.out.ConversationNotificationPort;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
 import fr.vlegall.seal.conversations.domain.port.out.FriendshipPort;
 import fr.vlegall.seal.conversations.domain.port.out.MemberDirectoryPort;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -40,6 +42,15 @@ final class InMemoryConversations {
     private final Set<Set<UserId>> friendships = new HashSet<>();
     private final Map<UserId, MemberProfile> profiles = new HashMap<>();
     private long next = 1;
+
+    /** CNV-04 : une annonce {@code conv.update}, avec les comptes prévenus. */
+    record Notified(ConversationId conversation, Set<UserId> users) {}
+
+    final List<Notified> notified = new ArrayList<>();
+
+    ConversationNotificationPort notifications() {
+        return (conversation, users) -> notified.add(new Notified(conversation, Set.copyOf(users)));
+    }
 
     UserId person(String username) {
         UserId id = new UserId(UUID.randomUUID());

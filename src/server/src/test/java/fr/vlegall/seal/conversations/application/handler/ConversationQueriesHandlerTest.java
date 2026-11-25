@@ -15,11 +15,12 @@ import org.junit.jupiter.api.Test;
 class ConversationQueriesHandlerTest {
 
     private final InMemoryConversations store = new InMemoryConversations();
-    private final CreateGroupHandler groups =
-            new CreateGroupHandler(store.repository(), store.activeFriends(), store.summaries(), store.clock);
+    private final CreateGroupHandler groups = new CreateGroupHandler(
+            store.repository(), store.activeFriends(), store.summaries(), store.notifications(), store.clock);
     private final OpenDirectConversationHandler direct = new OpenDirectConversationHandler(
-            store.repository(), store.activeFriends(), store.summaries(), store.clock);
-    private final LeaveConversationHandler leave = new LeaveConversationHandler(store.repository(), store.clock);
+            store.repository(), store.activeFriends(), store.summaries(), store.notifications(), store.clock);
+    private final LeaveConversationHandler leave =
+            new LeaveConversationHandler(store.repository(), store.notifications(), store.clock);
     private final ListConversationsHandler list = new ListConversationsHandler(store.repository(), store.summaries());
     private final ConversationMembershipHandler membership = new ConversationMembershipHandler(store.repository());
 

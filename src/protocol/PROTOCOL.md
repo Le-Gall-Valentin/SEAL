@@ -556,6 +556,15 @@ JSON :
   4401.
 - Les trames du serveur (`session.revoked`, puis les événements) portent un `id` qu'il choisit.
 
+Événements annoncés par le serveur, après validation de la transaction qui les cause, à toutes les connexions des
+comptes concernés ; un compte hors ligne relit par l'API (ADR 0043) :
+
+| Trame | Charge | Destinataires |
+| --- | --- | --- |
+| `friend.request` | `{ "requestId" }` | Le destinataire d'une invitation (FRD-04) |
+| `friend.update` | `{ "userId" }`, l'autre compte | Les deux comptes : acceptation, refus, révocation, retrait (FRD-11) |
+| `conv.update` | `{ "conversationId" }` | Chaque membre, anciens compris : création, ajout, retrait, départ, renommage (CNV-04, GRP-03) |
+
 | Code de fermeture | Cause |
 | --- | --- |
 | 4401 | Session finie : déconnexion, révocation, expiration (TRN-12), précédée de `session.revoked` |

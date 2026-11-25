@@ -19,7 +19,8 @@ class FriendshipHandlersTest {
     @Test
     @DisplayName("FRD-11 : retirer un ami supprime l'amitié et journalise ; un non-ami ou soi-même, rien")
     void frd11UnfriendRemovesOnlyAnExistingFriendship() {
-        RemoveFriendHandler handler = new RemoveFriendHandler(friends.friendships(), friends.events());
+        RemoveFriendHandler handler =
+                new RemoveFriendHandler(friends.friendships(), friends.events(), friends.notifications());
         friends.friendships.put(UserPair.of(me.user(), friend.user()), InMemoryFriends.NOW);
 
         assertThat(handler.unfriend(me.user(), me.user())).isFalse();

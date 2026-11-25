@@ -1,6 +1,7 @@
 package fr.vlegall.seal.ws.infrastructure.web;
 
 import fr.vlegall.seal.common.ErrorCode;
+import fr.vlegall.seal.ws.application.FrameText;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
@@ -65,11 +66,7 @@ public final class WireFrames {
 
     /** Une trame à envoyer. */
     public String frame(String type, String id, JsonNode payload) {
-        ObjectNode frame = json.createObjectNode();
-        frame.put("type", type);
-        frame.put("id", id);
-        frame.set("payload", payload);
-        return json.writeValueAsString(frame);
+        return FrameText.of(type, id, payload);
     }
 
     /** {@code error} au même {@code id}, avec un code de la section 14.6. */

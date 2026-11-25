@@ -10,6 +10,7 @@ import fr.vlegall.seal.friends.domain.model.RequestStatus;
 import fr.vlegall.seal.friends.domain.model.UserPair;
 import fr.vlegall.seal.friends.domain.port.out.BlockRepository;
 import fr.vlegall.seal.friends.domain.port.out.DirectoryPort;
+import fr.vlegall.seal.friends.domain.port.out.FriendNotificationPort;
 import fr.vlegall.seal.friends.domain.port.out.FriendRequestRepository;
 import fr.vlegall.seal.friends.domain.port.out.FriendsEventPort;
 import fr.vlegall.seal.friends.domain.port.out.FriendshipRepository;
@@ -41,6 +42,9 @@ final class InMemoryFriends {
 
     final List<String> calls = new ArrayList<>();
     final List<String> events = new ArrayList<>();
+    /** FRD-04 : annonces en direct, « request:destinataire » ou « relation:un:autre ». */
+    final List<String> notified = new ArrayList<>();
+
     final Map<UUID, FriendRequest> requests = new LinkedHashMap<>();
     final Map<UserPair, Instant> friendships = new HashMap<>();
     final Set<UserPair> blocks = new HashSet<>();
@@ -209,6 +213,24 @@ final class InMemoryFriends {
             @Override
             public void friendRemoved(UserId user, UserId formerFriend) {
                 events.add("removed");
+            }
+        };
+    }
+
+    FriendNotificationPort notifications() {
+        return notifications(notified);
+    }
+
+    static FriendNotificationPort notifications(List<String> notified) {
+        return new FriendNotificationPort() {
+            @Override
+            public void requestReceived(UserId receiver, UUID requestId) {
+                notified.add("request:" + receiver.value());
+            }
+
+            @Override
+            public void relationChanged(UserId one, UserId other) {
+                notified.add("relation:" + one.value() + ":" + other.value());
             }
         };
     }

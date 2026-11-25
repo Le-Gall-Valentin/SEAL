@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Section 11, GRP-01 à GRP-04 : une conversation et ses membres actifs. Immuable : chaque action rend la conversation
@@ -54,6 +55,11 @@ public record Conversation(
         members.add(new Member(creator, Role.ADMIN, at));
         others.forEach(user -> members.add(new Member(user, Role.MEMBER, at)));
         return new Conversation(id, ConversationType.GROUP, Optional.of(name), creator, at, 0, members);
+    }
+
+    /** Les comptes des membres actifs. */
+    public Set<UserId> memberIds() {
+        return activeMembers.stream().map(Member::user).collect(Collectors.toUnmodifiableSet());
     }
 
     public boolean isActiveMember(UserId user) {

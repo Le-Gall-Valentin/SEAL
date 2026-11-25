@@ -6,6 +6,7 @@ import fr.vlegall.seal.conversations.application.port.in.ExcludeMemberUseCase;
 import fr.vlegall.seal.conversations.domain.model.Conversation;
 import fr.vlegall.seal.conversations.domain.model.ConversationException;
 import fr.vlegall.seal.conversations.domain.model.ConversationId;
+import fr.vlegall.seal.conversations.domain.port.out.ConversationNotificationPort;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
 import java.time.Clock;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExcludeMemberHandler implements ExcludeMemberUseCase {
 
     private final ConversationRepository conversations;
+    private final ConversationNotificationPort notifications;
     private final Clock clock;
 
-    public ExcludeMemberHandler(ConversationRepository conversations, Clock clock) {
+    public ExcludeMemberHandler(
+            ConversationRepository conversations, ConversationNotificationPort notifications, Clock clock) {
         this.conversations = conversations;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -27,5 +31,7 @@ public class ExcludeMemberHandler implements ExcludeMemberUseCase {
     public void exclude(UserId caller, ConversationId id, UserId target) {
         Conversation before = conversations.lockForMember(id, caller).orElseThrow(ConversationException.NotFound::new);
         conversations.save(before, before.exclude(caller, target), clock.instant());
+        // GRP-03, CNV-04 : les membres restants et le retiré, qui ne lira plus la suite.
+        notifications.changed(id, before.memberIds());
     }
 }

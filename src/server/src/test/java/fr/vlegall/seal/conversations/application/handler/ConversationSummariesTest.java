@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
 class ConversationSummariesTest {
 
     private final InMemoryConversations store = new InMemoryConversations();
-    private final CreateGroupHandler groups =
-            new CreateGroupHandler(store.repository(), store.activeFriends(), store.summaries(), store.clock);
+    private final CreateGroupHandler groups = new CreateGroupHandler(
+            store.repository(), store.activeFriends(), store.summaries(), store.notifications(), store.clock);
     private final UserId me = store.person("moi");
     private final UserId friend = store.person("ami");
 

@@ -6,6 +6,7 @@ import fr.vlegall.seal.conversations.application.port.in.LeaveConversationUseCas
 import fr.vlegall.seal.conversations.domain.model.Conversation;
 import fr.vlegall.seal.conversations.domain.model.ConversationException;
 import fr.vlegall.seal.conversations.domain.model.ConversationId;
+import fr.vlegall.seal.conversations.domain.port.out.ConversationNotificationPort;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
 import java.time.Clock;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class LeaveConversationHandler implements LeaveConversationUseCase {
 
     private final ConversationRepository conversations;
+    private final ConversationNotificationPort notifications;
     private final Clock clock;
 
-    public LeaveConversationHandler(ConversationRepository conversations, Clock clock) {
+    public LeaveConversationHandler(
+            ConversationRepository conversations, ConversationNotificationPort notifications, Clock clock) {
         this.conversations = conversations;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -27,5 +31,7 @@ public class LeaveConversationHandler implements LeaveConversationUseCase {
     public void leave(UserId caller, ConversationId id) {
         Conversation before = conversations.lockForMember(id, caller).orElseThrow(ConversationException.NotFound::new);
         conversations.save(before, before.depart(caller), clock.instant());
+        // GRP-03, CNV-04 : les membres restants et celui qui part, sur ses autres appareils.
+        notifications.changed(id, before.memberIds());
     }
 }

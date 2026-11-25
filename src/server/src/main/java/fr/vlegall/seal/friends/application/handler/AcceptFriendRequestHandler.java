@@ -5,6 +5,7 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.application.port.in.AcceptFriendRequestUseCase;
 import fr.vlegall.seal.friends.domain.model.FriendRequest;
 import fr.vlegall.seal.friends.domain.model.RequestStatus;
+import fr.vlegall.seal.friends.domain.port.out.FriendNotificationPort;
 import fr.vlegall.seal.friends.domain.port.out.FriendRequestRepository;
 import fr.vlegall.seal.friends.domain.port.out.FriendsEventPort;
 import fr.vlegall.seal.friends.domain.port.out.FriendshipRepository;
@@ -21,6 +22,7 @@ public class AcceptFriendRequestHandler implements AcceptFriendRequestUseCase {
     private final FriendRequestRepository requests;
     private final FriendshipRepository friendships;
     private final FriendsEventPort events;
+    private final FriendNotificationPort notifications;
     private final Clock clock;
 
     public AcceptFriendRequestHandler(
@@ -28,11 +30,13 @@ public class AcceptFriendRequestHandler implements AcceptFriendRequestUseCase {
             FriendRequestRepository requests,
             FriendshipRepository friendships,
             FriendsEventPort events,
+            FriendNotificationPort notifications,
             Clock clock) {
         this.open = open;
         this.requests = requests;
         this.friendships = friendships;
         this.events = events;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -49,6 +53,7 @@ public class AcceptFriendRequestHandler implements AcceptFriendRequestUseCase {
         requests.close(request.id(), RequestStatus.ACCEPTED, now);
         friendships.create(request.pair(), now);
         events.requestAccepted(receiver, request.sender(), request.id());
+        notifications.relationChanged(receiver, request.sender());
         return true;
     }
 }

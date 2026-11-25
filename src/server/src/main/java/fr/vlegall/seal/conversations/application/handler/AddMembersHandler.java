@@ -7,6 +7,7 @@ import fr.vlegall.seal.conversations.domain.model.Conversation;
 import fr.vlegall.seal.conversations.domain.model.ConversationException;
 import fr.vlegall.seal.conversations.domain.model.ConversationId;
 import fr.vlegall.seal.conversations.domain.model.ConversationSummary;
+import fr.vlegall.seal.conversations.domain.port.out.ConversationNotificationPort;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -20,13 +21,19 @@ public class AddMembersHandler implements AddMembersUseCase {
     private final ConversationRepository conversations;
     private final ActiveFriends friends;
     private final ConversationSummaries summaries;
+    private final ConversationNotificationPort notifications;
     private final Clock clock;
 
     public AddMembersHandler(
-            ConversationRepository conversations, ActiveFriends friends, ConversationSummaries summaries, Clock clock) {
+            ConversationRepository conversations,
+            ActiveFriends friends,
+            ConversationSummaries summaries,
+            ConversationNotificationPort notifications,
+            Clock clock) {
         this.conversations = conversations;
         this.friends = friends;
         this.summaries = summaries;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -44,7 +51,12 @@ public class AddMembersHandler implements AddMembersUseCase {
                 newcomers.stream().filter(user -> !before.isActiveMember(user)).collect(Collectors.toSet());
         friends.require(caller, arriving);
         Instant at = clock.instant();
-        conversations.save(before, before.join(caller, arriving, at), at);
+        Conversation after = before.join(caller, arriving, at);
+        conversations.save(before, after, at);
+        if (!arriving.isEmpty()) {
+            // GRP-03, CNV-04 : l'arrivant et chaque membre.
+            notifications.changed(id, after.memberIds());
+        }
         // Relu tel que GET le rendra : ordre des membres et instants à la précision de la base.
         return summaries.of(caller, conversations.findForMember(id, caller).orElseThrow());
     }
