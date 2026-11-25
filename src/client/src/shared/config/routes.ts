@@ -41,3 +41,19 @@ export function friendsTabOf(params: URLSearchParams): FriendsTab {
 }
 
 export const FRIENDS_INVITATIONS = `${ROUTES.FRIENDS}?${FRIENDS_TAB_PARAM}=invitations`
+
+/** ADR 0041 (point 1) : conversation ouverte, `/?conversation={id}` ; le serveur ne voit que `/`. */
+const CONVERSATION_PARAM = 'conversation'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
+
+/** L'adresse d'une conversation. */
+export function conversationPath(id: string): string {
+  return `${ROUTES.HOME}?${CONVERSATION_PARAM}=${encodeURIComponent(id)}`
+}
+
+/** La conversation de l'adresse ; un identifiant mal formé est ignoré, comme une valeur d'onglet inconnue. */
+export function conversationOf(params: URLSearchParams): string | null {
+  const id = params.get(CONVERSATION_PARAM)
+  return id !== null && UUID.test(id) ? id : null
+}

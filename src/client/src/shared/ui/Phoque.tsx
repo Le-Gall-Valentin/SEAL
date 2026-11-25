@@ -3,7 +3,7 @@ import { brandMessages } from './brandMessages'
 import { SEAL_PATH } from './sealPath'
 
 /** Poses de la mascotte utilisées par les écrans (composant Phoque de la maquette). */
-export type PhoqueVariant = 'waving' | 'neutral' | 'searching'
+export type PhoqueVariant = 'waving' | 'neutral' | 'searching' | 'sleeping'
 
 // 96 : état « compte neuf » de l'écran Amis (Etats, ADR 0038).
 const SIZES = { 64: 'size-16', 88: 'size-22', 96: 'size-24', 200: 'size-50' } as const
@@ -17,6 +17,7 @@ const LABELS = {
   waving: 'phoqueWaving',
   neutral: 'phoqueNeutral',
   searching: 'phoqueSearching',
+  sleeping: 'phoqueSleeping',
 } as const
 
 /** La mascotte, dessin repris tel quel de la maquette : ses couleurs ne suivent pas le thème. */
@@ -32,6 +33,7 @@ export function Phoque({ variant, size }: PhoqueProps) {
       {variant === 'waving' && <Waving />}
       {variant === 'neutral' && <Neutral />}
       {variant === 'searching' && <Searching />}
+      {variant === 'sleeping' && <Sleeping />}
     </svg>
   )
 }
@@ -272,6 +274,80 @@ function Searching() {
         fill="#EDF0E4"
         stroke="#1B1F14"
         strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </>
+  )
+}
+
+/** Pose « dort » de la maquette : état « Aucune conversation » (Etats, ADR 0041). */
+function Sleeping() {
+  return (
+    <>
+      <path
+        d="M6 106L19 97L108 96L122 105L113 114L16 115Z"
+        fill="#DCE7E4"
+        stroke="#1B1F14"
+        strokeWidth="2.6"
+        strokeLinejoin="round"
+      />
+      <path d="M19 104L107 103" stroke="#BFD1CC" strokeWidth="2.4" strokeLinecap="round" />
+      <path
+        d="M64 46C93 46 113 60 113 79C113 95 95 103 64 103C33 103 15 95 15 79C15 60 35 46 64 46Z"
+        fill="#FBFCF7"
+      />
+      <path
+        d="M18 88C27 98 44 102 64 102C84 102 101 98 110 88C99 94 83 96 64 96C45 96 29 94 18 88Z"
+        fill="#E3E8D5"
+      />
+      <path
+        d="M64 46C93 46 113 60 113 79C113 95 95 103 64 103C33 103 15 95 15 79C15 60 35 46 64 46Z"
+        fill="none"
+        stroke="#1B1F14"
+        strokeWidth="3.5"
+      />
+      <path
+        d="M22 95C14 98 10 103 14 106C18 109 27 106 32 100"
+        fill="#EDF0E4"
+        stroke="#1B1F14"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M106 95C114 98 118 103 114 106C110 109 101 106 96 100"
+        fill="#EDF0E4"
+        stroke="#1B1F14"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <ellipse cx="35" cy="83" rx="6.5" ry="3.4" fill="#EBCFC2" opacity="0.75" />
+      <ellipse cx="93" cy="83" rx="6.5" ry="3.4" fill="#EBCFC2" opacity="0.75" />
+      <path
+        d="M40 74C42.5 78.5 49.5 78.5 52 74M76 74C78.5 78.5 85.5 78.5 88 74"
+        fill="none"
+        stroke="#1B1F14"
+        strokeWidth="3.4"
+        strokeLinecap="round"
+      />
+      <path d="M44 84L33 82M84 84L95 82" stroke="#1B1F14" strokeWidth="1.7" strokeLinecap="round" />
+      <ellipse cx="57" cy="85.5" rx="8" ry="6" fill="#FFFFFF" stroke="#1B1F14" strokeWidth="2.4" />
+      <ellipse cx="71" cy="85.5" rx="8" ry="6" fill="#FFFFFF" stroke="#1B1F14" strokeWidth="2.4" />
+      <circle cx="53.5" cy="85" r="1.1" fill="#1B1F14" />
+      <circle cx="56.5" cy="88" r="1.1" fill="#1B1F14" />
+      <circle cx="74.5" cy="85" r="1.1" fill="#1B1F14" />
+      <circle cx="71.5" cy="88" r="1.1" fill="#1B1F14" />
+      <path
+        d="M59.6 77.6H68.4C70.2 77.6 71 79.7 69.7 80.9L65.6 84.4C64.7 85.2 63.3 85.2 62.4 84.4L58.3 80.9C57 79.7 57.8 77.6 59.6 77.6Z"
+        fill="#1B1F14"
+      />
+      <path
+        d="M84 30H92L84 38H92M98 14H108L98 25H108"
+        fill="none"
+        stroke="#66741C"
+        strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

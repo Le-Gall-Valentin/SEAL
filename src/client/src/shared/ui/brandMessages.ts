@@ -7,6 +7,7 @@ export const brandMessages = defineMessages({
     phoqueWaving: 'Le phoque SEAL vous salue',
     phoqueNeutral: 'Le phoque SEAL',
     phoqueSearching: 'Le phoque SEAL cherche',
+    phoqueSleeping: 'Le phoque SEAL dort',
     sealVerified: 'Signature vérifiée',
   },
 })

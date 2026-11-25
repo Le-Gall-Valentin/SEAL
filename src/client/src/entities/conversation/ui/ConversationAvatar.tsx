@@ -10,8 +10,8 @@ interface ConversationAvatarProps {
   readonly conversation: Conversation
   readonly me: string
   readonly size: Size
-  /** Couleur des joints de la mosaïque : celle du fond de la ligne, accentuée quand elle est sélectionnée. */
-  readonly seam?: 'surface' | 'accent-soft'
+  /** Joints de la mosaïque à la couleur d'une ligne sélectionnée (--accent-soft) au lieu de --surface. */
+  readonly onAccent?: boolean
 }
 
 // Maquette Conv-Ordinateur : mosaïque de 40 (en-tête), 44 (liste) et 72 px (infos du groupe).
@@ -21,8 +21,6 @@ const MOSAIC: Record<Size, { readonly box: string; readonly big: string; readonl
     44: { box: 'size-11 gap-[1.5px]', big: 'pl-1 text-[15px]', small: 'text-[11px]' },
     72: { box: 'size-18 gap-0.5', big: 'pl-1.25 text-[24px]', small: 'text-[17px]' },
   }
-
-const SEAM_CLASS = { surface: 'bg-surface', 'accent-soft': 'bg-accent-soft' } as const
 
 /** Première lettre d'un nom, en capitale ; les initiales seulement, jamais de photo (CDC, section 2). */
 function letterOf(name: string): string {
@@ -38,7 +36,7 @@ export function ConversationAvatar({
   conversation,
   me,
   size,
-  seam = 'surface',
+  onAccent = false,
 }: ConversationAvatarProps) {
   if (conversation.type === 'DIRECT') {
     const counterpart = counterpartOf(conversation, me)
@@ -64,7 +62,7 @@ export function ConversationAvatar({
   return (
     <span
       aria-hidden="true"
-      className={`grid flex-none grid-rows-2 overflow-hidden rounded-full leading-none font-semibold text-ink-2 ${columns} ${sizes.box} ${SEAM_CLASS[seam]}`}
+      className={`grid flex-none grid-rows-2 overflow-hidden rounded-full leading-none font-semibold text-ink-2 ${columns} ${sizes.box} ${onAccent ? 'bg-accent-soft' : 'bg-surface'}`}
     >
       {cells.map((cell, index) => (
         <span
