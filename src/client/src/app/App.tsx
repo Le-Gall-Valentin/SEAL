@@ -8,7 +8,7 @@ import { friendsApi } from '@/entities/friend'
 import { keysApi } from '@/entities/keyring'
 import { oauthProvidersApi } from '@/entities/oauth-provider'
 import { passwordBlocklist } from '@/entities/password'
-import { sessionApi } from '@/entities/session'
+import { realtimeApi, sessionApi } from '@/entities/session'
 import { answerFriendRequestApi } from '@/features/answer-friend-request'
 import { profileApi } from '@/features/change-display-name'
 import { createGroupApi } from '@/features/create-group'
@@ -74,6 +74,7 @@ const apis: Apis = {
   renameGroup: renameGroupApi,
   removeMember: removeMemberApi,
   leaveGroup: leaveGroupApi,
+  realtime: realtimeApi,
 }
 
 // KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un

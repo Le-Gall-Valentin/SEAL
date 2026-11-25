@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { Friend, IFriendsApi, Page, ReceivedRequest } from '../api/IFriendsApi'
 import { FriendsApiProvider } from './friendsPort'
-import { useFriends, useReceivedRequests, useReceivedRequestsRefresh } from './useFriendLists'
+import { useFriends, useReceivedRequests } from './useFriendLists'
 
 const never = () => Promise.reject(new Error('non attendu'))
 const id = (n: number) => `0192f7a1-0000-7000-8000-${String(n).padStart(12, '0')}`
@@ -101,7 +101,7 @@ describe('entities/friend : listes complètes (ADR 0037, point 3)', () => {
       focusManager.setFocused(undefined)
     })
 
-    it('FRD-04, AUTH-52, ADR 0037 (point 11) : toutes les 60 s, seulement après une action de l’utilisateur', async () => {
+    it('FRD-04, ADR 0043 : plus aucune relecture périodique, même après une action ; la trame friend.* la remplace', async () => {
       vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
       let calls = 0
       const { wrapper: Wrapper } = wrapper({
@@ -110,22 +110,13 @@ describe('entities/friend : listes complètes (ADR 0037, point 3)', () => {
           return Promise.resolve({ items: [received], next: null })
         },
       })
-      const { result } = await renderHook(
-        () => {
-          useReceivedRequestsRefresh()
-          return useReceivedRequests()
-        },
-        { wrapper: Wrapper },
-      )
+      const { result } = await renderHook(() => useReceivedRequests(), { wrapper: Wrapper })
       await expect.poll(() => result.current.data).toEqual([received])
-      expect(calls).toBe(1)
-
-      vi.advanceTimersByTime(3 * 60_000)
-      expect(calls).toBe(1)
 
       window.dispatchEvent(new Event('pointerdown'))
-      vi.advanceTimersByTime(60_000)
-      await expect.poll(() => calls).toBe(2)
+      vi.advanceTimersByTime(3 * 60_000)
+
+      expect(calls).toBe(1)
     })
 
     it('FRD-04, ADR 0037 (point 2) : relues au retour du focus', async () => {

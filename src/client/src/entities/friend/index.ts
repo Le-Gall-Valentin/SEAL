@@ -8,7 +8,6 @@ export {
   invalidateFriends,
   useFriends,
   useReceivedRequests,
-  useReceivedRequestsRefresh,
   useSentRequests,
 } from './model/useFriendLists'
 export { affinity, PICKER_SIZE, rankFriends } from './model/friendPicker'

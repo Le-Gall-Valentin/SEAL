@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { initialsOf } from '@/entities/account'
-import { useConversationsRefresh } from '@/entities/conversation'
-import { useReceivedRequests, useReceivedRequestsRefresh } from '@/entities/friend'
+import { useReceivedRequests } from '@/entities/friend'
 import { useCurrentAccount } from '@/entities/session'
 import { conversationIdOf, ROUTES, settingsSectionOf } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { Avatar, PhoqueHead } from '@/shared/ui'
 import { appShellMessages } from '../i18n'
+import { useRealtimeUpdates } from '../model/useRealtimeUpdates'
 import { ConversationsIcon, FriendsIcon, SettingsIcon } from './icons'
 
 /**
@@ -17,10 +17,8 @@ import { ConversationsIcon, FriendsIcon, SettingsIcon } from './icons'
  */
 export function AppShell() {
   const location = useLocation()
-  // FRD-04, ADR 0037 (point 11) : une seule relecture périodique des invitations, pour tous les écrans.
-  useReceivedRequestsRefresh()
-  // ADR 0041 (point 8), AUTH-52 : de même pour la liste des conversations, jusqu'à la trame conv.update du lot 4.
-  useConversationsRefresh()
+  // TRN-10, ADR 0043 : une seule connexion temps réel, pour tous les écrans du compte actif.
+  useRealtimeUpdates()
   const params = new URLSearchParams(location.search)
   // Parametres-Telephone-Preferences : une sous-page des paramètres occupe tout l'écran, sans la barre du bas ;
   // Conv-Telephone-Fil de même pour un fil ouvert (ADR 0041, point 1).

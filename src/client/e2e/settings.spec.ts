@@ -130,6 +130,11 @@ test('ACC-03, ADR 0035 : sur téléphone, la liste des sections puis la sous-pag
 })
 
 test('FRD-01, FRD-04, FRD-11, ADR 0038 : inviter, voir le compteur, accepter, retirer ; feuille du téléphone', async () => {
+  // Le téléphone est déjà sur Amis, et son utilisateur vient d'agir (AUTH-52, ADR 0043 point 4).
+  await phone.goto('/amis')
+  await expect(phone.getByRole('heading', { name: 'Pas encore d’amis' })).toBeVisible()
+  await phone.mouse.move(10, 10)
+
   // L'ordinateur invite le téléphone depuis l'aside.
   await desktop.goto('/amis')
   await expect(desktop.getByRole('heading', { name: 'Pas encore d’amis' })).toBeVisible()
@@ -139,8 +144,7 @@ test('FRD-01, FRD-04, FRD-11, ADR 0038 : inviter, voir le compteur, accepter, re
     `Invitation envoyée à @${PHONE_USERNAME}.`,
   )
 
-  // Le téléphone voit la pastille, puis accepte dans l'onglet Invitations.
-  await phone.goto('/amis')
+  // FRD-04, TRN-10 : la pastille du téléphone se met à jour sans recharger la page, puis il accepte.
   await expect(phone.getByRole('link', { name: 'Amis, 1 invitation' })).toBeVisible()
   await phone.goto('/amis?onglet=invitations')
   await phone.getByRole('button', { name: 'Accepter — Léa Tremblay-Roy' }).click()

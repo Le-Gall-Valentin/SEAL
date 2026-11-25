@@ -11,7 +11,12 @@ import { FriendsApiProvider, type IFriendsApi } from '@/entities/friend'
 import { type IKeysApi, KeysApiProvider } from '@/entities/keyring'
 import { type IOAuthProvidersApi, OAuthProvidersApiProvider } from '@/entities/oauth-provider'
 import { type IPasswordBlocklist, PasswordBlocklistProvider } from '@/entities/password'
-import { type ISessionApi, SessionApiProvider } from '@/entities/session'
+import {
+  type IRealtimeApi,
+  type ISessionApi,
+  RealtimeApiProvider,
+  SessionApiProvider,
+} from '@/entities/session'
 import {
   AnswerFriendRequestApiProvider,
   type IAnswerFriendRequestApi,
@@ -71,6 +76,7 @@ export interface Apis {
   readonly renameGroup: IRenameGroupApi
   readonly removeMember: IRemoveMemberApi
   readonly leaveGroup: ILeaveGroupApi
+  readonly realtime: IRealtimeApi
 }
 
 interface ApiProvidersProps {
@@ -84,6 +90,7 @@ type Layer = (children: ReactNode) => ReactNode
 export function ApiProviders({ apis, children }: ApiProvidersProps) {
   const layers: readonly Layer[] = [
     (inner) => <SessionApiProvider api={apis.session}>{inner}</SessionApiProvider>,
+    (inner) => <RealtimeApiProvider api={apis.realtime}>{inner}</RealtimeApiProvider>,
     (inner) => <AuthorityApiProvider api={apis.authority}>{inner}</AuthorityApiProvider>,
     (inner) => <KeysApiProvider api={apis.keys}>{inner}</KeysApiProvider>,
     (inner) => (

@@ -1,11 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
-import { ConversationsApiProvider, useConversations } from '@/entities/conversation'
 import { FriendsApiProvider, type ReceivedRequest } from '@/entities/friend'
-import { type Account, SessionApiProvider } from '@/entities/session'
+import {
+  type Account,
+  type IRealtimeApi,
+  RealtimeApiProvider,
+  type RealtimeListener,
+  SessionApiProvider,
+} from '@/entities/session'
 import { AppShell } from './AppShell'
 
 const ACTIVE: Account = {
@@ -29,11 +34,20 @@ function received(count: number): ReceivedRequest[] {
 
 const never = () => Promise.reject(new Error('non attendu'))
 
+// TRN-10 : connexions temps réel ouvertes par la coque, et leurs écouteurs.
+const listeners: RealtimeListener[] = []
+const realtime: IRealtimeApi = {
+  connect: (listener) => {
+    listeners.push(listener)
+    return () => undefined
+  },
+}
+
 async function renderAt(
   path: string,
   width: number,
   height: number,
-  invitations = 0,
+  invitations: number | (() => number) = 0,
   onRead: () => void = () => undefined,
 ) {
   await page.viewport(width, height)
@@ -61,11 +75,14 @@ async function renderAt(
             sentRequests: never,
             receivedRequests: () => {
               onRead()
-              return Promise.resolve({ items: received(invitations), next: null })
+              const count = typeof invitations === 'function' ? invitations() : invitations
+              return Promise.resolve({ items: received(count), next: null })
             },
           }}
         >
-          <RouterProvider router={router} />
+          <RealtimeApiProvider api={realtime}>
+            <RouterProvider router={router} />
+          </RealtimeApiProvider>
         </FriendsApiProvider>
       </SessionApiProvider>
     </QueryClientProvider>,
@@ -141,25 +158,20 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
     expect(link.element().textContent).toContain('99+')
   })
 
-  it('FRD-04, AUTH-52, ADR 0037 (point 11) : la coque relit les invitations toutes les 60 s, seulement après une action', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-    try {
-      let reads = 0
-      const { screen } = await renderAt('/', 1440, 900, 1, () => {
-        reads += 1
-      })
-      await expect.element(screen.getByRole('link', { name: 'Amis, 1 invitation' })).toBeVisible()
-      const first = reads
+  it('FRD-04, TRN-10 : la coque ouvre une connexion ; une trame friend.request met la pastille à jour sans attendre', async () => {
+    listeners.length = 0
+    let count = 1
+    const { screen } = await renderAt('/', 1440, 900, () => count)
+    await expect.element(screen.getByRole('link', { name: 'Amis, 1 invitation' })).toBeVisible()
 
-      vi.advanceTimersByTime(2 * 60_000)
-      expect(reads).toBe(first)
+    count = 2
+    window.dispatchEvent(new KeyboardEvent('keydown'))
+    listeners
+      .at(-1)
+      ?.onEvent({ type: 'friend.request', requestId: '0193a1b2-0000-7000-8000-000000000009' })
 
-      window.dispatchEvent(new KeyboardEvent('keydown'))
-      vi.advanceTimersByTime(60_000)
-      await expect.poll(() => reads).toBe(first + 1)
-    } finally {
-      vi.useRealTimers()
-    }
+    await expect.element(screen.getByRole('link', { name: 'Amis, 2 invitations' })).toBeVisible()
+    expect(listeners).toHaveLength(1)
   })
 
   it('FRD-04, ADR 0038 : téléphone, la barre du bas nomme l’entrée Amis avec ses invitations', async () => {
@@ -234,58 +246,5 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
     await expect
       .element(screen.getByRole('navigation', { name: 'Navigation principale' }))
       .toBeVisible()
-  })
-
-  it('CNV-04, AUTH-52, ADR 0041 (point 8) : la coque relit les conversations toutes les 60 s, seulement après une action', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-    try {
-      let reads = 0
-      function Conversations() {
-        const count = useConversations().data?.length
-        return <p>Conversations lues : {count ?? '…'}</p>
-      }
-      const router = createMemoryRouter(
-        [{ element: <AppShell />, children: [{ path: '/', element: <Conversations /> }] }],
-        { initialEntries: ['/'] },
-      )
-      const screen = await render(
-        <QueryClientProvider client={new QueryClient()}>
-          <SessionApiProvider
-            api={{ me: () => Promise.resolve(ACTIVE), reloadCsrf: () => Promise.resolve() }}
-          >
-            <FriendsApiProvider
-              api={{
-                friends: never,
-                sentRequests: never,
-                receivedRequests: () => Promise.resolve({ items: [], next: null }),
-              }}
-            >
-              <ConversationsApiProvider
-                api={{
-                  list: () => {
-                    reads += 1
-                    return Promise.resolve({ items: [], next: null })
-                  },
-                  get: never,
-                }}
-              >
-                <RouterProvider router={router} />
-              </ConversationsApiProvider>
-            </FriendsApiProvider>
-          </SessionApiProvider>
-        </QueryClientProvider>,
-      )
-      await expect.element(screen.getByText('Conversations lues : 0')).toBeVisible()
-      const first = reads
-
-      vi.advanceTimersByTime(2 * 60_000)
-      expect(reads).toBe(first)
-
-      window.dispatchEvent(new KeyboardEvent('keydown'))
-      vi.advanceTimersByTime(60_000)
-      await expect.poll(() => reads).toBe(first + 1)
-    } finally {
-      vi.useRealTimers()
-    }
   })
 })

@@ -33,6 +33,9 @@ const PENDING: Account = {
 // Appels de GET /api/v1/auth/oauth/pending : une session ouverte n'en fait aucun (AUTH-16).
 const pendingCalls: string[] = []
 
+// Connexions temps réel ouvertes, par état du compte (TRN-10 : session complète d'un compte actif seulement).
+const realtimeCalls: string[] = []
+
 // Doublures de tous les ports, comme la racine de composition les assemble ; seul /me varie.
 function fakeApis(account: Account | null): Apis {
   const never = () => Promise.reject(new Error('non attendu'))
@@ -85,6 +88,12 @@ function fakeApis(account: Account | null): Apis {
     renameGroup: { rename: never },
     removeMember: { exclude: never },
     leaveGroup: { leave: never },
+    realtime: {
+      connect: () => {
+        realtimeCalls.push(account?.status ?? 'anonyme')
+        return () => undefined
+      },
+    },
   }
 }
 
@@ -121,7 +130,27 @@ describe('ADR 0012 : routeur de la couche app', () => {
   afterEach(() => {
     broken = true
     pendingCalls.length = 0
+    realtimeCalls.length = 0
     vi.restoreAllMocks()
+  })
+
+  it('TRN-10, TRN-11 : la connexion temps réel ne s’ouvre que pour la session complète d’un compte actif', async () => {
+    const anonymous = await renderAt('/connexion', routes, null)
+    await expect.element(anonymous.screen.getByRole('heading', { level: 1 })).toBeVisible()
+    await anonymous.screen.unmount()
+    const restricted = await renderAt('/', routes, PENDING)
+    await expect
+      .element(restricted.screen.getByRole('heading', { name: 'Vérifiez votre courriel' }))
+      .toBeVisible()
+    expect(realtimeCalls).toEqual([])
+    await restricted.screen.unmount()
+
+    const active = await renderAt('/')
+    await expect
+      .element(active.screen.getByRole('heading', { level: 1, name: 'Conversations' }))
+      .toBeVisible()
+
+    expect(realtimeCalls).toEqual(['ACTIVE'])
   })
 
   it('CNV-04, ADR 0041 : la racine, réservée au compte actif, affiche l’écran Conversations', async () => {

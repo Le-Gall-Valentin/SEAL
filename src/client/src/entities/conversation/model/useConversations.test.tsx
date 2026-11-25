@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { Conversation, IConversationsApi, Page } from '../api/IConversationsApi'
 import { ConversationsApiProvider } from './conversationsPort'
-import { useConversation, useConversations, useConversationsRefresh } from './useConversations'
+import { useConversation, useConversations } from './useConversations'
 
 const never = () => Promise.reject(new Error('non attendu'))
 const id = (n: number) => `0193a1b2-0000-7000-8000-${String(n).padStart(12, '0')}`
@@ -74,7 +74,7 @@ describe('entities/conversation : liste complète et détail (CNV-04, ADR 0037 p
     expect(asked).toEqual([id(7)])
   })
 
-  it('ADR 0041 (point 8), AUTH-52 : la liste ne se relit toutes les 60 s qu’après une action', async () => {
+  it('ADR 0043 : plus aucune relecture périodique de la liste, même après une action ; conv.update la remplace', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     let reads = 0
     const Wrapper = wrapper({
@@ -83,22 +83,14 @@ describe('entities/conversation : liste complète et détail (CNV-04, ADR 0037 p
         return Promise.resolve({ items: [], next: null })
       },
     })
-    await renderHook(
-      () => {
-        useConversations()
-        useConversationsRefresh()
-      },
-      { wrapper: Wrapper },
-    )
+    await renderHook(() => useConversations(), { wrapper: Wrapper })
     await expect.poll(() => reads).toBe(1)
 
+    window.dispatchEvent(new KeyboardEvent('keydown'))
     vi.advanceTimersByTime(3 * 60_000)
     await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(reads).toBe(1)
 
-    window.dispatchEvent(new KeyboardEvent('keydown'))
-    vi.advanceTimersByTime(60_000)
-    await expect.poll(() => reads).toBe(2)
+    expect(reads).toBe(1)
   })
 
   it('CNV-04, ADR 0041 (point 8) : la liste et la conversation ouverte se relisent au retour du focus', async () => {
