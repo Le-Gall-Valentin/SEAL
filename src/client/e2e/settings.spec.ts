@@ -179,7 +179,8 @@ test('CNV-01, CNV-03, GRP-03, ADR 0041 : directe depuis Amis, groupe, renommage,
 
   // CNV-01 : la directe s'ouvre depuis Amis, à l'adresse de la conversation.
   await desktop.goto('/amis')
-  await desktop.getByRole('button', { name: 'Envoyer un message — Essai Téléphone' }).click()
+  // ADR 0017 : le nom de l'ami est isolé (U+2068, U+2069) dans le libellé.
+  await desktop.getByRole('button', { name: /^Envoyer un message — .Essai Téléphone.$/u }).click()
   await expect(desktop).toHaveURL(/\/\?conversation=[0-9a-f-]{36}$/u)
   await expect(desktop.getByRole('heading', { level: 2, name: 'Essai Téléphone' })).toBeVisible()
 
@@ -222,4 +223,30 @@ test('CNV-01, CNV-03, GRP-03, ADR 0041 : directe depuis Amis, groupe, renommage,
   await expect(phone.getByRole('heading', { level: 1, name: 'Conversations' })).toBeVisible()
   await expect(phone.getByRole('link', { name: 'Raquette au fjord' })).toHaveCount(0)
   expect(await phone.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+})
+
+test('CNV-04, ADR 0041 : en thème sombre, l’écran Conversations prend les jetons sombres de la maquette', async () => {
+  await desktop.emulateMedia({ colorScheme: 'dark' })
+  try {
+    await desktop.goto('/')
+    const title = desktop.getByRole('heading', { level: 1, name: 'Conversations' })
+    await expect(title).toBeVisible()
+    // tokens.css, thème sombre : --ink #e9eddf, --surface #151a10.
+    await expect(title).toHaveCSS('color', 'rgb(233, 237, 223)')
+    const surface = await title.evaluate((element) => {
+      let node: Element | null = element
+      while (node !== null && getComputedStyle(node).backgroundColor === 'rgba(0, 0, 0, 0)') {
+        node = node.parentElement
+      }
+      return node === null ? null : getComputedStyle(node).backgroundColor
+    })
+    expect(surface).toBe('rgb(21, 26, 16)')
+    await desktop.getByRole('link', { name: 'Raquette au fjord' }).click()
+    await expect(desktop.getByRole('heading', { level: 2, name: 'Raquette au fjord' })).toHaveCSS(
+      'color',
+      'rgb(233, 237, 223)',
+    )
+  } finally {
+    await desktop.emulateMedia({ colorScheme: 'light' })
+  }
 })
