@@ -17,6 +17,8 @@ describe('ADR 0038 (point 7) : avatar à initiales, teintes de la maquette', () 
   })
 
   it.each([
+    [24, '10px'],
+    [36, '13px'],
     [40, '13px'],
     [56, '20px'],
     [64, '23px'],

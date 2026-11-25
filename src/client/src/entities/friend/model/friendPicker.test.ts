@@ -117,6 +117,17 @@ describe('entities/friend : classement du sélecteur (CDC 10.3, FRD-20)', () => 
     expect(byUsername?.usernameMatch).toEqual([3, 6])
   })
 
+  it('FRD-20, maquette Nouvelle-Conversation : la saisie est surlignée dans le nom et dans l’identifiant', () => {
+    const [mathis] = rankFriends([friend('mathis_b', 'Mathis Bouchard')], 'ma', new Set(), NOW)
+    const [thomas] = rankFriends([friend('thomas.lavoie', 'Thomas Lavoie')], 'ma', new Set(), NOW)
+
+    expect(mathis?.usernameMatch).toEqual([0, 2])
+    expect(mathis?.nameMatch).toEqual([0, 2])
+    expect(thomas?.tier).toBe(2)
+    expect(thomas?.usernameMatch).toEqual([3, 5])
+    expect(thomas?.nameMatch).toEqual([3, 5])
+  })
+
   it('FRD-20 : un caractère décomposé du nom affiché garde ses repères dans le texte d’origine', () => {
     const decomposed = 'E\u0301lodie'.normalize('NFD')
     const [ranked] = rankFriends([friend('z', `Zoe ${decomposed}`)], 'elo', new Set(), NOW)

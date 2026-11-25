@@ -14,5 +14,13 @@ export const friendMessages = defineMessages({
     yesterday: 'hier',
     days: 'il y a {count} jours',
     date: 'le {date}',
+    // FRD-20, maquette Nouvelle-Conversation ; ADR 0041 (point 4) pour les deux états vides.
+    pickerHint: 'Seuls vos amis apparaissent ici.',
+    pickerKeys: '↑ ↓ pour choisir · Entrée pour ajouter · Échap pour effacer',
+    pickerBest: 'Meilleures correspondances',
+    pickerList: 'Ajouter des amis',
+    pickerRemove: 'Retirer {name}',
+    pickerNoFriends: 'Vous n’avez pas encore d’amis.',
+    pickerNoMatch: 'Aucun ami ne correspond à « {query} ».',
   },
 })

@@ -1,6 +1,9 @@
 import { normalizeSearch } from '@/shared/lib'
 import type { Friend } from '../api/IFriendsApi'
 
+/** Le segment ui n'atteint pas api (ADR 0012) : l'ami du sélecteur lui parvient par ce modèle. */
+export type { Friend }
+
 /** FRD-20 (10.3, étape 4) : le sélecteur ne propose que les 5 amis les plus probables. */
 export const PICKER_SIZE = 5
 
@@ -70,23 +73,27 @@ function tierOf(friend: Friend, query: string): Omit<RankedFriend, 'friend'> | n
     return { tier: 0, usernameMatch: null, nameMatch: null }
   }
   const username = mapped(friend.username, 0)
-  if (username.text.startsWith(query)) {
-    return { tier: 0, usernameMatch: rangeOf(username, 0, query.length), nameMatch: null }
-  }
-  const word = words(friend.displayName).find((candidate) => candidate.text.startsWith(query))
-  if (word) {
-    return { tier: 1, usernameMatch: null, nameMatch: rangeOf(word, 0, query.length) }
-  }
-  const inUsername = username.text.indexOf(query)
-  if (inUsername >= 0) {
-    return { tier: 2, usernameMatch: rangeOf(username, inUsername, query.length), nameMatch: null }
-  }
   const name = mapped(friend.displayName, 0)
+  const word = words(friend.displayName).find((candidate) => candidate.text.startsWith(query))
+  const inUsername = username.text.indexOf(query)
   const inName = name.text.indexOf(query)
-  if (inName >= 0) {
-    return { tier: 3, usernameMatch: null, nameMatch: rangeOf(name, inName, query.length) }
+  // Maquette Nouvelle-Conversation : la saisie est surlignée partout où elle apparaît, quel que soit le palier.
+  const usernameMatch = inUsername >= 0 ? rangeOf(username, inUsername, query.length) : null
+  const nameMatch = word
+    ? rangeOf(word, 0, query.length)
+    : inName >= 0
+      ? rangeOf(name, inName, query.length)
+      : null
+  if (inUsername === 0) {
+    return { tier: 0, usernameMatch, nameMatch }
   }
-  return null
+  if (word) {
+    return { tier: 1, usernameMatch, nameMatch }
+  }
+  if (inUsername > 0) {
+    return { tier: 2, usernameMatch, nameMatch }
+  }
+  return inName >= 0 ? { tier: 3, usernameMatch, nameMatch } : null
 }
 
 /**

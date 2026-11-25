@@ -11,4 +11,7 @@ export {
   useReceivedRequestsRefresh,
   useSentRequests,
 } from './model/useFriendLists'
+export { affinity, PICKER_SIZE, rankFriends } from './model/friendPicker'
+export type { MatchRange, RankedFriend } from './model/friendPicker'
+export { FriendPicker } from './ui/FriendPicker'
 export { RequestTime } from './ui/RequestTime'
