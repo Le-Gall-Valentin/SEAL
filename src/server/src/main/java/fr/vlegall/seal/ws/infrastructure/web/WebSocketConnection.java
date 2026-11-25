@@ -5,6 +5,10 @@ import fr.vlegall.seal.security.ratelimit.LocalRateLimit;
 import fr.vlegall.seal.ws.domain.model.CloseReason;
 import fr.vlegall.seal.ws.domain.model.Connection;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.socket.CloseStatus;
@@ -24,11 +28,16 @@ final class WebSocketConnection implements Connection {
 
     private final WebSocketSession session;
     private final UserId user;
-    private final String sessionId;
     private final LocalRateLimit frameLimit;
+    private final WireFrames frames;
+    private volatile String sessionId;
+    private volatile @Nullable String formerSessionId;
+    private volatile Instant lastHeardAt;
 
-    WebSocketConnection(WebSocketSession session, LocalRateLimit frameLimit) {
+    WebSocketConnection(WebSocketSession session, LocalRateLimit frameLimit, WireFrames frames, Instant openedAt) {
         this.frameLimit = frameLimit;
+        this.frames = frames;
+        this.lastHeardAt = openedAt;
         this.session = new ConcurrentWebSocketSessionDecorator(session, SEND_TIME_LIMIT_MS, BUFFER_SIZE_LIMIT);
         this.user = (UserId) session.getAttributes().get(FullSessionHandshakeInterceptor.USER);
         this.sessionId = (String) session.getAttributes().get(FullSessionHandshakeInterceptor.SESSION);
@@ -55,6 +64,27 @@ final class WebSocketConnection implements Connection {
     }
 
     @Override
+    public Optional<String> formerSessionId() {
+        return Optional.ofNullable(formerSessionId);
+    }
+
+    @Override
+    public void follow(String renamedSessionId) {
+        formerSessionId = sessionId;
+        sessionId = renamedSessionId;
+    }
+
+    @Override
+    public Instant lastHeardAt() {
+        return lastHeardAt;
+    }
+
+    /** TRN-13 : une trame vient d'arriver. */
+    void heard(Instant at) {
+        lastHeardAt = at;
+    }
+
+    @Override
     public void send(String text) {
         try {
             session.sendMessage(new TextMessage(text));
@@ -65,6 +95,10 @@ final class WebSocketConnection implements Connection {
 
     @Override
     public void close(CloseReason reason) {
+        if (reason == CloseReason.SESSION_ENDED) {
+            // TRN-12 : session.revoked, puis 4401 ; l'identifiant d'une trame du serveur est choisi par lui.
+            send(frames.frame("session.revoked", UUID.randomUUID().toString(), frames.empty()));
+        }
         closeWith(new CloseStatus(reason.code()));
     }
 

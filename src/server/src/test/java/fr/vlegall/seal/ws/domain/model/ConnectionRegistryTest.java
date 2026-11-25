@@ -3,6 +3,7 @@ package fr.vlegall.seal.ws.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import fr.vlegall.seal.common.UserId;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -22,30 +23,7 @@ class ConnectionRegistryTest {
     private final ConnectionRegistry registry = new ConnectionRegistry();
 
     private static Connection connection(UserId user, String session) {
-        return new Connection() {
-            private final String id = UUID.randomUUID().toString();
-
-            @Override
-            public String id() {
-                return id;
-            }
-
-            @Override
-            public UserId user() {
-                return user;
-            }
-
-            @Override
-            public String sessionId() {
-                return session;
-            }
-
-            @Override
-            public void send(String text) {}
-
-            @Override
-            public void close(CloseReason reason) {}
-        };
+        return new FakeConnection(user, session, Instant.EPOCH);
     }
 
     @Test

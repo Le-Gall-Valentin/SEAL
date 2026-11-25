@@ -10,12 +10,15 @@ import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.ws.application.port.in.InboundFrameHandler;
 import fr.vlegall.seal.ws.domain.model.CloseReason;
 import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
+import fr.vlegall.seal.ws.infrastructure.session.BoundSessions;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -45,13 +48,22 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
     private final WireFrames frames;
     private final ConnectionRegistry registry;
     private final RateLimiter limiter;
+    private final BoundSessions sessions;
+    private final Clock clock;
     private final Map<String, InboundFrameHandler> handlers = new HashMap<>();
 
     public SealWebSocketHandler(
-            WireFrames frames, ConnectionRegistry registry, RateLimiter limiter, List<InboundFrameHandler> handlers) {
+            WireFrames frames,
+            ConnectionRegistry registry,
+            RateLimiter limiter,
+            BoundSessions sessions,
+            Clock clock,
+            List<InboundFrameHandler> handlers) {
         this.frames = frames;
         this.registry = registry;
         this.limiter = limiter;
+        this.sessions = sessions;
+        this.clock = clock;
         for (InboundFrameHandler handler : handlers) {
             if (handler.type().equals(PING) || this.handlers.putIfAbsent(handler.type(), handler) != null) {
                 throw new IllegalStateException("Deux gestionnaires pour la trame " + handler.type());
@@ -67,8 +79,8 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
         session.setBinaryMessageSizeLimit(MAX_FRAME_BYTES);
         UserId user = (UserId) session.getAttributes().get(FullSessionHandshakeInterceptor.USER);
         // TRN-13, A06 : le seau des trames appartient à la connexion, hors de la table partagée du limiteur.
-        WebSocketConnection connection =
-                new WebSocketConnection(session, limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, user));
+        WebSocketConnection connection = new WebSocketConnection(
+                session, limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, user), frames, clock.instant());
         session.getAttributes().put(CONNECTION, connection);
         if (!registry.open(connection)) {
             connection.close(CloseReason.TOO_MANY_CONNECTIONS);
@@ -83,6 +95,7 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         WebSocketConnection connection = connection(session);
+        connection.heard(clock.instant());
         if (message.getPayload().getBytes(StandardCharsets.UTF_8).length > MAX_FRAME_BYTES) {
             connection.closeWith(CloseStatus.TOO_BIG_TO_PROCESS);
             return;
@@ -99,7 +112,10 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
             connection.send(frames.rateLimited(frame.id(), limited.retryAfter().orElse(Duration.ofSeconds(1))));
             return;
         }
-        connection.send(answer(connection, frame));
+        String answer = answer(connection, frame);
+        if (answer != null) {
+            connection.send(answer);
+        }
     }
 
     @Override
@@ -107,13 +123,20 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
         connection(session).closeWith(CloseStatus.POLICY_VIOLATION);
     }
 
-    private String answer(WebSocketConnection connection, WireFrame frame) {
+    /** La réponse à la trame, ou {@code null} si la connexion vient d'être fermée. */
+    private @Nullable String answer(WebSocketConnection connection, WireFrame frame) {
         if (frame.type().equals(PING)) {
             return frames.frame("pong", frame.id(), frames.empty());
         }
         InboundFrameHandler handler = handlers.get(frame.type());
         if (handler == null) {
             return frames.error(frame.id(), ErrorCode.VALIDATION_FAILED.name());
+        }
+        // AUTH-52, ADR 0043 (point 4) : seule une action de l'utilisateur prolonge la session ; sur une session
+        // finie, la trame n'est pas traitée (A10).
+        if (handler.userAction() && !sessions.userActed(connection)) {
+            connection.close(CloseReason.SESSION_ENDED);
+            return null;
         }
         try {
             JsonNode result = handler.handle(connection.user(), frame.payload());

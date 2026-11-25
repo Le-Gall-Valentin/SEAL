@@ -2,7 +2,7 @@ package fr.vlegall.seal.ws.domain.model;
 
 /** Causes de fermeture d'une connexion par le serveur, et leur code (TRN-12, TRN-13, ADR 0043). */
 public enum CloseReason {
-    /** TRN-12 : session finie (déconnexion, révocation, expiration), après {@code session.revoked}. */
+    /** TRN-12 : session finie (déconnexion, révocation, expiration) ; la trame {@code session.revoked} part avant. */
     SESSION_ENDED(4401),
     /** TRN-13 : aucune trame depuis 60 secondes. */
     SILENT(4408),

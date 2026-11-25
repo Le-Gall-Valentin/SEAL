@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -43,18 +45,21 @@ public final class SessionEstablisher {
     private final Clock clock;
     private final CredentialVersions versions;
     private final List<SessionOpeningCleanup> cleanups;
+    private final ApplicationEventPublisher events;
 
     public SessionEstablisher(
             CsrfTokenRepository csrfTokens,
             Clock clock,
             CredentialVersions versions,
-            List<SessionOpeningCleanup> cleanups) {
+            List<SessionOpeningCleanup> cleanups,
+            ApplicationEventPublisher events) {
         this.renewal = new CompositeSessionAuthenticationStrategy(
                 List.of(new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrfTokens)));
         this.csrfTokens = csrfTokens;
         this.clock = clock;
         this.versions = versions;
         this.cleanups = List.copyOf(cleanups);
+        this.events = events;
     }
 
     /**
@@ -77,7 +82,10 @@ public final class SessionEstablisher {
     public void close(HttpServletRequest request, HttpServletResponse response) {
         HttpSession session = request.getSession(false);
         if (session != null) {
+            String id = session.getId();
             session.invalidate();
+            // TRN-12, AUTH-53 : les WebSockets de cette session se ferment aussitôt (ADR 0043, point 5).
+            events.publishEvent(new SessionsEndedEvent(Set.of(id)));
         }
         holder.clearContext();
         csrfTokens.saveToken(null, request, response);
@@ -130,12 +138,18 @@ public final class SessionEstablisher {
      * contexte de sécurité n'y est écrit.
      */
     public void renew(HttpServletRequest request, HttpServletResponse response) {
+        HttpSession previous = request.getSession(false);
+        String previousId = previous == null ? null : previous.getId();
         Objects.requireNonNull(request.getSession(true), "session");
         Objects.requireNonNull(request.changeSessionId(), "nouvel identifiant de session");
         holder.clearContext();
         // Un contexte vide retire de la session tout contexte qui s'y trouverait : l'attente reste anonyme.
         contexts.saveContext(holder.createEmptyContext(), request, response);
         csrfTokens.saveToken(null, request, response);
+        if (previousId != null) {
+            // TRN-12 : la session ne porte plus de compte ; ses WebSockets se ferment aussitôt.
+            events.publishEvent(new SessionsEndedEvent(Set.of(previousId)));
+        }
     }
 
     private List<GrantedAuthority> fullAuthorities() {
@@ -247,7 +261,14 @@ public final class SessionEstablisher {
             HttpServletRequest request,
             HttpServletResponse response) {
         Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(principal, null, authorities);
+        HttpSession previous = request.getSession(false);
+        String previousId = previous == null ? null : previous.getId();
         renewal.onAuthentication(authentication, request, response);
+        HttpSession current = request.getSession(false);
+        if (previousId != null && current != null && !previousId.equals(current.getId())) {
+            // TRN-12, ADR 0043 : les WebSockets du compte suivent le nouvel identifiant de leur session.
+            events.publishEvent(new SessionRenewedEvent(previousId, current.getId(), principal.userId()));
+        }
         // ADR 0032, point 7 : la session ouverte ne garde ni départ OAuth ni inscription en attente.
         cleanups.forEach(cleanup -> cleanup.clean(request));
         SecurityContext context = holder.createEmptyContext();

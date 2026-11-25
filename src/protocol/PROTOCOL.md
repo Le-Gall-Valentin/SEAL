@@ -547,6 +547,13 @@ JSON :
 - Le serveur répond à chaque trame du client au même `id` : `pong` à `ping`, `ack` (charge propre au type) ou
   `error` (`{ "code" }`, code de la section 14.6 du CDC). Un type inconnu reçoit `error` `VALIDATION_FAILED`.
 - Une trame de plus de 64 Kio, comptés en octets UTF-8, ferme la connexion (TRN-13).
+- La connexion est liée à sa session HTTP (TRN-12). Elle la suit quand la session change d'identifiant pour le même
+  compte (ré-authentification, AUTH-23, AUTH-55) ; elle se ferme quand la session finit ou ne porte plus la session
+  complète de ce compte.
+- Une trame née d'une action de l'utilisateur (`msg.send`, puis `read`) prolonge la session HTTP si son dernier accès
+  date d'une minute au moins ; `ping` ne la prolonge jamais (AUTH-52, ADR 0043). Sur une session finie, elle n'est
+  pas traitée : le serveur envoie `session.revoked`, puis ferme en 4401.
+- Les trames du serveur (`session.revoked`, puis les événements) portent un `id` qu'il choisit.
 
 | Code de fermeture | Cause |
 | --- | --- |

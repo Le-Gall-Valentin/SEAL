@@ -6,8 +6,10 @@ import fr.vlegall.seal.security.journal.SecurityEventType;
 import fr.vlegall.seal.security.journal.SecurityJournal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
 import org.springframework.stereotype.Component;
@@ -29,10 +31,15 @@ public final class SessionRevocation {
 
     private final FindByIndexNameSessionRepository<? extends Session> sessions;
     private final SecurityJournal journal;
+    private final ApplicationEventPublisher events;
 
-    public SessionRevocation(FindByIndexNameSessionRepository<? extends Session> sessions, SecurityJournal journal) {
+    public SessionRevocation(
+            FindByIndexNameSessionRepository<? extends Session> sessions,
+            SecurityJournal journal,
+            ApplicationEventPublisher events) {
         this.sessions = sessions;
         this.journal = journal;
+        this.events = events;
     }
 
     /** Toutes les sessions du compte sauf {@code currentSessionId} (AUTH-16, ADR 0021 point 4). */
@@ -57,6 +64,8 @@ public final class SessionRevocation {
             return;
         }
         ids.forEach(sessions::deleteById);
+        // TRN-12 : les WebSockets de ces sessions se ferment aussitôt (ADR 0043, point 5).
+        events.publishEvent(new SessionsEndedEvent(Set.copyOf(ids)));
         try {
             journal.recordStandalone(new SecurityEvent(
                     SecurityEventType.SESSION_REVOKED, user, Map.of("sessions", Integer.toString(ids.size()))));

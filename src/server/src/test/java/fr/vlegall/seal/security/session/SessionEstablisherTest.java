@@ -7,8 +7,10 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.support.MutableClock;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,8 +39,9 @@ class SessionEstablisherTest {
 
     private final MutableClock clock = MutableClock.fixedAt(NOW);
     private OptionalLong storedVersion = OptionalLong.of(VERSION);
+    private final List<Object> published = new ArrayList<>();
     private final SessionEstablisher sessions = new SessionEstablisher(
-            CookieCsrfTokenRepository.withHttpOnlyFalse(), clock, user -> storedVersion, List.of());
+            CookieCsrfTokenRepository.withHttpOnlyFalse(), clock, user -> storedVersion, List.of(), published::add);
 
     /** Authentification d'une connexion réussie d'un compte actif, telle que la rend le fournisseur. */
     private static Authentication activeLogin() {
@@ -106,6 +109,48 @@ class SessionEstablisherTest {
         sessions.openRestricted(USER, request, new MockHttpServletResponse());
 
         assertThat(request.getSession(false).getId()).isNotEqualTo("session-fixee");
+    }
+
+    @Test
+    @DisplayName("TRN-12, ADR 0043 : un renouvellement annonce l'ancien et le nouvel identifiant, et le compte")
+    void trn12RenewalIsAnnounced() {
+        MockHttpSession session = new MockHttpSession(null, "avant");
+        MockHttpServletRequest request = requestWithSession(session);
+
+        sessions.open(activeLogin(), request, new MockHttpServletResponse());
+
+        String current = request.getSession(false).getId();
+        assertThat(published).containsExactly(new SessionRenewedEvent("avant", current, USER));
+    }
+
+    @Test
+    @DisplayName("TRN-12, ADR 0043 : une première session n'annonce aucun renouvellement")
+    void trn12FirstSessionIsNotARenewal() {
+        sessions.open(activeLogin(), new MockHttpServletRequest(), new MockHttpServletResponse());
+
+        assertThat(published).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AUTH-32, TRN-12 : la session rendue anonyme pour une inscription OAuth est annoncée finie")
+    void auth32AnonymousRenewalEndsTheSession() {
+        MockHttpSession session = new MockHttpSession(null, "complete");
+        MockHttpServletRequest request = requestWithSession(session);
+
+        sessions.renew(request, new MockHttpServletResponse());
+
+        assertThat(published).containsExactly(new SessionsEndedEvent(Set.of("complete")));
+    }
+
+    @Test
+    @DisplayName("AUTH-53, TRN-12 : la déconnexion annonce la session finie, pour fermer ses WebSockets")
+    void auth53LogoutAnnouncesTheEndedSession() {
+        MockHttpSession session = new MockHttpSession(null, "finie");
+        MockHttpServletRequest request = requestWithSession(session);
+
+        sessions.close(request, new MockHttpServletResponse());
+
+        assertThat(published).containsExactly(new SessionsEndedEvent(Set.of("finie")));
     }
 
     @Test
