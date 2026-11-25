@@ -15,7 +15,7 @@ import { LeaveGroupApiProvider } from '@/features/leave-group'
 import { RemoveMemberApiProvider } from '@/features/remove-group-member'
 import { RenameGroupApiProvider } from '@/features/rename-group'
 import { StartDirectApiProvider } from '@/features/start-direct-conversation'
-import { ApiError } from '@/shared/lib'
+import { ApiError, NetworkError } from '@/shared/lib'
 import { ConversationsScreen } from './ConversationsScreen'
 
 const ME = 'me'
@@ -40,21 +40,29 @@ const SKI: Conversation = {
   lastServerSeq: 0,
 }
 
+interface Fakes {
+  readonly get?: IConversationsApi['get']
+  readonly list?: IConversationsApi['list']
+  readonly leave?: (conversationId: string) => Promise<void>
+}
+
 async function renderAt(
   entry: string,
   width: number,
-  get: IConversationsApi['get'] = () => Promise.resolve(SKI),
+  fakes: Fakes | IConversationsApi['get'] = {},
 ) {
+  const {
+    get = () => Promise.resolve(SKI),
+    list = () => Promise.resolve({ items: [SKI], next: null }),
+    leave = never,
+  } = typeof fakes === 'function' ? { get: fakes } : fakes
   await page.viewport(width, 900)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const conversations: IConversationsApi = {
-    list: () => Promise.resolve({ items: [SKI], next: null }),
-    get,
-  }
+  const conversations: IConversationsApi = { list, get }
   const router = createMemoryRouter([{ path: '/', element: <ConversationsScreen me={ME} /> }], {
     initialEntries: [entry],
   })
-  return render(
+  const screen = await render(
     <QueryClientProvider client={client}>
       <ConversationsApiProvider api={conversations}>
         <FriendsApiProvider
@@ -69,7 +77,7 @@ async function renderAt(
               <AddMembersApiProvider api={{ admit: never }}>
                 <RenameGroupApiProvider api={{ rename: never }}>
                   <RemoveMemberApiProvider api={{ exclude: never }}>
-                    <LeaveGroupApiProvider api={{ leave: never }}>
+                    <LeaveGroupApiProvider api={{ leave }}>
                       <RouterProvider router={router} />
                     </LeaveGroupApiProvider>
                   </RemoveMemberApiProvider>
@@ -81,6 +89,7 @@ async function renderAt(
       </ConversationsApiProvider>
     </QueryClientProvider>,
   )
+  return Object.assign(screen, { router })
 }
 
 describe('pages/conversations : écran Conversations (CNV-04, ADR 0041)', () => {
@@ -154,6 +163,76 @@ describe('pages/conversations : écran Conversations (CNV-04, ADR 0041)', () => 
 
     await expect
       .element(screen.getByRole('dialog', { name: 'Nouvelle conversation' }))
+      .toBeVisible()
+  })
+
+  it('CNV-06, ADR 0041 (point 4) : une conversation disparue ramène l’adresse à la liste, avec l’alerte', async () => {
+    const screen = await renderAt(`/?conversation=${SKI.id}`, 1440, () =>
+      Promise.reject(new ApiError(404, 'NOT_FOUND')),
+    )
+
+    await expect
+      .element(screen.getByRole('alert'))
+      .toHaveTextContent('Cette conversation n’est plus disponible.')
+    await expect.poll(() => screen.router.state.location.search).toBe('')
+  })
+
+  it('ADR 0041 (point 4) : une directe dont l’autre compte n’est plus actif ramène aussi à la liste', async () => {
+    const alone: Conversation = {
+      ...SKI,
+      type: 'DIRECT',
+      name: null,
+      members: [member(ME, 'moi', 'Moi')],
+    }
+    const screen = await renderAt(`/?conversation=${SKI.id}`, 1440, () => Promise.resolve(alone))
+
+    await expect
+      .element(screen.getByRole('alert'))
+      .toHaveTextContent('Cette conversation n’est plus disponible.')
+    await expect.poll(() => screen.router.state.location.search).toBe('')
+  })
+
+  it('A10 : sur téléphone, un autre échec propose « Réessayer » et « Retour »', async () => {
+    const screen = await renderAt(`/?conversation=${SKI.id}`, 390, () =>
+      Promise.reject(new NetworkError()),
+    )
+
+    await expect.element(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible()
+    await screen.getByRole('button', { name: 'Retour' }).click()
+
+    await expect
+      .element(screen.getByRole('heading', { level: 1, name: 'Conversations' }))
+      .toBeVisible()
+  })
+
+  it('GRP-03, WCAG 2.4.3 : quitter un groupe ramène à la liste sans alerte, le focus sur son titre', async () => {
+    let left = false
+    const screen = await renderAt(`/?conversation=${SKI.id}`, 1440, {
+      get: () => (left ? Promise.reject(new ApiError(404, 'NOT_FOUND')) : Promise.resolve(SKI)),
+      list: () => Promise.resolve({ items: left ? [] : [SKI], next: null }),
+      leave: () => {
+        left = true
+        return Promise.resolve()
+      },
+    })
+
+    await screen
+      .getByRole('complementary')
+      .getByRole('button', { name: 'Quitter le groupe' })
+      .click()
+    await screen.getByRole('alertdialog').getByRole('button', { name: 'Quitter le groupe' }).click()
+
+    await expect
+      .element(screen.getByRole('heading', { level: 1, name: 'Conversations' }))
+      .toHaveFocus()
+    expect(screen.router.state.location.search).toBe('')
+    expect(screen.getByText('Cette conversation n’est plus disponible.').elements()).toHaveLength(0)
+
+    // Réinvité, l'utilisateur rouvre le même groupe.
+    left = false
+    await screen.router.navigate(`/?conversation=${SKI.id}`)
+    await expect
+      .element(screen.getByRole('heading', { level: 2, name: 'Ski du dimanche' }))
       .toBeVisible()
   })
 })

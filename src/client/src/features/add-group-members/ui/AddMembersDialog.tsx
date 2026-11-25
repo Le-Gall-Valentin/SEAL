@@ -18,7 +18,8 @@ interface AddMembersDialogProps {
  */
 export function AddMembersDialog({ conversation, open, onClose }: AddMembersDialogProps) {
   const t = useMessages(addMembersMessages)
-  const friends = useFriends().data ?? []
+  const friendList = useFriends()
+  const friends = friendList.data ?? []
   const [selected, setSelected] = useState<readonly Friend[]>([])
   const done = () => {
     setSelected([])
@@ -47,6 +48,11 @@ export function AddMembersDialog({ conversation, open, onClose }: AddMembersDial
           <FriendPicker
             label={t('members')}
             friends={friends}
+            loading={friendList.data === undefined && !friendList.isError}
+            failed={friendList.data === undefined && friendList.isError}
+            onRetry={() => {
+              void friendList.refetch()
+            }}
             selected={selected}
             exclude={new Set(conversation.members.map((member) => member.userId))}
             max={seatsLeft(conversation)}

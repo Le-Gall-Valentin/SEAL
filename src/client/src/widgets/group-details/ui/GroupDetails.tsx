@@ -54,6 +54,15 @@ export function GroupDetails({
   const friendIds = new Set(friends?.map((friend) => friend.userId))
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [removing, setRemoving] = useState<Member | null>(null)
+  // WCAG 2.4.3 : la ligne retirée avait le focus ; il passe au titre des membres une fois la confirmation fermée, car
+  // le reste de l'écran est inerte tant que la fenêtre modale est ouverte (comme l'écran Amis).
+  const focusMembersOnClose = useRef(false)
+  useEffect(() => {
+    if (removing === null && focusMembersOnClose.current) {
+      focusMembersOnClose.current = false
+      membersRef.current?.focus()
+    }
+  }, [removing])
   const count = conversation.members.length
   const date = DAY_MONTH.format(conversation.createdAt)
 
@@ -191,11 +200,8 @@ export function GroupDetails({
         conversation={conversation}
         member={removing}
         onClose={(removed) => {
+          focusMembersOnClose.current = removed
           setRemoving(null)
-          if (removed) {
-            // WCAG 2.4.3 : la ligne qui avait le focus a disparu ; il revient au titre de la liste.
-            membersRef.current?.focus()
-          }
         }}
       />
       <LeaveGroupDialog
@@ -225,7 +231,10 @@ export function GroupDetails({
   )
 }
 
-/** Tiroir de Conv-Tablette : `dialog` natif modal, 380 px à droite (plein écran sur téléphone), voile --overlay. */
+/**
+ * Tiroir de Conv-Tablette : `dialog` natif modal, 380 px à droite, voile --overlay ; feuille plein écran sur téléphone
+ * (ADR 0041, point 3).
+ */
 function Drawer({
   open,
   onClose,
@@ -255,9 +264,12 @@ function Drawer({
       aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault()
-        onClose()
+        // Seul Échap adressé au tiroir le ferme, pas celui d'un dialogue ouvert depuis lui.
+        if (event.target === event.currentTarget) {
+          onClose()
+        }
       }}
-      className="ml-auto h-full max-h-none w-full max-w-95 flex-col bg-raised p-0 text-ink shadow-dialog backdrop:bg-overlay open:flex"
+      className="ml-auto h-full max-h-none w-full max-w-full flex-col bg-raised p-0 text-ink shadow-dialog backdrop:bg-overlay open:flex sm:max-w-95"
     >
       {open && children}
     </dialog>

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import type { Conversation, Member } from '@/entities/conversation'
 import { type Friend, FriendsApiProvider } from '@/entities/friend'
@@ -53,7 +54,11 @@ function group(role: Member['role']): Conversation {
 async function show(
   conversation: Conversation,
   variant: 'aside' | 'drawer',
-  apis: { leave?: () => Promise<void>; exclude?: () => Promise<void> } = {},
+  apis: {
+    leave?: () => Promise<void>
+    exclude?: () => Promise<void>
+    rename?: () => Promise<Conversation>
+  } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const onLeft = vi.fn()
@@ -69,7 +74,9 @@ async function show(
         }}
       >
         <AddMembersApiProvider api={{ admit: () => Promise.resolve(conversation) }}>
-          <RenameGroupApiProvider api={{ rename: () => Promise.resolve(conversation) }}>
+          <RenameGroupApiProvider
+            api={{ rename: apis.rename ?? (() => Promise.resolve(conversation)) }}
+          >
             <RemoveMemberApiProvider api={{ exclude }}>
               <LeaveGroupApiProvider api={{ leave: apis.leave ?? (() => Promise.resolve()) }}>
                 {children}
@@ -186,5 +193,65 @@ describe('widgets/group-details : infos du groupe (GRP-03, GRP-04, ADR 0041)', (
     const { screen } = await show(alone, 'aside')
 
     await expect.element(screen.getByText('1 membre · Créé le 28 oct.')).toBeVisible()
+  })
+
+  it('ADR 0035, ADR 0041 (point 3) : Échap dans un dialogue ouvert depuis le tiroir ne ferme que ce dialogue', async () => {
+    const { screen, onClose } = await show(group('ADMIN'), 'drawer')
+
+    await screen.getByRole('button', { name: 'Renommer le groupe' }).click()
+    await expect.element(screen.getByRole('dialog', { name: 'Renommer le groupe' })).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+
+    await expect
+      .element(screen.getByRole('dialog', { name: 'Renommer le groupe' }))
+      .not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('ADR 0035 : pendant un envoi, Échap ne ferme ni le dialogue ni le tiroir', async () => {
+    const { screen, onClose } = await show(group('ADMIN'), 'drawer', {
+      rename: () => new Promise(() => undefined),
+    })
+
+    await screen.getByRole('button', { name: 'Renommer le groupe' }).click()
+    await screen.getByRole('textbox', { name: 'Nom du groupe' }).fill('Autre nom')
+    await screen.getByRole('button', { name: 'Enregistrer' }).click()
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(screen.getByRole('dialog', { name: 'Renommer le groupe' })).toBeVisible()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('WCAG 2.4.3 : un dialogue annulé rend le focus à son déclencheur ; après un retrait, au titre des membres', async () => {
+    const { screen } = await show(group('ADMIN'), 'aside')
+
+    await screen.getByRole('button', { name: 'Renommer le groupe' }).click()
+    await screen.getByRole('button', { name: 'Annuler' }).click()
+    await expect.element(screen.getByRole('button', { name: 'Renommer le groupe' })).toHaveFocus()
+
+    await screen
+      .getByRole('button', { name: `Retirer ${isolate('Camille Tremblay')} du groupe` })
+      .click()
+    await screen
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Retirer', exact: true })
+      .click()
+    await expect.element(screen.getByRole('heading', { level: 3, name: '4 membres' })).toHaveFocus()
+  })
+
+  it('ADR 0041 (point 3) : sur téléphone, le tiroir devient une feuille plein écran', async () => {
+    await page.viewport(390, 844)
+    try {
+      const { screen } = await show(group('MEMBER'), 'drawer')
+      const sheet = screen
+        .getByRole('dialog', { name: 'Infos du groupe' })
+        .element()
+        .getBoundingClientRect()
+
+      expect(Math.round(sheet.width)).toBe(390)
+      expect(Math.round(sheet.height)).toBe(844)
+    } finally {
+      await page.viewport(1280, 800)
+    }
   })
 })

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type Ref, useState } from 'react'
 import { Link } from 'react-router'
 import {
   type Conversation,
@@ -23,6 +23,8 @@ interface ConversationListProps {
   readonly selectedId: string | null
   readonly onNew: () => void
   readonly variant: ListVariant
+  /** Titre « Conversations », qui reçoit le focus quand la conversation ouverte disparaît (WCAG 2.4.3). */
+  readonly titleRef?: Ref<HTMLHeadingElement> | undefined
 }
 
 /** SEC-01 : saisie de recherche bornée, comme celle d'Amis (ADR 0038, point 6). */
@@ -39,7 +41,13 @@ const STATE_BUTTON =
  * mène à `/?conversation={id}` (ADR 0041, point 1) ; la recherche porte sur les noms, côté client. Sans message avant
  * le lot 4, une ligne n'a ni aperçu, ni heure, ni non-lus (ADR 0041, point 7).
  */
-export function ConversationList({ me, selectedId, onNew, variant }: ConversationListProps) {
+export function ConversationList({
+  me,
+  selectedId,
+  onNew,
+  variant,
+  titleRef,
+}: ConversationListProps) {
   const t = useMessages(conversationListMessages)
   const conversations = useConversations()
   const [query, setQuery] = useState('')
@@ -53,7 +61,9 @@ export function ConversationList({ me, selectedId, onNew, variant }: Conversatio
         className={`flex items-center justify-between gap-3 ${variant === 'small' ? 'px-4 pt-4 pb-3' : 'px-4 pt-5 pb-3'}`}
       >
         <h1
-          className={`m-0 font-bold tracking-[-0.025em] ${variant === 'small' ? 'text-[26px]' : 'text-[20px]'}`}
+          ref={titleRef}
+          tabIndex={-1}
+          className={`m-0 font-bold tracking-[-0.025em] outline-none ${variant === 'small' ? 'text-[26px]' : 'text-[20px]'}`}
         >
           {t('title')}
         </h1>

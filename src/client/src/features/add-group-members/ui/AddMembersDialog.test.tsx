@@ -84,7 +84,9 @@ describe('features/add-group-members : Ajouter des membres (GRP-03, GRP-04, ADR 
 
     await screen.getByRole('option', { name: /Inès Côté/u }).click()
 
-    await expect.element(screen.getByRole('combobox', { name: 'Membres' })).toBeDisabled()
+    await expect
+      .element(screen.getByRole('combobox', { name: 'Membres' }))
+      .toHaveAttribute('aria-disabled', 'true')
   })
 
   it.each([

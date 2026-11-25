@@ -27,8 +27,9 @@ export function useLeaveGroup(onDone: () => void) {
       }
     },
     onSuccess: async () => {
-      await invalidateConversations(client)
+      // L'écran quitte d'abord le groupe (il en ignore le 404), puis la liste est relue.
       onDone()
+      await invalidateConversations(client)
     },
   })
   const failure: ConversationFailure | null =

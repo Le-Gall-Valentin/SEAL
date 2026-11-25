@@ -22,6 +22,8 @@ interface ModalDialogProps {
   readonly describedBy?: string | undefined
   /** 528 px au lieu de 500 : Nouvelle-Conversation, qui loge le sélecteur d'amis. */
   readonly wide?: boolean
+  /** Feuille plein écran sur téléphone, sous 640 px (Nouvelle-Conversation, ADR 0041 point 3). */
+  readonly sheet?: boolean
   readonly children: ReactNode
 }
 
@@ -44,6 +46,7 @@ export function ModalDialog({
   danger = false,
   describedBy,
   wide = false,
+  sheet = false,
   children,
 }: ModalDialogProps) {
   const t = useMessages(formMessages)
@@ -68,10 +71,12 @@ export function ModalDialog({
       role={danger ? 'alertdialog' : undefined}
       aria-labelledby={titleId}
       aria-describedby={describedBy}
-      className={`m-auto mt-10 w-[calc(100%-32px)] overflow-y-auto rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay ${danger ? 'max-w-[520px]' : wide ? 'max-w-[528px]' : 'max-w-[500px]'}`}
+      className={`m-auto mt-10 w-[calc(100%-32px)] overflow-y-auto rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay ${danger ? 'max-w-[520px]' : wide ? 'max-w-[528px]' : 'max-w-[500px]'} ${sheet ? 'max-sm:m-0 max-sm:h-full max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:rounded-none' : ''}`}
       onCancel={(event) => {
-        // Échap : la fenêtre ne se ferme que si l'écran le permet, et par lui.
+        // Échap : la fenêtre ne se ferme que si l'écran le permet, et par lui. React fait remonter l'annulation : une
+        // fenêtre ouverte depuis une autre (le tiroir des infos d'un groupe) ne doit pas fermer aussi celle-ci.
         event.preventDefault()
+        event.stopPropagation()
         if (closable) {
           onClose()
         }

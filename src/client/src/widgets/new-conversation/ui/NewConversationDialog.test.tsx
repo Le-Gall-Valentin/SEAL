@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { userEvent } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import type { Conversation } from '@/entities/conversation'
 import { type Friend, FriendsApiProvider, type IFriendsApi } from '@/entities/friend'
@@ -89,7 +89,9 @@ describe('widgets/new-conversation : Nouvelle conversation (CNV-01, CNV-03, ADR 
     const submit = screen.getByRole('button', { name: 'Ouvrir la conversation' })
     await expect.element(submit).toBeDisabled()
     await screen.getByRole('option', { name: /Inès Côté/u }).click()
-    await expect.element(screen.getByRole('combobox', { name: 'Message direct' })).toBeDisabled()
+    await expect
+      .element(screen.getByRole('combobox', { name: 'Message direct' }))
+      .toHaveAttribute('aria-disabled', 'true')
     await submit.click()
 
     await expect.poll(() => onOpened.mock.calls).toEqual([['d-1']])
@@ -153,5 +155,21 @@ describe('widgets/new-conversation : Nouvelle conversation (CNV-01, CNV-03, ADR 
     await screen.getByRole('button', { name: 'Annuler' }).click()
 
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('ADR 0041 (point 3) : sur téléphone, Nouvelle conversation devient une feuille plein écran', async () => {
+    await page.viewport(390, 844)
+    try {
+      const { screen } = await open()
+      const sheet = screen
+        .getByRole('dialog', { name: 'Nouvelle conversation' })
+        .element()
+        .getBoundingClientRect()
+
+      expect(Math.round(sheet.width)).toBe(390)
+      expect(Math.round(sheet.height)).toBe(844)
+    } finally {
+      await page.viewport(1280, 800)
+    }
   })
 })

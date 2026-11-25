@@ -138,13 +138,48 @@ describe('entities/friend : sélecteur d’amis au clavier (FRD-20)', () => {
     await expect.element(screen.getByRole('option', { name: /Maude/u })).not.toBeInTheDocument()
   })
 
-  it('GRP-01 : la sélection pleine désactive la saisie et retire la liste', async () => {
+  it('GRP-01, WCAG 2.4.3 : la sélection pleine met la saisie en lecture seule, focus gardé, et retire la liste', async () => {
     const screen = await render(<Picker max={1} />)
+    const input = screen.getByRole('combobox', { name: 'Membres' })
 
-    await screen.getByRole('option', { name: /Mathis/u }).click()
+    await input.fill('ma')
+    await userEvent.keyboard('{Enter}')
 
-    await expect.element(screen.getByRole('combobox', { name: 'Membres' })).toBeDisabled()
+    await expect.element(input).toHaveFocus()
+    await expect.element(input).toHaveAttribute('readonly')
+    await expect.element(input).toHaveAttribute('aria-disabled', 'true')
     await expect.element(screen.getByRole('listbox')).not.toBeInTheDocument()
+  })
+
+  it('FRD-20 : sans liste, Entrée n’est pas retenue et envoie le formulaire', async () => {
+    const onSubmit = vi.fn((event: Event) => {
+      event.preventDefault()
+    })
+    const screen = await render(
+      <form
+        onSubmit={(event) => {
+          onSubmit(event.nativeEvent)
+        }}
+      >
+        <Picker max={1} />
+        <button type="submit">OK</button>
+      </form>,
+    )
+
+    await screen.getByRole('combobox', { name: 'Membres' }).fill('ma')
+    await userEvent.keyboard('{Enter}')
+    await userEvent.keyboard('{Enter}')
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('WCAG 2.4.3 : retirer un jeton rend le focus à la saisie', async () => {
+    const screen = await render(<Picker />)
+
+    await screen.getByRole('option', { name: /Camille Tremblay/u }).click()
+    await screen.getByRole('button', { name: `Retirer ${isolate('Camille Tremblay')}` }).click()
+
+    await expect.element(screen.getByRole('combobox', { name: 'Membres' })).toHaveFocus()
   })
 
   it('FRD-20, ADR 0041 (point 4) : sans ami, puis sans correspondance, le dire', async () => {
@@ -167,5 +202,42 @@ describe('entities/friend : sélecteur d’amis au clavier (FRD-20)', () => {
       .element(screen.getByText('↑ ↓ pour choisir · Entrée pour ajouter · Échap pour effacer'))
       .toBeVisible()
     await expect.element(screen.getByText('Meilleures correspondances')).toBeVisible()
+  })
+
+  it('FRD-20, A10 : pendant le chargement, rien ne dit « pas encore d’amis » ; un échec propose de réessayer', async () => {
+    const loading = await render(
+      <FriendPicker
+        label="Membres"
+        friends={[]}
+        loading
+        selected={[]}
+        exclude={new Set()}
+        max={49}
+        onSelect={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    )
+    await expect
+      .element(loading.getByText('Vous n’avez pas encore d’amis.'))
+      .not.toBeInTheDocument()
+    await loading.unmount()
+
+    const onRetry = vi.fn()
+    const failed = await render(
+      <FriendPicker
+        label="Membres"
+        friends={[]}
+        failed
+        onRetry={onRetry}
+        selected={[]}
+        exclude={new Set()}
+        max={49}
+        onSelect={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    )
+    await expect.element(failed.getByText('Vous n’avez pas encore d’amis.')).not.toBeInTheDocument()
+    await failed.getByRole('button', { name: 'Réessayer' }).click()
+    expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })

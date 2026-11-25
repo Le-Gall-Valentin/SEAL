@@ -1,8 +1,8 @@
-import { type KeyboardEvent, useId, useState } from 'react'
+import { type KeyboardEvent, useId, useRef, useState } from 'react'
 import { initialsOf } from '@/entities/account/@x/friend'
 import { useMessages } from '@/shared/i18n'
 import { isolate, useClock } from '@/shared/lib'
-import { Avatar } from '@/shared/ui'
+import { Avatar, LoadErrorState } from '@/shared/ui'
 import { friendMessages } from '../i18n'
 import { tintOf } from '../model/friends'
 import { type Friend, type MatchRange, rankFriends } from '../model/friendPicker'
@@ -20,6 +20,10 @@ interface FriendPickerProps {
   readonly max: number
   readonly onSelect: (friend: Friend) => void
   readonly onRemove: (friend: Friend) => void
+  /** Liste d'amis en lecture, ou en échec : rien n'est affirmé tant qu'elle n'est pas lue (A10). */
+  readonly loading?: boolean
+  readonly failed?: boolean
+  readonly onRetry?: () => void
 }
 
 /** Saisie de 64 caractères au plus, comme la recherche d'Amis : un identifiant ou un nom affiché tient en dessous. */
@@ -39,11 +43,15 @@ export function FriendPicker({
   max,
   onSelect,
   onRemove,
+  loading = false,
+  failed = false,
+  onRetry,
 }: FriendPickerProps) {
   const t = useMessages(friendMessages)
   const clock = useClock()
   const labelId = useId()
   const listId = useId()
+  const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(true)
   const [active, setActive] = useState(0)
@@ -72,9 +80,10 @@ export function FriendPicker({
         return
       }
       case 'Enter': {
-        event.preventDefault()
+        // Sans liste, Entrée garde son rôle : elle envoie le formulaire (« Ouvrir la conversation »).
         const chosen = showList ? ranked[activeIndex] : undefined
         if (chosen) {
+          event.preventDefault()
           choose(chosen.friend)
         }
         return
@@ -121,6 +130,8 @@ export function FriendPicker({
               aria-label={t('pickerRemove', { name: isolate(friend.displayName) })}
               onClick={() => {
                 onRemove(friend)
+                // WCAG 2.4.3 : le jeton qui avait le focus disparaît ; il revient à la saisie.
+                inputRef.current?.focus()
               }}
               className="grid size-7 place-items-center rounded-full text-ink-2 hover:bg-accent-soft-2"
             >
@@ -140,7 +151,10 @@ export function FriendPicker({
             autoComplete="off"
             spellCheck={false}
             maxLength={QUERY_MAX_LENGTH}
-            disabled={full}
+            ref={inputRef}
+            // WCAG 2.4.3 : sélection pleine, la saisie garde le focus en lecture seule au lieu d'être désactivée.
+            readOnly={full}
+            aria-disabled={full || undefined}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value)
@@ -148,7 +162,7 @@ export function FriendPicker({
               setActive(0)
             }}
             onKeyDown={onKeyDown}
-            className="h-full min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none disabled:opacity-55"
+            className="h-full min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none aria-disabled:opacity-55"
           />
         </span>
       </div>
@@ -156,7 +170,9 @@ export function FriendPicker({
         <span>{t('pickerHint')}</span>
         <span>{t('pickerKeys')}</span>
       </div>
-      {friends.length === 0 ? (
+      {loading ? null : failed ? (
+        <LoadErrorState heading="h3" onRetry={onRetry ?? (() => undefined)} />
+      ) : friends.length === 0 ? (
         <p className="text-[13px] text-ink-3">{t('pickerNoFriends')}</p>
       ) : showList ? (
         <>

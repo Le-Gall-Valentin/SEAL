@@ -28,7 +28,8 @@ interface NewConversationDialogProps {
  */
 export function NewConversationDialog({ open, onClose, onOpened }: NewConversationDialogProps) {
   const t = useMessages(newConversationMessages)
-  const friends = useFriends().data ?? []
+  const friendList = useFriends()
+  const friends = friendList.data ?? []
   const [kind, setKind] = useState<Kind>('direct')
   const [selected, setSelected] = useState<readonly Friend[]>([])
   const [name, setName] = useState('')
@@ -84,7 +85,7 @@ export function NewConversationDialog({ open, onClose, onOpened }: NewConversati
   }
 
   return (
-    <ModalDialog open={open} onClose={cancel} closable={!pending} title={t('title')} wide>
+    <ModalDialog open={open} onClose={cancel} closable={!pending} title={t('title')} wide sheet>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -143,6 +144,11 @@ export function NewConversationDialog({ open, onClose, onOpened }: NewConversati
             label={kind === 'direct' ? t('direct') : t('members')}
             labelHidden={kind === 'direct'}
             friends={friends}
+            loading={friendList.data === undefined && !friendList.isError}
+            failed={friendList.data === undefined && friendList.isError}
+            onRetry={() => {
+              void friendList.refetch()
+            }}
             selected={selected}
             exclude={new Set()}
             max={kind === 'direct' ? 1 : MAX_NEWCOMERS}
