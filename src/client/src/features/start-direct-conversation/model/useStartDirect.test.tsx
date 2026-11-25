@@ -55,15 +55,16 @@ describe('features/start-direct-conversation : ouvrir une directe (CNV-01, FRD-2
     expect(invalidated).toHaveBeenCalledWith({ queryKey: ['friends'] })
   })
 
-  it('A06 : deux demandes rapprochées n’envoient qu’une requête', async () => {
-    const openDirect = vi.fn(() => Promise.resolve({ created: true, conversation: DIRECT }))
+  it('CNV-01, A06 : deux demandes rapprochées n’envoient qu’une requête', async () => {
+    const openDirect = vi.fn(() => new Promise<never>(() => undefined))
     const { wrapper } = setup({ openDirect })
     const { result } = await renderHook(() => useStartDirect(() => undefined), { wrapper })
 
     result.current.open('ami')
     result.current.open('ami')
 
-    await expect.poll(() => result.current.pending).toBe(false)
+    await expect.poll(() => openDirect.mock.calls.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
     expect(openDirect).toHaveBeenCalledTimes(1)
   })
 

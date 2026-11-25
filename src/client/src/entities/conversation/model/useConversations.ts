@@ -19,6 +19,8 @@ export function useConversations() {
     queryKey: CONVERSATIONS_KEY,
     queryFn: async ({ signal }) =>
       sortConversations(await allPages((after) => api.list(after, signal))),
+    // ADR 0041 (point 8) : relue au retour du focus, explicitement, quel que soit le réglage commun.
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -29,6 +31,7 @@ export function useConversation(id: string | null) {
     queryKey: conversationKey(id ?? ''),
     queryFn: ({ signal }) => api.get(id ?? '', signal),
     enabled: id !== null,
+    refetchOnWindowFocus: true,
   })
 }
 

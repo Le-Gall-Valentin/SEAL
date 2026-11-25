@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
@@ -99,5 +99,36 @@ describe('entities/conversation : liste complète et détail (CNV-04, ADR 0037 p
     window.dispatchEvent(new KeyboardEvent('keydown'))
     vi.advanceTimersByTime(60_000)
     await expect.poll(() => reads).toBe(2)
+  })
+
+  it('ADR 0041 (point 8) : la liste et la conversation ouverte se relisent au retour du focus', async () => {
+    let lists = 0
+    let gets = 0
+    const Wrapper = wrapper({
+      list: () => {
+        lists += 1
+        return Promise.resolve({ items: [], next: null })
+      },
+      get: () => {
+        gets += 1
+        return Promise.resolve(conversation(1, 1))
+      },
+    })
+    await renderHook(
+      () => {
+        useConversations()
+        useConversation(id(1))
+      },
+      { wrapper: Wrapper },
+    )
+    await expect.poll(() => [lists, gets]).toEqual([1, 1])
+
+    try {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+      await expect.poll(() => [lists, gets]).toEqual([2, 2])
+    } finally {
+      focusManager.setFocused(undefined)
+    }
   })
 })
