@@ -198,7 +198,7 @@ describe('entities/friend : sélecteur d’amis au clavier (FRD-20)', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1)
   })
 
-  it('WCAG 2.4.3 : retirer un jeton rend le focus à la saisie', async () => {
+  it('FRD-20, WCAG 2.4.3 : retirer un jeton rend le focus à la saisie', async () => {
     const screen = await render(<Picker />)
 
     await screen.getByRole('option', { name: /Camille Tremblay/u }).click()

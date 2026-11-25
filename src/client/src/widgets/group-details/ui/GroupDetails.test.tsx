@@ -189,7 +189,7 @@ describe('widgets/group-details : infos du groupe (GRP-03, GRP-04, ADR 0041)', (
     await expect.poll(() => exclude.mock.calls).toEqual([['g-1', 'u1']])
   })
 
-  it('ADR 0041 (point 4) : un groupe d’un seul membre se dit au singulier', async () => {
+  it('GRP-04, ADR 0041 (point 4) : un groupe d’un seul membre se dit au singulier', async () => {
     const alone: Conversation = {
       ...group('ADMIN'),
       members: [member(ME, 'moi', 'Moi Même', 'ADMIN')],
@@ -199,7 +199,7 @@ describe('widgets/group-details : infos du groupe (GRP-03, GRP-04, ADR 0041)', (
     await expect.element(screen.getByText('1 membre · Créé le 28 oct.')).toBeVisible()
   })
 
-  it('ADR 0035, ADR 0041 (point 3) : Échap dans un dialogue ouvert depuis le tiroir ne ferme que ce dialogue', async () => {
+  it('GRP-03, ADR 0035, ADR 0041 (point 3) : Échap dans un dialogue ouvert depuis le tiroir ne ferme que ce dialogue', async () => {
     const { screen, onClose } = await show(group('ADMIN'), 'drawer')
 
     await screen.getByRole('button', { name: 'Renommer le groupe' }).click()
@@ -212,7 +212,7 @@ describe('widgets/group-details : infos du groupe (GRP-03, GRP-04, ADR 0041)', (
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('ADR 0035 : pendant un envoi, Échap ne ferme ni le dialogue ni le tiroir', async () => {
+  it('GRP-03, ADR 0035 : pendant un envoi, Échap ne ferme ni le dialogue ni le tiroir', async () => {
     const { screen, onClose } = await show(group('ADMIN'), 'drawer', {
       rename: () => new Promise(() => undefined),
     })
@@ -226,7 +226,7 @@ describe('widgets/group-details : infos du groupe (GRP-03, GRP-04, ADR 0041)', (
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('WCAG 2.4.3 : un dialogue annulé rend le focus à son déclencheur ; après un retrait, au titre des membres', async () => {
+  it('GRP-03, WCAG 2.4.3 : un dialogue annulé rend le focus à son déclencheur ; après un retrait, au titre des membres', async () => {
     const { screen } = await show(group('ADMIN'), 'aside')
 
     await screen.getByRole('button', { name: 'Renommer le groupe' }).click()
@@ -243,7 +243,7 @@ describe('widgets/group-details : infos du groupe (GRP-03, GRP-04, ADR 0041)', (
     await expect.element(screen.getByRole('heading', { level: 3, name: '4 membres' })).toHaveFocus()
   })
 
-  it('ADR 0041 (point 3) : sur téléphone, le tiroir devient une feuille plein écran', async () => {
+  it('GRP-04, ADR 0041 (point 3) : sur téléphone, le tiroir devient une feuille plein écran', async () => {
     await page.viewport(390, 844)
     try {
       const { screen } = await show(group('MEMBER'), 'drawer')

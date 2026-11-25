@@ -110,7 +110,7 @@ describe('features/add-group-members : Ajouter des membres (GRP-03, GRP-04, ADR 
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('A06 : un double clic n’envoie qu’un ajout', async () => {
+  it('GRP-03, A06 : un double clic n’envoie qu’un ajout', async () => {
     const admit = vi.fn(() => Promise.resolve(GROUP))
     const { screen } = await open({ admit })
 

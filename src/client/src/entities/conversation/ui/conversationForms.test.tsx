@@ -54,7 +54,7 @@ describe('entities/conversation : champ du nom et refus (ADR 0041, point 4)', ()
     await expect.element(screen.getByRole('alert')).toHaveTextContent(text)
   })
 
-  it('ADR 0041 (point 4) : un nom refusé reste sous le champ ; aucun refus, aucune alerte', async () => {
+  it('GRP-01, ADR 0041 (point 4) : un nom refusé reste sous le champ ; aucun refus, aucune alerte', async () => {
     const invalidName: ConversationFailure = { kind: 'invalid-name' }
     const named = await render(<ConversationAlert failure={invalidName} />)
     expect(named.container.querySelector('[role="alert"]')).toBeNull()
@@ -64,7 +64,7 @@ describe('entities/conversation : champ du nom et refus (ADR 0041, point 4)', ()
     expect(none.container.querySelector('[role="alert"]')).toBeNull()
   })
 
-  it('ADR 0041 (point 4) : une panne réseau reprend l’alerte commune des formulaires', async () => {
+  it('CNV-03, ADR 0041 (point 4) : une panne réseau reprend l’alerte commune des formulaires', async () => {
     const screen = await render(<ConversationAlert failure={{ kind: 'network' }} />)
 
     await expect.element(screen.getByRole('alert')).toBeVisible()

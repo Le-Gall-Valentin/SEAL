@@ -123,7 +123,7 @@ describe('widgets/conversation-list : liste des conversations (CNV-04, CNV-10, m
     expect(onNew).toHaveBeenCalledTimes(1)
   })
 
-  it('A10 : un échec de lecture propose de réessayer', async () => {
+  it('CNV-04, A10 : un échec de lecture propose de réessayer', async () => {
     const list = vi.fn<IConversationsApi['list']>(() => Promise.reject(new Error('panne')))
     const screen = await show(list)
 
@@ -136,7 +136,7 @@ describe('widgets/conversation-list : liste des conversations (CNV-04, CNV-10, m
     await expect.element(screen.getByRole('link', { name: 'Ski du dimanche' })).toBeVisible()
   })
 
-  it('Maquettes Conv-Tablette et Conv-Telephone-Liste : bouton rond « Nouvelle conversation », recherche « Rechercher » sur tablette', async () => {
+  it('CNV-04, maquettes Conv-Tablette et Conv-Telephone-Liste : bouton rond « Nouvelle conversation », recherche « Rechercher » sur tablette', async () => {
     const tablet = await show(both, { variant: 'medium' })
     await expect.element(tablet.getByRole('searchbox', { name: 'Rechercher' })).toBeVisible()
     await expect

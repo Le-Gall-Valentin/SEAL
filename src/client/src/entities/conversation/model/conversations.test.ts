@@ -84,7 +84,7 @@ describe('entities/conversation : règles de la liste et des groupes (CNV-04, CN
     expect(canLeave(asMember)).toBe(true)
   })
 
-  it('ADR 0039 (point 3) : une directe ne se gère pas', () => {
+  it('GRP-03, ADR 0039 (point 3) : une directe ne se gère pas', () => {
     expect(canRename(direct, ME)).toBe(false)
     expect(canRemove(direct, ME, 'mathis')).toBe(false)
     expect(canAdd(direct)).toBe(false)

@@ -102,7 +102,7 @@ describe('pages/conversations : écran Conversations (CNV-04, ADR 0041)', () => 
     await page.viewport(1280, 800)
   })
 
-  it('Maquette Etats : sur ordinateur, la liste et « Vos conversations sont scellées » sans conversation choisie', async () => {
+  it('CNV-04, maquette Etats : sur ordinateur, la liste et « Vos conversations sont scellées » sans conversation choisie', async () => {
     const screen = await renderAt('/', 1440)
 
     await expect
@@ -129,7 +129,7 @@ describe('pages/conversations : écran Conversations (CNV-04, ADR 0041)', () => 
       .not.toBeInTheDocument()
   })
 
-  it('Maquettes Conv-Telephone-Liste et Conv-Telephone-Fil : sur téléphone, la liste ou le fil, et « Retour »', async () => {
+  it('CNV-04, maquettes Conv-Telephone-Liste et Conv-Telephone-Fil : sur téléphone, la liste ou le fil, et « Retour »', async () => {
     const screen = await renderAt(`/?conversation=${SKI.id}`, 390)
 
     await expect
@@ -182,7 +182,7 @@ describe('pages/conversations : écran Conversations (CNV-04, ADR 0041)', () => 
     await expect.poll(() => screen.router.state.location.search).toBe('')
   })
 
-  it('ADR 0041 (point 4) : une directe dont l’autre compte n’est plus actif ramène aussi à la liste', async () => {
+  it('CNV-06, ADR 0041 (point 4) : une directe dont l’autre compte n’est plus actif ramène aussi à la liste', async () => {
     const alone: Conversation = {
       ...SKI,
       type: 'DIRECT',
@@ -197,7 +197,7 @@ describe('pages/conversations : écran Conversations (CNV-04, ADR 0041)', () => 
     await expect.poll(() => screen.router.state.location.search).toBe('')
   })
 
-  it('A10 : sur téléphone, un autre échec propose « Réessayer » et « Retour »', async () => {
+  it('CNV-06, A10 : sur téléphone, un autre échec propose « Réessayer » et « Retour »', async () => {
     const screen = await renderAt(`/?conversation=${SKI.id}`, 390, () =>
       Promise.reject(new NetworkError()),
     )

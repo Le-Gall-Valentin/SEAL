@@ -228,7 +228,7 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
     ).toHaveLength(0)
   })
 
-  it('ADR 0041 (point 1) : un identifiant de conversation mal formé n’ouvre rien ; la barre du bas reste', async () => {
+  it('CNV-04, ADR 0041 (point 1) : un identifiant de conversation mal formé n’ouvre rien ; la barre du bas reste', async () => {
     const { screen } = await renderAt('/?conversation=pas-un-uuid', 390, 844)
 
     await expect

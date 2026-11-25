@@ -68,7 +68,7 @@ describe('features/start-direct-conversation : ouvrir une directe (CNV-01, FRD-2
     expect(openDirect).toHaveBeenCalledTimes(1)
   })
 
-  it('ADR 0041 (point 4) : une panne réseau reprend l’issue commune des formulaires', async () => {
+  it('CNV-01, ADR 0041 (point 4) : une panne réseau reprend l’issue commune des formulaires', async () => {
     const { wrapper } = setup({ openDirect: () => Promise.reject(new NetworkError()) })
     const { result } = await renderHook(() => useStartDirect(() => undefined), { wrapper })
 

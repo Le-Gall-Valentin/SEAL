@@ -66,7 +66,7 @@ describe('features/remove-group-member : retirer un membre (GRP-03, ADR 0041)', 
     expect(exclude).toHaveBeenCalledWith('g-1', 'u-1')
   })
 
-  it('ADR 0041 (point 4) : un membre déjà parti (NOT_A_MEMBER) vaut un retrait réussi', async () => {
+  it('GRP-03, ADR 0041 (point 4) : un membre déjà parti (NOT_A_MEMBER) vaut un retrait réussi', async () => {
     const { screen, onClose } = await open({
       exclude: () => Promise.reject(new ApiError(404, 'NOT_A_MEMBER')),
     })
@@ -89,7 +89,7 @@ describe('features/remove-group-member : retirer un membre (GRP-03, ADR 0041)', 
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('A06 : un double clic pendant l’envoi n’envoie qu’un retrait', async () => {
+  it('GRP-03, A06 : un double clic pendant l’envoi n’envoie qu’un retrait', async () => {
     const exclude = vi.fn(() => new Promise<void>(() => undefined))
     const { screen } = await open({ exclude })
 

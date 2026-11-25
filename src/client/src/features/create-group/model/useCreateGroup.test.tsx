@@ -66,7 +66,7 @@ describe('features/create-group : créer un groupe (CNV-03, GRP-02, FRD-21)', ()
     expect(invalidated).toHaveBeenCalledWith({ queryKey: ['friends'] })
   })
 
-  it('A06 : deux créations rapprochées n’envoient qu’une requête', async () => {
+  it('CNV-03, A06 : deux créations rapprochées n’envoient qu’une requête', async () => {
     const createGroup = vi.fn(() => new Promise<never>(() => undefined))
     const { wrapper } = setup({ createGroup })
     const { result } = await renderHook(() => useCreateGroup(() => undefined), { wrapper })
@@ -79,7 +79,7 @@ describe('features/create-group : créer un groupe (CNV-03, GRP-02, FRD-21)', ()
     expect(createGroup).toHaveBeenCalledTimes(1)
   })
 
-  it('ADR 0041 (point 4) : une panne réseau reprend l’issue commune des formulaires', async () => {
+  it('CNV-03, ADR 0041 (point 4) : une panne réseau reprend l’issue commune des formulaires', async () => {
     const { wrapper } = setup({ createGroup: () => Promise.reject(new NetworkError()) })
     const { result } = await renderHook(() => useCreateGroup(() => undefined), { wrapper })
 

@@ -177,7 +177,7 @@ describe('SEC-01, ADR 0042 : lecture d’un nom reçu du serveur', () => {
   // U+0378 n'est attribué dans aucune version d'Unicode : il tient lieu d'un caractère trop récent pour le navigateur.
   const UNKNOWN = String.fromCodePoint(0x378)
 
-  it('ADR 0042 : un point non attribué dans les tables du navigateur se lit, mais ne se saisit pas', () => {
+  it('SEC-01, ADR 0042 : un point non attribué dans les tables du navigateur se lit, mais ne se saisit pas', () => {
     expect(isDisplayNameReadable(`Ana${UNKNOWN}`)).toBe(true)
     expect(isDisplayNameReadable(UNKNOWN)).toBe(true)
     expect(isNameReadable(`Ski ${UNKNOWN}`, 64)).toBe(true)

@@ -149,7 +149,7 @@ describe('widgets/conversation-panel : en-tête et fil (CNV-04, GRP-05, ADR 0041
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 
-  it('Maquette Etats : sans conversation choisie, « Vos conversations sont scellées » propose d’en commencer une', async () => {
+  it('CNV-04, maquette Etats : sans conversation choisie, « Vos conversations sont scellées » propose d’en commencer une', async () => {
     const onNew = vi.fn()
     const screen = await render(
       <ConversationPanel

@@ -59,7 +59,7 @@ describe('features/leave-group : quitter un groupe (GRP-03, ADR 0041)', () => {
     await expect.poll(() => onClose.mock.calls).toEqual([[true]])
   })
 
-  it('ADR 0041 (point 4) : une panne réseau s’annonce', async () => {
+  it('GRP-03, ADR 0041 (point 4) : une panne réseau s’annonce', async () => {
     const { screen, onClose } = await open({ leave: () => Promise.reject(new NetworkError()) })
 
     await screen.getByRole('button', { name: 'Quitter le groupe' }).click()
@@ -68,7 +68,7 @@ describe('features/leave-group : quitter un groupe (GRP-03, ADR 0041)', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('A06 : un double clic pendant l’envoi n’envoie qu’un départ', async () => {
+  it('GRP-03, A06 : un double clic pendant l’envoi n’envoie qu’un départ', async () => {
     const leave = vi.fn(() => new Promise<void>(() => undefined))
     const { screen } = await open({ leave })
 

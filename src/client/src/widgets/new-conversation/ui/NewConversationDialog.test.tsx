@@ -155,7 +155,7 @@ describe('widgets/new-conversation : Nouvelle conversation (CNV-01, CNV-03, ADR 
     expect(onOpened).not.toHaveBeenCalled()
   })
 
-  it('ADR 0041 (point 3) : « Annuler » ferme la fenêtre', async () => {
+  it('CNV-01, ADR 0041 (point 3) : « Annuler » ferme la fenêtre', async () => {
     const { screen, onClose } = await open()
 
     await screen.getByRole('button', { name: 'Annuler' }).click()
@@ -163,7 +163,7 @@ describe('widgets/new-conversation : Nouvelle conversation (CNV-01, CNV-03, ADR 
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('ADR 0041 (point 3) : sur téléphone, Nouvelle conversation devient une feuille plein écran', async () => {
+  it('CNV-01, ADR 0041 (point 3) : sur téléphone, Nouvelle conversation devient une feuille plein écran', async () => {
     await page.viewport(390, 844)
     try {
       const { screen } = await open()

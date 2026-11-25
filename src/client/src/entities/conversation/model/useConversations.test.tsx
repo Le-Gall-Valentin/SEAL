@@ -101,7 +101,7 @@ describe('entities/conversation : liste complète et détail (CNV-04, ADR 0037 p
     await expect.poll(() => reads).toBe(2)
   })
 
-  it('ADR 0041 (point 8) : la liste et la conversation ouverte se relisent au retour du focus', async () => {
+  it('CNV-04, ADR 0041 (point 8) : la liste et la conversation ouverte se relisent au retour du focus', async () => {
     let lists = 0
     let gets = 0
     const Wrapper = wrapper({

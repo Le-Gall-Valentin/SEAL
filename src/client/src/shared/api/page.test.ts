@@ -5,7 +5,7 @@ import { PAGE_LIMIT, pagePath, pageSchema } from './page'
 const NEXT = '0192f7a1-ffff-7000-8000-00000000a11c'
 
 describe('shared/api : pages par curseur (ADR 0037, point 3)', () => {
-  it('ADR 0037 (point 3) : limit de 50, after encodé, séparateur selon la base', () => {
+  it('CNV-04, FRD-10, ADR 0037 (point 3) : limit de 50, after encodé, séparateur selon la base', () => {
     expect(PAGE_LIMIT).toBe(50)
     expect(pagePath('/api/v1/friends', null)).toBe('/api/v1/friends?limit=50')
     expect(pagePath('/api/v1/friends', 'a b')).toBe('/api/v1/friends?limit=50&after=a%20b')

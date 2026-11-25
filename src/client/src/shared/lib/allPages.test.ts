@@ -3,7 +3,7 @@ import { allPages } from './allPages'
 import type { Page } from './page'
 
 describe('shared/lib : toutes les pages d’une liste (ADR 0037, point 3)', () => {
-  it('ADR 0037 (point 3) : suit next jusqu’à null, même après une page vide', async () => {
+  it('CNV-04, FRD-10, ADR 0037 (point 3) : suit next jusqu’à null, même après une page vide', async () => {
     const pages: Record<string, Page<number>> = {
       '': { items: [1, 2], next: 'a' },
       a: { items: [], next: 'b' },
@@ -20,13 +20,13 @@ describe('shared/lib : toutes les pages d’une liste (ADR 0037, point 3)', () =
     expect(asked).toEqual([null, 'a', 'b'])
   })
 
-  it('A10 : un curseur déjà vu arrête la lecture en erreur', async () => {
+  it('CNV-04, FRD-10, A10 : un curseur déjà vu arrête la lecture en erreur', async () => {
     await expect(allPages(async () => Promise.resolve({ items: [1], next: 'a' }))).rejects.toThrow(
       'pagination sans fin',
     )
   })
 
-  it('A10 : au-delà de 200 pages, la lecture s’arrête en erreur', async () => {
+  it('CNV-04, FRD-10, A10 : au-delà de 200 pages, la lecture s’arrête en erreur', async () => {
     let page = 0
     await expect(
       allPages(async () => Promise.resolve({ items: [], next: String(page++) })),
