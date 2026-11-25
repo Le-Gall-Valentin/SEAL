@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { Conversation } from '@/entities/conversation'
-import { ApiError } from '@/shared/lib'
+import { ApiError, NetworkError } from '@/shared/lib'
 import type { ICreateGroupApi } from '../api/ICreateGroupApi'
 import { CreateGroupApiProvider } from './createGroupPort'
 import { useCreateGroup } from './useCreateGroup'
@@ -64,5 +64,27 @@ describe('features/create-group : créer un groupe (CNV-03, GRP-02, FRD-21)', ()
 
     await expect.poll(() => result.current.failure).toEqual({ kind: 'not-friends' })
     expect(invalidated).toHaveBeenCalledWith({ queryKey: ['friends'] })
+  })
+
+  it('A06 : deux créations rapprochées n’envoient qu’une requête', async () => {
+    const createGroup = vi.fn(() => new Promise<never>(() => undefined))
+    const { wrapper } = setup({ createGroup })
+    const { result } = await renderHook(() => useCreateGroup(() => undefined), { wrapper })
+
+    result.current.create({ name: 'Ski', memberIds: ['a'] })
+    result.current.create({ name: 'Ski', memberIds: ['a'] })
+
+    await expect.poll(() => createGroup.mock.calls.length).toBe(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(createGroup).toHaveBeenCalledTimes(1)
+  })
+
+  it('ADR 0041 (point 4) : une panne réseau reprend l’issue commune des formulaires', async () => {
+    const { wrapper } = setup({ createGroup: () => Promise.reject(new NetworkError()) })
+    const { result } = await renderHook(() => useCreateGroup(() => undefined), { wrapper })
+
+    result.current.create({ name: 'Ski', memberIds: ['a'] })
+
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'network' })
   })
 })

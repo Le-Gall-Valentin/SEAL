@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { Conversation } from '@/entities/conversation'
-import { ApiError } from '@/shared/lib'
+import { ApiError, NetworkError } from '@/shared/lib'
 import type { IStartDirectApi } from '../api/IStartDirectApi'
 import { StartDirectApiProvider } from './startDirectPort'
 import { useStartDirect } from './useStartDirect'
@@ -65,5 +65,14 @@ describe('features/start-direct-conversation : ouvrir une directe (CNV-01, FRD-2
 
     await expect.poll(() => result.current.pending).toBe(false)
     expect(openDirect).toHaveBeenCalledTimes(1)
+  })
+
+  it('ADR 0041 (point 4) : une panne réseau reprend l’issue commune des formulaires', async () => {
+    const { wrapper } = setup({ openDirect: () => Promise.reject(new NetworkError()) })
+    const { result } = await renderHook(() => useStartDirect(() => undefined), { wrapper })
+
+    result.current.open('ami')
+
+    await expect.poll(() => result.current.failure).toEqual({ kind: 'network' })
   })
 })
