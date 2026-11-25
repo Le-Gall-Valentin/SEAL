@@ -1,6 +1,7 @@
 import type { AvatarTint } from '@/shared/config'
 
-const TINT_CLASS: Record<AvatarTint, string> = {
+/** Fond de chaque teinte, partagé par l'avatar et la mosaïque d'un groupe (ADR 0038, point 7). */
+export const TINT_CLASS: Record<AvatarTint, string> = {
   ice: 'bg-av-ice',
   moss: 'bg-av-moss',
   birch: 'bg-av-birch',

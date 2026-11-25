@@ -6,6 +6,7 @@ import {
   UsernameAvailabilityApiProvider,
 } from '@/entities/account'
 import { AuthorityApiProvider, type IAuthorityApi } from '@/entities/authority'
+import { ConversationsApiProvider, type IConversationsApi } from '@/entities/conversation'
 import { FriendsApiProvider, type IFriendsApi } from '@/entities/friend'
 import { type IKeysApi, KeysApiProvider } from '@/entities/keyring'
 import { type IOAuthProvidersApi, OAuthProvidersApiProvider } from '@/entities/oauth-provider'
@@ -57,6 +58,7 @@ export interface Apis {
   readonly sendFriendRequest: ISendFriendRequestApi
   readonly answerFriendRequest: IAnswerFriendRequestApi
   readonly removeFriend: IRemoveFriendApi
+  readonly conversations: IConversationsApi
 }
 
 interface ApiProvidersProps {
@@ -103,6 +105,9 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
     ),
     (inner) => <EmailChangeApiProvider api={apis.emailChange}>{inner}</EmailChangeApiProvider>,
     (inner) => <FriendsApiProvider api={apis.friends}>{inner}</FriendsApiProvider>,
+    (inner) => (
+      <ConversationsApiProvider api={apis.conversations}>{inner}</ConversationsApiProvider>
+    ),
     (inner) => (
       <SendFriendRequestApiProvider api={apis.sendFriendRequest}>
         {inner}
