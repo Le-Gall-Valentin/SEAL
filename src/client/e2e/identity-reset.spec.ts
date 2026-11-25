@@ -52,7 +52,7 @@ test('KEY-34 : sans sa clé, un nouvel appareil confirme, reçoit une nouvelle c
   newKey = await confirmRecoveryKey(page)
   await expect(page.getByRole('dialog')).toBeHidden()
   await expect(page.getByRole('heading', { name: 'Restaurer vos clés' })).toBeHidden()
-  await expect(page.getByRole('heading', { level: 1, name: 'seal' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Conversations' })).toBeVisible()
   expect(newKey).not.toBe(lostKey)
 })
 
@@ -68,5 +68,5 @@ test('KEY-34 : sur un autre appareil, l’ancienne clé ne restaure plus rien, l
   await restore(page, newKey)
 
   await expect(page.getByRole('heading', { name: 'Restaurer vos clés' })).toBeHidden()
-  await expect(page.getByRole('heading', { level: 1, name: 'seal' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Conversations' })).toBeVisible()
 })
