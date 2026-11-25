@@ -106,4 +106,21 @@ describe('entities/conversation : adaptateur de la liste et du détail (14.5, AD
 
     await expect(conversationsApi.get(CONVERSATION)).rejects.toThrow()
   })
+
+  it('SEC-01, ADR 0042 : un nom avec un caractère inconnu des tables du navigateur se lit quand même', async () => {
+    const unknown = String.fromCodePoint(0x378)
+    request.mockResolvedValue({
+      ...group,
+      name: `Ski ${unknown}`,
+      members: [
+        member(ME, 'moi', 'Moi Même', 'ADMIN'),
+        member(FRIEND, 'camille.t', `Camille ${unknown}`),
+      ],
+    })
+
+    const conversation = await conversationsApi.get(CONVERSATION)
+
+    expect(conversation.name).toBe(`Ski ${unknown}`)
+    expect(conversation.members[1]?.displayName).toBe(`Camille ${unknown}`)
+  })
 })

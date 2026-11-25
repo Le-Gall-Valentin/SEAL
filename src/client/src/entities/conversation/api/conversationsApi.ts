@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
-  isDisplayNameValid,
-  isNameValid,
+  isDisplayNameReadable,
+  isNameReadable,
   isUsernameWellFormed,
 } from '@/entities/account/@x/conversation'
 import { pagePath, pageSchema, request } from '@/shared/api'
@@ -14,11 +14,12 @@ export const GROUP_NAME_RAW_MAX_LENGTH = 128
 export const MAX_MEMBERS = 50
 
 const UUID = z.uuid()
-// SEC-01, AUTH-01, ACC-03 : le nom d'un autre compte qui ne suit pas les règles d'écriture est refusé (échec fermé).
+// SEC-01, AUTH-01, ACC-03 : le nom d'un autre compte qui ne suit pas les règles d'écriture est refusé (échec fermé),
+// à la règle de lecture de l'ADR 0042.
 const MEMBER = z.strictObject({
   userId: UUID,
   username: z.string().max(20).refine(isUsernameWellFormed),
-  displayName: z.string().max(200).refine(isDisplayNameValid),
+  displayName: z.string().max(200).refine(isDisplayNameReadable),
   role: z.enum(['ADMIN', 'MEMBER']),
 })
 
@@ -47,7 +48,7 @@ export const CONVERSATION_RESPONSE = z.discriminatedUnion('type', [
     name: z
       .string()
       .max(GROUP_NAME_RAW_MAX_LENGTH)
-      .refine((name) => isNameValid(name, GROUP_NAME_MAX_LENGTH)),
+      .refine((name) => isNameReadable(name, GROUP_NAME_MAX_LENGTH)),
   }),
 ])
 

@@ -177,4 +177,25 @@ describe('entities/friend : adaptateur des listes d’amis et d’invitations (1
 
     await expect(friendsApi.sentRequests(null)).rejects.toThrow()
   })
+
+  it('SEC-01, ADR 0042 : un nom avec un caractère inconnu des tables du navigateur se lit quand même', async () => {
+    const displayName = `Chloé ${String.fromCodePoint(0x378)}`
+    request.mockResolvedValue({
+      items: [
+        {
+          userId: USER,
+          username: 'chloe.f',
+          displayName,
+          friendsSince: '2026-11-20T10:00:00.123Z',
+          lastInteractionAt: null,
+          interactionCount30d: 0,
+        },
+      ],
+      next: null,
+    })
+
+    const page = await friendsApi.friends(null)
+
+    expect(page.items[0]?.displayName).toBe(displayName)
+  })
 })

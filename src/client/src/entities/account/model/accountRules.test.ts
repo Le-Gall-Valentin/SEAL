@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { isDisplayNameValid, isNameValid } from './displayName'
+import {
+  isDisplayNameReadable,
+  isDisplayNameValid,
+  isNameReadable,
+  isNameValid,
+} from './displayName'
 import { isEmailWellFormed, localPartOf } from './email'
 import { isReservedUsername, isUsernameWellFormed, usernameSuggestionFrom } from './username'
 
@@ -165,5 +170,32 @@ describe('GRP-01, ADR 0040 : règle du nom à une autre longueur', () => {
     expect(isNameValid('', 64)).toBe(false)
     expect(isNameValid(`S${String.fromCodePoint(0x200b)}ki`, 64)).toBe(false)
     expect(isNameValid('é'.repeat(51), 50)).toBe(false)
+  })
+})
+
+describe('SEC-01, ADR 0042 : lecture d’un nom reçu du serveur', () => {
+  // U+0378 n'est attribué dans aucune version d'Unicode : il tient lieu d'un caractère trop récent pour le navigateur.
+  const UNKNOWN = String.fromCodePoint(0x378)
+
+  it('ADR 0042 : un point non attribué dans les tables du navigateur se lit, mais ne se saisit pas', () => {
+    expect(isDisplayNameReadable(`Ana${UNKNOWN}`)).toBe(true)
+    expect(isDisplayNameReadable(UNKNOWN)).toBe(true)
+    expect(isNameReadable(`Ski ${UNKNOWN}`, 64)).toBe(true)
+    expect(isDisplayNameValid(`Ana${UNKNOWN}`)).toBe(false)
+    expect(isNameValid(`Ski ${UNKNOWN}`, 64)).toBe(false)
+  })
+
+  it.each([
+    ['vide', ''],
+    ['51 caractères', 'é'.repeat(51)],
+    ['remplissage hangeul seul', 'ㅤ'],
+    ['contrôle', 'Val\u0007entin'],
+    ['direction', 'Val\u202Eentin'],
+    ['espace sans chasse', 'Val\u200Bentin'],
+    ['usage privé', 'Val\uE000entin'],
+    ['séparateur de ligne', 'Val\u2028entin'],
+    ['demi-paire isolée', 'Val\uD800entin'],
+  ])('SEC-01, ADR 0042 : « %s » reste refusé à la lecture', (_cas, name) => {
+    expect(isDisplayNameReadable(name)).toBe(false)
   })
 })

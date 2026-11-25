@@ -105,4 +105,11 @@ describe('entities/session : adaptateur de GET /api/v1/auth/me', () => {
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/csrf')
   })
+
+  it('SEC-01, ADR 0042 : un nom affiché avec un caractère inconnu des tables du navigateur se lit quand même', async () => {
+    const displayName = `Valentin ${String.fromCodePoint(0x378)}`
+    respond(200, { ...PENDING, displayName })
+
+    expect((await sessionApi.me())?.displayName).toBe(displayName)
+  })
 })
