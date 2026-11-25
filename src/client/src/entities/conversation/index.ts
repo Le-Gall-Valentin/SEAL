@@ -15,6 +15,8 @@ export {
   MAX_MEMBERS,
 } from './api/conversationsApi'
 export { ConversationsApiProvider } from './model/conversationsPort'
+export { conversationFailureOf } from './model/conversationFailure'
+export type { ConversationFailure } from './model/conversationFailure'
 export {
   canAdd,
   canLeave,
@@ -22,6 +24,7 @@ export {
   canRename,
   counterpartOf,
   isAdmin,
+  isGroupNameValid,
   matchConversation,
   seatsLeft,
   sortConversations,
@@ -34,4 +37,6 @@ export {
   useConversations,
   useConversationsRefresh,
 } from './model/useConversations'
+export { ConversationAlert } from './ui/ConversationAlert'
 export { ConversationAvatar } from './ui/ConversationAvatar'
+export { GroupNameField } from './ui/GroupNameField'

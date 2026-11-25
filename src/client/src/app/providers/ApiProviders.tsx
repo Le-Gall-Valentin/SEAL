@@ -17,6 +17,7 @@ import {
   type IAnswerFriendRequestApi,
 } from '@/features/answer-friend-request'
 import { type IProfileApi, ProfileApiProvider } from '@/features/change-display-name'
+import { CreateGroupApiProvider, type ICreateGroupApi } from '@/features/create-group'
 import { EmailChangeApiProvider, type IEmailChangeApi } from '@/features/change-email'
 import { type IPasswordChangeApi, PasswordChangeApiProvider } from '@/features/change-password'
 import { type ILoginApi, LoginApiProvider } from '@/features/login'
@@ -34,6 +35,7 @@ import {
   SendFriendRequestApiProvider,
 } from '@/features/send-friend-request'
 import { type IVerifyEmailApi, VerifyEmailApiProvider } from '@/features/verify-email'
+import { type IStartDirectApi, StartDirectApiProvider } from '@/features/start-direct-conversation'
 
 /** Les ports des tranches ; la racine de composition leur donne leurs adaptateurs, les tests des doublures. */
 export interface Apis {
@@ -59,6 +61,8 @@ export interface Apis {
   readonly answerFriendRequest: IAnswerFriendRequestApi
   readonly removeFriend: IRemoveFriendApi
   readonly conversations: IConversationsApi
+  readonly startDirect: IStartDirectApi
+  readonly createGroup: ICreateGroupApi
 }
 
 interface ApiProvidersProps {
@@ -108,6 +112,8 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
     (inner) => (
       <ConversationsApiProvider api={apis.conversations}>{inner}</ConversationsApiProvider>
     ),
+    (inner) => <StartDirectApiProvider api={apis.startDirect}>{inner}</StartDirectApiProvider>,
+    (inner) => <CreateGroupApiProvider api={apis.createGroup}>{inner}</CreateGroupApiProvider>,
     (inner) => (
       <SendFriendRequestApiProvider api={apis.sendFriendRequest}>
         {inner}

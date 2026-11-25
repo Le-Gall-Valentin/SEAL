@@ -79,6 +79,8 @@ function fakeApis(account: Account | null): Apis {
     answerFriendRequest: { accept: never, decline: never, revoke: never },
     removeFriend: { unfriend: never },
     conversations: { list: never, get: never },
+    startDirect: { openDirect: never },
+    createGroup: { createGroup: never },
   }
 }
 

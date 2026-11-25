@@ -11,6 +11,7 @@ import { passwordBlocklist } from '@/entities/password'
 import { sessionApi } from '@/entities/session'
 import { answerFriendRequestApi } from '@/features/answer-friend-request'
 import { profileApi } from '@/features/change-display-name'
+import { createGroupApi } from '@/features/create-group'
 import { emailChangeApi } from '@/features/change-email'
 import { passwordChangeApi } from '@/features/change-password'
 import { loginApi } from '@/features/login'
@@ -22,6 +23,7 @@ import { registerApi } from '@/features/register'
 import { removeFriendApi } from '@/features/remove-friend'
 import { sendFriendRequestApi } from '@/features/send-friend-request'
 import { verifyEmailApi } from '@/features/verify-email'
+import { startDirectApi } from '@/features/start-direct-conversation'
 import { LanguageProvider } from '@/shared/i18n'
 import {
   ApiProviders,
@@ -62,6 +64,8 @@ const apis: Apis = {
   answerFriendRequest: answerFriendRequestApi,
   removeFriend: removeFriendApi,
   conversations: conversationsApi,
+  startDirect: startDirectApi,
+  createGroup: createGroupApi,
 }
 
 // KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un

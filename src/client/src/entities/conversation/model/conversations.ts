@@ -1,5 +1,9 @@
+import { isNameValid } from '@/entities/account/@x/conversation'
 import { normalizeSearch } from '@/shared/lib'
-import { MAX_MEMBERS } from '../api/conversationsApi'
+import { GROUP_NAME_MAX_LENGTH, MAX_MEMBERS } from '../api/conversationsApi'
+
+/** Le segment ui n'atteint pas api (ADR 0012) : les bornes lui parviennent par ce modèle. */
+export { GROUP_NAME_RAW_MAX_LENGTH } from '../api/conversationsApi'
 import type { Conversation, Member } from '../api/IConversationsApi'
 
 /** Le segment ui n'atteint pas api (ADR 0012) : les types lui parviennent par ce modèle. */
@@ -81,4 +85,9 @@ export function canAdd(conversation: Conversation): boolean {
 /** GRP-03 : tout membre part d'un groupe ; une directe ne se quitte pas (ADR 0039, point 3). */
 export function canLeave(conversation: Conversation): boolean {
   return conversation.type === 'GROUP'
+}
+
+/** GRP-01, ADR 0040 : nom d'un groupe, 1 à 64 points de code après NFC, sous la règle du nom affiché. */
+export function isGroupNameValid(raw: string): boolean {
+  return isNameValid(raw, GROUP_NAME_MAX_LENGTH)
 }

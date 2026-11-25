@@ -7,6 +7,7 @@ import {
   canRename,
   counterpartOf,
   isAdmin,
+  isGroupNameValid,
   matchConversation,
   seatsLeft,
   sortConversations,
@@ -97,5 +98,16 @@ describe('entities/conversation : règles de la liste et des groupes (CNV-04, CN
     expect(seatsLeft(conversation({}))).toBe(48)
     expect(seatsLeft(full)).toBe(0)
     expect(canAdd(full)).toBe(false)
+  })
+})
+
+describe('entities/conversation : nom d’un groupe (GRP-01, ADR 0040)', () => {
+  it('GRP-01, ADR 0040 : 1 à 64 caractères après NFC, sans caractère invisible', () => {
+    expect(isGroupNameValid('Ski du dimanche')).toBe(true)
+    expect(isGroupNameValid('é'.repeat(64))).toBe(true)
+    expect(isGroupNameValid('e\u0301'.repeat(64))).toBe(true)
+    expect(isGroupNameValid('é'.repeat(65))).toBe(false)
+    expect(isGroupNameValid('   ')).toBe(false)
+    expect(isGroupNameValid(`S${String.fromCodePoint(0x200b)}ki`)).toBe(false)
   })
 })
