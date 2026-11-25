@@ -1,22 +1,24 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
-import { initialsOf } from '@/entities/account'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   canAdd,
   canRemove,
   canRename,
   type Conversation,
-  ConversationAvatar,
   type Member,
 } from '@/entities/conversation'
-import { tintOf, useFriends } from '@/entities/friend'
+import { useFriends } from '@/entities/friend'
 import { AddMembersDialog } from '@/features/add-group-members'
 import { LeaveGroupDialog } from '@/features/leave-group'
 import { RemoveMemberDialog } from '@/features/remove-group-member'
 import { RenameGroupDialog } from '@/features/rename-group'
 import { useMessages } from '@/shared/i18n'
-import { isolate } from '@/shared/lib'
-import { Avatar } from '@/shared/ui'
+import { CrossIcon, LoadErrorState } from '@/shared/ui'
 import { groupDetailsMessages } from '../i18n'
+import { Drawer } from './Drawer'
+import { GroupSummary } from './GroupSummary'
+import { LeaveIcon, PersonPlusIcon, ShieldIcon } from './icons'
+import { MemberRow } from './MemberRow'
+import { LinkButton } from './parts'
 
 interface GroupDetailsProps {
   readonly me: string
@@ -30,9 +32,7 @@ interface GroupDetailsProps {
   readonly onLeft: () => void
 }
 
-const DAY_MONTH = new Intl.DateTimeFormat('fr', { day: 'numeric', month: 'short' })
-
-type Dialog = { readonly kind: 'add' } | { readonly kind: 'rename' } | { readonly kind: 'leave' }
+type Dialog = 'add' | 'rename' | 'leave'
 
 /**
  * GRP-03, GRP-04 : infos d'un groupe (Conv-Ordinateur, Conv-Tablette). Tout membre ajoute ses amis et part ; seul
@@ -50,63 +50,58 @@ export function GroupDetails({
   const t = useMessages(groupDetailsMessages)
   const titleId = useId()
   const membersRef = useRef<HTMLHeadingElement>(null)
-  const friends = useFriends().data
-  const friendIds = new Set(friends?.map((friend) => friend.userId))
+  const friends = useFriends()
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [removing, setRemoving] = useState<Member | null>(null)
-  // WCAG 2.4.3 : la ligne retirée avait le focus ; il passe au titre des membres une fois la confirmation fermée, car
-  // le reste de l'écran est inerte tant que la fenêtre modale est ouverte (comme l'écran Amis).
+  // WCAG 2.4.3 : quand le déclencheur d'un dialogue a disparu (ligne retirée, « Renommer » après un rôle perdu), le
+  // focus passe au titre des membres une fois le dialogue fermé, car le reste de l'écran est inerte jusque-là.
   const focusMembersOnClose = useRef(false)
   useEffect(() => {
-    if (removing === null && focusMembersOnClose.current) {
+    if (dialog === null && removing === null && focusMembersOnClose.current) {
       focusMembersOnClose.current = false
       membersRef.current?.focus()
     }
-  }, [removing])
+  }, [dialog, removing])
   const count = conversation.members.length
-  const date = DAY_MONTH.format(conversation.createdAt)
+  // A10, GRP-04 : tant que la liste d'amis n'est pas lue, aucun membre n'est montré, pour qu'aucun n'ait l'air d'un ami.
+  const friendIds =
+    friends.data === undefined ? null : new Set(friends.data.map((friend) => friend.userId))
+  const aside = variant === 'aside'
 
   const content = (
     <>
-      <div className="flex min-h-16 items-center justify-between gap-2 border-b border-line pr-2 pl-5">
-        <h2 id={titleId} className="m-0 text-[16px] font-bold">
+      <div className="flex min-h-16 items-center gap-2 border-b border-line py-2 pr-2 pl-5">
+        <h2 id={titleId} className="m-0 flex-1 text-[16px] font-bold">
           {t('title')}
         </h2>
         <button
           type="button"
-          aria-label={variant === 'aside' ? t('closePanel') : t('close')}
+          aria-label={aside ? t('closePanel') : t('close')}
           onClick={onClose}
           className="grid size-11 place-items-center rounded-[10px] text-ink-2"
         >
-          <CloseIcon />
+          <CrossIcon />
         </button>
       </div>
-      <div className="flex flex-col gap-5 overflow-y-auto px-5 py-5">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <ConversationAvatar conversation={conversation} me={me} size={72} />
-          <h3 className="m-0 text-[20px] font-bold tracking-[-0.015em] wrap-anywhere">
-            {conversation.name}
-          </h3>
-          <p className="m-0 text-[13px] text-ink-3">
-            {count === 1 ? t('metaOne', { date }) : t('meta', { count: String(count), date })}
-          </p>
-          {canRename(conversation, me) && (
-            <LinkButton
-              onClick={() => {
-                setDialog({ kind: 'rename' })
-              }}
-            >
-              <PencilIcon />
-              {t('rename')}
-            </LinkButton>
-          )}
-        </div>
-        {variant === 'aside' && (
-          <p className="m-0 rounded-[14px] bg-accent-soft px-3.5 py-3 text-[13px] leading-[1.45] text-ink-2">
+      <div className="flex flex-col gap-5 overflow-y-auto p-5">
+        <GroupSummary
+          me={me}
+          conversation={conversation}
+          onRename={
+            canRename(conversation, me)
+              ? () => {
+                  setDialog('rename')
+                }
+              : undefined
+          }
+        />
+        {aside && (
+          <p className="m-0 flex gap-2.5 rounded-[14px] border border-line bg-accent-soft px-3 py-2.5 text-[13px] leading-[1.4] text-accent-text">
+            <ShieldIcon />
             {t('encryption')}
           </p>
         )}
-        <section className="flex flex-col gap-2" aria-labelledby={`${titleId}-members`}>
+        <section className="flex flex-col gap-1.5" aria-labelledby={`${titleId}-members`}>
           <div className="flex items-center justify-between gap-2">
             <h3
               id={`${titleId}-members`}
@@ -119,79 +114,67 @@ export function GroupDetails({
             {canAdd(conversation) && (
               <LinkButton
                 onClick={() => {
-                  setDialog({ kind: 'add' })
+                  setDialog('add')
                 }}
               >
-                <PersonPlusIcon />
+                {aside && <PersonPlusIcon />}
                 {t('add')}
               </LinkButton>
             )}
           </div>
-          {variant === 'drawer' && (
-            <p className="m-0 text-[13px] leading-[1.45] text-ink-3">{t('addHint')}</p>
+          {!aside && <p className="m-0 text-[13px] leading-[1.4] text-ink-3">{t('addHint')}</p>}
+          {friendIds !== null ? (
+            <ul className="m-0 flex list-none flex-col p-0">
+              {conversation.members.map((member) => (
+                <MemberRow
+                  key={member.userId}
+                  member={member}
+                  isMe={member.userId === me}
+                  friend={friendIds.has(member.userId)}
+                  onRemove={
+                    canRemove(conversation, me, member.userId)
+                      ? () => {
+                          setRemoving(member)
+                        }
+                      : undefined
+                  }
+                />
+              ))}
+            </ul>
+          ) : (
+            friends.isError && (
+              <LoadErrorState
+                heading="h3"
+                onRetry={() => {
+                  void friends.refetch()
+                }}
+              />
+            )
           )}
-          <ul className="m-0 flex list-none flex-col gap-1 p-0">
-            {conversation.members.map((member) => {
-              const isMe = member.userId === me
-              return (
-                <li key={member.userId} className="flex items-center gap-3 py-1.5">
-                  <Avatar
-                    initials={initialsOf(member.displayName)}
-                    tint={tintOf(member.userId)}
-                    size={40}
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-[14.5px] font-semibold">
-                        {isMe ? t('you') : member.displayName}
-                      </span>
-                      {member.role === 'ADMIN' && <Tag accent>{t('admin')}</Tag>}
-                      {!isMe && friends !== undefined && !friendIds.has(member.userId) && (
-                        <Tag>{t('notFriend')}</Tag>
-                      )}
-                    </span>
-                    <span className="truncate font-mono text-[12px] text-ink-3">
-                      @{member.username}
-                    </span>
-                  </div>
-                  {canRemove(conversation, me, member.userId) && (
-                    <button
-                      type="button"
-                      aria-label={t('remove', { name: isolate(member.displayName) })}
-                      onClick={() => {
-                        setRemoving(member)
-                      }}
-                      className="grid size-11 flex-none place-items-center rounded-[10px] text-ink-2 hover:bg-sunken"
-                    >
-                      <PersonMinusIcon />
-                    </button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
         </section>
-        <div>
-          <LinkButton
-            danger
-            onClick={() => {
-              setDialog({ kind: 'leave' })
-            }}
-          >
-            {t('leave')}
-          </LinkButton>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setDialog('leave')
+          }}
+          className="inline-flex min-h-11 items-center gap-2 self-center text-[14px] font-semibold text-danger"
+        >
+          <LeaveIcon />
+          {t('leave')}
+        </button>
       </div>
       <RenameGroupDialog
         conversation={conversation}
-        open={dialog?.kind === 'rename'}
+        open={dialog === 'rename'}
         onClose={() => {
+          // Un refus FORBIDDEN relit le groupe : « Renommer » a pu disparaître avec le rôle.
+          focusMembersOnClose.current = !canRename(conversation, me)
           setDialog(null)
         }}
       />
       <AddMembersDialog
         conversation={conversation}
-        open={dialog?.kind === 'add'}
+        open={dialog === 'add'}
         onClose={() => {
           setDialog(null)
         }}
@@ -206,7 +189,7 @@ export function GroupDetails({
       />
       <LeaveGroupDialog
         conversation={conversation}
-        open={dialog?.kind === 'leave'}
+        open={dialog === 'leave'}
         onClose={(left) => {
           setDialog(null)
           if (left) {
@@ -217,7 +200,7 @@ export function GroupDetails({
     </>
   )
 
-  return variant === 'aside' ? (
+  return aside ? (
     <aside
       aria-labelledby={titleId}
       className="flex w-85 flex-none flex-col border-l border-line bg-surface"
@@ -228,162 +211,5 @@ export function GroupDetails({
     <Drawer open={open} onClose={onClose} titleId={titleId}>
       {content}
     </Drawer>
-  )
-}
-
-/**
- * Tiroir de Conv-Tablette : `dialog` natif modal, 380 px à droite, voile --overlay ; feuille plein écran sur téléphone
- * (ADR 0041, point 3).
- */
-function Drawer({
-  open,
-  onClose,
-  titleId,
-  children,
-}: {
-  readonly open: boolean
-  readonly onClose: () => void
-  readonly titleId: string
-  readonly children: ReactNode
-}) {
-  const ref = useRef<HTMLDialogElement>(null)
-  useEffect(() => {
-    const drawer = ref.current
-    if (drawer === null) {
-      return
-    }
-    if (open && !drawer.open) {
-      drawer.showModal()
-    } else if (!open && drawer.open) {
-      drawer.close()
-    }
-  }, [open])
-  return (
-    <dialog
-      ref={ref}
-      aria-labelledby={titleId}
-      onCancel={(event) => {
-        event.preventDefault()
-        // Seul Échap adressé au tiroir le ferme, pas celui d'un dialogue ouvert depuis lui.
-        if (event.target === event.currentTarget) {
-          onClose()
-        }
-      }}
-      className="ml-auto h-full max-h-none w-full max-w-full flex-col bg-raised p-0 text-ink shadow-dialog backdrop:bg-overlay open:flex sm:max-w-95"
-    >
-      {open && children}
-    </dialog>
-  )
-}
-
-/** Étiquette d'un membre : « Admin » accentuée, « Pas dans vos amis » neutre (Conv-Tablette). */
-function Tag({
-  accent = false,
-  children,
-}: {
-  readonly accent?: boolean
-  readonly children: ReactNode
-}) {
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-        accent ? 'bg-accent-soft text-accent-text' : 'text-ink-2 inset-ring inset-ring-line-strong'
-      }`}
-    >
-      {children}
-    </span>
-  )
-}
-
-function LinkButton({
-  danger = false,
-  onClick,
-  children,
-}: {
-  readonly danger?: boolean
-  readonly onClick: () => void
-  readonly children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex min-h-11 items-center gap-1.5 text-[14px] font-semibold ${
-        danger ? 'text-danger' : 'text-accent-text'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
-    </svg>
-  )
-}
-
-function PencilIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 20h4L19 9l-4-4L4 16z" />
-    </svg>
-  )
-}
-
-function PersonPlusIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="10" cy="8" r="3.5" />
-      <path d="M3.5 19c.8-3.4 3.4-5.2 6.5-5.2s5.7 1.8 6.5 5.2M18.5 8v6M15.5 11h6" />
-    </svg>
-  )
-}
-
-function PersonMinusIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="10" cy="8" r="3.5" />
-      <path d="M3.5 19c.8-3.4 3.4-5.2 6.5-5.2s5.7 1.8 6.5 5.2M15.5 11h6" />
-    </svg>
   )
 }

@@ -9,7 +9,7 @@ import { AddMembersApiProvider } from '@/features/add-group-members'
 import { LeaveGroupApiProvider } from '@/features/leave-group'
 import { RemoveMemberApiProvider } from '@/features/remove-group-member'
 import { RenameGroupApiProvider } from '@/features/rename-group'
-import { isolate } from '@/shared/lib'
+import { ApiError, isolate } from '@/shared/lib'
 import { GroupDetails } from './GroupDetails'
 
 const ME = 'me'
@@ -58,6 +58,7 @@ async function show(
     leave?: () => Promise<void>
     exclude?: () => Promise<void>
     rename?: () => Promise<Conversation>
+    friends?: () => Promise<{ items: Friend[]; next: string | null }>
   } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -68,7 +69,8 @@ async function show(
     <QueryClientProvider client={client}>
       <FriendsApiProvider
         api={{
-          friends: () => Promise.resolve({ items: [asFriend(CAMILLE)], next: null }),
+          friends:
+            apis.friends ?? (() => Promise.resolve({ items: [asFriend(CAMILLE)], next: null })),
           receivedRequests: () => Promise.resolve({ items: [], next: null }),
           sentRequests: () => Promise.resolve({ items: [], next: null }),
         }}
@@ -87,19 +89,21 @@ async function show(
       </FriendsApiProvider>
     </QueryClientProvider>
   )
-  const screen = await render(
+  const ui = (shown: Conversation) => (
     <Wrapper>
       <GroupDetails
         me={ME}
-        conversation={conversation}
+        conversation={shown}
         variant={variant}
         open
         onClose={onClose}
         onLeft={onLeft}
       />
-    </Wrapper>,
+    </Wrapper>
   )
-  return { screen, onLeft, onClose, exclude }
+  const screen = await render(ui(conversation))
+  const rerender = (shown: Conversation) => screen.rerender(ui(shown))
+  return { screen, onLeft, onClose, exclude, rerender }
 }
 
 describe('widgets/group-details : infos du groupe (GRP-03, GRP-04, ADR 0041)', () => {
@@ -253,5 +257,52 @@ describe('widgets/group-details : infos du groupe (GRP-03, GRP-04, ADR 0041)', (
     } finally {
       await page.viewport(1280, 800)
     }
+  })
+
+  it('GRP-04, A10 : tant que la liste d’amis n’est pas lue, aucun membre n’a l’air d’un ami ; un échec se réessaie', async () => {
+    const pending = await show(group('ADMIN'), 'aside', {
+      friends: () => new Promise(() => undefined),
+    })
+    await expect
+      .element(pending.screen.getByRole('heading', { level: 3, name: '4 membres' }))
+      .toBeVisible()
+    await expect.element(pending.screen.getByText('Mathis Bouchard')).not.toBeInTheDocument()
+    await pending.screen.unmount()
+
+    let calls = 0
+    const { screen } = await show(group('ADMIN'), 'aside', {
+      friends: () => {
+        calls += 1
+        return calls === 1
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : Promise.resolve({ items: [asFriend(CAMILLE)], next: null })
+      },
+    })
+    await screen.getByRole('button', { name: 'Réessayer' }).click()
+    await expect.element(screen.getByText('Pas dans vos amis').first()).toBeVisible()
+  })
+
+  it('GRP-03, WCAG 2.4.3 : refus FORBIDDEN au renommage, le lien disparu, le focus va au titre des membres', async () => {
+    const { screen, rerender } = await show(group('ADMIN'), 'aside', {
+      rename: () => Promise.reject(new ApiError(403, 'FORBIDDEN')),
+    })
+    await screen.getByRole('button', { name: 'Renommer le groupe' }).click()
+    await screen.getByRole('textbox', { name: 'Nom du groupe' }).fill('Ski')
+    await screen.getByRole('button', { name: 'Enregistrer' }).click()
+    await expect
+      .element(screen.getByText('Vous n’êtes plus administrateur de ce groupe.'))
+      .toBeVisible()
+
+    await rerender(group('MEMBER'))
+    await screen.getByRole('button', { name: 'Annuler' }).click()
+
+    await expect.element(screen.getByRole('heading', { level: 3, name: '4 membres' })).toHaveFocus()
+  })
+
+  it('ACC-03 : un nom de groupe chargé de marques combinantes reste dans son titre', async () => {
+    const { screen } = await show({ ...group('ADMIN'), name: `Z${'\u0301'.repeat(60)}` }, 'aside')
+
+    const title = screen.getByRole('heading', { level: 3 }).first().element()
+    expect(getComputedStyle(title).overflowY).toBe('hidden')
   })
 })
