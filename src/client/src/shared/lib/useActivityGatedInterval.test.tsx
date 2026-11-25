@@ -53,7 +53,7 @@ describe('shared/lib : échéance conditionnée par l’activité (AUTH-52, ADR 
     },
   )
 
-  it('AUTH-52 : le défilement d’un élément compte comme une action', async () => {
+  it('AUTH-52 : un défilement que la page provoque seule (recalage, scrollIntoView) ne compte pas', async () => {
     const tick = vi.fn()
     await renderHook(() => {
       useActivityGatedInterval(tick, PERIOD)
@@ -62,9 +62,10 @@ describe('shared/lib : échéance conditionnée par l’activité (AUTH-52, ADR 
     document.body.append(list)
 
     list.dispatchEvent(new Event('scroll'))
+    window.dispatchEvent(new Event('scroll'))
     vi.advanceTimersByTime(PERIOD)
 
-    expect(tick).toHaveBeenCalledTimes(1)
+    expect(tick).not.toHaveBeenCalled()
     list.remove()
   })
 
