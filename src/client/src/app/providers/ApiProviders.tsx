@@ -17,7 +17,9 @@ import {
   type IAnswerFriendRequestApi,
 } from '@/features/answer-friend-request'
 import { type IProfileApi, ProfileApiProvider } from '@/features/change-display-name'
+import { AddMembersApiProvider, type IAddMembersApi } from '@/features/add-group-members'
 import { CreateGroupApiProvider, type ICreateGroupApi } from '@/features/create-group'
+import { type ILeaveGroupApi, LeaveGroupApiProvider } from '@/features/leave-group'
 import { EmailChangeApiProvider, type IEmailChangeApi } from '@/features/change-email'
 import { type IPasswordChangeApi, PasswordChangeApiProvider } from '@/features/change-password'
 import { type ILoginApi, LoginApiProvider } from '@/features/login'
@@ -36,6 +38,8 @@ import {
 } from '@/features/send-friend-request'
 import { type IVerifyEmailApi, VerifyEmailApiProvider } from '@/features/verify-email'
 import { type IStartDirectApi, StartDirectApiProvider } from '@/features/start-direct-conversation'
+import { type IRemoveMemberApi, RemoveMemberApiProvider } from '@/features/remove-group-member'
+import { type IRenameGroupApi, RenameGroupApiProvider } from '@/features/rename-group'
 
 /** Les ports des tranches ; la racine de composition leur donne leurs adaptateurs, les tests des doublures. */
 export interface Apis {
@@ -63,6 +67,10 @@ export interface Apis {
   readonly conversations: IConversationsApi
   readonly startDirect: IStartDirectApi
   readonly createGroup: ICreateGroupApi
+  readonly addMembers: IAddMembersApi
+  readonly renameGroup: IRenameGroupApi
+  readonly removeMember: IRemoveMemberApi
+  readonly leaveGroup: ILeaveGroupApi
 }
 
 interface ApiProvidersProps {
@@ -114,6 +122,10 @@ export function ApiProviders({ apis, children }: ApiProvidersProps) {
     ),
     (inner) => <StartDirectApiProvider api={apis.startDirect}>{inner}</StartDirectApiProvider>,
     (inner) => <CreateGroupApiProvider api={apis.createGroup}>{inner}</CreateGroupApiProvider>,
+    (inner) => <AddMembersApiProvider api={apis.addMembers}>{inner}</AddMembersApiProvider>,
+    (inner) => <RenameGroupApiProvider api={apis.renameGroup}>{inner}</RenameGroupApiProvider>,
+    (inner) => <RemoveMemberApiProvider api={apis.removeMember}>{inner}</RemoveMemberApiProvider>,
+    (inner) => <LeaveGroupApiProvider api={apis.leaveGroup}>{inner}</LeaveGroupApiProvider>,
     (inner) => (
       <SendFriendRequestApiProvider api={apis.sendFriendRequest}>
         {inner}

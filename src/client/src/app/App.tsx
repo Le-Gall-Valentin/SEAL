@@ -24,6 +24,10 @@ import { removeFriendApi } from '@/features/remove-friend'
 import { sendFriendRequestApi } from '@/features/send-friend-request'
 import { verifyEmailApi } from '@/features/verify-email'
 import { startDirectApi } from '@/features/start-direct-conversation'
+import { leaveGroupApi } from '@/features/leave-group'
+import { removeMemberApi } from '@/features/remove-group-member'
+import { renameGroupApi } from '@/features/rename-group'
+import { addMembersApi } from '@/features/add-group-members'
 import { LanguageProvider } from '@/shared/i18n'
 import {
   ApiProviders,
@@ -66,6 +70,10 @@ const apis: Apis = {
   conversations: conversationsApi,
   startDirect: startDirectApi,
   createGroup: createGroupApi,
+  addMembers: addMembersApi,
+  renameGroup: renameGroupApi,
+  removeMember: removeMemberApi,
+  leaveGroup: leaveGroupApi,
 }
 
 // KEY-01, KEY-40 : Ed25519 et X25519 éprouvés, puis le jeton CSRF rechargé et le trousseau de l'appareil ouvert ; un
