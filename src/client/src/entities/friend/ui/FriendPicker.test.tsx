@@ -122,6 +122,31 @@ describe('entities/friend : sélecteur d’amis au clavier (FRD-20)', () => {
     expect(dialog?.open).toBe(false)
   })
 
+  it('FRD-20 : sans saisie ni liste affichée, Échap n’est pas retenu et ferme le dialogue au premier appui', async () => {
+    const screen = await render(
+      <dialog>
+        <Picker friends={[]} />
+      </dialog>,
+    )
+    const dialog = screen.container.querySelector('dialog')
+    dialog?.showModal()
+    await screen.getByRole('combobox', { name: 'Membres' }).click()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(dialog?.open).toBe(false)
+  })
+
+  it('FRD-20 : aria-controls ne désigne la liste que lorsqu’elle est affichée', async () => {
+    const screen = await render(<Picker />)
+    const input = screen.getByRole('combobox', { name: 'Membres' })
+    await expect.element(input).toHaveAttribute('aria-controls')
+
+    await input.fill('zz')
+
+    await expect.element(input).not.toHaveAttribute('aria-controls')
+  })
+
   it('FRD-20 : un clic sur une option l’ajoute ; « Retirer » la rend à la liste', async () => {
     const screen = await render(<Picker />)
 
@@ -188,10 +213,34 @@ describe('entities/friend : sélecteur d’amis au clavier (FRD-20)', () => {
     await empty.unmount()
 
     const screen = await render(<Picker />)
+    // Région live présente dès l'affichage, vide : son remplissage est annoncé par les lecteurs d'écran.
+    const status = screen.getByRole('status')
+    await expect.element(status).toBeInTheDocument()
+    expect(status.element().textContent).toBe('')
     await screen.getByRole('combobox', { name: 'Membres' }).fill('zz')
     await expect
-      .element(screen.getByText(`Aucun ami ne correspond à « ${isolate('zz')} ».`))
-      .toBeVisible()
+      .element(status)
+      .toHaveTextContent(`Aucun ami ne correspond à « ${isolate('zz')} ».`)
+  })
+
+  it('GRP-03, ADR 0041 (point 4) : tous les amis déjà membres, le dire au lieu d’une liste vide', async () => {
+    const screen = await render(
+      <Picker exclude={new Set(FRIENDS.map((candidate) => candidate.userId))} />,
+    )
+
+    await expect.element(screen.getByText('Tous vos amis sont déjà membres.')).toBeVisible()
+    await expect.element(screen.getByRole('listbox')).not.toBeInTheDocument()
+    await expect.element(screen.getByText('Vous n’avez pas encore d’amis.')).not.toBeInTheDocument()
+  })
+
+  it('ACC-03 : un nom chargé de marques combinantes reste dans son jeton', async () => {
+    const zalgo = friend('zalgo', `Z${'\u0301'.repeat(60)}`)
+    const screen = await render(<Picker friends={[zalgo]} />)
+    await screen.getByRole('option').click()
+
+    const remove = screen.getByRole('button', { name: /^Retirer/u }).element()
+    const name = remove.previousElementSibling
+    expect(name && getComputedStyle(name).overflowY).toBe('hidden')
   })
 
   it('FRD-20 : aides de la maquette Nouvelle-Conversation', async () => {

@@ -21,6 +21,7 @@ export const friendMessages = defineMessages({
     pickerList: 'Ajouter des amis',
     pickerRemove: 'Retirer {name}',
     pickerNoFriends: 'Vous n’avez pas encore d’amis.',
+    pickerAllMembers: 'Tous vos amis sont déjà membres.',
     pickerNoMatch: 'Aucun ami ne correspond à « {query} ».',
   },
 })

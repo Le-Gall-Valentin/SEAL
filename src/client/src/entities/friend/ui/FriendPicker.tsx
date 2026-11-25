@@ -61,6 +61,10 @@ export function FriendPicker({
   const ranked = rankFriends(friends, query, excluded, new Date(clock.now()))
   const activeIndex = Math.min(active, Math.max(0, ranked.length - 1))
   const showList = open && !full && ranked.length > 0
+  // ADR 0041 (point 4) : des amis, mais tous déjà membres ; rien à proposer.
+  const allExcluded = friends.length > 0 && friends.every((friend) => exclude.has(friend.userId))
+  const noMatch =
+    !loading && !failed && !allExcluded && open && !full && query !== '' && ranked.length === 0
   const optionId = (index: number) => `${listId}-${String(index)}`
 
   function choose(friend: Friend) {
@@ -89,7 +93,8 @@ export function FriendPicker({
         return
       }
       case 'Escape':
-        if (query !== '' || open) {
+        // Sans saisie ni liste affichée, Échap n'a rien à effacer : il revient au dialogue parent.
+        if (query !== '' || showList) {
           // Le dialogue parent se ferme sur l'annulation que déclenche Échap : on la retient tant qu'il reste à effacer.
           event.preventDefault()
           event.stopPropagation()
@@ -124,7 +129,8 @@ export function FriendPicker({
               tint={tintOf(friend.userId)}
               size={24}
             />
-            {friend.displayName}
+            {/* ACC-03 : des marques combinantes empilées restent dans le jeton. */}
+            <span className="min-w-0 truncate">{friend.displayName}</span>
             <button
               type="button"
               aria-label={t('pickerRemove', { name: isolate(friend.displayName) })}
@@ -145,7 +151,7 @@ export function FriendPicker({
             role="combobox"
             aria-labelledby={labelId}
             aria-expanded={showList}
-            aria-controls={listId}
+            aria-controls={showList ? listId : undefined}
             aria-autocomplete="list"
             aria-activedescendant={showList ? optionId(activeIndex) : undefined}
             autoComplete="off"
@@ -174,6 +180,8 @@ export function FriendPicker({
         <LoadErrorState heading="h3" onRetry={onRetry ?? (() => undefined)} />
       ) : friends.length === 0 ? (
         <p className="text-[13px] text-ink-3">{t('pickerNoFriends')}</p>
+      ) : allExcluded ? (
+        <p className="text-[13px] text-ink-3">{t('pickerAllMembers')}</p>
       ) : showList ? (
         <>
           <span className="px-2 pt-1.5 pb-0.5 text-[11px] font-bold tracking-[0.08em] text-ink-3 uppercase">
@@ -221,11 +229,12 @@ export function FriendPicker({
             ))}
           </ul>
         </>
-      ) : open && !full && query !== '' ? (
-        <p role="status" className="text-[13px] text-ink-3">
-          {t('pickerNoMatch', { query: isolate(query) })}
-        </p>
       ) : null}
+      {/* Région live toujours présente, même vide (une annonce n'est lue que si son conteneur existait déjà) ; vide,
+          elle annule l'écart de la colonne. */}
+      <p role="status" className="text-[13px] text-ink-3 empty:-mt-2">
+        {noMatch ? t('pickerNoMatch', { query: isolate(query) }) : ''}
+      </p>
     </div>
   )
 }

@@ -134,4 +134,19 @@ describe('entities/friend : classement du sélecteur (CDC 10.3, FRD-20)', () => 
 
     expect(ranked?.nameMatch).toEqual([4, 4 + 'E\u0301lo'.length])
   })
+
+  it('FRD-20 (étape 4) : un émoji avant la partie trouvée ne décale pas le surlignage (unités UTF-16)', () => {
+    const name = '\u{1F600}Lamarre'
+    const [ranked] = rankFriends([friend('z', name)], 'mar', new Set(), NOW)
+    const [astral] = rankFriends(
+      [friend('y', '\u{1F600}\u{1F600} x')],
+      '\u{1F600}x',
+      new Set(),
+      NOW,
+    )
+
+    expect(ranked?.nameMatch).toEqual([4, 7])
+    expect(name.slice(4, 7)).toBe('mar')
+    expect(astral?.nameMatch).toEqual([2, 6])
+  })
 })

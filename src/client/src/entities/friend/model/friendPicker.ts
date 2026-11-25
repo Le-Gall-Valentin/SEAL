@@ -22,7 +22,7 @@ export interface RankedFriend {
   readonly nameMatch: MatchRange | null
 }
 
-/** Texte normalisé comme `normalizeSearch`, avec, pour chaque caractère obtenu, sa plage dans le texte d'origine. */
+/** Texte normalisé comme `normalizeSearch`, avec, pour chaque unité UTF-16 obtenue, sa plage dans le texte d'origine. */
 interface MappedText {
   readonly text: string
   readonly origins: readonly MatchRange[]
@@ -42,7 +42,10 @@ function mapped(original: string, offset: number): MappedText {
         continue
       }
       text += part
-      origins.push([start, offset + index])
+      // Une origine par unité UTF-16 : `indexOf` et `query.length`, qui indexent `origins`, comptent en unités.
+      for (let unit = 0; unit < part.length; unit += 1) {
+        origins.push([start, offset + index])
+      }
     }
   }
   return { text, origins }
