@@ -53,7 +53,7 @@ export function conversationPath(id: string): string {
 }
 
 /** La conversation de l'adresse ; un identifiant mal formé est ignoré, comme une valeur d'onglet inconnue. */
-export function conversationOf(params: URLSearchParams): string | null {
+export function conversationIdOf(params: URLSearchParams): string | null {
   const id = params.get(CONVERSATION_PARAM)
   return id !== null && UUID.test(id) ? id : null
 }

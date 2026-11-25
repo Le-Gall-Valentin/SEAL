@@ -7,7 +7,7 @@ import {
   useConversation,
   useConversations,
 } from '@/entities/conversation'
-import { conversationOf, conversationPath, ROUTES } from '@/shared/config'
+import { conversationIdOf, conversationPath, ROUTES } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { LARGE_SCREEN, useMediaQuery, WIDE_SCREEN } from '@/shared/lib'
 import { LoadErrorState } from '@/shared/ui'
@@ -30,7 +30,7 @@ export function ConversationsScreen({ me }: { readonly me: string }) {
   const large = useMediaQuery(LARGE_SCREEN)
   const wide = useMediaQuery(WIDE_SCREEN)
   const variant = large ? 'large' : wide ? 'medium' : 'small'
-  const requested = conversationOf(params)
+  const requested = conversationIdOf(params)
   const [creating, setCreating] = useState(false)
   // Conv-Ordinateur montre les infos ouvertes ; le tiroir de Conv-Tablette s'ouvre à la demande, pour la conversation
   // où il a été ouvert : en changer le referme.

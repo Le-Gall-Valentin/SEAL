@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  conversationOf,
+  conversationIdOf,
   conversationPath,
   FRIENDS_INVITATIONS,
   friendsTabOf,
@@ -35,8 +35,10 @@ describe('FRD-10, ADR 0038 (point 5) : onglet de l’écran Amis', () => {
     const id = '0193a1b2-0000-7000-8000-000000000003'
 
     expect(conversationPath(id)).toBe(`/?conversation=${id}`)
-    expect(conversationOf(new URL(conversationPath(id), 'https://localhost').searchParams)).toBe(id)
-    expect(conversationOf(new URLSearchParams('conversation=pas-un-uuid'))).toBeNull()
-    expect(conversationOf(new URLSearchParams(''))).toBeNull()
+    expect(conversationIdOf(new URL(conversationPath(id), 'https://localhost').searchParams)).toBe(
+      id,
+    )
+    expect(conversationIdOf(new URLSearchParams('conversation=pas-un-uuid'))).toBeNull()
+    expect(conversationIdOf(new URLSearchParams(''))).toBeNull()
   })
 })

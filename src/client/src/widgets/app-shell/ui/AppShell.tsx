@@ -4,7 +4,7 @@ import { initialsOf } from '@/entities/account'
 import { useConversationsRefresh } from '@/entities/conversation'
 import { useReceivedRequests, useReceivedRequestsRefresh } from '@/entities/friend'
 import { useCurrentAccount } from '@/entities/session'
-import { conversationOf, ROUTES, settingsSectionOf } from '@/shared/config'
+import { conversationIdOf, ROUTES, settingsSectionOf } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { Avatar, PhoqueHead } from '@/shared/ui'
 import { appShellMessages } from '../i18n'
@@ -26,7 +26,7 @@ export function AppShell() {
   // Conv-Telephone-Fil de même pour un fil ouvert (ADR 0041, point 1).
   const fullScreen =
     (location.pathname === ROUTES.SETTINGS && settingsSectionOf(params) !== null) ||
-    (location.pathname === ROUTES.HOME && conversationOf(params) !== null)
+    (location.pathname === ROUTES.HOME && conversationIdOf(params) !== null)
   return (
     <div className="flex min-h-screen flex-col bg-bg font-sans text-ink sm:flex-row">
       <Rail />
