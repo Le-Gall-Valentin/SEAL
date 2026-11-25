@@ -20,6 +20,8 @@ interface ModalDialogProps {
   readonly danger?: boolean
   /** Identifiant du texte qui décrit la fenêtre. */
   readonly describedBy?: string | undefined
+  /** 528 px au lieu de 500 : Nouvelle-Conversation, qui loge le sélecteur d'amis. */
+  readonly wide?: boolean
   readonly children: ReactNode
 }
 
@@ -41,6 +43,7 @@ export function ModalDialog({
   subtitle,
   danger = false,
   describedBy,
+  wide = false,
   children,
 }: ModalDialogProps) {
   const t = useMessages(formMessages)
@@ -65,7 +68,7 @@ export function ModalDialog({
       role={danger ? 'alertdialog' : undefined}
       aria-labelledby={titleId}
       aria-describedby={describedBy}
-      className={`m-auto mt-10 w-[calc(100%-32px)] overflow-y-auto rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay ${danger ? 'max-w-[520px]' : 'max-w-[500px]'}`}
+      className={`m-auto mt-10 w-[calc(100%-32px)] overflow-y-auto rounded-[18px] bg-raised p-0 font-sans text-ink shadow-dialog backdrop:bg-overlay ${danger ? 'max-w-[520px]' : wide ? 'max-w-[528px]' : 'max-w-[500px]'}`}
       onCancel={(event) => {
         // Échap : la fenêtre ne se ferme que si l'écran le permet, et par lui.
         event.preventDefault()

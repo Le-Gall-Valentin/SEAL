@@ -8,8 +8,10 @@ import { tintOf } from '../model/friends'
 import { type Friend, type MatchRange, rankFriends } from '../model/friendPicker'
 
 interface FriendPickerProps {
-  /** Intitulé visible de la zone, qui nomme aussi la saisie (« Membres »). */
+  /** Intitulé de la zone, qui nomme aussi la saisie (« Membres »). */
   readonly label: string
+  /** Intitulé lu mais caché, quand l'écran le montre déjà ailleurs (« Message direct » du sélecteur segmenté). */
+  readonly labelHidden?: boolean
   readonly friends: readonly Friend[]
   readonly selected: readonly Friend[]
   /** Comptes déjà membres, jamais proposés (10.3, étape 2). */
@@ -30,6 +32,7 @@ const QUERY_MAX_LENGTH = 64
  */
 export function FriendPicker({
   label,
+  labelHidden = false,
   friends,
   selected,
   exclude,
@@ -95,7 +98,10 @@ export function FriendPicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <span id={labelId} className="text-[12px] font-bold tracking-[0.08em] text-ink-3 uppercase">
+      <span
+        id={labelId}
+        className={`text-[12px] font-bold tracking-[0.08em] text-ink-3 uppercase ${labelHidden ? 'sr-only' : ''}`}
+      >
         {label}
       </span>
       <div className="flex min-h-11 flex-wrap items-center gap-1.5 rounded-[10px] bg-surface px-2 py-1.5 inset-ring inset-ring-line-strong focus-within:ring-3 focus-within:ring-focus-glow focus-within:inset-ring-accent">
