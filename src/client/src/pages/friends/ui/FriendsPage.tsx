@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
+import { ConversationAlert } from '@/entities/conversation'
 import { type Friend, useFriends, useReceivedRequests, useSentRequests } from '@/entities/friend'
 import { AnswerAlerts, useAnswerFriendRequest } from '@/features/answer-friend-request'
 import { RemoveFriendDialog } from '@/features/remove-friend'
 import { AddFriendForm, AddFriendSheet, PersonPlusIcon } from '@/features/send-friend-request'
-import { friendsTabOf } from '@/shared/config'
+import { useStartDirect } from '@/features/start-direct-conversation'
+import { conversationPath, friendsTabOf } from '@/shared/config'
 import { useMessages } from '@/shared/i18n'
 import { LARGE_SCREEN, useMediaQuery } from '@/shared/lib'
 import { LoadErrorState } from '@/shared/ui'
@@ -26,6 +28,11 @@ export function FriendsPage() {
   const received = useReceivedRequests()
   const sent = useSentRequests()
   const answers = useAnswerFriendRequest()
+  const navigate = useNavigate()
+  // CNV-01, ADR 0038 (point 3) : « Envoyer un message » ouvre la directe, trouvée ou créée (ADR 0041, point 1).
+  const direct = useStartDirect((conversationId) => {
+    void navigate(conversationPath(conversationId))
+  })
   const [sheetOpen, setSheetOpen] = useState(false)
   const [removing, setRemoving] = useState<Friend | null>(null)
   const field = useRef<HTMLInputElement>(null)
@@ -77,6 +84,7 @@ export function FriendsPage() {
         receivedCount={received.data?.length ?? 0}
       />
       <AnswerAlerts gone={answers.gone} failure={answers.formFailure} />
+      <ConversationAlert failure={direct.failure} />
       <div className={large ? 'flex items-start gap-8' : 'flex flex-col'}>
         <div className="min-w-0 flex-1">
           {tab === 'invitations' ? (
@@ -106,7 +114,14 @@ export function FriendsPage() {
             <LoadErrorState heading="h2" onRetry={() => void friends.refetch()} />
           ) : (
             friends.data !== undefined && (
-              <FriendList friends={friends.data} onAdd={openAdd} onRemove={setRemoving} />
+              <FriendList
+                friends={friends.data}
+                onAdd={openAdd}
+                onMessage={(friend) => {
+                  direct.open(friend.userId)
+                }}
+                onRemove={setRemoving}
+              />
             )
           )}
         </div>

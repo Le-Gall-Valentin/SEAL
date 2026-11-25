@@ -67,3 +67,22 @@ export function ClearIcon() {
     </svg>
   )
 }
+
+/** Bulle de « Envoyer un message » (Amis-Ordinateur). */
+export function MessageIcon({ size = 18 }: { readonly size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 4.5h14A2.5 2.5 0 0 1 21.5 7v8a2.5 2.5 0 0 1-2.5 2.5h-7.2L7 21v-3.5H5A2.5 2.5 0 0 1 2.5 15V7A2.5 2.5 0 0 1 5 4.5z" />
+    </svg>
+  )
+}

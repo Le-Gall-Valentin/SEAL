@@ -6,11 +6,12 @@ import { useMessages } from '@/shared/i18n'
 import { Avatar, Phoque } from '@/shared/ui'
 import { friendsPageMessages } from '../i18n'
 import { FriendMenu } from './FriendMenu'
-import { ClearIcon, SearchIcon } from './icons'
+import { ClearIcon, MessageIcon, SearchIcon } from './icons'
 
 interface FriendListProps {
   readonly friends: readonly Friend[]
   readonly onAdd: () => void
+  readonly onMessage: (friend: Friend) => void
   readonly onRemove: (friend: Friend) => void
 }
 
@@ -26,7 +27,7 @@ const STATE_BUTTON =
   'mt-4 inline-flex h-11 items-center gap-2 rounded-[10px] pr-4 pl-3 text-[14.5px] font-semibold'
 
 /** FRD-10 : carte de la liste d'Amis-Ordinateur, recherche locale (ADR 0038, point 6), état « compte neuf » d'Etats. */
-export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
+export function FriendList({ friends, onAdd, onMessage, onRemove }: FriendListProps) {
   const t = useMessages(friendsPageMessages)
   const [query, setQuery] = useState('')
   if (friends.length === 0) {
@@ -104,7 +105,17 @@ export function FriendList({ friends, onAdd, onRemove }: FriendListProps) {
                   @{friend.username}
                 </span>
               </div>
-              <FriendMenu friend={friend} onRemove={onRemove} />
+              <button
+                type="button"
+                aria-label={t('messageTo', { name: friend.displayName })}
+                onClick={() => {
+                  onMessage(friend)
+                }}
+                className="grid size-11 flex-none place-items-center rounded-[10px] text-ink-2 hover:bg-sunken"
+              >
+                <MessageIcon size={20} />
+              </button>
+              <FriendMenu friend={friend} onMessage={onMessage} onRemove={onRemove} />
             </li>
           ))}
         </ul>
