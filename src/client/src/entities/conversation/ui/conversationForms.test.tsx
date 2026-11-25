@@ -13,12 +13,23 @@ function Field({ invalid = false }: { readonly invalid?: boolean }) {
 }
 
 describe('entities/conversation : champ du nom et refus (ADR 0041, point 4)', () => {
-  it('GRP-01, SEC-01 : « Nom du groupe », 128 unités au plus, sans placeholder', async () => {
+  it('GRP-01, SEC-01, ADR 0041 (point 9) : « Nom du groupe », 256 unités au plus, sans placeholder', async () => {
     const screen = await render(<Field />)
     const input = screen.getByRole('textbox', { name: 'Nom du groupe' })
 
-    await expect.element(input).toHaveAttribute('maxlength', '128')
+    await expect.element(input).toHaveAttribute('maxlength', '256')
     await expect.element(input).not.toHaveAttribute('placeholder')
+  })
+
+  it('GRP-01, ADR 0041 (point 9) : un nom valide collé décomposé (NFD) se saisit en entier', async () => {
+    // 64 caractères en NFC, 192 unités en NFD : « ệ » s'écrit e, point souscrit et circonflexe.
+    const decomposed = 'ệ'.repeat(64).normalize('NFD')
+    const screen = await render(<Field />)
+    const input = screen.getByRole('textbox', { name: 'Nom du groupe' })
+
+    await input.fill(decomposed)
+
+    await expect.element(input).toHaveValue(decomposed)
   })
 
   it('GRP-01, ADR 0041 (point 4) : un nom refusé le dit sous le champ', async () => {

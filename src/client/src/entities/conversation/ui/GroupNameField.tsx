@@ -1,7 +1,7 @@
 import type { Ref } from 'react'
 import { useMessages } from '@/shared/i18n'
 import { TextField } from '@/shared/ui'
-import { GROUP_NAME_RAW_MAX_LENGTH } from '../model/conversations'
+import { GROUP_NAME_INPUT_MAX_LENGTH } from '../config/limits'
 import { conversationMessages } from '../i18n'
 
 interface GroupNameFieldProps {
@@ -15,7 +15,8 @@ interface GroupNameFieldProps {
 
 /**
  * GRP-01 : « Nom du groupe » de Nouvelle-Conversation, sans placeholder, repris pour le renommage (ADR 0041, point
- * 3). 128 unités UTF-16 au plus, la borne brute du serveur (SEC-01) ; la règle de 64 caractères se vérifie en NFC.
+ * 3). 256 unités UTF-16 au plus, pour qu'un nom valide collé décomposé tienne ; la règle de 64 caractères se vérifie
+ * en NFC, et le nom part en NFC (ADR 0041, point 9).
  */
 export function GroupNameField({
   value,
@@ -30,7 +31,7 @@ export function GroupNameField({
     <TextField
       label={t('groupName')}
       autoComplete="off"
-      maxLength={GROUP_NAME_RAW_MAX_LENGTH}
+      maxLength={GROUP_NAME_INPUT_MAX_LENGTH}
       value={value}
       onChange={onChange}
       onBlur={onBlur}

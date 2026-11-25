@@ -5,13 +5,8 @@ import {
   isUsernameWellFormed,
 } from '@/entities/account/@x/conversation'
 import { pagePath, pageSchema, request } from '@/shared/api'
+import { GROUP_NAME_MAX_LENGTH, GROUP_NAME_RAW_MAX_LENGTH, MAX_MEMBERS } from '../config/limits'
 import type { Conversation, IConversationsApi } from './IConversationsApi'
-
-/** GRP-01, ADR 0040 : nom d'un groupe en points de code, et sa borne brute en unités UTF-16 (SEC-01). */
-export const GROUP_NAME_MAX_LENGTH = 64
-export const GROUP_NAME_RAW_MAX_LENGTH = 128
-/** GRP-01 : 50 membres actifs au plus, créateur compris. */
-export const MAX_MEMBERS = 50
 
 const UUID = z.uuid()
 // SEC-01, AUTH-01, ACC-03 : le nom d'un autre compte qui ne suit pas les règles d'écriture est refusé (échec fermé),

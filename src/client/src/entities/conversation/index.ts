@@ -6,14 +6,8 @@ export type {
   Member,
   MemberRole,
 } from './api/IConversationsApi'
-export {
-  CONVERSATION_RESPONSE,
-  conversationOf,
-  conversationsApi,
-  GROUP_NAME_MAX_LENGTH,
-  GROUP_NAME_RAW_MAX_LENGTH,
-  MAX_MEMBERS,
-} from './api/conversationsApi'
+export { CONVERSATION_RESPONSE, conversationOf, conversationsApi } from './api/conversationsApi'
+export { GROUP_NAME_MAX_LENGTH, GROUP_NAME_RAW_MAX_LENGTH, MAX_MEMBERS } from './config/limits'
 export { ConversationsApiProvider } from './model/conversationsPort'
 export { conversationFailureOf } from './model/conversationFailure'
 export type { ConversationFailure } from './model/conversationFailure'

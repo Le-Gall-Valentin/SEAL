@@ -1,10 +1,7 @@
 import { hasVisibleCharacter, isNameValid } from '@/entities/account/@x/conversation'
 import { normalizeSearch } from '@/shared/lib'
-import { GROUP_NAME_MAX_LENGTH, MAX_MEMBERS } from '../api/conversationsApi'
-
-/** Le segment ui n'atteint pas api (ADR 0012) : les bornes lui parviennent par ce modèle. */
-export { GROUP_NAME_RAW_MAX_LENGTH } from '../api/conversationsApi'
 import type { Conversation, Member } from '../api/IConversationsApi'
+import { GROUP_NAME_MAX_LENGTH, MAX_MEMBERS } from '../config/limits'
 
 /** Le segment ui n'atteint pas api (ADR 0012) : les types lui parviennent par ce modèle. */
 export type { Conversation, Member }
