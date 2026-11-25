@@ -34,6 +34,33 @@ const DIRECT: Conversation = {
 const noop = () => undefined
 
 describe('widgets/conversation-panel : en-tête et fil (CNV-04, GRP-05, ADR 0041 point 6)', () => {
+  it('CNV-04, ADR 0017 : des prénoms écrits de droite à gauche restent isolés dans « … et vous »', async () => {
+    const rtl: Conversation = {
+      ...GROUP,
+      members: [
+        member(ME, 'moi', 'Moi Même'),
+        member('u1', 'a.b', '\u05D0\u05D1\u05D2 X'),
+        member('u2', 'c.d', '\u05D3\u05D4\u05D5'),
+      ],
+    }
+    const screen = await render(
+      <ConversationPanel
+        me={ME}
+        conversation={rtl}
+        variant="large"
+        infoOpen={false}
+        onToggleInfo={noop}
+        onBack={noop}
+        onNew={noop}
+      />,
+    )
+
+    const subtitle = screen.getByText(/et vous$/u).element()
+    expect(subtitle.textContent).toBe(
+      '\u2068\u05D0\u05D1\u05D2\u2069, \u2068\u05D3\u05D4\u05D5\u2069 et vous',
+    )
+  })
+
   it('CNV-04, maquette Conv-Ordinateur : un groupe montre ses membres « … et vous » et le bouton d’infos', async () => {
     const onToggleInfo = vi.fn()
     const screen = await render(
@@ -51,7 +78,11 @@ describe('widgets/conversation-panel : en-tête et fil (CNV-04, GRP-05, ADR 0041
     await expect
       .element(screen.getByRole('heading', { level: 2, name: 'Équipe 8INF138' }))
       .toBeVisible()
-    await expect.element(screen.getByText('Camille, Mathis, Inès et vous')).toBeVisible()
+    await expect
+      .element(
+        screen.getByText(/^\u2068Camille\u2069, \u2068Mathis\u2069, \u2068Inès\u2069 et vous$/u),
+      )
+      .toBeVisible()
     const info = screen.getByRole('button', { name: 'Infos du groupe' })
     await expect.element(info).toHaveAttribute('aria-expanded', 'true')
     await info.click()

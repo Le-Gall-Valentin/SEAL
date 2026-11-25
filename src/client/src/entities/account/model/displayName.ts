@@ -46,8 +46,13 @@ export function isNameValid(raw: string, maxLength: number): boolean {
     length <= maxLength &&
     !FORBIDDEN.test(name) &&
     !hasHiddenFormat(name) &&
-    VISIBLE.test(name.replace(FILLERS, ''))
+    hasVisibleCharacter(name)
   )
+}
+
+/** Au moins une lettre, un chiffre, un symbole ou une ponctuation, hors des caractères de remplissage (ADR 0040). */
+export function hasVisibleCharacter(text: string): boolean {
+  return VISIBLE.test(text.replace(FILLERS, ''))
 }
 
 function hasHiddenFormat(name: string): boolean {

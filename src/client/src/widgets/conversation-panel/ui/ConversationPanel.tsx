@@ -2,9 +2,11 @@ import {
   type Conversation,
   ConversationAvatar,
   counterpartOf,
+  otherFirstNames,
   titleOf,
 } from '@/entities/conversation'
 import { useMessages } from '@/shared/i18n'
+import { isolate } from '@/shared/lib'
 import { Phoque } from '@/shared/ui'
 import { conversationPanelMessages } from '../i18n'
 
@@ -21,11 +23,6 @@ interface ConversationPanelProps {
 }
 
 const NAMES = new Intl.ListFormat('fr', { style: 'long', type: 'conjunction' })
-
-/** Prénom affiché : le premier mot du nom affiché, comme « Camille, Mathis, Inès et vous » de la maquette. */
-function firstNameOf(displayName: string): string {
-  return displayName.split(/\s+/u)[0] ?? displayName
-}
 
 /**
  * CNV-04 : en-tête d'une conversation (Conv-Ordinateur, Conv-Telephone-Fil) et fil, vide jusqu'aux messages du lot 4,
@@ -64,12 +61,8 @@ export function ConversationPanel({
   const title = titleOf(conversation, me) ?? ''
   const group = conversation.type === 'GROUP'
   const subtitle = group
-    ? NAMES.format([
-        ...conversation.members
-          .filter((member) => member.userId !== me)
-          .map((member) => firstNameOf(member.displayName)),
-        t('you'),
-      ])
+    ? // ADR 0017 : chaque prénom vient d'un autre compte et garde sa direction d'écriture.
+      NAMES.format([...otherFirstNames(conversation, me).map(isolate), t('you')])
     : `@${counterpartOf(conversation, me)?.username ?? ''}`
   return (
     <section aria-label={title} className="flex min-h-0 flex-1 flex-col">

@@ -9,6 +9,7 @@ import {
   isAdmin,
   isGroupNameValid,
   matchConversation,
+  otherFirstNames,
   seatsLeft,
   sortConversations,
   titleOf,
@@ -109,5 +110,32 @@ describe('entities/conversation : nom d’un groupe (GRP-01, ADR 0040)', () => {
     expect(isGroupNameValid('é'.repeat(65))).toBe(false)
     expect(isGroupNameValid('   ')).toBe(false)
     expect(isGroupNameValid(`S${String.fromCodePoint(0x200b)}ki`)).toBe(false)
+  })
+})
+
+describe('entities/conversation : sous-titre d’un groupe (CNV-04, maquette Conv-Ordinateur)', () => {
+  it('CNV-04 : les prénoms des autres membres, dans l’ordre d’arrivée, sans l’appelant', () => {
+    const group = conversation({
+      members: [
+        member('camille', 'Camille Tremblay'),
+        member(ME, 'Moi'),
+        member('ines', 'Inès  Côté'),
+      ],
+    })
+
+    expect(otherFirstNames(group, ME)).toEqual(['Camille', 'Inès'])
+  })
+
+  it('CNV-04, ACC-03 : un premier mot qui ne s’affiche pas (remplissage, marques seules) laisse le nom entier', () => {
+    const group = conversation({
+      members: [
+        member(ME, 'Moi'),
+        member('filler', '\u3164 Camille'),
+        member('marks', '\u0301\u0302 Mathis'),
+        member('single', 'Inès'),
+      ],
+    })
+
+    expect(otherFirstNames(group, ME)).toEqual(['\u3164 Camille', '\u0301\u0302 Mathis', 'Inès'])
   })
 })

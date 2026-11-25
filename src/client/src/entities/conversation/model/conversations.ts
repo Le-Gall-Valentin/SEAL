@@ -1,4 +1,4 @@
-import { isNameValid } from '@/entities/account/@x/conversation'
+import { hasVisibleCharacter, isNameValid } from '@/entities/account/@x/conversation'
 import { normalizeSearch } from '@/shared/lib'
 import { GROUP_NAME_MAX_LENGTH, MAX_MEMBERS } from '../api/conversationsApi'
 
@@ -14,6 +14,20 @@ export function counterpartOf(conversation: Conversation, me: string): Member | 
   return conversation.type === 'DIRECT'
     ? conversation.members.find((member) => member.userId !== me)
     : undefined
+}
+
+/**
+ * CNV-04, maquette Conv-Ordinateur (« Camille, Mathis, Inès et vous ») : le prénom de chaque autre membre, dans l'ordre
+ * d'arrivée. Le prénom est le premier mot du nom affiché ; s'il ne s'affiche pas (caractère de remplissage, marques
+ * seules), le nom entier le remplace (ACC-03).
+ */
+export function otherFirstNames(conversation: Conversation, me: string): string[] {
+  return conversation.members
+    .filter((member) => member.userId !== me)
+    .map(({ displayName }) => {
+      const first = displayName.split(/\s+/u)[0] ?? ''
+      return hasVisibleCharacter(first) ? first : displayName
+    })
 }
 
 /** CNV-04 : nom du groupe, ou nom affiché de l'interlocuteur ; une directe sans interlocuteur n'a pas de titre. */

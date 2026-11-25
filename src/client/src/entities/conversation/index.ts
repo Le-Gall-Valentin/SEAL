@@ -26,6 +26,7 @@ export {
   isAdmin,
   isGroupNameValid,
   matchConversation,
+  otherFirstNames,
   seatsLeft,
   sortConversations,
   titleOf,
