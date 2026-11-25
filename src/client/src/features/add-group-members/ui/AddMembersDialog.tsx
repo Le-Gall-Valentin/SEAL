@@ -20,7 +20,12 @@ export function AddMembersDialog({ conversation, open, onClose }: AddMembersDial
   const t = useMessages(addMembersMessages)
   const friendList = useFriends()
   const friends = friendList.data ?? []
-  const [selected, setSelected] = useState<readonly Friend[]>([])
+  const [chosen, setSelected] = useState<readonly Friend[]>([])
+  // FRD-21 : un ami retiré entre-temps quitte la sélection dès que la liste d'amis relue ne le compte plus.
+  const selected =
+    friendList.data === undefined
+      ? chosen
+      : chosen.filter((friend) => friends.some((current) => current.userId === friend.userId))
   const done = () => {
     setSelected([])
     onClose()
@@ -60,7 +65,7 @@ export function AddMembersDialog({ conversation, open, onClose }: AddMembersDial
               setSelected((current) => [...current, friend])
             }}
             onRemove={(friend) => {
-              setSelected((current) => current.filter((chosen) => chosen.userId !== friend.userId))
+              setSelected((current) => current.filter((item) => item.userId !== friend.userId))
             }}
           />
           <ConversationAlert failure={admission.failure} />

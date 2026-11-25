@@ -87,4 +87,15 @@ describe('features/create-group : créer un groupe (CNV-03, GRP-02, FRD-21)', ()
 
     await expect.poll(() => result.current.failure).toEqual({ kind: 'network' })
   })
+
+  it('SEC-04, ADR 0041 (point 4) : une création limitée (429) reprend l’alerte commune', async () => {
+    const { wrapper } = setup({
+      createGroup: () => Promise.reject(new ApiError(429, 'RATE_LIMITED')),
+    })
+    const { result } = await renderHook(() => useCreateGroup(() => undefined), { wrapper })
+
+    result.current.create({ name: 'Ski', memberIds: ['a'] })
+
+    await expect.poll(() => result.current.failure?.kind).toBe('rate-limited')
+  })
 })

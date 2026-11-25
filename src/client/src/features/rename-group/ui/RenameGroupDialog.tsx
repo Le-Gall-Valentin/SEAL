@@ -42,7 +42,7 @@ export function RenameGroupDialog({ conversation, open, onClose }: RenameGroupDi
     onClose()
   }
   const valid = isGroupNameValid(name)
-  const invalid = (touched && name !== '' && !valid) || renaming.failure?.kind === 'invalid-name'
+  const invalid = (touched && name !== '' && !valid) || renaming.refusedName === name
   const canSubmit = !renaming.pending && valid && name.normalize('NFC') !== current
   return (
     <ModalDialog open={open} onClose={cancel} closable={!renaming.pending} title={t('title')}>

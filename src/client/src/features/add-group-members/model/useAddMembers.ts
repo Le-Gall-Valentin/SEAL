@@ -16,7 +16,7 @@ interface Admission {
 
 /**
  * GRP-03, GRP-04 : tout membre ajoute ses propres amis ; la vue rendue remplace le détail. FRD-21 : un ami retiré
- * entre-temps refuse tout l'ajout et la liste d'amis est relue ; un groupe disparu relit les conversations.
+ * entre-temps refuse tout l'ajout et la liste d'amis est relue ; un groupe disparu ou plein relit les conversations.
  */
 export function useAddMembers(onDone: () => void) {
   const client = useQueryClient()
@@ -33,7 +33,8 @@ export function useAddMembers(onDone: () => void) {
       const kind = conversationFailureOf(error).kind
       if (kind === 'not-friends') {
         await invalidateFriends(client)
-      } else if (kind === 'gone') {
+      } else if (kind === 'gone' || kind === 'group-full') {
+        // Groupe disparu ou plein : la conversation relue montre l'état réel et les places restantes.
         await invalidateConversations(client)
       }
     },

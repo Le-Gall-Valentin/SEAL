@@ -7,7 +7,7 @@ import type { Conversation } from '@/entities/conversation'
 import { type Friend, FriendsApiProvider, type IFriendsApi } from '@/entities/friend'
 import { CreateGroupApiProvider, type ICreateGroupApi } from '@/features/create-group'
 import { type IStartDirectApi, StartDirectApiProvider } from '@/features/start-direct-conversation'
-import { ApiError } from '@/shared/lib'
+import { ApiError, isolate } from '@/shared/lib'
 import { NewConversationDialog } from './NewConversationDialog'
 
 let next = 0
@@ -33,10 +33,16 @@ const VIEW: Conversation = {
   lastServerSeq: 0,
 }
 
-function setup(apis: { direct?: Partial<IStartDirectApi>; group?: Partial<ICreateGroupApi> } = {}) {
+function setup(
+  apis: {
+    direct?: Partial<IStartDirectApi>
+    group?: Partial<ICreateGroupApi>
+    friends?: IFriendsApi['friends']
+  } = {},
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const friends: IFriendsApi = {
-    friends: () => Promise.resolve({ items: [CAMILLE, INES], next: null }),
+    friends: apis.friends ?? (() => Promise.resolve({ items: [CAMILLE, INES], next: null })),
     receivedRequests: () => Promise.resolve({ items: [], next: null }),
     sentRequests: () => Promise.resolve({ items: [], next: null }),
   }
@@ -171,5 +177,102 @@ describe('widgets/new-conversation : Nouvelle conversation (CNV-01, CNV-03, ADR 
     } finally {
       await page.viewport(1280, 800)
     }
+  })
+
+  it('FRD-21, ADR 0041 (point 4) : après NOT_FRIENDS, l’ancien ami quitte la sélection avec la liste relue', async () => {
+    let calls = 0
+    const { screen } = await open({
+      friends: () => {
+        calls += 1
+        return Promise.resolve({ items: calls === 1 ? [CAMILLE, INES] : [INES], next: null })
+      },
+      group: { createGroup: () => Promise.reject(new ApiError(403, 'NOT_FRIENDS')) },
+    })
+    await screen.getByRole('radio', { name: 'Groupe' }).click()
+    await screen.getByRole('textbox', { name: 'Nom du groupe' }).fill('Ski')
+    await screen.getByRole('option', { name: /Camille Tremblay/u }).click()
+    await screen.getByRole('option', { name: /Inès Côté/u }).click()
+    await screen.getByRole('button', { name: 'Créer le groupe (3)' }).click()
+
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: `Retirer ${isolate('Camille Tremblay')}` }))
+      .not.toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('button', { name: `Retirer ${isolate('Inès Côté')}` }))
+      .toBeVisible()
+    await expect.element(screen.getByRole('button', { name: 'Créer le groupe (2)' })).toBeEnabled()
+  })
+
+  it('CNV-01 : fermée, la fenêtre ne lit pas la liste d’amis ; elle la lit à l’ouverture', async () => {
+    const friends = vi.fn(() => Promise.resolve({ items: [CAMILLE, INES], next: null }))
+    const { Wrapper, onOpened, onClose } = setup({ friends })
+    const screen = await render(
+      <Wrapper>
+        <NewConversationDialog open={false} onClose={onClose} onOpened={onOpened} />
+      </Wrapper>,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(friends).not.toHaveBeenCalled()
+
+    await screen.rerender(
+      <Wrapper>
+        <NewConversationDialog open onClose={onClose} onOpened={onOpened} />
+      </Wrapper>,
+    )
+
+    await expect.element(screen.getByRole('option', { name: /Camille Tremblay/u })).toBeVisible()
+    expect(friends).toHaveBeenCalled()
+  })
+
+  it('FRD-20 : changer d’onglet vide aussi la saisie du sélecteur', async () => {
+    const { screen } = await open()
+    await screen.getByRole('combobox', { name: 'Message direct' }).fill('cam')
+
+    await screen.getByRole('radio', { name: 'Groupe' }).click()
+
+    await expect.element(screen.getByRole('combobox', { name: 'Membres' })).toHaveValue('')
+  })
+
+  it('GRP-01, ADR 0024 (point 9) : le nom refusé par le serveur n’est plus signalé une fois modifié', async () => {
+    const { screen } = await open({
+      group: {
+        createGroup: () =>
+          Promise.reject(new ApiError(400, 'VALIDATION_FAILED', { fields: ['name'] })),
+      },
+    })
+    await screen.getByRole('radio', { name: 'Groupe' }).click()
+    const name = screen.getByRole('textbox', { name: 'Nom du groupe' })
+    await name.fill('Ski')
+    await screen.getByRole('option', { name: /Camille Tremblay/u }).click()
+    await screen.getByRole('button', { name: 'Créer le groupe (2)' }).click()
+    await expect
+      .element(screen.getByText('1 à 64 caractères, dont un visible au moins.'))
+      .toBeVisible()
+
+    await name.fill('Ski alpin')
+
+    await expect
+      .element(screen.getByText('1 à 64 caractères, dont un visible au moins.'))
+      .not.toBeInTheDocument()
+  })
+
+  it('GRP-01 : un groupe se crée avec 49 amis au plus, le créateur faisant le 50e membre', async () => {
+    const many = Array.from({ length: 52 }, (_, index) =>
+      friend(`ami.${String(index).padStart(2, '0')}`, `Ami ${String(index)}`),
+    )
+    const { screen } = await open({
+      friends: () => Promise.resolve({ items: many, next: null }),
+    })
+    await screen.getByRole('radio', { name: 'Groupe' }).click()
+    const input = screen.getByRole('combobox', { name: 'Membres' })
+    await input.click()
+
+    await userEvent.keyboard('{Enter}'.repeat(48))
+    await expect.element(input).not.toHaveAttribute('aria-disabled')
+    await userEvent.keyboard('{Enter}')
+
+    await expect.element(input).toHaveAttribute('aria-disabled', 'true')
+    await expect.element(screen.getByRole('button', { name: 'Créer le groupe (50)' })).toBeVisible()
   })
 })

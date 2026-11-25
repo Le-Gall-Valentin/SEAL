@@ -12,11 +12,15 @@ export const SENT_REQUESTS_KEY = ['friends', 'sent'] as const
 /** ADR 0037 (points 2 et 11) : jusqu'à la WebSocket du lot 4, le compteur se relit toutes les 60 secondes. */
 const RECEIVED_REFRESH_MS = 60_000
 
-/** FRD-10 : tous les amis encore actifs, triés par nom affiché (ADR 0038, point 6). */
-export function useFriends() {
+/**
+ * FRD-10 : tous les amis encore actifs, triés par nom affiché (ADR 0038, point 6). `enabled` faux : rien n'est lu, la
+ * liste déjà gardée reste servie (un dialogue fermé).
+ */
+export function useFriends({ enabled = true }: { readonly enabled?: boolean } = {}) {
   const api = useFriendsApi()
   return useQuery({
     queryKey: FRIENDS_KEY,
+    enabled,
     queryFn: async ({ signal }) =>
       sortFriends(await allPages((after) => api.friends(after, signal))),
   })

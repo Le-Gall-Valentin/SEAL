@@ -1,5 +1,10 @@
 import { type KeyboardEvent, useState } from 'react'
-import { ConversationAlert, GroupNameField, isGroupNameValid } from '@/entities/conversation'
+import {
+  ConversationAlert,
+  GroupNameField,
+  isGroupNameValid,
+  MAX_MEMBERS,
+} from '@/entities/conversation'
 import { type Friend, FriendPicker, useFriends } from '@/entities/friend'
 import { useCreateGroup } from '@/features/create-group'
 import { useStartDirect } from '@/features/start-direct-conversation'
@@ -12,7 +17,7 @@ type Kind = 'direct' | 'group'
 const KINDS: readonly Kind[] = ['direct', 'group']
 
 /** GRP-01 : 50 membres au plus, le créateur compris. */
-const MAX_NEWCOMERS = 49
+const MAX_NEWCOMERS = MAX_MEMBERS - 1
 
 interface NewConversationDialogProps {
   readonly open: boolean
@@ -28,10 +33,16 @@ interface NewConversationDialogProps {
  */
 export function NewConversationDialog({ open, onClose, onOpened }: NewConversationDialogProps) {
   const t = useMessages(newConversationMessages)
-  const friendList = useFriends()
+  // La fenêtre reste montée avec l'écran : la liste d'amis ne se lit qu'à son ouverture.
+  const friendList = useFriends({ enabled: open })
   const friends = friendList.data ?? []
   const [kind, setKind] = useState<Kind>('direct')
-  const [selected, setSelected] = useState<readonly Friend[]>([])
+  const [chosen, setSelected] = useState<readonly Friend[]>([])
+  // FRD-21 : un ami retiré entre-temps quitte la sélection dès que la liste d'amis relue ne le compte plus.
+  const selected =
+    friendList.data === undefined
+      ? chosen
+      : chosen.filter((friend) => friends.some((current) => current.userId === friend.userId))
   const [name, setName] = useState('')
   const [nameTouched, setNameTouched] = useState(false)
 
@@ -50,8 +61,7 @@ export function NewConversationDialog({ open, onClose, onOpened }: NewConversati
   const pending = direct.pending || group.pending
   const failure = kind === 'direct' ? direct.failure : group.failure
   const nameInvalid =
-    (nameTouched && name !== '' && !isGroupNameValid(name)) ||
-    group.failure?.kind === 'invalid-name'
+    (nameTouched && name !== '' && !isGroupNameValid(name)) || group.refusedName === name
   const canSubmit =
     !pending &&
     (kind === 'direct' ? selected.length === 1 : selected.length > 0 && isGroupNameValid(name))
@@ -141,6 +151,8 @@ export function NewConversationDialog({ open, onClose, onOpened }: NewConversati
             />
           )}
           <FriendPicker
+            // Un autre onglet repart d'un sélecteur vide : saisie comprise.
+            key={kind}
             label={kind === 'direct' ? t('direct') : t('members')}
             labelHidden={kind === 'direct'}
             friends={friends}
@@ -156,7 +168,7 @@ export function NewConversationDialog({ open, onClose, onOpened }: NewConversati
               setSelected((current) => [...current, friend])
             }}
             onRemove={(friend) => {
-              setSelected((current) => current.filter((chosen) => chosen.userId !== friend.userId))
+              setSelected((current) => current.filter((item) => item.userId !== friend.userId))
             }}
           />
           <ConversationAlert failure={failure} />

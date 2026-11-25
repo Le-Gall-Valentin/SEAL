@@ -40,6 +40,8 @@ export function useRenameGroup(onDone: () => void) {
   return {
     pending: mutation.isPending,
     failure,
+    /** ADR 0024 (point 9) : le nom que le serveur a refusé, signalé tant que le champ le garde. */
+    refusedName: failure?.kind === 'invalid-name' ? mutation.variables?.name : undefined,
     rename: (renaming: Renaming) => {
       guard.run(() => mutation.mutateAsync(renaming))
     },

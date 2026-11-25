@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { Conversation, Member } from '@/entities/conversation'
 import { type Friend, FriendsApiProvider } from '@/entities/friend'
-import { ApiError } from '@/shared/lib'
+import { ApiError, isolate } from '@/shared/lib'
 import { AddMembersApiProvider } from '../model/addMembersPort'
 import { AddMembersDialog } from './AddMembersDialog'
 
@@ -31,14 +31,19 @@ const GROUP: Conversation = {
   lastServerSeq: 0,
 }
 
-async function open(api: Api, conversation = GROUP) {
+async function open(
+  api: Api,
+  conversation = GROUP,
+  friends: () => Promise<{ items: Friend[]; next: string | null }> = () =>
+    Promise.resolve({ items: [CAMILLE, INES, LEA], next: null }),
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const onClose = vi.fn()
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>
       <FriendsApiProvider
         api={{
-          friends: () => Promise.resolve({ items: [CAMILLE, INES, LEA], next: null }),
+          friends,
           receivedRequests: () => Promise.resolve({ items: [], next: null }),
           sentRequests: () => Promise.resolve({ items: [], next: null }),
         }}
@@ -113,5 +118,29 @@ describe('features/add-group-members : Ajouter des membres (GRP-03, GRP-04, ADR 
     await screen.getByRole('button', { name: 'Ajouter (1)' }).dblClick()
 
     await expect.poll(() => admit.mock.calls.length).toBe(1)
+  })
+
+  it('FRD-21, ADR 0041 (point 4) : après NOT_FRIENDS, l’ancien ami quitte la sélection avec la liste relue', async () => {
+    let calls = 0
+    const { screen } = await open(
+      { admit: () => Promise.reject(new ApiError(403, 'NOT_FRIENDS')) },
+      GROUP,
+      () => {
+        calls += 1
+        return Promise.resolve({
+          items: calls === 1 ? [CAMILLE, INES, LEA] : [CAMILLE, LEA],
+          next: null,
+        })
+      },
+    )
+    await screen.getByRole('option', { name: /Inès Côté/u }).click()
+    await screen.getByRole('option', { name: /Léa Roy/u }).click()
+    await screen.getByRole('button', { name: 'Ajouter (2)' }).click()
+
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: `Retirer ${isolate('Inès Côté')}` }))
+      .not.toBeInTheDocument()
+    await expect.element(screen.getByRole('button', { name: 'Ajouter (1)' })).toBeEnabled()
   })
 })

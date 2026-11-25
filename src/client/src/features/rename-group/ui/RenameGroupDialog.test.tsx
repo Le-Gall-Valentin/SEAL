@@ -74,4 +74,22 @@ describe('features/rename-group : Renommer le groupe (GRP-03, ADR 0041)', () => 
       .element(screen.getByRole('alert'))
       .toHaveTextContent('Vous n’êtes plus administrateur de ce groupe.')
   })
+
+  it('GRP-01, ADR 0024 (point 9) : le nom refusé par le serveur n’est plus signalé une fois modifié', async () => {
+    const { screen } = await open({
+      rename: () => Promise.reject(new ApiError(400, 'VALIDATION_FAILED', { fields: ['name'] })),
+    })
+    const field = screen.getByRole('textbox', { name: 'Nom du groupe' })
+    await field.fill('Autre')
+    await screen.getByRole('button', { name: 'Enregistrer' }).click()
+    await expect
+      .element(screen.getByText('1 à 64 caractères, dont un visible au moins.'))
+      .toBeVisible()
+
+    await field.fill('Autre nom')
+
+    await expect
+      .element(screen.getByText('1 à 64 caractères, dont un visible au moins.'))
+      .not.toBeInTheDocument()
+  })
 })
