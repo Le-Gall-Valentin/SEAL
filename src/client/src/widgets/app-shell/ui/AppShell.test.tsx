@@ -213,4 +213,25 @@ describe('ACC-03, ADR 0035 (point 3) : navigation principale', () => {
       .element(screen.getByRole('navigation', { name: 'Navigation principale' }))
       .toBeVisible()
   })
+
+  it('CNV-04, ADR 0041 (point 1), maquette Conv-Telephone-Fil : un fil ouvert sur téléphone retire la barre du bas', async () => {
+    const { screen } = await renderAt(
+      '/?conversation=0193a1b2-0000-7000-8000-000000000001',
+      390,
+      844,
+    )
+
+    await expect.element(screen.getByText('Accueil')).toBeVisible()
+    expect(
+      screen.getByRole('navigation', { name: 'Navigation principale' }).elements(),
+    ).toHaveLength(0)
+  })
+
+  it('ADR 0041 (point 1) : un identifiant de conversation mal formé n’ouvre rien ; la barre du bas reste', async () => {
+    const { screen } = await renderAt('/?conversation=pas-un-uuid', 390, 844)
+
+    await expect
+      .element(screen.getByRole('navigation', { name: 'Navigation principale' }))
+      .toBeVisible()
+  })
 })

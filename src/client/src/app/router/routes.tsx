@@ -1,8 +1,8 @@
 import { Navigate, type RouteObject } from 'react-router'
+import { ConversationsPage } from '@/pages/conversations'
 import { ChooseUsernamePage } from '@/pages/choose-username'
 import { ForgotPasswordPage } from '@/pages/forgot-password'
 import { FriendsPage } from '@/pages/friends'
-import { HomePage } from '@/pages/home'
 import { LoginPage } from '@/pages/login'
 import { RegisterPage } from '@/pages/register'
 import { ResetPasswordPage } from '@/pages/reset-password'
@@ -19,15 +19,15 @@ export function withRootErrorBoundary(children: RouteObject[]): RouteObject[] {
 }
 
 export const routes = withRootErrorBoundary([
-  // ADR 0024 (point 2), ADR 0035 (point 3), ADR 0038 (point 5) : accueil provisoire, Amis et Paramètres, dans la
-  // navigation principale.
+  // ADR 0041, ADR 0035 (point 3), ADR 0038 (point 5) : Conversations, Amis et Paramètres, dans la navigation
+  // principale.
   {
     element: <ActiveRoute />,
     children: [
       {
         element: <AppShell />,
         children: [
-          { path: ROUTES.HOME, element: <HomePage /> },
+          { path: ROUTES.HOME, element: <ConversationsPage /> },
           { path: ROUTES.FRIENDS, element: <FriendsPage /> },
           { path: ROUTES.SETTINGS, element: <SettingsPage /> },
         ],

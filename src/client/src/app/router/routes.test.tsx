@@ -124,11 +124,12 @@ describe('ADR 0012 : routeur de la couche app', () => {
     vi.restoreAllMocks()
   })
 
-  it('ADR 0024, point 2 : la racine, réservée au compte actif, affiche l’accueil provisoire', async () => {
+  it('CNV-04, ADR 0041 : la racine, réservée au compte actif, affiche l’écran Conversations', async () => {
     const { screen } = await renderAt('/')
 
-    await expect.element(screen.getByRole('heading', { level: 1 })).toHaveTextContent('seal')
-    await expect.element(screen.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
+    await expect
+      .element(screen.getByRole('heading', { level: 1, name: 'Conversations' }))
+      .toBeVisible()
   })
 
   it('ADR 0035 : /parametres, réservée au compte actif, affiche Paramètres dans la navigation principale', async () => {
@@ -145,7 +146,9 @@ describe('ADR 0012 : routeur de la couche app', () => {
   it('ADR 0012 : une adresse inconnue ramène à la racine, sans écran nouveau', async () => {
     const { router, screen } = await renderAt('/adresse/inconnue')
 
-    await expect.element(screen.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
+    await expect
+      .element(screen.getByRole('heading', { level: 1, name: 'Conversations' }))
+      .toBeVisible()
     expect(router.state.location.pathname).toBe('/')
   })
 
@@ -173,9 +176,10 @@ describe('ADR 0012 : routeur de la couche app', () => {
     async (path, account, expected, heading) => {
       const { router, screen } = await renderAt(path, routes, account)
 
-      await (heading === null
-        ? expect.element(screen.getByRole('button', { name: 'Se déconnecter' })).toBeVisible()
-        : expect.element(screen.getByRole('heading', { level: 1, name: heading })).toBeVisible())
+      // ADR 0041 : l'écran du compte actif est Conversations.
+      await expect
+        .element(screen.getByRole('heading', { level: 1, name: heading ?? 'Conversations' }))
+        .toBeVisible()
       expect(router.state.location.pathname).toBe(expected)
     },
   )
