@@ -144,7 +144,7 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     await expect.element(screen.getByLabelText('Identifiant')).toBeVisible()
     // CNV-01, ADR 0038 (point 3) : « Envoyer un message » arrive avec les conversations (ADR 0041).
     await expect
-      .element(screen.getByRole('button', { name: 'Envoyer un message — Inès Côté' }))
+      .element(screen.getByRole('button', { name: `Envoyer un message — ${isolate('Inès Côté')}` }))
       .toBeVisible()
   })
 
@@ -586,7 +586,9 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
     )
     const { screen } = await renderAt('/amis', 1440, 900, { openDirect })
 
-    await screen.getByRole('button', { name: 'Envoyer un message — Inès Côté' }).click()
+    await screen
+      .getByRole('button', { name: `Envoyer un message — ${isolate('Inès Côté')}` })
+      .click()
 
     await expect.element(screen.getByText('conversation d-1')).toBeVisible()
     expect(openDirect).toHaveBeenCalledWith(
@@ -599,12 +601,62 @@ describe('pages/friends : écran Amis (Amis-Ordinateur, Amis-Tablette, Amis-Tele
       openDirect: () => Promise.reject(new ApiError(403, 'NOT_FRIENDS')),
     })
 
-    await screen.getByRole('button', { name: 'Envoyer un message — Inès Côté' }).click()
+    await screen
+      .getByRole('button', { name: `Envoyer un message — ${isolate('Inès Côté')}` })
+      .click()
 
     await expect
       .element(screen.getByRole('alert'))
       .toHaveTextContent(
         'Vous ne pouvez ajouter que vos amis. Leur liste vient d’être mise à jour.',
       )
+  })
+
+  it('CNV-01 : pendant l’ouverture de la directe, « Envoyer un message » est marqué occupé', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900, {
+      openDirect: () => new Promise(() => undefined),
+    })
+    const button = screen.getByRole('button', {
+      name: `Envoyer un message — ${isolate('Inès Côté')}`,
+    })
+
+    await button.click()
+
+    await expect.element(button).toHaveAttribute('aria-busy', 'true')
+    await expect
+      .element(
+        screen.getByRole('button', { name: `Envoyer un message — ${isolate('Camille Tremblay')}` }),
+      )
+      .not.toHaveAttribute('aria-busy')
+  })
+
+  it('FRD-21 : l’alerte d’un refus s’efface quand une autre action commence', async () => {
+    const { screen } = await renderAt('/amis', 390, 844, {
+      openDirect: () => Promise.reject(new ApiError(403, 'NOT_FRIENDS')),
+    })
+    await screen
+      .getByRole('button', { name: `Envoyer un message — ${isolate('Inès Côté')}` })
+      .click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Ajouter un ami' }).click()
+
+    await expect
+      .element(
+        screen.getByText(
+          'Vous ne pouvez ajouter que vos amis. Leur liste vient d’être mise à jour.',
+        ),
+      )
+      .not.toBeInTheDocument()
+  })
+
+  it('FRD-10, WCAG 2.4.3 : « Effacer la recherche » rend le focus au champ de recherche', async () => {
+    const { screen } = await renderAt('/amis', 1440, 900)
+    const search = screen.getByRole('searchbox', { name: 'Rechercher un ami' })
+    await search.fill('zz')
+
+    await screen.getByRole('button', { name: 'Effacer la recherche' }).click()
+
+    await expect.element(search).toHaveFocus()
   })
 })

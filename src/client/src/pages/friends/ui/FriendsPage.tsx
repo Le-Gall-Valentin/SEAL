@@ -33,6 +33,7 @@ export function FriendsPage() {
   const direct = useStartDirect((conversationId) => {
     void navigate(conversationPath(conversationId))
   })
+  const [messagingId, setMessagingId] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [removing, setRemoving] = useState<Friend | null>(null)
   const field = useRef<HTMLInputElement>(null)
@@ -46,7 +47,12 @@ export function FriendsPage() {
       title.current?.focus()
     }
   }, [removing])
+  // L'alerte d'un refus de « Envoyer un message » ne vaut que jusqu'à l'action suivante.
+  const startAction = () => {
+    direct.reset()
+  }
   const openAdd = () => {
+    startAction()
     if (large) {
       field.current?.focus()
     } else {
@@ -70,6 +76,7 @@ export function FriendsPage() {
             aria-haspopup="dialog"
             aria-expanded={sheetOpen}
             onClick={() => {
+              startAction()
               setSheetOpen(true)
             }}
             className="grid size-11 place-items-center rounded-full bg-accent text-on-accent hover:bg-accent-hover"
@@ -118,9 +125,14 @@ export function FriendsPage() {
                 friends={friends.data}
                 onAdd={openAdd}
                 onMessage={(friend) => {
+                  setMessagingId(friend.userId)
                   direct.open(friend.userId)
                 }}
-                onRemove={setRemoving}
+                messagingId={direct.pending ? messagingId : null}
+                onRemove={(friend) => {
+                  startAction()
+                  setRemoving(friend)
+                }}
               />
             )
           )}
