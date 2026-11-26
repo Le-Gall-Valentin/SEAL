@@ -7,6 +7,7 @@ import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.session.SealPrincipal;
 import fr.vlegall.seal.support.MutableClock;
 import fr.vlegall.seal.ws.domain.model.FakeConnection;
+import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -102,6 +103,31 @@ class BoundSessionsTest {
         assertThat(lastAccess("ancien"))
                 .as("aucune écriture sous l'ancien identifiant")
                 .isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName(
+            "AUTH-55, ADR 0044 : après deux renommages non confirmés, la session vit sous l'identifiant encore en base")
+    void auth55ChainedRenamesFallBackToTheStoredId() {
+        full("a0", USER);
+        FakeConnection connection = connection("a0");
+        connection.follow("a1");
+        connection.follow("a2");
+
+        assertThat(sessions.alive(connection)).isTrue();
+        assertThat(connection.binding().formers()).containsExactly("a1", "a0");
+    }
+
+    @Test
+    @DisplayName("TRN-12, ADR 0044 : une fois le nouvel identifiant en base, les anciens sont oubliés")
+    void trn12ConfirmedRenameSettles() {
+        FakeConnection connection = connection("a0");
+        connection.follow("a1");
+        full("a1", USER);
+
+        assertThat(sessions.alive(connection)).isTrue();
+
+        assertThat(connection.binding()).isEqualTo(SessionBinding.of("a1"));
     }
 
     @Test

@@ -46,16 +46,13 @@ public class SessionWatch {
         event.sessionIds().forEach(id -> registry.bySession(id).forEach(c -> close(c, CloseReason.SESSION_ENDED)));
     }
 
-    /** AUTH-23 : la session change d'identifiant ; la connexion la suit, sauf si la session passe à un autre compte. */
+    /**
+     * AUTH-23, ADR 0044 : la session change d'identifiant ; ses connexions le suivent. La ronde juge ensuite le compte
+     * que garde la session : une session passée à un autre compte ferme ses connexions.
+     */
     @EventListener
     public void renewed(SessionRenewedEvent event) {
-        for (Connection connection : registry.bySession(event.previousId())) {
-            if (connection.user().equals(event.user())) {
-                connection.follow(event.currentId());
-            } else {
-                close(connection, CloseReason.SESSION_ENDED);
-            }
-        }
+        registry.bySession(event.previousId()).forEach(connection -> connection.follow(event.currentId()));
     }
 
     /** La ronde (les tests d'intégration la lancent eux-mêmes, à l'horloge réglable). */

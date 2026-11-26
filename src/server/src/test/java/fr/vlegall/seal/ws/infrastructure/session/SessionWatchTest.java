@@ -10,6 +10,7 @@ import fr.vlegall.seal.support.MutableClock;
 import fr.vlegall.seal.ws.domain.model.CloseReason;
 import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
 import fr.vlegall.seal.ws.domain.model.FakeConnection;
+import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,26 +45,29 @@ class SessionWatchTest {
     }
 
     @Test
-    @DisplayName("AUTH-23, TRN-12 : un renouvellement pour le même compte fait suivre la connexion, sans la fermer")
-    void auth23RenewalForTheSameAccountIsFollowed() {
+    @DisplayName(
+            "AUTH-23, TRN-12, ADR 0044 : un renouvellement fait suivre la connexion, sans la fermer ; la ronde juge le compte")
+    void auth23RenewalIsFollowed() {
         FakeConnection connection = open(USER, "avant");
+        FakeConnection unrelated = open(OTHER, "autre");
 
-        watch.renewed(new SessionRenewedEvent("avant", "apres", USER));
+        watch.renewed(new SessionRenewedEvent("avant", "apres"));
 
-        assertThat(connection.sessionId()).isEqualTo("apres");
-        assertThat(connection.formerSessionId()).contains("avant");
+        assertThat(connection.binding()).isEqualTo(new SessionBinding("apres", List.of("avant")));
         assertThat(connection.closed()).isEmpty();
+        assertThat(unrelated.binding()).isEqualTo(SessionBinding.of("autre"));
     }
 
     @Test
-    @DisplayName("AUTH-23, TRN-12 : un renouvellement pour un autre compte ferme la connexion en 4401")
-    void auth23RenewalForAnotherAccountEndsTheConnection() {
-        FakeConnection connection = open(USER, "avant");
+    @DisplayName(
+            "AUTH-55, ADR 0044 : deux renommages dans une même requête (OAuth) se suivent, l'identifiant en base gardé")
+    void auth55ChainedRenamesAreFollowed() {
+        FakeConnection connection = open(USER, "a0");
 
-        watch.renewed(new SessionRenewedEvent("avant", "apres", OTHER));
+        watch.renewed(new SessionRenewedEvent("a0", "a1"));
+        watch.renewed(new SessionRenewedEvent("a1", "a2"));
 
-        assertThat(connection.closed()).contains(CloseReason.SESSION_ENDED);
-        assertThat(connection.sessionId()).isEqualTo("avant");
+        assertThat(connection.binding()).isEqualTo(new SessionBinding("a2", List.of("a1", "a0")));
     }
 
     @Test

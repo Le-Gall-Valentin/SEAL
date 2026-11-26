@@ -4,12 +4,12 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.ratelimit.LocalRateLimit;
 import fr.vlegall.seal.ws.domain.model.CloseReason;
 import fr.vlegall.seal.ws.domain.model.Connection;
+import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.jspecify.annotations.Nullable;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.socket.CloseStatus;
@@ -36,8 +36,7 @@ final class WebSocketConnection implements Connection {
     private final UserId user;
     private final LocalRateLimit frameLimit;
     private final WireFrames frames;
-    private volatile String sessionId;
-    private volatile @Nullable String formerSessionId;
+    private final AtomicReference<SessionBinding> binding;
     private volatile Instant lastHeardAt;
 
     WebSocketConnection(WebSocketSession session, LocalRateLimit frameLimit, WireFrames frames, Instant openedAt) {
@@ -50,7 +49,8 @@ final class WebSocketConnection implements Connection {
         }
         this.session = new ConcurrentWebSocketSessionDecorator(session, SEND_TIME_LIMIT_MS, BUFFER_SIZE_LIMIT);
         this.user = (UserId) session.getAttributes().get(FullSessionHandshakeInterceptor.USER);
-        this.sessionId = (String) session.getAttributes().get(FullSessionHandshakeInterceptor.SESSION);
+        this.binding = new AtomicReference<>(
+                SessionBinding.of((String) session.getAttributes().get(FullSessionHandshakeInterceptor.SESSION)));
     }
 
     /** TRN-13 : seau des trames de cette connexion, libéré avec elle. */
@@ -69,19 +69,18 @@ final class WebSocketConnection implements Connection {
     }
 
     @Override
-    public String sessionId() {
-        return sessionId;
-    }
-
-    @Override
-    public Optional<String> formerSessionId() {
-        return Optional.ofNullable(formerSessionId);
+    public SessionBinding binding() {
+        return binding.get();
     }
 
     @Override
     public void follow(String renamedSessionId) {
-        formerSessionId = sessionId;
-        sessionId = renamedSessionId;
+        binding.updateAndGet(current -> current.renamedTo(renamedSessionId));
+    }
+
+    @Override
+    public void settle(SessionBinding seen) {
+        binding.compareAndSet(seen, seen.settled());
     }
 
     @Override

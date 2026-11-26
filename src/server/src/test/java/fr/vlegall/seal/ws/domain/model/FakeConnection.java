@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 
 /** Connexion en mémoire, pour tester ce qui l'entoure sans WebSocket. */
@@ -15,8 +16,7 @@ public final class FakeConnection implements Connection {
     private final UserId user;
     private final Instant lastHeardAt;
     private final List<String> sent = new CopyOnWriteArrayList<>();
-    private volatile String sessionId;
-    private volatile @Nullable String formerSessionId;
+    private final AtomicReference<SessionBinding> binding;
     private volatile @Nullable CloseReason closed;
     private final boolean failing;
 
@@ -26,7 +26,7 @@ public final class FakeConnection implements Connection {
 
     private FakeConnection(UserId user, String sessionId, Instant lastHeardAt, boolean failing) {
         this.user = user;
-        this.sessionId = sessionId;
+        this.binding = new AtomicReference<>(SessionBinding.of(sessionId));
         this.lastHeardAt = lastHeardAt;
         this.failing = failing;
     }
@@ -47,19 +47,18 @@ public final class FakeConnection implements Connection {
     }
 
     @Override
-    public String sessionId() {
-        return sessionId;
-    }
-
-    @Override
-    public Optional<String> formerSessionId() {
-        return Optional.ofNullable(formerSessionId);
+    public SessionBinding binding() {
+        return binding.get();
     }
 
     @Override
     public void follow(String renamedSessionId) {
-        formerSessionId = sessionId;
-        sessionId = renamedSessionId;
+        binding.updateAndGet(current -> current.renamedTo(renamedSessionId));
+    }
+
+    @Override
+    public void settle(SessionBinding seen) {
+        binding.compareAndSet(seen, seen.settled());
     }
 
     @Override

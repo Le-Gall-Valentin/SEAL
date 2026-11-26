@@ -45,7 +45,7 @@ public final class ConnectionRegistry {
     /** Les connexions liées à cette session HTTP (TRN-12). */
     public List<Connection> bySession(String sessionId) {
         return all().stream()
-                .filter(connection -> connection.sessionId().equals(sessionId))
+                .filter(connection -> connection.binding().names(sessionId))
                 .toList();
     }
 

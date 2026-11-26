@@ -2,7 +2,6 @@ package fr.vlegall.seal.ws.domain.model;
 
 import fr.vlegall.seal.common.UserId;
 import java.time.Instant;
-import java.util.Optional;
 
 /** Une connexion WebSocket ouverte d'un compte, liée à sa session HTTP (TRN-12). */
 public interface Connection {
@@ -13,17 +12,19 @@ public interface Connection {
     /** Le compte de la session. */
     UserId user();
 
-    /** L'identifiant de la session HTTP à laquelle la connexion est liée. */
-    String sessionId();
+    /** TRN-12 : la session HTTP à laquelle la connexion est liée, lue d'un seul coup. */
+    SessionBinding binding();
 
-    /**
-     * L'identifiant d'avant le dernier renouvellement de la session (AUTH-23) : la session le garde tant que la requête
-     * qui l'a renouvelée n'est pas finie.
-     */
-    Optional<String> formerSessionId();
+    /** L'identifiant actuel de la session HTTP. */
+    default String sessionId() {
+        return binding().current();
+    }
 
-    /** TRN-12, AUTH-23 : la session a changé d'identifiant pour le même compte ; la connexion la suit. */
+    /** TRN-12, AUTH-23 : la session a changé d'identifiant ; la connexion la suit. */
     void follow(String renamedSessionId);
+
+    /** TRN-12 : le nouvel identifiant est confirmé en base ; sans effet si la liaison a changé depuis {@code seen}. */
+    void settle(SessionBinding seen);
 
     /** TRN-13 : instant de la dernière trame reçue, ou de l'ouverture. */
     Instant lastHeardAt();

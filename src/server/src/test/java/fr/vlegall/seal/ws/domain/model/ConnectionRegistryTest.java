@@ -62,6 +62,18 @@ class ConnectionRegistryTest {
     }
 
     @Test
+    @DisplayName(
+            "AUTH-53, ADR 0044 : une connexion se retrouve aussi par un identifiant d'avant un renouvellement non confirmé")
+    void auth53FormerIdStillFindsTheConnection() {
+        FakeConnection connection = new FakeConnection(ALICE, "avant", Instant.EPOCH);
+        registry.open(connection);
+        connection.follow("apres");
+
+        assertThat(registry.bySession("avant")).containsExactly(connection);
+        assertThat(registry.bySession("apres")).containsExactly(connection);
+    }
+
+    @Test
     @DisplayName("TRN-13 : vingt ouvertures simultanées d'un même compte n'en acceptent que cinq")
     void trn13ConcurrentOpensNeverExceedFive() throws Exception {
         CountDownLatch start = new CountDownLatch(1);

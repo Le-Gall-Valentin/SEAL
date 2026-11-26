@@ -3,6 +3,7 @@ package fr.vlegall.seal.ws.infrastructure.session;
 import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.session.FullSessions;
 import fr.vlegall.seal.ws.domain.model.Connection;
+import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -41,16 +42,23 @@ public final class BoundSessions {
     /** La session de la connexion vit encore. */
     public boolean alive(Connection connection) {
         Instant now = clock.instant();
-        Session current = sessions.findById(connection.sessionId());
+        SessionBinding seen = connection.binding();
+        Session current = sessions.findById(seen.current());
         if (current != null) {
-            return alive(current, connection, now);
+            boolean alive = alive(current, connection, now);
+            if (alive && !seen.formers().isEmpty()) {
+                connection.settle(seen);
+            }
+            return alive;
         }
-        // AUTH-23 : renouvelée par une requête pas encore finie, la session garde son ancien identifiant.
-        return connection
-                .formerSessionId()
-                .map(sessions::findById)
-                .filter(former -> alive(former, connection, now))
-                .isPresent();
+        // AUTH-23 : renouvelée par une requête pas encore finie, la session garde un ancien identifiant.
+        for (String former : seen.formers()) {
+            Session stored = sessions.findById(former);
+            if (stored != null) {
+                return alive(stored, connection, now);
+            }
+        }
+        return false;
     }
 
     /**

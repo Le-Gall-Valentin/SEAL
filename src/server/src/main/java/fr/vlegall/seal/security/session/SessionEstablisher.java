@@ -53,8 +53,11 @@ public final class SessionEstablisher {
             CredentialVersions versions,
             List<SessionOpeningCleanup> cleanups,
             ApplicationEventPublisher events) {
+        // TRN-12, ADR 0044 : le renommage publie SessionFixationProtectionEvent, que SessionRenewals traduit.
+        ChangeSessionIdAuthenticationStrategy fixation = new ChangeSessionIdAuthenticationStrategy();
+        fixation.setApplicationEventPublisher(events);
         this.renewal = new CompositeSessionAuthenticationStrategy(
-                List.of(new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrfTokens)));
+                List.of(fixation, new CsrfAuthenticationStrategy(csrfTokens)));
         this.csrfTokens = csrfTokens;
         this.clock = clock;
         this.versions = versions;
@@ -261,14 +264,7 @@ public final class SessionEstablisher {
             HttpServletRequest request,
             HttpServletResponse response) {
         Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(principal, null, authorities);
-        HttpSession previous = request.getSession(false);
-        String previousId = previous == null ? null : previous.getId();
         renewal.onAuthentication(authentication, request, response);
-        HttpSession current = request.getSession(false);
-        if (previousId != null && current != null && !previousId.equals(current.getId())) {
-            // TRN-12, ADR 0043 : les WebSockets du compte suivent le nouvel identifiant de leur session.
-            events.publishEvent(new SessionRenewedEvent(previousId, current.getId(), principal.userId()));
-        }
         // ADR 0032, point 7 : la session ouverte ne garde ni départ OAuth ni inscription en attente.
         cleanups.forEach(cleanup -> cleanup.clean(request));
         SecurityContext context = holder.createEmptyContext();

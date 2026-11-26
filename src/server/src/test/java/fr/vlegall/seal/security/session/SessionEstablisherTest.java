@@ -25,6 +25,7 @@ import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.session.SessionFixationProtectionEvent;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.util.SerializationUtils;
@@ -112,7 +113,8 @@ class SessionEstablisherTest {
     }
 
     @Test
-    @DisplayName("TRN-12, ADR 0043 : un renouvellement annonce l'ancien et le nouvel identifiant, et le compte")
+    @DisplayName(
+            "TRN-12, ADR 0044 : un renouvellement publie l'événement de Spring Security, ancien et nouvel identifiant")
     void trn12RenewalIsAnnounced() {
         MockHttpSession session = new MockHttpSession(null, "avant");
         MockHttpServletRequest request = requestWithSession(session);
@@ -120,7 +122,10 @@ class SessionEstablisherTest {
         sessions.open(activeLogin(), request, new MockHttpServletResponse());
 
         String current = request.getSession(false).getId();
-        assertThat(published).containsExactly(new SessionRenewedEvent("avant", current, USER));
+        assertThat(published).singleElement().isInstanceOfSatisfying(SessionFixationProtectionEvent.class, event -> {
+            assertThat(event.getOldSessionId()).isEqualTo("avant");
+            assertThat(event.getNewSessionId()).isEqualTo(current);
+        });
     }
 
     @Test
