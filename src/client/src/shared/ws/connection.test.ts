@@ -120,7 +120,7 @@ describe('shared/ws : connexion temps réel (TRN-13, TRN-14, TRN-15, ADR 0043, A
     })
   })
 
-  it('ADR 0044 (décision 7) : un ping sans pong en 10 secondes abandonne la socket et rouvre', () => {
+  it('TRN-15, ADR 0044 (décision 7) : un ping sans pong en 10 secondes abandonne la socket et rouvre', () => {
     connect()
     last().accept()
     vi.advanceTimersByTime(25_000)
@@ -155,7 +155,7 @@ describe('shared/ws : connexion temps réel (TRN-13, TRN-14, TRN-15, ADR 0043, A
     )
   })
 
-  it('ADR 0043 : sans réponse en 10 secondes, l’envoi échoue', async () => {
+  it('TRN-14, ADR 0043 : sans réponse en 10 secondes, l’envoi échoue', async () => {
     const { connection } = connect()
     last().accept()
 
@@ -181,7 +181,7 @@ describe('shared/ws : connexion temps réel (TRN-13, TRN-14, TRN-15, ADR 0043, A
     await expect(sent).rejects.toBeInstanceOf(NetworkError)
   })
 
-  it('ADR 0043 (TRN-15) : une coupure rouvre après 1, 2, 4, 8, 16 puis 30 secondes', () => {
+  it('TRN-15, ADR 0043 : une coupure rouvre après 1, 2, 4, 8, 16 puis 30 secondes', () => {
     connect()
     last().accept()
     const waits: number[] = []
@@ -243,7 +243,7 @@ describe('shared/ws : connexion temps réel (TRN-13, TRN-14, TRN-15, ADR 0043, A
     expect(FakeSocket.all).toHaveLength(2)
   })
 
-  it('ADR 0044 (décision 2) : un double feu vert ne rouvre qu’une connexion', () => {
+  it('AUTH-52, ADR 0044 (décision 2) : un double feu vert ne rouvre qu’une connexion', () => {
     const resumes: (() => void)[] = []
     connect({
       beforeReconnect: (go) => {
@@ -284,7 +284,7 @@ describe('shared/ws : connexion temps réel (TRN-13, TRN-14, TRN-15, ADR 0043, A
     expect(FakeSocket.all).toHaveLength(2)
   })
 
-  it('ADR 0044 (décision 2) : trois échecs de suite sans réponse du serveur signalent la connexion injoignable, une fois', () => {
+  it('AUTH-52, ADR 0044 (décision 2) : trois échecs de suite sans réponse du serveur signalent la connexion injoignable, une fois', () => {
     const onUnreachable = vi.fn()
     connect({ onUnreachable })
 
@@ -301,7 +301,7 @@ describe('shared/ws : connexion temps réel (TRN-13, TRN-14, TRN-15, ADR 0043, A
     expect(onUnreachable).toHaveBeenCalledOnce()
   })
 
-  it('ADR 0044 (décision 2) : les coupures d’une connexion confirmée et les refus 4429 ne comptent pas', () => {
+  it('AUTH-52, ADR 0044 (décision 2) : les coupures d’une connexion confirmée et les refus 4429 ne comptent pas', () => {
     const onUnreachable = vi.fn()
     connect({ onUnreachable })
 
@@ -367,7 +367,7 @@ describe('shared/ws : connexion temps réel (TRN-13, TRN-14, TRN-15, ADR 0043, A
     expect(FakeSocket.all).toHaveLength(3)
   })
 
-  it('A10 : une trame illisible ou hors schéma n’atteint jamais onFrame ; une trame valide, si', () => {
+  it('TRN-14, A10 : une trame illisible ou hors schéma n’atteint jamais onFrame ; une trame valide, si', () => {
     const { options } = connect()
     last().accept()
 

@@ -25,7 +25,7 @@ public interface InboundFrameHandler {
     boolean userAction();
 
     /**
-     * Traite la charge d'une trame du compte {@code user} et rend celle de l'{@code ack}. Un refus lève une
+     * Traite la charge d'une trame du compte {@code user} et rend celle de son accusé ({@link #replyType()}). Un refus lève une
      * {@link fr.vlegall.seal.common.SealException}, rendue en {@code error} avec son code (section 14.6).
      */
     JsonNode handle(UserId user, JsonNode payload);

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.ws.domain.model.CloseReason;
+import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,11 +45,6 @@ class WebSocketConnectionTest {
             closed = status;
         }
 
-        @Override
-        public void closeQuickly(CloseStatus status) {
-            closed = status;
-        }
-
         void complete(boolean ok) {
             pending.removeFirst().accept(ok);
         }
@@ -68,7 +64,7 @@ class WebSocketConnectionTest {
             () -> {},
             new WireFrames(JsonMapper.builder().build()),
             Instant.EPOCH,
-            (patient, urgent) -> patient.run());
+            Runnable::run);
 
     @Test
     @DisplayName("TRN-13, ADR 0044 : une seule écriture à la fois, les suivantes attendent leur tour, dans l'ordre")
@@ -115,7 +111,7 @@ class WebSocketConnectionTest {
                 () -> {},
                 new WireFrames(JsonMapper.builder().build()),
                 Instant.EPOCH,
-                (patient, urgent) -> patient.run());
+                Runnable::run);
         assertThatNoException().isThrownBy(() -> other.send("deux"));
         assertThat(broken.closed).isEqualTo(CloseStatus.SERVER_ERROR);
     }
@@ -154,5 +150,17 @@ class WebSocketConnectionTest {
 
         assertThat(socket.written).isEmpty();
         assertThat(socket.closed).isEqualTo(new CloseStatus(4408));
+    }
+
+    @Test
+    @DisplayName("TRN-12, ADR 0044 : la connexion suit un renommage ; une confirmation périmée est sans effet")
+    void trn12FollowAndStaleSettle() {
+        SessionBinding seen = connection.binding();
+        connection.follow("renommee");
+        connection.settle(seen);
+        assertThat(connection.binding()).isEqualTo(new SessionBinding("renommee", List.of("session")));
+
+        connection.settle(connection.binding());
+        assertThat(connection.binding()).isEqualTo(SessionBinding.of("renommee"));
     }
 }

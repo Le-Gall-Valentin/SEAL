@@ -170,6 +170,6 @@ class WebSocketFramesIT {
         connection.send("{\"type\":\"test.named\",\"id\":\"n1\",\"payload\":{\"v\":1}}");
         String reply = connection.next(WAIT);
 
-        assertThat(reply).isEqualTo("{\"type\":\"test.done\",\"id\":\"n1\",\"payload\":{\"v\":1}}");
+        assertThat(reply).isEqualTo("{\"type\":\"test.named.ack\",\"id\":\"n1\",\"payload\":{\"v\":1}}");
     }
 }

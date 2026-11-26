@@ -80,7 +80,8 @@ class BoundSessionsTest {
     }
 
     @Test
-    @DisplayName("ADR 0023, ADR 0044 : une session dont le mot de passe a changé depuis ne garde pas sa connexion")
+    @DisplayName(
+            "TRN-12, ADR 0023, ADR 0044 : une session dont le mot de passe a changé depuis ne garde pas sa connexion")
     void adr0023StalePasswordVersionEndsTheConnection() {
         full("s", USER);
         assertThat(sessions.alive(connection("s"))).isTrue();
@@ -89,6 +90,24 @@ class BoundSessionsTest {
 
         assertThat(sessions.alive(connection("s"))).isFalse();
         assertThat(sessions.userActed(connection("s"))).isFalse();
+    }
+
+    @Test
+    @DisplayName(
+            "ACC-01, TRN-12, ADR 0044 : pendant un renommage pas encore écrit, la version n'est jugée que sous l'identifiant courant")
+    void acc01VersionIsJudgedUnderTheCurrentIdOnly() {
+        full("ancien", USER);
+        FakeConnection connection = connection("ancien");
+        connection.follow("nouveau");
+        // Le mot de passe vient de changer en base ; la session regravée n'est pas encore écrite sous son nouvel id.
+        passwordVersion = OptionalLong.of(2);
+
+        assertThat(sessions.alive(connection)).isTrue();
+
+        full("nouveau", USER);
+        assertThat(sessions.alive(connection))
+                .as("sous l'id courant, l'ancienne version ne vaut plus")
+                .isFalse();
     }
 
     @Test

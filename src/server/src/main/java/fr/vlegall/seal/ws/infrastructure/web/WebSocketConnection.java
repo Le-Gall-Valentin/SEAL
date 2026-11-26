@@ -119,6 +119,11 @@ final class WebSocketConnection implements Connection {
         if (closing.get() != null || closed.get()) {
             return;
         }
+        enqueue(text);
+    }
+
+    /** Met une trame dans la file et la vide ; au-delà de 512 Kio en attente, ferme en 1011. */
+    private void enqueue(String text) {
         long bytes = text.getBytes(StandardCharsets.UTF_8).length;
         if (queuedBytes.addAndGet(bytes) > BUFFER_SIZE_LIMIT) {
             LOG.debug("File d'envoi pleine : connexion fermée");
@@ -131,12 +136,16 @@ final class WebSocketConnection implements Connection {
 
     @Override
     public void close(CloseReason reason) {
-        if (reason == CloseReason.SESSION_ENDED && closing.get() == null && !closed.get()) {
+        // Seul le fil qui gagne la fermeture met session.revoked en file : deux fermetures concurrentes (requête et
+        // ronde) n'en envoient qu'une.
+        if (closed.get() || !closing.compareAndSet(null, new CloseStatus(reason.code()))) {
+            return;
+        }
+        if (reason == CloseReason.SESSION_ENDED) {
             // TRN-12 : session.revoked, puis 4401 une fois la trame écrite ; l'identifiant d'une trame du serveur est
             // choisi par lui.
-            send(frames.frame("session.revoked", UUID.randomUUID().toString(), frames.empty()));
-        }
-        if (closing.compareAndSet(null, new CloseStatus(reason.code()))) {
+            enqueue(frames.frame("session.revoked", UUID.randomUUID().toString(), frames.empty()));
+        } else {
             drain();
         }
     }
@@ -204,7 +213,7 @@ final class WebSocketConnection implements Connection {
     private void finish(CloseStatus status) {
         if (closed.compareAndSet(false, true)) {
             outbox.clear();
-            closer.close(() -> socket.close(status), () -> socket.closeQuickly(status));
+            closer.close(() -> socket.close(status));
         }
     }
 }

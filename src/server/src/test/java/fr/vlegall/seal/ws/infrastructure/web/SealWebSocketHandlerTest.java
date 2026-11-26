@@ -54,8 +54,20 @@ class SealWebSocketHandlerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"pong", "error", "ping", "session.revoked", "Pas un type"})
-    @DisplayName("TRN-14, ADR 0044 : un accusé ne peut porter ni un nom réservé ni un nom mal formé")
+    @ValueSource(
+            strings = {
+                "pong",
+                "error",
+                "ping",
+                "session.revoked",
+                "conv.update",
+                "friend.request",
+                "msg.new",
+                "Pas un type",
+                ".ack",
+                "msg..ack"
+            })
+    @DisplayName("TRN-14, ADR 0044 : un accusé est ack ou se termine par .ack ; jamais le nom d'une trame du serveur")
     void trn14ReservedOrMalformedReplyIsRefused(String reply) {
         assertThatThrownBy(() -> new SealWebSocketHandler(
                         new WireFrames(JsonMapper.builder().build()),

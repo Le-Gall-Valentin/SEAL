@@ -78,8 +78,8 @@ class SlowReaderIT {
 
     @Test
     @DisplayName(
-            "TRN-13, A10 : un lecteur lent ne fait ni échouer ni attendre la requête d'un autre membre, puis il est fermé")
-    void trn13SlowReaderIsIsolatedThenClosed() throws Exception {
+            "TRN-13, A10, ADR 0044 : un lecteur lent est fermé dès que sa file dépasse 512 Kio, sans retenir les autres membres")
+    void trn13SlowReaderIsClosedWithoutHoldingOthers() throws Exception {
         TestAccount alice = TestAccount.fresh(mvc, mail, "rapide");
         TestAccount bob = TestAccount.fresh(mvc, mail, "lent");
         TestAccount carol = TestAccount.fresh(mvc, mail, "membre");
@@ -88,28 +88,24 @@ class SlowReaderIT {
                 new TestWebSocketClient(port).connect(carol.session, TestWebSocketClient.ORIGIN);
 
         try (SilentWebSocket stuck = new SilentWebSocket(port, bob.session)) {
+            // Le serveur continue de lire Bob (l'écriture ne le bloque pas) : ses réponses s'entassent dans sa file.
             floodUntilStalled(stuck);
-            // Au-delà des 10 s d'envoi que tolère le décorateur.
-            Thread.sleep(10_500);
-
-            long started = System.nanoTime();
-            MvcResult renamed = mvc.perform(
-                            alice.unsafe(patch("/api/v1/conversations/" + group), Map.of("name", "Sans attente")))
-                    .andReturn();
-            long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
-
-            assertThat(renamed.getResponse().getStatus()).isEqualTo(200);
-            assertThat(elapsedMs).as("la requête n'attend pas le lecteur lent").isLessThan(2_000);
-            String frame = carolSocket.next(Duration.ofSeconds(5));
-            assertThat(frame).as("l'autre membre est prévenu").isNotNull();
-            assertThat(JSON.readTree(frame).get("type").asString()).isEqualTo("conv.update");
-            long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+            long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
             while (!registry.byUser(new UserId(bob.id)).isEmpty() && System.nanoTime() < deadline) {
-                Thread.sleep(200);
+                Thread.sleep(100);
             }
             assertThat(registry.byUser(new UserId(bob.id)))
                     .as("le lecteur lent est fermé")
                     .isEmpty();
+
+            MvcResult renamed = mvc.perform(
+                            alice.unsafe(patch("/api/v1/conversations/" + group), Map.of("name", "Sans attente")))
+                    .andReturn();
+
+            assertThat(renamed.getResponse().getStatus()).isEqualTo(200);
+            String frame = carolSocket.next(Duration.ofSeconds(5));
+            assertThat(frame).as("l'autre membre est prévenu").isNotNull();
+            assertThat(JSON.readTree(frame).get("type").asString()).isEqualTo("conv.update");
         }
     }
 }

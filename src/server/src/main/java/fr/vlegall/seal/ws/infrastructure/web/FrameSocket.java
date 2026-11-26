@@ -9,9 +9,9 @@ interface FrameSocket {
     /** Écrit une trame sans attendre ; {@code done} reçoit vrai une fois écrite, faux si l'écriture a échoué. */
     void sendText(String text, Consumer<Boolean> done);
 
-    /** Ferme la connexion avec ce code ; peut attendre l'écriture de la trame de fermeture (10 s au plus). */
+    /**
+     * Ferme la connexion avec ce code. Tomcat écrit la trame de fermeture d'un code autre que 1000 en 50 ms au plus
+     * ({@code ABNORMAL_SESSION_CLOSE_SEND_TIMEOUT}), puis coupe.
+     */
     void close(CloseStatus status);
-
-    /** Ferme la connexion sans attendre plus de 100 ms l'écriture de la trame de fermeture. */
-    void closeQuickly(CloseStatus status);
 }

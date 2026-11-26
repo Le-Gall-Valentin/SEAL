@@ -42,7 +42,7 @@ final class InMemoryFriends {
 
     final List<String> calls = new ArrayList<>();
     final List<String> events = new ArrayList<>();
-    /** FRD-04 : annonces en direct, « request:destinataire » ou « relation:un:autre ». */
+    /** FRD-04 : annonces en direct, « request:destinataire », « declined:qui-refuse:émetteur » ou « relation:un:autre ». */
     final List<String> notified = new ArrayList<>();
 
     final Map<UUID, FriendRequest> requests = new LinkedHashMap<>();

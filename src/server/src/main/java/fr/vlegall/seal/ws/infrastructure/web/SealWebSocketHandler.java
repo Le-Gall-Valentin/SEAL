@@ -18,7 +18,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +31,8 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * TRN-10, TRN-14 : point d'accès {@code /ws}, WebSocket brute en trames texte JSON, sans STOMP. Chaque trame reçoit une
- * réponse au même {@code id} : {@code pong} à {@code ping}, {@code ack} ou {@code error}. Une trame illisible ou
+ * réponse au même {@code id} : {@code pong} à {@code ping}, l'accusé que nomme son gestionnaire ({@code ack} par défaut,
+ * ADR 0044) ou {@code error}. Une trame illisible ou
  * binaire ferme la connexion (1008), une trame de plus de 64 Kio aussi (1009). TRN-13 : 5 connexions par compte
  * (4429 au-delà) et 30 trames par 10 secondes et par connexion.
  */
@@ -44,8 +44,10 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(SealWebSocketHandler.class);
     private static final String PING = "ping";
-    /** Types que le serveur émet lui-même : aucun gestionnaire ne peut en faire son accusé. */
-    private static final Set<String> RESERVED_REPLIES = Set.of(PING, "pong", "error", "session.revoked");
+    /** Accusé par défaut ; un accusé nommé se termine par {@code .ack} (ADR 0044, décision 3). */
+    private static final String ACK = "ack";
+
+    private static final String ACK_SUFFIX = ".ack";
 
     private static final String CONNECTION = "seal.connection";
 
@@ -54,7 +56,7 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
     private final RateLimiter limiter;
     private final BoundSessions sessions;
     private final Clock clock;
-    private final ConnectionCloser closer;
+    private final Closer closer;
     private final Map<String, InboundFrameHandler> handlers = new HashMap<>();
 
     public SealWebSocketHandler(
@@ -63,7 +65,7 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
             RateLimiter limiter,
             BoundSessions sessions,
             Clock clock,
-            ConnectionCloser closer,
+            Closer closer,
             List<InboundFrameHandler> handlers) {
         this.frames = frames;
         this.registry = registry;
@@ -75,8 +77,10 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
             if (handler.type().equals(PING) || this.handlers.putIfAbsent(handler.type(), handler) != null) {
                 throw new IllegalStateException("Deux gestionnaires pour la trame " + handler.type());
             }
-            // ADR 0044 (décision 3) : l'accusé nommé par le gestionnaire suit le format des types, sans nom réservé.
-            if (RESERVED_REPLIES.contains(handler.replyType()) || !WireFrames.isType(handler.replyType())) {
+            // ADR 0044 (décision 3) : l'accusé est ack ou se termine par .ack, au format des types ; il ne peut donc
+            // porter le nom d'aucune trame du serveur (pong, error, événements).
+            String reply = handler.replyType();
+            if (!WireFrames.isType(reply) || !(reply.equals(ACK) || reply.endsWith(ACK_SUFFIX))) {
                 throw new IllegalStateException("Accusé réservé ou mal formé pour la trame " + handler.type());
             }
         }

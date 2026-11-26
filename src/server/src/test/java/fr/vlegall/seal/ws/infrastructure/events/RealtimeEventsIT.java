@@ -156,7 +156,8 @@ class RealtimeEventsIT {
     }
 
     @Test
-    @DisplayName("ADR 0043, A10 : une annonce faite dans une transaction annulée ne part jamais ; validée, elle part")
+    @DisplayName(
+            "CNV-04, ADR 0043, A10 : une annonce faite dans une transaction annulée ne part jamais ; validée, elle part")
     void adr0043AnnouncementFollowsTheTransaction() throws Exception {
         TestWebSocketClient.Connection connection = connect(alice);
         Set<UserId> target = Set.of(new UserId(alice.id));

@@ -134,7 +134,7 @@ describe('entities/session : connexion temps réel liée à la session (TRN-12)'
     expect(client.getQueryData(['friends', 'list'])).toBeUndefined()
   })
 
-  it('ADR 0044 (décision 2) : injoignable mais session vivante, les données restent', async () => {
+  it('AUTH-53, ADR 0044 (décision 2) : injoignable mais session vivante, les données restent', async () => {
     const realtime = fakeRealtime()
     const client = new QueryClient()
     client.setQueryData(SESSION_QUERY_KEY, ACTIVE)

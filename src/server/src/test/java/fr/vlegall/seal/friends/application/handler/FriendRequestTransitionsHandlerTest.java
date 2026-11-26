@@ -61,7 +61,7 @@ class FriendRequestTransitionsHandlerTest {
     @Test
     @DisplayName(
             "FRD-04, CDC 10.1, ADR 0044 : un refus n'est annoncé qu'à qui refuse, une révocation aux deux ; un échec, à personne")
-    void frd04DeclineAndRevokeAreAnnouncedToBoth() {
+    void frd04DeclineToTheReceiverOnlyRevokeToBoth() {
         FriendRequest other = friends.pending(receiver, sender);
 
         assertThat(decline().decline(sender.user(), request.id())).isFalse();

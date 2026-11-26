@@ -41,7 +41,7 @@ public class WebSocketTestConfiguration {
 
             @Override
             public String replyType() {
-                return "test.done";
+                return "test.named.ack";
             }
 
             @Override

@@ -10,18 +10,18 @@ import org.springframework.stereotype.Component;
 
 /**
  * TRN-12, ADR 0044 (décision 10) : ferme les connexions hors du fil appelant, car Tomcat écrit la trame de fermeture de
- * façon bloquante (10 secondes au plus face à un client qui ne lit plus). Une fermeture n'est jamais abandonnée : file
- * pleine ou arrêt en cours, elle se fait sur le fil appelant, mais vite (100 ms au plus pour la trame de fermeture).
+ * façon bloquante (50 ms au plus pour les codes de SEAL, jamais 1000). Une fermeture n'est jamais abandonnée : file
+ * pleine ou arrêt en cours, elle se fait sur le fil appelant.
  */
 @Component
-public final class ConnectionCloser implements Closer, DisposableBean {
+final class ConnectionCloser implements Closer, DisposableBean {
 
     static final int THREADS = 2;
     static final int QUEUE_CAPACITY = 10_000;
 
     private final ThreadPoolExecutor executor;
 
-    public ConnectionCloser() {
+    ConnectionCloser() {
         this(THREADS, QUEUE_CAPACITY);
     }
 
@@ -36,11 +36,11 @@ public final class ConnectionCloser implements Closer, DisposableBean {
     }
 
     @Override
-    public void close(Runnable patient, Runnable urgent) {
+    public void close(Runnable close) {
         try {
-            executor.execute(patient);
+            executor.execute(close);
         } catch (RejectedExecutionException full) {
-            urgent.run();
+            close.run();
         }
     }
 

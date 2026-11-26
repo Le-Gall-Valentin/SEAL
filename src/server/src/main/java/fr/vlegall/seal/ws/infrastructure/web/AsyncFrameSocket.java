@@ -12,34 +12,26 @@ import org.springframework.web.socket.adapter.NativeWebSocketSession;
 
 /**
  * TRN-13, ADR 0044 (décision 10) : écriture par l'API asynchrone de Jakarta WebSocket. Aucun fil n'attend le client :
- * Tomcat rappelle à la fin de l'écriture, ou en échec après 10 secondes. Hors de Tomcat, l'écriture est synchrone.
+ * Tomcat rappelle à la fin de l'écriture, ou en échec après 10 secondes. Hors de Tomcat (MockMvc), l'écriture est
+ * synchrone.
  */
 final class AsyncFrameSocket implements FrameSocket {
 
-    /** Délai d'une écriture, comme le tolérait le décorateur de Spring. */
+    /** TRN-13 : délai d'une écriture, au-delà duquel le client est jugé trop lent (ADR 0044). */
     static final long SEND_TIMEOUT_MS = 10_000;
-    /** Délai de l'écriture bloquante de la trame de fermeture (Tomcat : 20 s par défaut). */
-    static final String BLOCKING_SEND_TIMEOUT = "org.apache.tomcat.websocket.BLOCKING_SEND_TIMEOUT";
 
     private static final Logger LOG = LoggerFactory.getLogger(AsyncFrameSocket.class);
 
-    /** Délai d'écriture de la trame de fermeture quand la fermeture ne peut pas attendre. */
-    static final long QUICK_CLOSE_TIMEOUT_MS = 100;
-
     private final WebSocketSession session;
-    private final jakarta.websocket.@Nullable Session endpoint;
     private final jakarta.websocket.RemoteEndpoint.@Nullable Async remote;
 
     AsyncFrameSocket(WebSocketSession session) {
         this.session = session;
         if (session instanceof NativeWebSocketSession nativeSession
                 && nativeSession.getNativeSession() instanceof jakarta.websocket.Session endpoint) {
-            endpoint.getUserProperties().put(BLOCKING_SEND_TIMEOUT, SEND_TIMEOUT_MS);
-            this.endpoint = endpoint;
             this.remote = endpoint.getAsyncRemote();
             this.remote.setSendTimeout(SEND_TIMEOUT_MS);
         } else {
-            this.endpoint = null;
             this.remote = null;
         }
     }
@@ -58,14 +50,6 @@ final class AsyncFrameSocket implements FrameSocket {
             written = false;
         }
         done.accept(written);
-    }
-
-    @Override
-    public void closeQuickly(CloseStatus status) {
-        if (endpoint != null) {
-            endpoint.getUserProperties().put(BLOCKING_SEND_TIMEOUT, QUICK_CLOSE_TIMEOUT_MS);
-        }
-        close(status);
     }
 
     @Override

@@ -86,7 +86,7 @@ class NotifyUsersHandlerTest {
     }
 
     @Test
-    @DisplayName("A10, ADR 0043 : une transaction annulée n'annonce rien")
+    @DisplayName("CNV-04, A10, ADR 0043 : une transaction annulée n'annonce rien")
     void a10RolledBackTransactionAnnouncesNothing() {
         TransactionSynchronizationManager.initSynchronization();
 

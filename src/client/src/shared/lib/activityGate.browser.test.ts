@@ -29,7 +29,7 @@ describe('shared/lib : garde d’activité (AUTH-52, ADR 0043 point 4, ADR 0044)
     gate.dispose()
   })
 
-  it('ADR 0044 : une rafale d’événements ne lance qu’une tâche par clé, la dernière', () => {
+  it('AUTH-52, ADR 0044 : une rafale d’événements ne lance qu’une tâche par clé, la dernière', () => {
     const gate = createActivityGate({ now: () => now })
     const first = vi.fn()
     const last = vi.fn()

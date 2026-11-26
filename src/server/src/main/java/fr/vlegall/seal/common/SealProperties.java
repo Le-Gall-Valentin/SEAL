@@ -14,6 +14,7 @@ import org.springframework.boot.context.properties.bind.ConstructorBinding;
  * @param security paramètres des en-têtes de sécurité
  * @param session durées de vie des sessions
  * @param mail expédition des courriels
+ * @param ws réglages de la WebSocket : intervalle de la ronde (ADR 0043, point 5 ; ADR 0044)
  * @param dataDir dossier de ce que SEAL génère lui-même, comme la clé de l'Autorité (KEY-10) : {@code /data} dans
  *     l'image (volume {@code app-data}), {@code ../data}, soit {@code src/data}, hors de Git, en local
  */

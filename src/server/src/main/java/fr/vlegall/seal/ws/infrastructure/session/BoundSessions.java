@@ -56,17 +56,20 @@ public final class BoundSessions {
         SessionBinding seen = connection.binding();
         Session current = sessions.findById(seen.current());
         if (current != null) {
-            boolean alive = alive(current, connection, now);
+            boolean alive = alive(current, connection, now, true);
             if (alive && !seen.formers().isEmpty()) {
                 connection.settle(seen);
             }
             return alive;
         }
-        // AUTH-23 : renouvelée par une requête pas encore finie, la session garde un ancien identifiant.
+        // AUTH-23 : renouvelée par une requête pas encore finie, la session garde un ancien identifiant. Sa version du
+        // mot de passe n'y est pas jugée : la requête (ACC-01) a pu valider la nouvelle version avant d'écrire la
+        // session
+        // regravée ; elle le sera sous l'identifiant courant, une fois écrit (ADR 0044).
         for (String former : seen.formers()) {
             Session stored = sessions.findById(former);
             if (stored != null) {
-                return alive(stored, connection, now);
+                return alive(stored, connection, now, false);
             }
         }
         return false;
@@ -87,7 +90,7 @@ public final class BoundSessions {
             // Renouvellement en cours : rien n'est écrit sous l'ancien identifiant, que la requête va remplacer.
             return alive(connection);
         }
-        if (!alive(current, connection, now)) {
+        if (!alive(current, connection, now, true)) {
             return false;
         }
         if (!current.getLastAccessedTime().plus(EXTENSION_INTERVAL).isAfter(now)) {
@@ -97,14 +100,14 @@ public final class BoundSessions {
         return true;
     }
 
-    private boolean alive(@Nullable Session session, Connection connection, Instant now) {
+    private boolean alive(@Nullable Session session, Connection connection, Instant now, boolean judgeVersion) {
         return session != null
                 && now.isBefore(session.getLastAccessedTime().plus(session.getMaxInactiveInterval()))
                 && now.isBefore(session.getCreationTime().plus(absoluteTimeout))
                 // ADR 0023, ADR 0044 : la session garde la session complète du même compte, au mot de passe courant.
                 && FullSessions.storedPrincipal(session)
                         .filter(principal -> principal.userId().equals(connection.user()))
-                        .filter(versions::isCurrent)
+                        .filter(principal -> !judgeVersion || versions.isCurrent(principal))
                         .isPresent();
     }
 }

@@ -545,7 +545,8 @@ JSON :
 - `type` : nom de la trame, en minuscules et points (`msg.send`) ; `id` : 1 à 64 caractères `[A-Za-z0-9_-]`,
   choisi par l'émetteur de la trame ; `payload` : un objet, vide s'il est absent. Tout autre champ est refusé.
 - Le serveur répond à chaque trame du client au même `id` : `pong` à `ping` ; en cas de succès, l'accusé que nomme
-  le type (`ack` par défaut, `msg.ack` pour `msg.send`, ADR 0044), avec sa charge propre ; sinon `error`
+  le type (`ack` par défaut, sinon un nom en `.ack` comme `msg.ack` pour `msg.send`, ADR 0044), avec sa charge
+  propre ; sinon `error`
   (`{ "code", "retryAfter"? }`, code de la section 14.6 du CDC). Un type inconnu reçoit `error` `VALIDATION_FAILED`.
 - Une chaîne UTF-16 mal formée (surrogat isolé, permis par un échappement JSON) fait refuser la trame : fermeture 1008.
 - Limites (TRN-13, 15.2) : 64 Kio par trame, comptés en octets UTF-8 (au-delà, fermeture) ; 5 connexions par compte
