@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,9 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(SealWebSocketHandler.class);
     private static final String PING = "ping";
+    /** Types que le serveur émet lui-même : aucun gestionnaire ne peut en faire son accusé. */
+    private static final Set<String> RESERVED_REPLIES = Set.of(PING, "pong", "error", "session.revoked");
+
     private static final String CONNECTION = "seal.connection";
 
     private final WireFrames frames;
@@ -70,6 +74,10 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
         for (InboundFrameHandler handler : handlers) {
             if (handler.type().equals(PING) || this.handlers.putIfAbsent(handler.type(), handler) != null) {
                 throw new IllegalStateException("Deux gestionnaires pour la trame " + handler.type());
+            }
+            // ADR 0044 (décision 3) : l'accusé nommé par le gestionnaire suit le format des types, sans nom réservé.
+            if (RESERVED_REPLIES.contains(handler.replyType()) || !WireFrames.isType(handler.replyType())) {
+                throw new IllegalStateException("Accusé réservé ou mal formé pour la trame " + handler.type());
             }
         }
     }
@@ -136,19 +144,20 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
             return frames.frame("pong", frame.id(), frames.empty());
         }
         InboundFrameHandler handler = handlers.get(frame.type());
-        if (handler == null) {
-            return frames.error(frame.id(), ErrorCode.VALIDATION_FAILED.name());
-        }
-        // TRN-12, A10 : sur une session finie, aucune trame n'est traitée, sans attendre la ronde. AUTH-52, ADR 0043
-        // (point 4) : seule une action de l'utilisateur prolonge la session.
-        boolean alive = handler.userAction() ? sessions.userActed(connection) : sessions.alive(connection);
+        // TRN-12, A10, ADR 0044 : sur une session finie, aucune trame n'est traitée ni refusée pour son type, sans
+        // attendre la ronde. AUTH-52, ADR 0043 (point 4) : seule une action de l'utilisateur prolonge la session.
+        boolean alive =
+                handler != null && handler.userAction() ? sessions.userActed(connection) : sessions.alive(connection);
         if (!alive) {
             connection.close(CloseReason.SESSION_ENDED);
             return null;
         }
+        if (handler == null) {
+            return frames.error(frame.id(), ErrorCode.VALIDATION_FAILED.name());
+        }
         try {
             JsonNode result = handler.handle(connection.user(), frame.payload());
-            return frames.frame("ack", frame.id(), result);
+            return frames.frame(handler.replyType(), frame.id(), result);
         } catch (SealException refused) {
             return frames.error(frame.id(), refused.code().name());
         } catch (RuntimeException unexpected) {

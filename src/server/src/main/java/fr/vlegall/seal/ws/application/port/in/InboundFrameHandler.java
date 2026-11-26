@@ -13,6 +13,14 @@ public interface InboundFrameHandler {
     /** Nom de la trame traitée, tel qu'il circule (« msg.send »). */
     String type();
 
+    /**
+     * Type de la réponse en cas de succès (ADR 0044, décision 3) : {@code ack} par défaut, {@code msg.ack} pour
+     * {@code msg.send} (7.5 étape 8, MSG-27).
+     */
+    default String replyType() {
+        return "ack";
+    }
+
     /** La trame naît d'une action de l'utilisateur : elle prolonge la session (AUTH-52, ADR 0043 point 4). */
     boolean userAction();
 

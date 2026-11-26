@@ -544,16 +544,18 @@ JSON :
 
 - `type` : nom de la trame, en minuscules et points (`msg.send`) ; `id` : 1 à 64 caractères `[A-Za-z0-9_-]`,
   choisi par l'émetteur de la trame ; `payload` : un objet, vide s'il est absent. Tout autre champ est refusé.
-- Le serveur répond à chaque trame du client au même `id` : `pong` à `ping`, `ack` (charge propre au type) ou
-  `error` (`{ "code" }`, code de la section 14.6 du CDC). Un type inconnu reçoit `error` `VALIDATION_FAILED`.
+- Le serveur répond à chaque trame du client au même `id` : `pong` à `ping` ; en cas de succès, l'accusé que nomme
+  le type (`ack` par défaut, `msg.ack` pour `msg.send`, ADR 0044), avec sa charge propre ; sinon `error`
+  (`{ "code", "retryAfter"? }`, code de la section 14.6 du CDC). Un type inconnu reçoit `error` `VALIDATION_FAILED`.
+- Une chaîne UTF-16 mal formée (surrogat isolé, permis par un échappement JSON) fait refuser la trame : fermeture 1008.
 - Une trame de plus de 64 Kio, comptés en octets UTF-8, ferme la connexion (TRN-13).
 - La connexion est liée à sa session HTTP (TRN-12). Elle la suit quand la session change d'identifiant pour le même
   compte (ré-authentification, AUTH-23, AUTH-55) ; elle se ferme quand la session finit ou ne porte plus la session
   complète de ce compte.
 - Une trame née d'une action de l'utilisateur (`msg.send`, puis `read`) prolonge la session HTTP si son dernier accès
   date d'une minute au moins ; `ping` et les autres trames ne la prolongent jamais (AUTH-52, ADR 0043). Sur une
-  session finie, aucune trame autre que `ping` n'est traitée : le serveur envoie `session.revoked`, puis ferme en
-  4401.
+  session finie, aucune trame autre que `ping` n'est traitée ni refusée pour son type : le serveur envoie
+  `session.revoked`, puis ferme en 4401.
 - Les trames du serveur (`session.revoked`, puis les événements) portent un `id` qu'il choisit.
 
 Événements annoncés par le serveur, après validation de la transaction qui les cause, à toutes les connexions des

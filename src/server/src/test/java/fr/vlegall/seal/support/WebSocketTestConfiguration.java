@@ -29,6 +29,33 @@ public class WebSocketTestConfiguration {
         return echo(PEEK, false);
     }
 
+    /** ADR 0044 (décision 3) : un gestionnaire qui nomme son accusé, comme msg.send avec msg.ack. */
+    @Bean
+    InboundFrameHandler namedReplyFrameHandler() {
+        InboundFrameHandler echo = echo("test.named", true);
+        return new InboundFrameHandler() {
+            @Override
+            public String type() {
+                return echo.type();
+            }
+
+            @Override
+            public String replyType() {
+                return "test.done";
+            }
+
+            @Override
+            public boolean userAction() {
+                return true;
+            }
+
+            @Override
+            public JsonNode handle(UserId user, JsonNode payload) {
+                return echo.handle(user, payload);
+            }
+        };
+    }
+
     private static InboundFrameHandler echo(String type, boolean userAction) {
         return new InboundFrameHandler() {
             @Override

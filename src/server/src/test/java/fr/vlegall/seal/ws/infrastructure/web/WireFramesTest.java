@@ -57,6 +57,26 @@ class WireFramesTest {
         assertThat(frames.read(text)).isEmpty();
     }
 
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "{\"type\":\"ping\",\"id\":\"1\",\"payload\":{\"t\":\"\\ud800\"}}",
+                "{\"type\":\"ping\",\"id\":\"1\",\"payload\":{\"t\":\"a\\udc00b\"}}",
+                "{\"type\":\"ping\",\"id\":\"1\",\"payload\":{\"\\ud800\":1}}",
+                "{\"type\":\"ping\",\"id\":\"1\",\"payload\":{\"l\":[{\"t\":\"\\ud83d\"}]}}"
+            })
+    @DisplayName("TRN-14, A10, ADR 0044 : une chaîne UTF-16 mal formée (surrogat isolé) fait refuser la trame")
+    void trn14RefusesLoneSurrogates(String text) {
+        assertThat(frames.read(text)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("TRN-14 : une paire de surrogats bien formée passe")
+    void trn14AcceptsSurrogatePairs() {
+        assertThat(frames.read("{\"type\":\"ping\",\"id\":\"1\",\"payload\":{\"t\":\"\\ud83d\\ude00\"}}"))
+                .isPresent();
+    }
+
     @Test
     @DisplayName("TRN-14 : réponses ack, error et pong au même id")
     void trn14WritesResponses() {

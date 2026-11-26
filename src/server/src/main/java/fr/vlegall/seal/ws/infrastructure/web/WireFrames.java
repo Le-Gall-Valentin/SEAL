@@ -3,6 +3,8 @@ package fr.vlegall.seal.ws.infrastructure.web;
 import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.ws.application.FrameText;
 import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -57,7 +59,8 @@ public final class WireFrames {
                 || id == null
                 || !id.isString()
                 || !ID.matcher(id.asString()).matches()
-                || (payload != null && !payload.isObject())) {
+                || (payload != null && !payload.isObject())
+                || (payload != null && !wellFormed(payload))) {
             return Optional.empty();
         }
         return Optional.of(
@@ -85,8 +88,48 @@ public final class WireFrames {
                         .put("retryAfter", seconds));
     }
 
-    private static boolean isType(String type) {
+    /** TRN-14, ADR 0044 : un type de trame, pour les types reçus comme pour les accusés nommés. */
+    static boolean isType(String type) {
         return TYPE.matcher(type).matches() && !type.endsWith(".") && !type.contains("..");
+    }
+
+    /**
+     * A10, ADR 0044 : chaque nom et chaque chaîne de la charge est de l'UTF-16 bien formé. Un surrogat isolé, permis
+     * par un échappement JSON, ferait échouer l'écriture d'une réponse qui le reprend.
+     */
+    private static boolean wellFormed(JsonNode payload) {
+        Deque<JsonNode> pending = new ArrayDeque<>();
+        pending.push(payload);
+        while (!pending.isEmpty()) {
+            JsonNode node = pending.pop();
+            if (node.isString() && !wellFormed(node.asString())) {
+                return false;
+            }
+            if (node.isObject()) {
+                for (String name : node.propertyNames()) {
+                    if (!wellFormed(name)) {
+                        return false;
+                    }
+                }
+            }
+            node.values().forEach(pending::push);
+        }
+        return true;
+    }
+
+    private static boolean wellFormed(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (Character.isHighSurrogate(c)) {
+                if (i + 1 >= text.length() || !Character.isLowSurrogate(text.charAt(i + 1))) {
+                    return false;
+                }
+                i++;
+            } else if (Character.isLowSurrogate(c)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Un objet vide, charge de {@code pong}. */

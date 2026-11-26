@@ -161,4 +161,15 @@ class WebSocketFramesIT {
 
         assertThat(reply(connection).get("type").asString()).isEqualTo("ack");
     }
+
+    @Test
+    @DisplayName("TRN-14, MSG-27, ADR 0044 (décision 3) : un gestionnaire nomme son accusé ; ack reste le défaut")
+    void trn14HandlerNamesItsReply() throws Exception {
+        TestWebSocketClient.Connection connection = connect();
+
+        connection.send("{\"type\":\"test.named\",\"id\":\"n1\",\"payload\":{\"v\":1}}");
+        String reply = connection.next(WAIT);
+
+        assertThat(reply).isEqualTo("{\"type\":\"test.done\",\"id\":\"n1\",\"payload\":{\"v\":1}}");
+    }
 }

@@ -156,6 +156,17 @@ class SessionWatchIT {
     }
 
     @Test
+    @DisplayName("TRN-12, ADR 0044 : une trame de type inconnu après l'expiration reçoit session.revoked puis 4401")
+    void trn12UnknownFrameAfterExpiryEndsTheConnection() throws Exception {
+        TestWebSocketClient.Connection connection = connect(account.session);
+
+        clock.advance(Duration.ofMinutes(31));
+        connection.send("{\"type\":\"zz.inconnu\",\"id\":\"tard\",\"payload\":{}}");
+
+        expectRevokedThenClosed(connection);
+    }
+
+    @Test
     @DisplayName("AUTH-52, ADR 0043 : une trame sans action de l'utilisateur ne prolonge jamais la session")
     void auth52NonActionFrameNeverExtendsTheSession() throws Exception {
         TestWebSocketClient.Connection connection = connect(account.session);
