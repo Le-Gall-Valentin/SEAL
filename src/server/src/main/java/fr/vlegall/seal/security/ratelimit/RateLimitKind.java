@@ -14,8 +14,8 @@ public enum RateLimitKind {
     /** Utilisateur : recopié dans {@code security_events.user_id}. */
     USER,
     /**
-     * Connexion WebSocket (TRN-13) : identifiant tiré au hasard, jamais journalisé ; le compte de la connexion est
-     * recopié dans {@code security_events.user_id}.
+     * Connexion WebSocket (TRN-13) : seau propre à la connexion, hors de la table partagée ({@code RateLimiter.local}).
+     * Le compte est recopié dans {@code security_events.user_id}, un refus par compte et par période (ADR 0044).
      */
     CONNECTION
 }

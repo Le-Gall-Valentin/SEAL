@@ -399,6 +399,45 @@ class RateLimiterTest {
     }
 
     @Test
+    @DisplayName(
+            "TRN-13, A09, ADR 0044 (décision 9) : les refus de mille connexions d'un compte s'écrivent une fois par période")
+    void trn13ConnectionRefusalsAreJournaledOncePerAccountAndPeriod() {
+        UserId alice = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000001"));
+        UserId bob = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000002"));
+
+        for (int connection = 0; connection < 1_000; connection++) {
+            exhaust(limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, alice));
+        }
+        exhaust(limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, bob));
+        verify(journal, times(2)).recordStandalone(any());
+
+        clock.advance(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION.period());
+        exhaust(limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, alice));
+        verify(journal, times(3)).recordStandalone(any());
+    }
+
+    @Test
+    @DisplayName("TRN-13, A06 : la mémoire des refus par compte se vide une fois la période passée")
+    void trn13ConnectionJournalIsPurged() {
+        UserId alice = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000001"));
+        exhaust(limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, alice));
+        assertThat(limiter.connectionJournalSize()).isEqualTo(1);
+
+        clock.advance(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION.period());
+        limiter.purgeRefilledBuckets();
+
+        assertThat(limiter.connectionJournalSize()).isZero();
+    }
+
+    /** Prend toute la capacité d'un seau local, puis un jeton de plus, refusé. */
+    private static void exhaust(LocalRateLimit limit) {
+        for (int i = 0; i < RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION.capacity(); i++) {
+            limit.consume();
+        }
+        assertThat(refusal(limit::consume)).isNotNull();
+    }
+
+    @Test
     @DisplayName("TRN-13, A06 : des milliers de connexions ne remplissent pas la table partagée des autres limites")
     void trn13ConnectionsNeverFillTheSharedTable() {
         UserId user = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000001"));
