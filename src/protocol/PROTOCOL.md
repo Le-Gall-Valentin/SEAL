@@ -548,7 +548,12 @@ JSON :
   le type (`ack` par défaut, `msg.ack` pour `msg.send`, ADR 0044), avec sa charge propre ; sinon `error`
   (`{ "code", "retryAfter"? }`, code de la section 14.6 du CDC). Un type inconnu reçoit `error` `VALIDATION_FAILED`.
 - Une chaîne UTF-16 mal formée (surrogat isolé, permis par un échappement JSON) fait refuser la trame : fermeture 1008.
-- Une trame de plus de 64 Kio, comptés en octets UTF-8, ferme la connexion (TRN-13).
+- Limites (TRN-13, 15.2) : 64 Kio par trame, comptés en octets UTF-8 (au-delà, fermeture) ; 5 connexions par compte
+  (la sixième est fermée en 4429) ; 30 trames par 10 secondes et par connexion. La 31e reçoit
+  `error` `{ "code": "RATE_LIMITED", "retryAfter": n }`, `n` en secondes entières, au moins 1 ; la connexion reste.
+- Le client envoie `ping` à l'ouverture puis toutes les 25 secondes, et attend `pong` 10 secondes ; le serveur ferme
+  une connexion muette depuis 60 secondes (4408). Une erreur inattendue d'un gestionnaire rend `error`
+  `INTERNAL_ERROR`, sans détail.
 - La connexion est liée à sa session HTTP (TRN-12). Elle la suit quand la session change d'identifiant pour le même
   compte (ré-authentification, AUTH-23, AUTH-55) ; elle se ferme quand la session finit ou ne porte plus la session
   complète de ce compte.

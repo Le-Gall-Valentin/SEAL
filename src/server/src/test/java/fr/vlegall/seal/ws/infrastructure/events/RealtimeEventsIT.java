@@ -5,14 +5,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealServerTest;
 import fr.vlegall.seal.support.TestAccount;
 import fr.vlegall.seal.support.TestRelations;
 import fr.vlegall.seal.support.TestWebSocketClient;
+import fr.vlegall.seal.ws.application.port.in.NotifyUsersUseCase;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -43,6 +48,12 @@ class RealtimeEventsIT {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private NotifyUsersUseCase notify;
+
+    @Autowired
+    private PlatformTransactionManager transactions;
 
     private TestAccount alice;
     private TestAccount bob;
@@ -131,7 +142,7 @@ class RealtimeEventsIT {
     }
 
     @Test
-    @DisplayName("CNV-04, ADR 0043 : une requête refusée n'annonce rien")
+    @DisplayName("CNV-04, ADR 0043 : une requête refusée avant toute écriture n'annonce rien")
     void cnv04RefusedRequestAnnouncesNothing() throws Exception {
         UUID group = TestRelations.group(jdbc, alice.id, bob.id);
         TestWebSocketClient.Connection member = connect(bob);
@@ -142,5 +153,30 @@ class RealtimeEventsIT {
                 .andExpect(status().is4xxClientError());
 
         assertThat(member.next(QUIET)).isNull();
+    }
+
+    @Test
+    @DisplayName("ADR 0043, A10 : une annonce faite dans une transaction annulée ne part jamais ; validée, elle part")
+    void adr0043AnnouncementFollowsTheTransaction() throws Exception {
+        TestWebSocketClient.Connection connection = connect(alice);
+        Set<UserId> target = Set.of(new UserId(alice.id));
+        TransactionTemplate transaction = new TransactionTemplate(transactions);
+
+        transaction.executeWithoutResult(status -> {
+            notify.announce(
+                    target,
+                    "conv.update",
+                    JSON.createObjectNode()
+                            .put("conversationId", UUID.randomUUID().toString()));
+            status.setRollbackOnly();
+        });
+        assertThat(connection.next(QUIET)).as("rien après une annulation").isNull();
+
+        transaction.executeWithoutResult(status -> notify.announce(
+                target,
+                "conv.update",
+                JSON.createObjectNode().put("conversationId", UUID.randomUUID().toString())));
+        assertThat(next(connection, "conv.update").get("conversationId").asString())
+                .isNotBlank();
     }
 }

@@ -27,10 +27,14 @@ class FriendshipHandlersTest {
         assertThat(handler.unfriend(me.user(), friends.person("inconnu").user()))
                 .isFalse();
         assertThat(friends.events).isEmpty();
+        assertThat(friends.notified).as("un retrait refusé n'annonce rien").isEmpty();
 
         assertThat(handler.unfriend(friend.user(), me.user())).isTrue();
         assertThat(friends.friendships).isEmpty();
         assertThat(friends.events).containsExactly("removed");
+        assertThat(friends.notified)
+                .containsExactly(
+                        "relation:" + friend.user().value() + ":" + me.user().value());
     }
 
     @Test

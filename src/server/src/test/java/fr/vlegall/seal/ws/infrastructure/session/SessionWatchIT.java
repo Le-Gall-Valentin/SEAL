@@ -18,6 +18,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +38,7 @@ import tools.jackson.databind.json.JsonMapper;
 class SessionWatchIT {
 
     private static final Duration WAIT = Duration.ofSeconds(5);
+    private static final Pattern RESET_TOKEN = Pattern.compile("#jeton=([A-Za-z0-9_-]{43})");
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     @LocalServerPort
@@ -187,6 +190,47 @@ class SessionWatchIT {
         connection.send("{\"type\":\"test.echo\",\"id\":\"tard\",\"payload\":{}}");
 
         expectRevokedThenClosed(connection);
+    }
+
+    @Test
+    @DisplayName(
+            "ACC-01, TRN-12 : changer le mot de passe en fermant les autres sessions ferme leurs connexions ; la sienne suit")
+    void acc01PasswordChangeClosesTheOtherSessionsConnections() throws Exception {
+        Cookie other = secondSession();
+        TestWebSocketClient.Connection mine = connect(account.session);
+        TestWebSocketClient.Connection elsewhere = connect(other);
+
+        mvc.perform(account.unsafe(
+                        post("/api/v1/account/password"),
+                        Map.of("currentPassword", AuthClient.PASSWORD, "newPassword", "raquette-sous-la-neige-1")))
+                .andExpect(status().is2xxSuccessful());
+
+        expectRevokedThenClosed(elsewhere);
+        expectOpen(mine);
+    }
+
+    @Test
+    @DisplayName("AUTH-70, TRN-12 : une réinitialisation du mot de passe ferme toutes les connexions du compte")
+    void auth70PasswordResetClosesEveryConnection() throws Exception {
+        Cookie other = secondSession();
+        TestWebSocketClient.Connection one = connect(account.session);
+        TestWebSocketClient.Connection two = connect(other);
+        String email = account.username + "@exemple.ca";
+        mail.reset();
+        AuthClient anonymous = new AuthClient(mvc, mail);
+        mvc.perform(anonymous.unsafe(post("/api/v1/auth/password-reset/request"), null, Map.of("email", email)))
+                .andExpect(status().is2xxSuccessful());
+        Matcher link = RESET_TOKEN.matcher(mail.sentTo(email).getLast().getText());
+        assertThat(link.find()).as("lien de réinitialisation").isTrue();
+
+        mvc.perform(anonymous.unsafe(
+                        post("/api/v1/auth/password-reset/confirm"),
+                        null,
+                        Map.of("token", link.group(1), "password", "phrase-de-la-reinitialisation")))
+                .andExpect(status().is2xxSuccessful());
+
+        expectRevokedThenClosed(one);
+        expectRevokedThenClosed(two);
     }
 
     @Test

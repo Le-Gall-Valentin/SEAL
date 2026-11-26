@@ -80,7 +80,8 @@ class GroupMembershipHandlersTest {
     void grp03RenameIsAnnouncedToMembers() {
         store.notified.clear();
 
-        assertThatThrownBy(() -> rename.rename(member, group, "Autre"));
+        assertThatThrownBy(() -> rename.rename(member, group, "Autre"))
+                .isInstanceOf(ConversationException.Forbidden.class);
         rename.rename(admin, group, "Autre");
 
         assertThat(store.notified).containsExactly(new InMemoryConversations.Notified(group, Set.of(admin, member)));

@@ -9,6 +9,8 @@ import fr.vlegall.seal.support.TestAccount;
 import fr.vlegall.seal.support.TestWebSocketClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.web.servlet.MockMvc;
@@ -65,6 +67,26 @@ class WebSocketHandshakeIT {
                 .isEqualTo(403);
         assertThat(ws().handshakeStatus(account.session, "http://localhost:8443"))
                 .isEqualTo(403);
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "null",
+                "https://localhost:8443.evil.example",
+                "HTTPS://LOCALHOST:8443",
+                "https://LOCALHOST:8443",
+                "https://localhost:8443/",
+                "https://localhost",
+                "https://127.0.0.1:8443",
+                ""
+            })
+    @DisplayName(
+            "TRN-11, 16.1 : une origine nulle, suffixée, en majuscules, avec chemin ou autre hôte est refusée en 403")
+    void trn11OriginVariantsAreRefused(String origin) throws Exception {
+        TestAccount account = TestAccount.fresh(mvc, mail, "ws");
+
+        assertThat(ws().handshakeStatus(account.session, origin)).isEqualTo(403);
     }
 
     @Test
