@@ -50,6 +50,7 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
     private final RateLimiter limiter;
     private final BoundSessions sessions;
     private final Clock clock;
+    private final ConnectionCloser closer;
     private final Map<String, InboundFrameHandler> handlers = new HashMap<>();
 
     public SealWebSocketHandler(
@@ -58,12 +59,14 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
             RateLimiter limiter,
             BoundSessions sessions,
             Clock clock,
+            ConnectionCloser closer,
             List<InboundFrameHandler> handlers) {
         this.frames = frames;
         this.registry = registry;
         this.limiter = limiter;
         this.sessions = sessions;
         this.clock = clock;
+        this.closer = closer;
         for (InboundFrameHandler handler : handlers) {
             if (handler.type().equals(PING) || this.handlers.putIfAbsent(handler.type(), handler) != null) {
                 throw new IllegalStateException("Deux gestionnaires pour la trame " + handler.type());
@@ -79,8 +82,12 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
         session.setBinaryMessageSizeLimit(MAX_FRAME_BYTES);
         UserId user = (UserId) session.getAttributes().get(FullSessionHandshakeInterceptor.USER);
         // TRN-13, A06 : le seau des trames appartient à la connexion, hors de la table partagée du limiteur.
-        WebSocketConnection connection = new WebSocketConnection(
-                session, limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, user), frames, clock.instant());
+        WebSocketConnection connection = WebSocketConnection.of(
+                session,
+                limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, user),
+                frames,
+                clock.instant(),
+                closer);
         session.getAttributes().put(CONNECTION, connection);
         if (!registry.open(connection)) {
             connection.close(CloseReason.TOO_MANY_CONNECTIONS);

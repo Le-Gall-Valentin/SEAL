@@ -12,7 +12,6 @@ import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
 import fr.vlegall.seal.ws.domain.model.FakeConnection;
 import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -28,14 +27,9 @@ class SessionWatchTest {
 
     private final MutableClock clock = MutableClock.followingSystem();
     private final ConnectionRegistry registry = new ConnectionRegistry();
-    private final List<Runnable> dispatched = new ArrayList<>();
     private final SessionWatch watch = new SessionWatch(
             registry,
             new BoundSessions(new MapSessionRepository(new ConcurrentHashMap<>()), clock, Duration.ofHours(12)),
-            task -> {
-                dispatched.add(task);
-                task.run();
-            },
             clock);
 
     private FakeConnection open(UserId user, String sessionId) {
@@ -71,7 +65,7 @@ class SessionWatchTest {
     }
 
     @Test
-    @DisplayName("TRN-12, A10 : une fermeture en échec n'empêche pas les autres, et part de l'exécuteur")
+    @DisplayName("TRN-12, A10 : une fermeture en échec n'empêche pas les autres")
     void a10FailingCloseIsIsolated() {
         assertThat(registry.open(FakeConnection.failing(USER, "finie", clock.instant())))
                 .isTrue();
@@ -80,7 +74,6 @@ class SessionWatchTest {
         assertThatNoException().isThrownBy(() -> watch.ended(new SessionsEndedEvent(Set.of("finie"))));
 
         assertThat(other.closed()).contains(CloseReason.SESSION_ENDED);
-        assertThat(dispatched).hasSize(2);
     }
 
     @Test

@@ -5,7 +5,6 @@ import fr.vlegall.seal.security.session.SessionsEndedEvent;
 import fr.vlegall.seal.ws.domain.model.CloseReason;
 import fr.vlegall.seal.ws.domain.model.Connection;
 import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
-import fr.vlegall.seal.ws.domain.port.out.FrameDispatcher;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,13 +29,11 @@ public class SessionWatch {
 
     private final ConnectionRegistry registry;
     private final BoundSessions sessions;
-    private final FrameDispatcher dispatcher;
     private final Clock clock;
 
-    public SessionWatch(ConnectionRegistry registry, BoundSessions sessions, FrameDispatcher dispatcher, Clock clock) {
+    public SessionWatch(ConnectionRegistry registry, BoundSessions sessions, Clock clock) {
         this.registry = registry;
         this.sessions = sessions;
-        this.dispatcher = dispatcher;
         this.clock = clock;
     }
 
@@ -75,16 +72,16 @@ public class SessionWatch {
         }
     }
 
-    /** ADR 0044 (décision 10) : la fermeture, qui envoie une trame, part de l'exécuteur. */
+    /**
+     * ADR 0044 (décision 10) : la fermeture est demandée aussitôt, sur ce fil, et n'attend pas le client ; dès cet
+     * instant, la connexion ne reçoit plus aucune trame. Un échec reste propre à sa connexion.
+     */
     private void close(Connection connection, CloseReason reason) {
-        dispatcher.dispatch(() -> {
-            try {
-                connection.close(reason);
-            } catch (RuntimeException failed) {
-                LOG.debug(
-                        "Fermeture d'une WebSocket en échec ({})",
-                        failed.getClass().getSimpleName());
-            }
-        });
+        try {
+            connection.close(reason);
+        } catch (RuntimeException failed) {
+            LOG.debug(
+                    "Fermeture d'une WebSocket en échec ({})", failed.getClass().getSimpleName());
+        }
     }
 }

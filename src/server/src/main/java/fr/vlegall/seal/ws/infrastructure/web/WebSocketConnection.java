@@ -5,52 +5,94 @@ import fr.vlegall.seal.security.ratelimit.LocalRateLimit;
 import fr.vlegall.seal.ws.domain.model.CloseReason;
 import fr.vlegall.seal.ws.domain.model.Connection;
 import fr.vlegall.seal.ws.domain.model.SessionBinding;
-import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.socket.CloseStatus;
-import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.adapter.NativeWebSocketSession;
-import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 
 /**
- * Une connexion de {@code /ws}, sûre entre fils d'exécution : les réponses et les trames d'événements (tâche 5) partent
- * de fils différents. Un envoi lent au-delà de 10 secondes, ou qui accumule plus de 512 Kio, ferme la connexion.
+ * Une connexion de {@code /ws}, sûre entre fils d'exécution (TRN-13, ADR 0044, décision 10). Chaque trame entre dans la
+ * file d'envoi de la connexion et en sort par une écriture asynchrone, une à la fois : aucun appelant n'attend le
+ * client. Plus de 512 Kio en attente, ou une écriture refusée ou trop lente (10 s), ferment la connexion en 1011. Une
+ * fois la fermeture demandée, plus rien n'entre dans la file.
  */
 final class WebSocketConnection implements Connection {
 
-    private static final Logger LOG = LoggerFactory.getLogger(WebSocketConnection.class);
-    private static final int SEND_TIME_LIMIT_MS = 10_000;
-    private static final int BUFFER_SIZE_LIMIT = 512 * 1024;
-    /** ADR 0044 (décision 10) : un envoi bloqué abandonne au bout de 10 s, comme le décorateur (Tomcat : 20 s). */
-    static final String BLOCKING_SEND_TIMEOUT = "org.apache.tomcat.websocket.BLOCKING_SEND_TIMEOUT";
-    /** TRN-12 : attente au plus de la remise de session.revoked avant la fermeture. */
-    private static final long REVOKED_FLUSH_WAIT_MS = 2_000;
+    /** TRN-13, ADR 0044 : octets UTF-8 au plus en attente d'écriture. */
+    static final long BUFFER_SIZE_LIMIT = 512 * 1024;
 
-    private final ConcurrentWebSocketSessionDecorator session;
+    private static final Logger LOG = LoggerFactory.getLogger(WebSocketConnection.class);
+    /** Vrai sur le fil qui vide la file : une écriture qui finit aussitôt n'y rappelle pas {@link #drain()}. */
+    private static final ThreadLocal<Boolean> DRAINING = ThreadLocal.withInitial(() -> false);
+
+    private record Pending(String text, long bytes) {}
+
+    private final FrameSocket socket;
+    private final String id;
     private final UserId user;
     private final LocalRateLimit frameLimit;
     private final WireFrames frames;
+    private final Executor closer;
     private final AtomicReference<SessionBinding> binding;
+    private final Queue<Pending> outbox = new ConcurrentLinkedQueue<>();
+    private final AtomicLong queuedBytes = new AtomicLong();
+    private final AtomicBoolean writing = new AtomicBoolean();
+    private final AtomicReference<@Nullable CloseStatus> closing = new AtomicReference<>();
+    private final AtomicBoolean closed = new AtomicBoolean();
     private volatile Instant lastHeardAt;
 
-    WebSocketConnection(WebSocketSession session, LocalRateLimit frameLimit, WireFrames frames, Instant openedAt) {
+    WebSocketConnection(
+            FrameSocket socket,
+            String id,
+            UserId user,
+            String sessionId,
+            LocalRateLimit frameLimit,
+            WireFrames frames,
+            Instant openedAt,
+            Executor closer) {
+        this.socket = socket;
+        this.id = id;
+        this.user = user;
         this.frameLimit = frameLimit;
         this.frames = frames;
+        this.closer = closer;
+        this.binding = new AtomicReference<>(SessionBinding.of(sessionId));
         this.lastHeardAt = openedAt;
-        if (session instanceof NativeWebSocketSession nativeSession
-                && nativeSession.getNativeSession() instanceof jakarta.websocket.Session endpoint) {
-            endpoint.getUserProperties().put(BLOCKING_SEND_TIMEOUT, (long) SEND_TIME_LIMIT_MS);
-        }
-        this.session = new ConcurrentWebSocketSessionDecorator(session, SEND_TIME_LIMIT_MS, BUFFER_SIZE_LIMIT);
-        this.user = (UserId) session.getAttributes().get(FullSessionHandshakeInterceptor.USER);
-        this.binding = new AtomicReference<>(
-                SessionBinding.of((String) session.getAttributes().get(FullSessionHandshakeInterceptor.SESSION)));
+    }
+
+    WebSocketConnection(
+            FrameSocket socket,
+            UserId user,
+            String sessionId,
+            LocalRateLimit frameLimit,
+            WireFrames frames,
+            Instant openedAt,
+            Executor closer) {
+        this(socket, UUID.randomUUID().toString(), user, sessionId, frameLimit, frames, openedAt, closer);
+    }
+
+    /** La connexion d'une session ouverte par {@link FullSessionHandshakeInterceptor}. */
+    static WebSocketConnection of(
+            WebSocketSession session, LocalRateLimit frameLimit, WireFrames frames, Instant openedAt, Executor closer) {
+        return new WebSocketConnection(
+                new AsyncFrameSocket(session),
+                session.getId(),
+                (UserId) session.getAttributes().get(FullSessionHandshakeInterceptor.USER),
+                (String) session.getAttributes().get(FullSessionHandshakeInterceptor.SESSION),
+                frameLimit,
+                frames,
+                openedAt,
+                closer);
     }
 
     /** TRN-13 : seau des trames de cette connexion, libéré avec elle. */
@@ -60,7 +102,7 @@ final class WebSocketConnection implements Connection {
 
     @Override
     public String id() {
-        return session.getId();
+        return id;
     }
 
     @Override
@@ -95,58 +137,90 @@ final class WebSocketConnection implements Connection {
 
     @Override
     public void send(String text) {
-        try {
-            session.sendMessage(new TextMessage(text));
-        } catch (IOException | RuntimeException failed) {
-            // TRN-13, ADR 0044 (décision 10) : un client trop lent (plus de 10 s ou de 512 Kio en attente) ou un envoi
-            // impossible ferme la connexion en 1011 ; l'échec ne remonte jamais à l'appelant.
-            LOG.debug(
-                    "Trame non envoyée ({}) : connexion fermée",
-                    failed.getClass().getSimpleName());
-            abort();
+        if (closing.get() != null || closed.get()) {
+            return;
         }
+        long bytes = text.getBytes(StandardCharsets.UTF_8).length;
+        if (queuedBytes.addAndGet(bytes) > BUFFER_SIZE_LIMIT) {
+            LOG.debug("File d'envoi pleine : connexion fermée");
+            finish(CloseStatus.SERVER_ERROR);
+            return;
+        }
+        outbox.add(new Pending(text, bytes));
+        drain();
     }
 
     @Override
     public void close(CloseReason reason) {
-        if (reason == CloseReason.SESSION_ENDED) {
-            // TRN-12 : session.revoked, puis 4401 ; l'identifiant d'une trame du serveur est choisi par lui.
+        if (reason == CloseReason.SESSION_ENDED && closing.get() == null && !closed.get()) {
+            // TRN-12 : session.revoked, puis 4401 une fois la trame écrite ; l'identifiant d'une trame du serveur est
+            // choisi par lui.
             send(frames.frame("session.revoked", UUID.randomUUID().toString(), frames.empty()));
-            awaitFlush();
         }
-        closeWith(new CloseStatus(reason.code()));
+        if (closing.compareAndSet(null, new CloseStatus(reason.code()))) {
+            drain();
+        }
     }
 
-    /**
-     * TRN-12 : si un autre fil vide le tampon, la fermeture l'interromprait avant session.revoked ; on attend qu'il
-     * soit vide, 2 secondes au plus.
-     */
-    private void awaitFlush() {
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(REVOKED_FLUSH_WAIT_MS);
-        while ((session.getBufferSize() > 0 || session.getTimeSinceSendStarted() > 0) && System.nanoTime() < deadline) {
-            try {
-                Thread.sleep(5);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                return;
+    /** Fermeture immédiate, sans vider la file : trame illisible (1008) ou trop grande (1009). */
+    void closeWith(CloseStatus status) {
+        finish(status);
+    }
+
+    /** Écrit les trames en attente, une à la fois, puis ferme si la fermeture est demandée et la file vide. */
+    private void drain() {
+        boolean outer = !DRAINING.get();
+        DRAINING.set(true);
+        try {
+            while (!closed.get() && writing.compareAndSet(false, true)) {
+                Pending next = outbox.poll();
+                if (next == null) {
+                    writing.set(false);
+                    if (!outbox.isEmpty()) {
+                        continue;
+                    }
+                    CloseStatus status = closing.get();
+                    if (status != null) {
+                        finish(status);
+                    }
+                    return;
+                }
+                queuedBytes.addAndGet(-next.bytes());
+                write(next.text());
+            }
+        } finally {
+            if (outer) {
+                DRAINING.remove();
             }
         }
     }
 
-    /** 1011, sur la session elle-même : le décorateur remplacerait le code après un dépassement de ses limites. */
-    private void abort() {
+    private void write(String text) {
         try {
-            session.getDelegate().close(CloseStatus.SERVER_ERROR);
-        } catch (IOException | RuntimeException gone) {
-            LOG.debug("Connexion déjà fermée", gone);
+            socket.sendText(text, written -> {
+                writing.set(false);
+                if (!written) {
+                    LOG.debug("Trame non écrite : connexion fermée");
+                    finish(CloseStatus.SERVER_ERROR);
+                } else if (!DRAINING.get()) {
+                    drain();
+                }
+            });
+        } catch (RuntimeException failed) {
+            // A10 : une socket déjà fermée ou un encodage impossible ne remontent jamais à l'appelant.
+            LOG.debug(
+                    "Trame non écrite ({}) : connexion fermée",
+                    failed.getClass().getSimpleName());
+            writing.set(false);
+            finish(CloseStatus.SERVER_ERROR);
         }
     }
 
-    void closeWith(CloseStatus status) {
-        try {
-            session.close(status);
-        } catch (IOException | RuntimeException gone) {
-            LOG.debug("Connexion déjà fermée", gone);
+    /** Ferme une seule fois, hors du fil appelant : la trame de fermeture s'écrit de façon bloquante. */
+    private void finish(CloseStatus status) {
+        if (closed.compareAndSet(false, true)) {
+            outbox.clear();
+            closer.execute(() -> socket.close(status));
         }
     }
 }

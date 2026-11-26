@@ -7,8 +7,6 @@ import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
 import fr.vlegall.seal.ws.domain.model.FakeConnection;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -28,11 +26,7 @@ class NotifyUsersHandlerTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final ConnectionRegistry registry = new ConnectionRegistry();
-    private final List<Runnable> dispatched = new ArrayList<>();
-    private final NotifyUsersHandler handler = new NotifyUsersHandler(registry, task -> {
-        dispatched.add(task);
-        task.run();
-    });
+    private final NotifyUsersHandler handler = new NotifyUsersHandler(registry);
     private final FakeConnection alicePhone = open(ALICE, "a1");
     private final FakeConnection aliceLaptop = open(ALICE, "a2");
     private final FakeConnection bob = open(BOB, "b1");
@@ -64,14 +58,6 @@ class NotifyUsersHandlerTest {
         assertThat(frame.get("type").asString()).isEqualTo("friend.request");
         assertThat(frame.get("id").asString()).matches("[A-Za-z0-9_-]{1,64}");
         assertThat(frame.get("payload")).isEqualTo(payload);
-    }
-
-    @Test
-    @DisplayName("TRN-13, ADR 0044 (décision 10) : chaque envoi part de l'exécuteur, une tâche par connexion")
-    void trn13EachSendIsDispatchedOnItsOwn() {
-        handler.announce(Set.of(ALICE, BOB), "friend.update", payload);
-
-        assertThat(dispatched).hasSize(3);
     }
 
     @Test
