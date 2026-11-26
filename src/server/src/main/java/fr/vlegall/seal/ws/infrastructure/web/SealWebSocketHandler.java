@@ -4,9 +4,14 @@ import fr.vlegall.seal.common.ErrorCode;
 import fr.vlegall.seal.common.SealException;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.logging.LogValues;
+import fr.vlegall.seal.security.ratelimit.RateLimit;
+import fr.vlegall.seal.security.ratelimit.RateLimitExceededException;
+import fr.vlegall.seal.security.ratelimit.RateLimiter;
 import fr.vlegall.seal.ws.application.port.in.InboundFrameHandler;
-import java.io.IOException;
+import fr.vlegall.seal.ws.domain.model.CloseReason;
+import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +29,8 @@ import tools.jackson.databind.JsonNode;
 /**
  * TRN-10, TRN-14 : point d'accès {@code /ws}, WebSocket brute en trames texte JSON, sans STOMP. Chaque trame reçoit une
  * réponse au même {@code id} : {@code pong} à {@code ping}, {@code ack} ou {@code error}. Une trame illisible ou
- * binaire ferme la connexion (1008), une trame de plus de 64 Kio aussi (1009, TRN-13).
+ * binaire ferme la connexion (1008), une trame de plus de 64 Kio aussi (1009). TRN-13 : 5 connexions par compte
+ * (4429 au-delà) et 30 trames par 10 secondes et par connexion.
  */
 @Component
 public final class SealWebSocketHandler extends TextWebSocketHandler {
@@ -34,12 +40,18 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(SealWebSocketHandler.class);
     private static final String PING = "ping";
+    private static final String CONNECTION = "seal.connection";
 
     private final WireFrames frames;
+    private final ConnectionRegistry registry;
+    private final RateLimiter limiter;
     private final Map<String, InboundFrameHandler> handlers = new HashMap<>();
 
-    public SealWebSocketHandler(WireFrames frames, List<InboundFrameHandler> handlers) {
+    public SealWebSocketHandler(
+            WireFrames frames, ConnectionRegistry registry, RateLimiter limiter, List<InboundFrameHandler> handlers) {
         this.frames = frames;
+        this.registry = registry;
+        this.limiter = limiter;
         for (InboundFrameHandler handler : handlers) {
             if (handler.type().equals(PING) || this.handlers.putIfAbsent(handler.type(), handler) != null) {
                 throw new IllegalStateException("Deux gestionnaires pour la trame " + handler.type());
@@ -53,44 +65,58 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
         // compte la trame texte en caractères : handleTextMessage recompte en octets UTF-8.
         session.setTextMessageSizeLimit(MAX_FRAME_BYTES);
         session.setBinaryMessageSizeLimit(MAX_FRAME_BYTES);
+        UserId user = (UserId) session.getAttributes().get(FullSessionHandshakeInterceptor.USER);
+        // TRN-13, A06 : le seau des trames appartient à la connexion, hors de la table partagée du limiteur.
+        WebSocketConnection connection =
+                new WebSocketConnection(session, limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, user));
+        session.getAttributes().put(CONNECTION, connection);
+        if (!registry.open(connection)) {
+            connection.close(CloseReason.TOO_MANY_CONNECTIONS);
+        }
     }
 
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws IOException {
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        registry.close(connection(session));
+    }
+
+    @Override
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+        WebSocketConnection connection = connection(session);
         if (message.getPayload().getBytes(StandardCharsets.UTF_8).length > MAX_FRAME_BYTES) {
-            session.close(CloseStatus.TOO_BIG_TO_PROCESS);
+            connection.closeWith(CloseStatus.TOO_BIG_TO_PROCESS);
             return;
         }
         Optional<WireFrame> read = frames.read(message.getPayload());
         if (read.isEmpty()) {
-            session.close(CloseStatus.POLICY_VIOLATION);
+            connection.closeWith(CloseStatus.POLICY_VIOLATION);
             return;
         }
         WireFrame frame = read.get();
-        if (frame.type().equals(PING)) {
-            send(session, frames.frame("pong", frame.id(), frames.empty()));
+        try {
+            connection.frameLimit().consume();
+        } catch (RateLimitExceededException limited) {
+            connection.send(frames.rateLimited(frame.id(), limited.retryAfter().orElse(Duration.ofSeconds(1))));
             return;
         }
-        InboundFrameHandler handler = handlers.get(frame.type());
-        if (handler == null) {
-            send(session, frames.error(frame.id(), ErrorCode.VALIDATION_FAILED.name()));
-            return;
-        }
-        send(session, answer(handler, user(session), frame));
+        connection.send(answer(connection, frame));
     }
 
     @Override
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
-        try {
-            session.close(CloseStatus.POLICY_VIOLATION);
-        } catch (IOException alreadyGone) {
-            LOG.debug("Connexion déjà fermée", alreadyGone);
-        }
+        connection(session).closeWith(CloseStatus.POLICY_VIOLATION);
     }
 
-    private String answer(InboundFrameHandler handler, UserId user, WireFrame frame) {
+    private String answer(WebSocketConnection connection, WireFrame frame) {
+        if (frame.type().equals(PING)) {
+            return frames.frame("pong", frame.id(), frames.empty());
+        }
+        InboundFrameHandler handler = handlers.get(frame.type());
+        if (handler == null) {
+            return frames.error(frame.id(), ErrorCode.VALIDATION_FAILED.name());
+        }
         try {
-            JsonNode result = handler.handle(user, frame.payload());
+            JsonNode result = handler.handle(connection.user(), frame.payload());
             return frames.frame("ack", frame.id(), result);
         } catch (SealException refused) {
             return frames.error(frame.id(), refused.code().name());
@@ -101,11 +127,7 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private static UserId user(WebSocketSession session) {
-        return (UserId) session.getAttributes().get(FullSessionHandshakeInterceptor.USER);
-    }
-
-    private static void send(WebSocketSession session, String text) throws IOException {
-        session.sendMessage(new TextMessage(text));
+    private static WebSocketConnection connection(WebSocketSession session) {
+        return (WebSocketConnection) session.getAttributes().get(CONNECTION);
     }
 }

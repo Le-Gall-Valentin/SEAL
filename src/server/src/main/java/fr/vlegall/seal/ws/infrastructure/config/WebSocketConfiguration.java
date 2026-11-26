@@ -1,8 +1,10 @@
 package fr.vlegall.seal.ws.infrastructure.config;
 
 import fr.vlegall.seal.common.SealProperties;
+import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
 import fr.vlegall.seal.ws.infrastructure.web.FullSessionHandshakeInterceptor;
 import fr.vlegall.seal.ws.infrastructure.web.SealWebSocketHandler;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -25,6 +27,12 @@ public class WebSocketConfiguration implements WebSocketConfigurer {
         this.properties = properties;
         this.handler = handler;
         this.interceptor = interceptor;
+    }
+
+    /** TRN-12, TRN-13 : connexions ouvertes, modèle du domaine sans Spring ; statique, hors du cycle avec le handler. */
+    @Bean
+    static ConnectionRegistry connectionRegistry() {
+        return new ConnectionRegistry();
     }
 
     @Override

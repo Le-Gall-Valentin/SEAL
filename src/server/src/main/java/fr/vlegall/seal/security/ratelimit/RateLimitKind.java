@@ -12,5 +12,10 @@ public enum RateLimitKind {
     /** Courriel saisi : masqué s'il en a la forme, {@code ***} sinon. */
     EMAIL,
     /** Utilisateur : recopié dans {@code security_events.user_id}. */
-    USER
+    USER,
+    /**
+     * Connexion WebSocket (TRN-13) : identifiant tiré au hasard, jamais journalisé ; le compte de la connexion est
+     * recopié dans {@code security_events.user_id}.
+     */
+    CONNECTION
 }

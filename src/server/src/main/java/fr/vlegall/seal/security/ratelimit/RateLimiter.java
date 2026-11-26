@@ -102,6 +102,25 @@ public final class RateLimiter {
         consume(limit, user.value().toString(), user);
     }
 
+    /**
+     * TRN-13, A06 : seau propre à une connexion WebSocket, hors de la table partagée. Il meurt avec la connexion : un
+     * va-et-vient de connexions ne peut pas remplir la table des autres limites. Un refus s'écrit au même journal,
+     * rattaché au compte.
+     */
+    public LocalRateLimit local(RateLimit limit, UserId user) {
+        if (limit.kind() != RateLimitKind.CONNECTION) {
+            throw new IllegalArgumentException("Limite sans seau local : " + limit + " (" + limit.kind() + ")");
+        }
+        Tracked tracked = track(limit);
+        return () -> {
+            requireNoTransaction();
+            ConsumptionProbe probe = tracked.bucket().tryConsumeAndReturnRemaining(1);
+            if (!probe.isConsumed()) {
+                refuse(limit, "", user, tracked, probe.getNanosToWaitForRefill());
+            }
+        };
+    }
+
     /** Rend un jeton réservé par {@link #consume(RateLimit, String)}, sans dépasser la capacité ; ne crée aucun seau. */
     public void refund(RateLimit limit, String key) {
         requireKind(limit, false);
@@ -218,7 +237,7 @@ public final class RateLimiter {
             // au mauvais endroit (ADR 0021, mise à jour). La limite reste lisible par son nom.
             case ENTERED -> null;
             case EMAIL -> LogValues.email(key);
-            case USER -> null;
+            case USER, CONNECTION -> null;
         };
     }
 
@@ -227,7 +246,7 @@ public final class RateLimiter {
     }
 
     private static void requireKind(RateLimit limit, boolean user) {
-        if ((limit.kind() == RateLimitKind.USER) != user) {
+        if ((limit.kind() == RateLimitKind.USER) != user || limit.kind() == RateLimitKind.CONNECTION) {
             throw new IllegalArgumentException("Clé incompatible avec la limite " + limit + " (" + limit.kind() + ")");
         }
     }

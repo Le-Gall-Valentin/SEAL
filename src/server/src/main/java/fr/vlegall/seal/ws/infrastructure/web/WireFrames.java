@@ -1,5 +1,7 @@
 package fr.vlegall.seal.ws.infrastructure.web;
 
+import fr.vlegall.seal.common.ErrorCode;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -73,6 +75,17 @@ public final class WireFrames {
     /** {@code error} au même {@code id}, avec un code de la section 14.6. */
     public String error(String id, String code) {
         return frame("error", id, json.createObjectNode().put("code", code));
+    }
+
+    /** TRN-13 : {@code error} {@code RATE_LIMITED}, avec le délai en secondes avant la prochaine trame permise. */
+    public String rateLimited(String id, Duration retryAfter) {
+        long seconds = Math.max(1, (retryAfter.toMillis() + 999) / 1000);
+        return frame(
+                "error",
+                id,
+                json.createObjectNode()
+                        .put("code", ErrorCode.RATE_LIMITED.name())
+                        .put("retryAfter", seconds));
     }
 
     private static boolean isType(String type) {
