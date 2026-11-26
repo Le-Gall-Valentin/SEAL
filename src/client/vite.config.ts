@@ -15,6 +15,8 @@ const https =
 
 // Spring Boot lancé par ./mvnw spring-boot:test-run depuis src/server.
 const springBoot = 'https://localhost:8443'
+// Origine du serveur de développement, celle que le navigateur envoie dans l'en-tête Origin.
+const devOrigin = 'https://localhost:5173'
 
 export default defineConfig({
   // ADR 0016 : Tailwind produit une feuille statique au build, compatible avec style-src 'self' (TRN-21).
@@ -39,7 +41,20 @@ export default defineConfig({
     // l'autorité mkcert installée dans le système. La CSP stricte s'applique au build de production.
     proxy: {
       '/api': { target: springBoot, secure: false },
-      '/ws': { target: springBoot, ws: true, secure: false },
+      // ADR 0044 (décision 4) : le serveur n'admet qu'une origine (TRN-02, TRN-11) ; le relais réécrit celle du
+      // serveur de développement, et elle seule, en celle de SEAL.
+      '/ws': {
+        target: springBoot,
+        ws: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('proxyReqWs', (proxyReq, req) => {
+            if (req.headers.origin === devOrigin) {
+              proxyReq.setHeader('Origin', springBoot)
+            }
+          })
+        },
+      },
     },
   },
 })
