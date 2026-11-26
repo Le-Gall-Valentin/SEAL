@@ -46,8 +46,22 @@ public final class FullSessions {
 
     /** TRN-12 : le compte de la session complète que garde cette session, lue hors de toute requête ; vide sinon. */
     public static Optional<UserId> storedUser(Session session) {
-        Object context = session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
-        return context instanceof SecurityContext stored ? user(stored.getAuthentication()) : Optional.empty();
+        return storedPrincipal(session).map(SealPrincipal::userId);
+    }
+
+    /** TRN-12, ADR 0044 : le principal de la session complète que garde cette session, version du mot de passe comprise. */
+    public static Optional<SealPrincipal> storedPrincipal(Session session) {
+        if (!(session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)
+                instanceof SecurityContext stored)) {
+            return Optional.empty();
+        }
+        Authentication authentication = stored.getAuthentication();
+        if (authentication == null
+                || user(authentication).isEmpty()
+                || !(authentication.getPrincipal() instanceof SealPrincipal principal)) {
+            return Optional.empty();
+        }
+        return Optional.of(principal);
     }
 
     /** Le compte de la session complète gardée par la session de la requête ; vide sinon. */

@@ -1,6 +1,7 @@
 package fr.vlegall.seal.ws.infrastructure.session;
 
 import fr.vlegall.seal.common.SealProperties;
+import fr.vlegall.seal.security.session.CredentialVersions;
 import fr.vlegall.seal.security.session.FullSessions;
 import fr.vlegall.seal.ws.domain.model.Connection;
 import fr.vlegall.seal.ws.domain.model.SessionBinding;
@@ -27,16 +28,26 @@ public final class BoundSessions {
     private final SessionRepository<? extends Session> sessions;
     private final Clock clock;
     private final Duration absoluteTimeout;
+    private final CredentialVersions versions;
 
-    BoundSessions(SessionRepository<? extends Session> sessions, Clock clock, Duration absoluteTimeout) {
+    BoundSessions(
+            SessionRepository<? extends Session> sessions,
+            Clock clock,
+            Duration absoluteTimeout,
+            CredentialVersions versions) {
         this.sessions = sessions;
         this.clock = clock;
         this.absoluteTimeout = absoluteTimeout;
+        this.versions = versions;
     }
 
     @Autowired
-    public BoundSessions(SessionRepository<? extends Session> sessions, Clock clock, SealProperties properties) {
-        this(sessions, clock, properties.session().absoluteTimeout());
+    public BoundSessions(
+            SessionRepository<? extends Session> sessions,
+            Clock clock,
+            SealProperties properties,
+            CredentialVersions versions) {
+        this(sessions, clock, properties.session().absoluteTimeout(), versions);
     }
 
     /** La session de la connexion vit encore. */
@@ -90,8 +101,10 @@ public final class BoundSessions {
         return session != null
                 && now.isBefore(session.getLastAccessedTime().plus(session.getMaxInactiveInterval()))
                 && now.isBefore(session.getCreationTime().plus(absoluteTimeout))
-                && FullSessions.storedUser(session)
-                        .filter(connection.user()::equals)
+                // ADR 0023, ADR 0044 : la session garde la session complète du même compte, au mot de passe courant.
+                && FullSessions.storedPrincipal(session)
+                        .filter(principal -> principal.userId().equals(connection.user()))
+                        .filter(versions::isCurrent)
                         .isPresent();
     }
 }

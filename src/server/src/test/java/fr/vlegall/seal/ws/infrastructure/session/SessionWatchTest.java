@@ -13,6 +13,7 @@ import fr.vlegall.seal.ws.domain.model.FakeConnection;
 import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.time.Duration;
 import java.util.List;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,7 +30,11 @@ class SessionWatchTest {
     private final ConnectionRegistry registry = new ConnectionRegistry();
     private final SessionWatch watch = new SessionWatch(
             registry,
-            new BoundSessions(new MapSessionRepository(new ConcurrentHashMap<>()), clock, Duration.ofHours(12)),
+            new BoundSessions(
+                    new MapSessionRepository(new ConcurrentHashMap<>()),
+                    clock,
+                    Duration.ofHours(12),
+                    user -> OptionalLong.empty()),
             clock);
 
     private FakeConnection open(UserId user, String sessionId) {

@@ -11,6 +11,7 @@ import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +30,9 @@ class BoundSessionsTest {
 
     private final MutableClock clock = MutableClock.followingSystem();
     private final MapSessionRepository repository = new MapSessionRepository(new ConcurrentHashMap<>());
-    private final BoundSessions sessions = new BoundSessions(repository, clock, Duration.ofHours(12));
+    private OptionalLong passwordVersion = OptionalLong.of(1);
+    private final BoundSessions sessions =
+            new BoundSessions(repository, clock, Duration.ofHours(12), user -> passwordVersion);
 
     /** Session complète du compte {@code owner}, telle que SessionEstablisher l'écrit. */
     private MapSession stored(String id, String authority, UserId owner) {
@@ -74,6 +77,18 @@ class BoundSessionsTest {
         assertThat(sessions.alive(connection("autre"))).isFalse();
         assertThat(sessions.alive(connection("restreinte"))).isFalse();
         assertThat(sessions.alive(connection("vide"))).isFalse();
+    }
+
+    @Test
+    @DisplayName("ADR 0023, ADR 0044 : une session dont le mot de passe a changé depuis ne garde pas sa connexion")
+    void adr0023StalePasswordVersionEndsTheConnection() {
+        full("s", USER);
+        assertThat(sessions.alive(connection("s"))).isTrue();
+
+        passwordVersion = OptionalLong.of(2);
+
+        assertThat(sessions.alive(connection("s"))).isFalse();
+        assertThat(sessions.userActed(connection("s"))).isFalse();
     }
 
     @Test
