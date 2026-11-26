@@ -23,7 +23,11 @@ final class AsyncFrameSocket implements FrameSocket {
 
     private static final Logger LOG = LoggerFactory.getLogger(AsyncFrameSocket.class);
 
+    /** Délai d'écriture de la trame de fermeture quand la fermeture ne peut pas attendre. */
+    static final long QUICK_CLOSE_TIMEOUT_MS = 100;
+
     private final WebSocketSession session;
+    private final jakarta.websocket.@Nullable Session endpoint;
     private final jakarta.websocket.RemoteEndpoint.@Nullable Async remote;
 
     AsyncFrameSocket(WebSocketSession session) {
@@ -31,9 +35,11 @@ final class AsyncFrameSocket implements FrameSocket {
         if (session instanceof NativeWebSocketSession nativeSession
                 && nativeSession.getNativeSession() instanceof jakarta.websocket.Session endpoint) {
             endpoint.getUserProperties().put(BLOCKING_SEND_TIMEOUT, SEND_TIMEOUT_MS);
+            this.endpoint = endpoint;
             this.remote = endpoint.getAsyncRemote();
             this.remote.setSendTimeout(SEND_TIMEOUT_MS);
         } else {
+            this.endpoint = null;
             this.remote = null;
         }
     }
@@ -52,6 +58,14 @@ final class AsyncFrameSocket implements FrameSocket {
             written = false;
         }
         done.accept(written);
+    }
+
+    @Override
+    public void closeQuickly(CloseStatus status) {
+        if (endpoint != null) {
+            endpoint.getUserProperties().put(BLOCKING_SEND_TIMEOUT, QUICK_CLOSE_TIMEOUT_MS);
+        }
+        close(status);
     }
 
     @Override

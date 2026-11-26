@@ -110,6 +110,10 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         WebSocketConnection connection = connection(session);
+        if (connection.isClosing()) {
+            // TRN-13 : une connexion refusée (4429) ou en fermeture ne voit traiter aucune trame (échec fermé).
+            return;
+        }
         connection.heard(clock.instant());
         if (message.getPayload().getBytes(StandardCharsets.UTF_8).length > MAX_FRAME_BYTES) {
             connection.closeWith(CloseStatus.TOO_BIG_TO_PROCESS);
@@ -135,7 +139,10 @@ public final class SealWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
-        connection(session).closeWith(CloseStatus.POLICY_VIOLATION);
+        WebSocketConnection connection = connection(session);
+        if (!connection.isClosing()) {
+            connection.closeWith(CloseStatus.POLICY_VIOLATION);
+        }
     }
 
     /** La réponse à la trame, ou {@code null} si la connexion vient d'être fermée. */

@@ -10,7 +10,6 @@ import java.time.Instant;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -42,7 +41,7 @@ final class WebSocketConnection implements Connection {
     private final UserId user;
     private final LocalRateLimit frameLimit;
     private final WireFrames frames;
-    private final Executor closer;
+    private final Closer closer;
     private final AtomicReference<SessionBinding> binding;
     private final Queue<Pending> outbox = new ConcurrentLinkedQueue<>();
     private final AtomicLong queuedBytes = new AtomicLong();
@@ -59,7 +58,7 @@ final class WebSocketConnection implements Connection {
             LocalRateLimit frameLimit,
             WireFrames frames,
             Instant openedAt,
-            Executor closer) {
+            Closer closer) {
         this.socket = socket;
         this.id = id;
         this.user = user;
@@ -77,13 +76,13 @@ final class WebSocketConnection implements Connection {
             LocalRateLimit frameLimit,
             WireFrames frames,
             Instant openedAt,
-            Executor closer) {
+            Closer closer) {
         this(socket, UUID.randomUUID().toString(), user, sessionId, frameLimit, frames, openedAt, closer);
     }
 
     /** La connexion d'une session ouverte par {@link FullSessionHandshakeInterceptor}. */
     static WebSocketConnection of(
-            WebSocketSession session, LocalRateLimit frameLimit, WireFrames frames, Instant openedAt, Executor closer) {
+            WebSocketSession session, LocalRateLimit frameLimit, WireFrames frames, Instant openedAt, Closer closer) {
         return new WebSocketConnection(
                 new AsyncFrameSocket(session),
                 session.getId(),
@@ -162,6 +161,11 @@ final class WebSocketConnection implements Connection {
         }
     }
 
+    /** TRN-13 : fermeture demandée ou faite ; plus aucune trame reçue n'est traitée. */
+    boolean isClosing() {
+        return closing.get() != null || closed.get();
+    }
+
     /** Fermeture immédiate, sans vider la file : trame illisible (1008) ou trop grande (1009). */
     void closeWith(CloseStatus status) {
         finish(status);
@@ -220,7 +224,7 @@ final class WebSocketConnection implements Connection {
     private void finish(CloseStatus status) {
         if (closed.compareAndSet(false, true)) {
             outbox.clear();
-            closer.execute(() -> socket.close(status));
+            closer.close(() -> socket.close(status), () -> socket.closeQuickly(status));
         }
     }
 }

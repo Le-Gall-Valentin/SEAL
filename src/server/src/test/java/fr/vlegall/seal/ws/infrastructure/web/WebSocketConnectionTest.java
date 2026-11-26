@@ -44,6 +44,11 @@ class WebSocketConnectionTest {
             closed = status;
         }
 
+        @Override
+        public void closeQuickly(CloseStatus status) {
+            closed = status;
+        }
+
         void complete(boolean ok) {
             pending.removeFirst().accept(ok);
         }
@@ -63,7 +68,7 @@ class WebSocketConnectionTest {
             () -> {},
             new WireFrames(JsonMapper.builder().build()),
             Instant.EPOCH,
-            Runnable::run);
+            (patient, urgent) -> patient.run());
 
     @Test
     @DisplayName("TRN-13, ADR 0044 : une seule écriture à la fois, les suivantes attendent leur tour, dans l'ordre")
@@ -110,7 +115,7 @@ class WebSocketConnectionTest {
                 () -> {},
                 new WireFrames(JsonMapper.builder().build()),
                 Instant.EPOCH,
-                Runnable::run);
+                (patient, urgent) -> patient.run());
         assertThatNoException().isThrownBy(() -> other.send("deux"));
         assertThat(broken.closed).isEqualTo(CloseStatus.SERVER_ERROR);
     }
@@ -127,6 +132,18 @@ class WebSocketConnectionTest {
         assertThat(socket.closed).isNull();
         socket.complete(true);
         assertThat(socket.closed).isEqualTo(new CloseStatus(4401));
+    }
+
+    @Test
+    @DisplayName("TRN-13 : une connexion se dit en fermeture dès la demande, avant que la socket ne soit fermée")
+    void trn13ClosingIsKnownAtOnce() {
+        assertThat(connection.isClosing()).isFalse();
+
+        connection.send("en cours");
+        connection.close(CloseReason.TOO_MANY_CONNECTIONS);
+
+        assertThat(socket.closed).isNull();
+        assertThat(connection.isClosing()).isTrue();
     }
 
     @Test
