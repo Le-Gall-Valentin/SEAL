@@ -27,6 +27,11 @@ public class WsFriendNotificationAdapter implements FriendNotificationPort {
     }
 
     @Override
+    public void requestDeclined(UserId receiver, UserId sender) {
+        update(receiver, sender);
+    }
+
+    @Override
     public void relationChanged(UserId one, UserId other) {
         update(one, other);
         update(other, one);

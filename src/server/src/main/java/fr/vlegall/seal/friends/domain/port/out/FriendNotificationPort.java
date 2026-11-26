@@ -9,6 +9,12 @@ public interface FriendNotificationPort {
     /** FRD-04 : {@code friend.request} au seul destinataire. */
     void requestReceived(UserId receiver, UUID requestId);
 
-    /** {@code friend.update} aux deux comptes : acceptation, refus, révocation ou retrait. */
+    /**
+     * CDC 10.1, ADR 0044 (décision 8) : {@code friend.update} aux seuls appareils de qui a refusé, « sans notification
+     * de refus » pour l'émetteur.
+     */
+    void requestDeclined(UserId receiver, UserId sender);
+
+    /** {@code friend.update} aux deux comptes : acceptation, révocation ou retrait. */
     void relationChanged(UserId one, UserId other);
 }

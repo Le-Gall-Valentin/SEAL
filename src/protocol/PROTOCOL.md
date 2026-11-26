@@ -564,7 +564,7 @@ comptes concernés ; un compte hors ligne relit par l'API (ADR 0043) :
 | Trame | Charge | Destinataires |
 | --- | --- | --- |
 | `friend.request` | `{ "requestId" }` | Le destinataire d'une invitation (FRD-04) |
-| `friend.update` | `{ "userId" }`, l'autre compte | Les deux comptes : acceptation, refus, révocation, retrait (FRD-11) |
+| `friend.update` | `{ "userId" }`, l'autre compte | Les deux comptes : acceptation, révocation, retrait (FRD-11) ; un refus, au seul compte qui refuse (10.1, ADR 0044) |
 | `conv.update` | `{ "conversationId" }` | Chaque membre, anciens compris : création, ajout, retrait, départ, renommage (CNV-04, GRP-03) |
 
 | Code de fermeture | Cause |

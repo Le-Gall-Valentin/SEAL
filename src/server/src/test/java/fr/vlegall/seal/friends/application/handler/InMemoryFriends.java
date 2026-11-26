@@ -229,6 +229,11 @@ final class InMemoryFriends {
             }
 
             @Override
+            public void requestDeclined(UserId receiver, UserId sender) {
+                notified.add("declined:" + receiver.value() + ":" + sender.value());
+            }
+
+            @Override
             public void relationChanged(UserId one, UserId other) {
                 notified.add("relation:" + one.value() + ":" + other.value());
             }

@@ -79,6 +79,26 @@ class RealtimeEventsIT {
     }
 
     @Test
+    @DisplayName(
+            "FRD-04, CDC 10.1, ADR 0044 : un refus n'est annoncé qu'aux appareils de qui refuse, jamais à l'émetteur")
+    void frd04DeclineIsNotAnnouncedToTheSender() throws Exception {
+        mvc.perform(alice.unsafe(post("/api/v1/friend-requests"), Map.of("username", bob.username)))
+                .andExpect(status().isCreated());
+        String requestId = jdbc.sql("SELECT id FROM friend_requests WHERE sender_id = ? AND status = 'PENDING'")
+                .param(alice.id)
+                .query(String.class)
+                .single();
+        TestWebSocketClient.Connection sender = connect(alice);
+        TestWebSocketClient.Connection receiver = connect(bob);
+
+        mvc.perform(bob.unsafe(post("/api/v1/friend-requests/" + requestId + "/decline"), null))
+                .andExpect(status().isNoContent());
+
+        assertThat(next(receiver, "friend.update").get("userId").asString()).isEqualTo(alice.id.toString());
+        assertThat(sender.next(QUIET)).as("aucune notification de refus").isNull();
+    }
+
+    @Test
     @DisplayName("FRD-11 : un retrait d'ami est annoncé aux deux comptes, chacun avec l'identifiant de l'autre")
     void frd11RemovalIsAnnouncedToBoth() throws Exception {
         TestRelations.befriend(jdbc, alice.id, bob.id);

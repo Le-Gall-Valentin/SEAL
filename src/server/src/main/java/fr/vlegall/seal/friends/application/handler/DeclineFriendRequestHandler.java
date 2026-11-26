@@ -32,7 +32,8 @@ public class DeclineFriendRequestHandler implements DeclineFriendRequestUseCase 
         return open.lockAddressedTo(receiver, requestId)
                 .map(request -> {
                     requests.close(request.id(), RequestStatus.DECLINED, clock.instant());
-                    notifications.relationChanged(receiver, request.sender());
+                    // CDC 10.1, ADR 0044 : « sans notification de refus » pour l'émetteur.
+                    notifications.requestDeclined(receiver, request.sender());
                     return true;
                 })
                 .orElse(false);

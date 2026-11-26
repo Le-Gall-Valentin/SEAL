@@ -59,7 +59,8 @@ class FriendRequestTransitionsHandlerTest {
     }
 
     @Test
-    @DisplayName("FRD-04 : un refus et une révocation sont annoncés aux deux comptes ; un échec, à personne")
+    @DisplayName(
+            "FRD-04, CDC 10.1, ADR 0044 : un refus n'est annoncé qu'à qui refuse, une révocation aux deux ; un échec, à personne")
     void frd04DeclineAndRevokeAreAnnouncedToBoth() {
         FriendRequest other = friends.pending(receiver, sender);
 
@@ -69,7 +70,7 @@ class FriendRequestTransitionsHandlerTest {
         assertThat(revoke().revoke(receiver.user(), other.id())).isTrue();
 
         String pair = receiver.user().value() + ":" + sender.user().value();
-        assertThat(friends.notified).containsExactly("relation:" + pair, "relation:" + pair);
+        assertThat(friends.notified).containsExactly("declined:" + pair, "relation:" + pair);
     }
 
     @Test
@@ -104,7 +105,7 @@ class FriendRequestTransitionsHandlerTest {
         assertThat(friends.friendships).isEmpty();
         assertThat(friends.events).isEmpty();
         assertThat(friends.notified)
-                .containsExactly("relation:" + receiver.user().value() + ":"
+                .containsExactly("declined:" + receiver.user().value() + ":"
                         + sender.user().value());
     }
 
