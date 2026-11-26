@@ -49,6 +49,7 @@ class SealPropertiesBindingTest {
                     "seal.security.hsts-max-age=300s",
                     "seal.session.absolute-timeout=12h",
                     "seal.session.sudo-window=10m",
+                    "seal.ws.sweep-delay=10s",
                     "seal.mail.from=SEAL <noreply@seal.localhost>");
 
     /** Chargeur qui accepte tout et rend un autre dossier, qui existe : la liaison ne doit pas le suivre non plus. */
@@ -78,6 +79,7 @@ class SealPropertiesBindingTest {
                         "seal.security.hsts-max-age=300s",
                         "seal.session.absolute-timeout=12h",
                         "seal.session.sudo-window=10m",
+                        "seal.ws.sweep-delay=10s",
                         "seal.mail.from=SEAL <noreply@seal.localhost>",
                         "seal.data-dir=../data")
                 .run(started -> assertThat(started.getBean(SealProperties.class).dataDir())

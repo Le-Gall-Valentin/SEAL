@@ -37,7 +37,6 @@ final class WebSocketConnection implements Connection {
     private record Pending(String text, long bytes) {}
 
     private final FrameSocket socket;
-    private final String id;
     private final UserId user;
     private final LocalRateLimit frameLimit;
     private final WireFrames frames;
@@ -52,7 +51,6 @@ final class WebSocketConnection implements Connection {
 
     WebSocketConnection(
             FrameSocket socket,
-            String id,
             UserId user,
             String sessionId,
             LocalRateLimit frameLimit,
@@ -60,7 +58,6 @@ final class WebSocketConnection implements Connection {
             Instant openedAt,
             Closer closer) {
         this.socket = socket;
-        this.id = id;
         this.user = user;
         this.frameLimit = frameLimit;
         this.frames = frames;
@@ -69,23 +66,11 @@ final class WebSocketConnection implements Connection {
         this.lastHeardAt = openedAt;
     }
 
-    WebSocketConnection(
-            FrameSocket socket,
-            UserId user,
-            String sessionId,
-            LocalRateLimit frameLimit,
-            WireFrames frames,
-            Instant openedAt,
-            Closer closer) {
-        this(socket, UUID.randomUUID().toString(), user, sessionId, frameLimit, frames, openedAt, closer);
-    }
-
     /** La connexion d'une session ouverte par {@link FullSessionHandshakeInterceptor}. */
     static WebSocketConnection of(
             WebSocketSession session, LocalRateLimit frameLimit, WireFrames frames, Instant openedAt, Closer closer) {
         return new WebSocketConnection(
                 new AsyncFrameSocket(session),
-                session.getId(),
                 (UserId) session.getAttributes().get(FullSessionHandshakeInterceptor.USER),
                 (String) session.getAttributes().get(FullSessionHandshakeInterceptor.SESSION),
                 frameLimit,
@@ -97,11 +82,6 @@ final class WebSocketConnection implements Connection {
     /** TRN-13 : seau des trames de cette connexion, libéré avec elle. */
     LocalRateLimit frameLimit() {
         return frameLimit;
-    }
-
-    @Override
-    public String id() {
-        return id;
     }
 
     @Override

@@ -6,9 +6,6 @@ import java.time.Instant;
 /** Une connexion WebSocket ouverte d'un compte, liée à sa session HTTP (TRN-12). */
 public interface Connection {
 
-    /** Identifiant propre à la connexion. */
-    String id();
-
     /** Le compte de la session. */
     UserId user();
 

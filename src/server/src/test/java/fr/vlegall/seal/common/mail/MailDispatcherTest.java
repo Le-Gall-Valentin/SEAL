@@ -42,6 +42,7 @@ class MailDispatcherTest {
                 new SealProperties.Security(Duration.ofMinutes(5)),
                 new SealProperties.Session(Duration.ofHours(12), Duration.ofMinutes(10)),
                 new SealProperties.Mail("SEAL <noreply@seal.localhost>"),
+                new SealProperties.Ws(Duration.ofSeconds(10)),
                 Path.of("data"));
         return new MailDispatcher(sender, properties, background);
     }

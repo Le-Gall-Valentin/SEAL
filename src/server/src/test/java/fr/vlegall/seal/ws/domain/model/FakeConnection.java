@@ -4,7 +4,6 @@ import fr.vlegall.seal.common.UserId;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
@@ -12,7 +11,6 @@ import org.jspecify.annotations.Nullable;
 /** Connexion en mémoire, pour tester ce qui l'entoure sans WebSocket. */
 public final class FakeConnection implements Connection {
 
-    private final String id = UUID.randomUUID().toString();
     private final UserId user;
     private final Instant lastHeardAt;
     private final List<String> sent = new CopyOnWriteArrayList<>();
@@ -34,11 +32,6 @@ public final class FakeConnection implements Connection {
     /** Une connexion dont chaque envoi et chaque fermeture échouent, comme un client qui ne lit plus. */
     public static FakeConnection failing(UserId user, String sessionId, Instant lastHeardAt) {
         return new FakeConnection(user, sessionId, lastHeardAt, true);
-    }
-
-    @Override
-    public String id() {
-        return id;
     }
 
     @Override

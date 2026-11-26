@@ -11,7 +11,6 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -52,8 +51,7 @@ public class SessionWatch {
         registry.bySession(event.previousId()).forEach(connection -> connection.follow(event.currentId()));
     }
 
-    /** La ronde (les tests d'intégration la lancent eux-mêmes, à l'horloge réglable). */
-    @Scheduled(fixedDelayString = "${seal.ws.sweep-delay:PT10S}")
+    /** La ronde, planifiée par {@link SessionSweepScheduling} (les tests d'intégration la lancent eux-mêmes). */
     public void sweep() {
         Instant now = clock.instant();
         for (Connection connection : registry.all()) {
