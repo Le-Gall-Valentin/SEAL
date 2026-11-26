@@ -5,9 +5,12 @@ import fr.vlegall.seal.security.session.SessionsEndedEvent;
 import fr.vlegall.seal.ws.domain.model.CloseReason;
 import fr.vlegall.seal.ws.domain.model.Connection;
 import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
+import fr.vlegall.seal.ws.domain.port.out.FrameDispatcher;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,20 +26,24 @@ public class SessionWatch {
     /** TRN-13 : 60 secondes sans trame ferment la connexion (4408). */
     static final Duration SILENCE = Duration.ofSeconds(60);
 
+    private static final Logger LOG = LoggerFactory.getLogger(SessionWatch.class);
+
     private final ConnectionRegistry registry;
     private final BoundSessions sessions;
+    private final FrameDispatcher dispatcher;
     private final Clock clock;
 
-    public SessionWatch(ConnectionRegistry registry, BoundSessions sessions, Clock clock) {
+    public SessionWatch(ConnectionRegistry registry, BoundSessions sessions, FrameDispatcher dispatcher, Clock clock) {
         this.registry = registry;
         this.sessions = sessions;
+        this.dispatcher = dispatcher;
         this.clock = clock;
     }
 
     /** AUTH-53, TRN-12 : déconnexion ou révocation. */
     @EventListener
     public void ended(SessionsEndedEvent event) {
-        event.sessionIds().forEach(id -> registry.bySession(id).forEach(c -> c.close(CloseReason.SESSION_ENDED)));
+        event.sessionIds().forEach(id -> registry.bySession(id).forEach(c -> close(c, CloseReason.SESSION_ENDED)));
     }
 
     /** AUTH-23 : la session change d'identifiant ; la connexion la suit, sauf si la session passe à un autre compte. */
@@ -46,7 +53,7 @@ public class SessionWatch {
             if (connection.user().equals(event.user())) {
                 connection.follow(event.currentId());
             } else {
-                connection.close(CloseReason.SESSION_ENDED);
+                close(connection, CloseReason.SESSION_ENDED);
             }
         }
     }
@@ -56,11 +63,31 @@ public class SessionWatch {
     public void sweep() {
         Instant now = clock.instant();
         for (Connection connection : registry.all()) {
-            if (!sessions.alive(connection)) {
-                connection.close(CloseReason.SESSION_ENDED);
-            } else if (!now.isBefore(connection.lastHeardAt().plus(SILENCE))) {
-                connection.close(CloseReason.SILENT);
+            try {
+                if (!sessions.alive(connection)) {
+                    close(connection, CloseReason.SESSION_ENDED);
+                } else if (!now.isBefore(connection.lastHeardAt().plus(SILENCE))) {
+                    close(connection, CloseReason.SILENT);
+                }
+            } catch (RuntimeException failed) {
+                // A10 : une connexion en échec n'arrête pas la ronde ; elle sera revue au tour suivant.
+                LOG.warn(
+                        "Ronde des WebSockets : connexion non vérifiée ({})",
+                        failed.getClass().getSimpleName());
             }
         }
+    }
+
+    /** ADR 0044 (décision 10) : la fermeture, qui envoie une trame, part de l'exécuteur. */
+    private void close(Connection connection, CloseReason reason) {
+        dispatcher.dispatch(() -> {
+            try {
+                connection.close(reason);
+            } catch (RuntimeException failed) {
+                LOG.debug(
+                        "Fermeture d'une WebSocket en échec ({})",
+                        failed.getClass().getSimpleName());
+            }
+        });
     }
 }

@@ -570,5 +570,6 @@ comptes concernés ; un compte hors ligne relit par l'API (ADR 0043) :
 | 4401 | Session finie : déconnexion, révocation, expiration (TRN-12), précédée de `session.revoked` |
 | 4408 | Aucune trame depuis 60 secondes |
 | 4429 | Sixième connexion d'un même compte |
+| 1011 | Envoi impossible : client trop lent (plus de 10 secondes ou de 512 Kio en attente) (ADR 0044) |
 | 1009 | Trame de plus de 64 Kio |
 | 1008 | Trame illisible, à champ inconnu ou binaire |

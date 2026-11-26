@@ -18,11 +18,22 @@ public final class FakeConnection implements Connection {
     private volatile String sessionId;
     private volatile @Nullable String formerSessionId;
     private volatile @Nullable CloseReason closed;
+    private final boolean failing;
 
     public FakeConnection(UserId user, String sessionId, Instant lastHeardAt) {
+        this(user, sessionId, lastHeardAt, false);
+    }
+
+    private FakeConnection(UserId user, String sessionId, Instant lastHeardAt, boolean failing) {
         this.user = user;
         this.sessionId = sessionId;
         this.lastHeardAt = lastHeardAt;
+        this.failing = failing;
+    }
+
+    /** Une connexion dont chaque envoi et chaque fermeture échouent, comme un client qui ne lit plus. */
+    public static FakeConnection failing(UserId user, String sessionId, Instant lastHeardAt) {
+        return new FakeConnection(user, sessionId, lastHeardAt, true);
     }
 
     @Override
@@ -58,11 +69,17 @@ public final class FakeConnection implements Connection {
 
     @Override
     public void send(String text) {
+        if (failing) {
+            throw new IllegalStateException("envoi impossible");
+        }
         sent.add(text);
     }
 
     @Override
     public void close(CloseReason reason) {
+        if (failing) {
+            throw new IllegalStateException("fermeture impossible");
+        }
         closed = reason;
     }
 

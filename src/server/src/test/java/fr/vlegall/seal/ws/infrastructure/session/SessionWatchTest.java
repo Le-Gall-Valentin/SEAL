@@ -1,6 +1,7 @@
 package fr.vlegall.seal.ws.infrastructure.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.session.SessionRenewedEvent;
@@ -10,6 +11,8 @@ import fr.vlegall.seal.ws.domain.model.CloseReason;
 import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
 import fr.vlegall.seal.ws.domain.model.FakeConnection;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,9 +27,14 @@ class SessionWatchTest {
 
     private final MutableClock clock = MutableClock.followingSystem();
     private final ConnectionRegistry registry = new ConnectionRegistry();
+    private final List<Runnable> dispatched = new ArrayList<>();
     private final SessionWatch watch = new SessionWatch(
             registry,
             new BoundSessions(new MapSessionRepository(new ConcurrentHashMap<>()), clock, Duration.ofHours(12)),
+            task -> {
+                dispatched.add(task);
+                task.run();
+            },
             clock);
 
     private FakeConnection open(UserId user, String sessionId) {
@@ -56,6 +64,31 @@ class SessionWatchTest {
 
         assertThat(connection.closed()).contains(CloseReason.SESSION_ENDED);
         assertThat(connection.sessionId()).isEqualTo("avant");
+    }
+
+    @Test
+    @DisplayName("TRN-12, A10 : une fermeture en échec n'empêche pas les autres, et part de l'exécuteur")
+    void a10FailingCloseIsIsolated() {
+        assertThat(registry.open(FakeConnection.failing(USER, "finie", clock.instant())))
+                .isTrue();
+        FakeConnection other = open(USER, "finie");
+
+        assertThatNoException().isThrownBy(() -> watch.ended(new SessionsEndedEvent(Set.of("finie"))));
+
+        assertThat(other.closed()).contains(CloseReason.SESSION_ENDED);
+        assertThat(dispatched).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("TRN-12, A10 : la ronde continue après une connexion en échec")
+    void a10SweepSurvivesAFailingConnection() {
+        assertThat(registry.open(FakeConnection.failing(USER, "disparue", clock.instant())))
+                .isTrue();
+        FakeConnection gone = open(USER, "disparue-aussi");
+
+        assertThatNoException().isThrownBy(watch::sweep);
+
+        assertThat(gone.closed()).contains(CloseReason.SESSION_ENDED);
     }
 
     @Test
