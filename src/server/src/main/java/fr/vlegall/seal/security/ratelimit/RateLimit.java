@@ -46,7 +46,9 @@ public enum RateLimit {
      * ADR 0032, point 3 : 20 retours OAuth par 15 minutes et par IP. Chaque refus écrit une ligne du journal : sans
      * limite, n'importe qui le ferait grossir sans fin.
      */
-    OAUTH_CALLBACKS_PER_IP(20, Duration.ofMinutes(15), RateLimitKind.IP);
+    OAUTH_CALLBACKS_PER_IP(20, Duration.ofMinutes(15), RateLimitKind.IP),
+    /** TRN-13, 15.2 : 30 trames par 10 secondes et par connexion WebSocket. */
+    WEBSOCKET_FRAMES_PER_CONNECTION(30, Duration.ofSeconds(10), RateLimitKind.CONNECTION);
 
     private final int capacity;
     private final Duration period;

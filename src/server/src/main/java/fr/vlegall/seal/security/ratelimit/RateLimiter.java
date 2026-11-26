@@ -60,6 +60,12 @@ public final class RateLimiter {
     private final SecurityJournal journal;
     private final int maxBuckets;
     private final ConcurrentMap<String, Tracked> buckets = new ConcurrentHashMap<>();
+    /**
+     * TRN-13, ADR 0044 (décision 9) : fin du silence du journal par limite et par compte, pour les seaux locaux des
+     * connexions ; vidée par {@link #purgeRefilledBuckets()} une fois le silence passé.
+     */
+    private final ConcurrentMap<String, AtomicLong> connectionJournal = new ConcurrentHashMap<>();
+
     private final AtomicBoolean capacityAlerted = new AtomicBoolean();
 
     @Autowired
@@ -102,6 +108,28 @@ public final class RateLimiter {
         consume(limit, user.value().toString(), user);
     }
 
+    /**
+     * TRN-13, A06 : seau propre à une connexion WebSocket, hors de la table partagée. Il meurt avec la connexion : un
+     * va-et-vient de connexions ne peut pas remplir la table des autres limites. Un refus s'écrit au même journal,
+     * rattaché au compte.
+     */
+    public LocalRateLimit local(RateLimit limit, UserId user) {
+        if (limit.kind() != RateLimitKind.CONNECTION) {
+            throw new IllegalArgumentException("Limite sans seau local : " + limit + " (" + limit.kind() + ")");
+        }
+        Tracked tracked = track(limit);
+        return () -> {
+            requireNoTransaction();
+            ConsumptionProbe probe = tracked.bucket().tryConsumeAndReturnRemaining(1);
+            if (!probe.isConsumed()) {
+                // A09 : un refus par compte et par période, quel que soit le nombre de connexions ouvertes.
+                AtomicLong quietUntil = connectionJournal.computeIfAbsent(
+                        limit.name() + ":" + user.value(), name -> new AtomicLong(Long.MIN_VALUE));
+                refuse(limit, "", user, quietUntil, limit.period().toNanos(), probe.getNanosToWaitForRefill());
+            }
+        };
+    }
+
     /** Rend un jeton réservé par {@link #consume(RateLimit, String)}, sans dépasser la capacité ; ne crée aucun seau. */
     public void refund(RateLimit limit, String key) {
         requireKind(limit, false);
@@ -129,7 +157,13 @@ public final class RateLimiter {
         for (String id : buckets.keySet()) {
             buckets.computeIfPresent(id, (key, tracked) -> isFull(tracked) ? null : tracked);
         }
+        long now = timeMeter.currentTimeNanos();
+        connectionJournal.values().removeIf(quietUntil -> quietUntil.get() <= now);
         capacityAlerted.set(false);
+    }
+
+    int connectionJournalSize() {
+        return connectionJournal.size();
     }
 
     int bucketCount() {
@@ -157,7 +191,8 @@ public final class RateLimiter {
         if (tracked == null) {
             refuseForCapacity(limit);
         } else if (!probe[0].isConsumed()) {
-            refuse(limit, key, user, tracked, probe[0].getNanosToWaitForRefill());
+            long nanosToWait = probe[0].getNanosToWaitForRefill();
+            refuse(limit, key, user, tracked.journalQuietUntil(), nanosToWait, nanosToWait);
         }
     }
 
@@ -180,8 +215,15 @@ public final class RateLimiter {
         return new Tracked(limit, bucket, new AtomicLong(Long.MIN_VALUE));
     }
 
-    private void refuse(RateLimit limit, String key, @Nullable UserId user, Tracked tracked, long nanosToWait) {
-        if (tracked.claimJournal(timeMeter.currentTimeNanos(), nanosToWait)) {
+    /** Refuse ; le journal n'écrit qu'un refus par silence de {@code quietFor} nanosecondes. */
+    private void refuse(
+            RateLimit limit,
+            String key,
+            @Nullable UserId user,
+            AtomicLong quietUntil,
+            long quietFor,
+            long nanosToWait) {
+        if (claimJournal(quietUntil, timeMeter.currentTimeNanos(), quietFor)) {
             Map<String, String> details = new HashMap<>();
             details.put("limit", limit.name());
             String recordedKey = recordedKey(limit.kind(), key);
@@ -218,7 +260,7 @@ public final class RateLimiter {
             // au mauvais endroit (ADR 0021, mise à jour). La limite reste lisible par son nom.
             case ENTERED -> null;
             case EMAIL -> LogValues.email(key);
-            case USER -> null;
+            case USER, CONNECTION -> null;
         };
     }
 
@@ -227,7 +269,7 @@ public final class RateLimiter {
     }
 
     private static void requireKind(RateLimit limit, boolean user) {
-        if ((limit.kind() == RateLimitKind.USER) != user) {
+        if ((limit.kind() == RateLimitKind.USER) != user || limit.kind() == RateLimitKind.CONNECTION) {
             throw new IllegalArgumentException("Clé incompatible avec la limite " + limit + " (" + limit.kind() + ")");
         }
     }
@@ -247,11 +289,10 @@ public final class RateLimiter {
      * Un seau et l'instant, en nanosecondes de l'horloge du limiteur, avant lequel un nouveau refus n'est plus
      * journalisé.
      */
-    private record Tracked(RateLimit limit, Bucket bucket, AtomicLong journalQuietUntil) {
-
-        boolean claimJournal(long now, long nanosToWait) {
-            long quietUntil = journalQuietUntil.get();
-            return now >= quietUntil && journalQuietUntil.compareAndSet(quietUntil, now + nanosToWait);
-        }
+    private static boolean claimJournal(AtomicLong quietUntil, long now, long quietFor) {
+        long until = quietUntil.get();
+        return now >= until && quietUntil.compareAndSet(until, now + quietFor);
     }
+
+    private record Tracked(RateLimit limit, Bucket bucket, AtomicLong journalQuietUntil) {}
 }

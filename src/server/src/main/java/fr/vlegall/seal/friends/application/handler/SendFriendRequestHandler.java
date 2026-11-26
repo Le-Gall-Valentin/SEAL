@@ -11,6 +11,7 @@ import fr.vlegall.seal.friends.domain.model.Person;
 import fr.vlegall.seal.friends.domain.model.UserPair;
 import fr.vlegall.seal.friends.domain.port.out.BlockRepository;
 import fr.vlegall.seal.friends.domain.port.out.DirectoryPort;
+import fr.vlegall.seal.friends.domain.port.out.FriendNotificationPort;
 import fr.vlegall.seal.friends.domain.port.out.FriendRequestRepository;
 import fr.vlegall.seal.friends.domain.port.out.FriendsEventPort;
 import fr.vlegall.seal.friends.domain.port.out.FriendshipRepository;
@@ -26,6 +27,7 @@ public class SendFriendRequestHandler implements SendFriendRequestUseCase {
     private final FriendshipRepository friendships;
     private final FriendRequestRepository requests;
     private final FriendsEventPort events;
+    private final FriendNotificationPort notifications;
     private final Clock clock;
 
     public SendFriendRequestHandler(
@@ -34,12 +36,14 @@ public class SendFriendRequestHandler implements SendFriendRequestUseCase {
             FriendshipRepository friendships,
             FriendRequestRepository requests,
             FriendsEventPort events,
+            FriendNotificationPort notifications,
             Clock clock) {
         this.directory = directory;
         this.blocks = blocks;
         this.friendships = friendships;
         this.requests = requests;
         this.events = events;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -90,6 +94,8 @@ public class SendFriendRequestHandler implements SendFriendRequestUseCase {
         }
         FriendRequest request = created.get();
         events.requestSent(sender, receiver.user(), request.id());
+        // FRD-04 : le compteur du destinataire se met à jour en direct.
+        notifications.requestReceived(receiver.user(), request.id());
         return new InvitationOutcome.Sent(new Invitation(request.id(), receiver, request.createdAt()));
     }
 

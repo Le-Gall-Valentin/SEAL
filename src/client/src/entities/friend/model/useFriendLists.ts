@@ -1,5 +1,5 @@
-import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
-import { allPages, useActivityGatedInterval } from '@/shared/lib'
+import { type QueryClient, useQuery } from '@tanstack/react-query'
+import { allPages } from '@/shared/lib'
 import { newestFirst, sortFriends } from './friends'
 import { useFriendsApi } from './friendsPort'
 
@@ -8,9 +8,6 @@ export const FRIENDS_ROOT_KEY = ['friends'] as const
 export const FRIENDS_KEY = ['friends', 'list'] as const
 export const RECEIVED_REQUESTS_KEY = ['friends', 'received'] as const
 export const SENT_REQUESTS_KEY = ['friends', 'sent'] as const
-
-/** ADR 0037 (points 2 et 11) : jusqu'à la WebSocket du lot 4, le compteur se relit toutes les 60 secondes. */
-const RECEIVED_REFRESH_MS = 60_000
 
 /**
  * FRD-10 : tous les amis encore actifs, triés par nom affiché (ADR 0038, point 6). `enabled` faux : rien n'est lu, la
@@ -27,8 +24,8 @@ export function useFriends({ enabled = true }: { readonly enabled?: boolean } = 
 }
 
 /**
- * FRD-04 : invitations reçues en attente, la plus récente d'abord, relues au retour du focus (ADR 0037, point 2) ; la
- * relecture périodique est celle de `useReceivedRequestsRefresh`.
+ * FRD-04 : invitations reçues en attente, la plus récente d'abord, relues au retour du focus (ADR 0037, point 2) et
+ * sur les trames friend.* (ADR 0043).
  */
 export function useReceivedRequests() {
   const api = useFriendsApi()
@@ -38,18 +35,6 @@ export function useReceivedRequests() {
       newestFirst(await allPages((after) => api.receivedRequests(after, signal))),
     refetchOnWindowFocus: true,
   })
-}
-
-/**
- * FRD-04, ADR 0037 (point 11) : relit les invitations reçues toutes les 60 secondes, seulement si l'utilisateur a agi
- * depuis l'échéance précédente, pour qu'une relecture ne prolonge pas une session inactive (AUTH-52). La coque la
- * monte une fois pour tous les écrans.
- */
-export function useReceivedRequestsRefresh(): void {
-  const client = useQueryClient()
-  useActivityGatedInterval(() => {
-    void client.refetchQueries({ queryKey: RECEIVED_REQUESTS_KEY, type: 'active' })
-  }, RECEIVED_REFRESH_MS)
 }
 
 /** Invitations envoyées en attente, la plus récente d'abord. */
@@ -65,4 +50,20 @@ export function useSentRequests() {
 /** ADR 0037 (point 2) : après chaque action, les trois listes et le compteur sont relus. */
 export function invalidateFriends(client: QueryClient): Promise<void> {
   return client.invalidateQueries({ queryKey: FRIENDS_ROOT_KEY })
+}
+
+/**
+ * ADR 0043, ADR 0044 (décision 1) : une trame ou une reconnexion rend les trois listes et le compteur périmés, sans requête ; ils sont
+ * relus au prochain affichage, au retour du focus ou par {@link refetchFriends}.
+ */
+export function markFriendsStale(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({ queryKey: FRIENDS_ROOT_KEY, refetchType: 'none' })
+}
+
+/**
+ * ADR 0044 (décision 1) : relit ceux qui sont affichés et périmés. Une lecture déjà en cours, partie avant la trame,
+ * est relancée : son résultat serait antérieur au changement annoncé. La garde d'activité regroupe les rafales.
+ */
+export function refetchFriends(client: QueryClient): Promise<void> {
+  return client.refetchQueries({ queryKey: FRIENDS_ROOT_KEY, type: 'active', stale: true })
 }

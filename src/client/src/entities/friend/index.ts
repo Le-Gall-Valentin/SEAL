@@ -6,9 +6,10 @@ export { FriendsApiProvider } from './model/friendsPort'
 export { matchFriend, tintOf, usernameInitials } from './model/friends'
 export {
   invalidateFriends,
+  markFriendsStale,
+  refetchFriends,
   useFriends,
   useReceivedRequests,
-  useReceivedRequestsRefresh,
   useSentRequests,
 } from './model/useFriendLists'
 export { affinity, PICKER_SIZE, rankFriends } from './model/friendPicker'

@@ -19,16 +19,18 @@ import org.junit.jupiter.api.Test;
 class GroupMembershipHandlersTest {
 
     private final InMemoryConversations store = new InMemoryConversations();
-    private final CreateGroupHandler groups =
-            new CreateGroupHandler(store.repository(), store.activeFriends(), store.summaries(), store.clock);
+    private final CreateGroupHandler groups = new CreateGroupHandler(
+            store.repository(), store.activeFriends(), store.summaries(), store.notifications(), store.clock);
     private final OpenDirectConversationHandler direct = new OpenDirectConversationHandler(
-            store.repository(), store.activeFriends(), store.summaries(), store.clock);
-    private final AddMembersHandler add =
-            new AddMembersHandler(store.repository(), store.activeFriends(), store.summaries(), store.clock);
-    private final ExcludeMemberHandler exclude = new ExcludeMemberHandler(store.repository(), store.clock);
-    private final LeaveConversationHandler leave = new LeaveConversationHandler(store.repository(), store.clock);
+            store.repository(), store.activeFriends(), store.summaries(), store.notifications(), store.clock);
+    private final AddMembersHandler add = new AddMembersHandler(
+            store.repository(), store.activeFriends(), store.summaries(), store.notifications(), store.clock);
+    private final ExcludeMemberHandler exclude =
+            new ExcludeMemberHandler(store.repository(), store.notifications(), store.clock);
+    private final LeaveConversationHandler leave =
+            new LeaveConversationHandler(store.repository(), store.notifications(), store.clock);
     private final RenameGroupHandler rename =
-            new RenameGroupHandler(store.repository(), store.summaries(), store.clock);
+            new RenameGroupHandler(store.repository(), store.summaries(), store.notifications(), store.clock);
     private final GetConversationHandler get = new GetConversationHandler(store.repository(), store.summaries());
 
     private final UserId admin = store.person("admin");
@@ -43,6 +45,46 @@ class GroupMembershipHandlersTest {
         store.befriend(member, membersFriend);
         store.befriend(admin, adminsFriend);
         group = groups.create(admin, "Ski", Set.of(member)).id();
+    }
+
+    @Test
+    @DisplayName(
+            "GRP-03, CNV-04 : un ajout est annoncé à l'arrivant et aux membres ; un ajout sans arrivant, à personne")
+    void grp03AdditionIsAnnouncedToNewcomerAndMembers() {
+        store.notified.clear();
+
+        add.admit(member, group, Set.of(membersFriend));
+        add.admit(admin, group, Set.of(member, admin));
+
+        assertThat(store.notified)
+                .containsExactly(new InMemoryConversations.Notified(group, Set.of(admin, member, membersFriend)));
+    }
+
+    @Test
+    @DisplayName("GRP-03, CNV-04 : un retrait et un départ sont annoncés aux membres restants et à celui qui part")
+    void grp03ExclusionAndDepartureAreAnnouncedToFormerMembersToo() {
+        add.admit(admin, group, Set.of(adminsFriend));
+        store.notified.clear();
+
+        exclude.exclude(admin, group, adminsFriend);
+        leave.leave(member, group);
+
+        assertThat(store.notified)
+                .containsExactly(
+                        new InMemoryConversations.Notified(group, Set.of(admin, member, adminsFriend)),
+                        new InMemoryConversations.Notified(group, Set.of(admin, member)));
+    }
+
+    @Test
+    @DisplayName("GRP-03, CNV-04 : un renommage est annoncé aux membres ; un refus, à personne")
+    void grp03RenameIsAnnouncedToMembers() {
+        store.notified.clear();
+
+        assertThatThrownBy(() -> rename.rename(member, group, "Autre"))
+                .isInstanceOf(ConversationException.Forbidden.class);
+        rename.rename(admin, group, "Autre");
+
+        assertThat(store.notified).containsExactly(new InMemoryConversations.Notified(group, Set.of(admin, member)));
     }
 
     @Test

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.conversations.domain.model.ConversationException;
+import fr.vlegall.seal.conversations.domain.model.ConversationId;
 import fr.vlegall.seal.conversations.domain.model.ConversationSummary;
 import fr.vlegall.seal.conversations.domain.model.ConversationType;
 import fr.vlegall.seal.conversations.domain.model.GroupName;
@@ -20,9 +21,9 @@ class OpenDirectAndCreateGroupHandlerTest {
 
     private final InMemoryConversations store = new InMemoryConversations();
     private final OpenDirectConversationHandler direct = new OpenDirectConversationHandler(
-            store.repository(), store.activeFriends(), store.summaries(), store.clock);
-    private final CreateGroupHandler groups =
-            new CreateGroupHandler(store.repository(), store.activeFriends(), store.summaries(), store.clock);
+            store.repository(), store.activeFriends(), store.summaries(), store.notifications(), store.clock);
+    private final CreateGroupHandler groups = new CreateGroupHandler(
+            store.repository(), store.activeFriends(), store.summaries(), store.notifications(), store.clock);
     private final GetConversationHandler get = new GetConversationHandler(store.repository(), store.summaries());
     private final UserId me = store.person("moi");
     private final UserId friend = store.person("ami");
@@ -32,6 +33,25 @@ class OpenDirectAndCreateGroupHandlerTest {
     OpenDirectAndCreateGroupHandlerTest() {
         store.befriend(me, friend);
         store.befriend(me, other);
+    }
+
+    @Test
+    @DisplayName("CNV-04 : une directe créée est annoncée aux deux comptes ; retrouvée, elle ne l'est pas")
+    void cnv04CreatedDirectIsAnnouncedOnce() {
+        OpenedDirect first = direct.open(me, friend);
+        direct.open(friend, me);
+
+        assertThat(store.notified)
+                .containsExactly(
+                        new InMemoryConversations.Notified(first.conversation().id(), Set.of(me, friend)));
+    }
+
+    @Test
+    @DisplayName("CNV-04, GRP-01 : un groupe créé est annoncé à tous ses membres")
+    void cnv04CreatedGroupIsAnnouncedToAllMembers() {
+        ConversationId id = groups.create(me, "Ski", Set.of(friend, other)).id();
+
+        assertThat(store.notified).containsExactly(new InMemoryConversations.Notified(id, Set.of(me, friend, other)));
     }
 
     @Test

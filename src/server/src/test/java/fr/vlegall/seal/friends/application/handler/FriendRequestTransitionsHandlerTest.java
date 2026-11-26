@@ -21,15 +21,22 @@ class FriendRequestTransitionsHandlerTest {
 
     private AcceptFriendRequestHandler accept() {
         return new AcceptFriendRequestHandler(
-                friends.open(), friends.requests(), friends.friendships(), friends.events(), InMemoryFriends.CLOCK);
+                friends.open(),
+                friends.requests(),
+                friends.friendships(),
+                friends.events(),
+                friends.notifications(),
+                InMemoryFriends.CLOCK);
     }
 
     private DeclineFriendRequestHandler decline() {
-        return new DeclineFriendRequestHandler(friends.open(), friends.requests(), InMemoryFriends.CLOCK);
+        return new DeclineFriendRequestHandler(
+                friends.open(), friends.requests(), friends.notifications(), InMemoryFriends.CLOCK);
     }
 
     private RevokeFriendRequestHandler revoke() {
-        return new RevokeFriendRequestHandler(friends.open(), friends.requests(), InMemoryFriends.CLOCK);
+        return new RevokeFriendRequestHandler(
+                friends.open(), friends.requests(), friends.notifications(), InMemoryFriends.CLOCK);
     }
 
     private RequestStatus status() {
@@ -46,6 +53,24 @@ class FriendRequestTransitionsHandlerTest {
         assertThat(status()).isEqualTo(RequestStatus.ACCEPTED);
         assertThat(friends.friendships).containsKey(UserPair.of(sender.user(), receiver.user()));
         assertThat(friends.events).containsExactly("accepted");
+        assertThat(friends.notified)
+                .containsExactly("relation:" + receiver.user().value() + ":"
+                        + sender.user().value());
+    }
+
+    @Test
+    @DisplayName(
+            "FRD-04, CDC 10.1, ADR 0044 : un refus n'est annoncé qu'à qui refuse, une révocation aux deux ; un échec, à personne")
+    void frd04DeclineToTheReceiverOnlyRevokeToBoth() {
+        FriendRequest other = friends.pending(receiver, sender);
+
+        assertThat(decline().decline(sender.user(), request.id())).isFalse();
+        assertThat(friends.notified).isEmpty();
+        assertThat(decline().decline(receiver.user(), request.id())).isTrue();
+        assertThat(revoke().revoke(receiver.user(), other.id())).isTrue();
+
+        String pair = receiver.user().value() + ":" + sender.user().value();
+        assertThat(friends.notified).containsExactly("declined:" + pair, "relation:" + pair);
     }
 
     @Test
@@ -58,6 +83,7 @@ class FriendRequestTransitionsHandlerTest {
         assertThat(status()).isEqualTo(RequestStatus.PENDING);
         assertThat(friends.friendships).isEmpty();
         assertThat(friends.events).isEmpty();
+        assertThat(friends.notified).isEmpty();
     }
 
     @Test
@@ -78,6 +104,9 @@ class FriendRequestTransitionsHandlerTest {
         assertThat(status()).isEqualTo(RequestStatus.DECLINED);
         assertThat(friends.friendships).isEmpty();
         assertThat(friends.events).isEmpty();
+        assertThat(friends.notified)
+                .containsExactly("declined:" + receiver.user().value() + ":"
+                        + sender.user().value());
     }
 
     @Test

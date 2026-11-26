@@ -531,3 +531,54 @@ nonce, de `enc` ou de `wrappedCek` ; en-tête déplacé dans une autre conversat
 dans une autre conversation (transfert subreptice), sous un autre `messageId`, sous un autre émetteur annoncé ou sous
 un autre numéro de certificat ; signature d'une autre IK ; signature altérée ; Bob absent des
 destinataires signés ; destinataires non triés, pourtant signés.
+
+## 7. Trames WebSocket (CDC 12.2 ; TRN-10 à TRN-15, ADR 0043)
+
+`/ws` est une WebSocket brute (pas de STOMP), ouverte à la seule session complète d'un compte actif dont la
+poignée de main porte un en-tête `Origin` égal à l'origine de SEAL ; sinon 403 (TRN-11). Chaque trame est un texte
+JSON :
+
+```json
+{ "type": "ping", "id": "choisi-par-le-client", "payload": {} }
+```
+
+- `type` : nom de la trame, en minuscules et points (`msg.send`) ; `id` : 1 à 64 caractères `[A-Za-z0-9_-]`,
+  choisi par l'émetteur de la trame ; `payload` : un objet, vide s'il est absent. Tout autre champ est refusé.
+- Le serveur répond à chaque trame du client au même `id` : `pong` à `ping` ; en cas de succès, l'accusé que nomme
+  le type (`ack` par défaut, sinon un nom en `.ack` comme `msg.ack` pour `msg.send`, ADR 0044), avec sa charge
+  propre ; sinon `error`
+  (`{ "code", "retryAfter"? }`, code de la section 14.6 du CDC). Un type inconnu reçoit `error` `VALIDATION_FAILED`.
+- Une chaîne UTF-16 mal formée (surrogat isolé, permis par un échappement JSON) fait refuser la trame : fermeture 1008.
+- Limites (TRN-13, 15.2) : 64 Kio par trame, comptés en octets UTF-8 (au-delà, fermeture) ; 5 connexions par compte
+  (la sixième est fermée en 4429) ; 30 trames par 10 secondes et par connexion. La 31e reçoit
+  `error` `{ "code": "RATE_LIMITED", "retryAfter": n }`, `n` en secondes entières, au moins 1 ; la connexion reste.
+- Le client envoie `ping` à l'ouverture puis toutes les 25 secondes, et attend `pong` 10 secondes : sans réponse, il
+  ferme lui-même la connexion en 4000 et la rouvre (ADR 0044) ; le serveur ferme une connexion muette depuis
+  60 secondes (4408). Une erreur inattendue d'un gestionnaire rend `error`
+  `INTERNAL_ERROR`, sans détail.
+- La connexion est liée à sa session HTTP (TRN-12). Elle la suit quand la session change d'identifiant pour le même
+  compte (ré-authentification, AUTH-23, AUTH-55) ; elle se ferme quand la session finit, ne porte plus la session
+  complète de ce compte, ou garde une version du mot de passe qui n'est plus la courante (ADR 0023, ADR 0044).
+- Une trame née d'une action de l'utilisateur (`msg.send`, puis `read`) prolonge la session HTTP si son dernier accès
+  date d'une minute au moins ; `ping` et les autres trames ne la prolongent jamais (AUTH-52, ADR 0043). Sur une
+  session finie, aucune trame autre que `ping` n'est traitée ni refusée pour son type : le serveur envoie
+  `session.revoked`, puis ferme en 4401.
+- Les trames du serveur (`session.revoked`, puis les événements) portent un `id` qu'il choisit.
+
+Événements annoncés par le serveur, après validation de la transaction qui les cause, à toutes les connexions des
+comptes concernés ; un compte hors ligne relit par l'API (ADR 0043) :
+
+| Trame | Charge | Destinataires |
+| --- | --- | --- |
+| `friend.request` | `{ "requestId" }` | Le destinataire d'une invitation (FRD-04) |
+| `friend.update` | `{ "userId" }`, l'autre compte | Les deux comptes : acceptation, révocation, retrait (FRD-11) ; un refus, au seul compte qui refuse (10.1, ADR 0044) |
+| `conv.update` | `{ "conversationId" }` | Chaque membre, anciens compris : création, ajout, retrait, départ, renommage (CNV-04, GRP-03) |
+
+| Code de fermeture | Cause |
+| --- | --- |
+| 4401 | Session finie : déconnexion, révocation, expiration (TRN-12), précédée de `session.revoked` |
+| 4408 | Aucune trame depuis 60 secondes |
+| 4429 | Sixième connexion d'un même compte |
+| 1011 | Envoi impossible : client trop lent (plus de 10 secondes ou de 512 Kio en attente) (ADR 0044) |
+| 1009 | Trame de plus de 64 Kio |
+| 1008 | Trame illisible, à champ inconnu ou binaire |

@@ -27,10 +27,11 @@ export {
 } from './model/conversations'
 export {
   invalidateConversations,
+  markConversationsStale,
+  refetchConversations,
   storeConversation,
   useConversation,
   useConversations,
-  useConversationsRefresh,
 } from './model/useConversations'
 export { ConversationAlert } from './ui/ConversationAlert'
 export { ConversationAvatar } from './ui/ConversationAvatar'

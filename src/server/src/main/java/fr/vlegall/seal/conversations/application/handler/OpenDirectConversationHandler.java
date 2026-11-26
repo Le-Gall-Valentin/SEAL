@@ -6,6 +6,7 @@ import fr.vlegall.seal.conversations.application.port.in.OpenDirectConversationU
 import fr.vlegall.seal.conversations.domain.model.Conversation;
 import fr.vlegall.seal.conversations.domain.model.DirectKey;
 import fr.vlegall.seal.conversations.domain.model.OpenedDirect;
+import fr.vlegall.seal.conversations.domain.port.out.ConversationNotificationPort;
 import fr.vlegall.seal.conversations.domain.port.out.ConversationRepository;
 import java.time.Clock;
 import java.util.Set;
@@ -17,13 +18,19 @@ public class OpenDirectConversationHandler implements OpenDirectConversationUseC
     private final ConversationRepository conversations;
     private final ActiveFriends friends;
     private final ConversationSummaries summaries;
+    private final ConversationNotificationPort notifications;
     private final Clock clock;
 
     public OpenDirectConversationHandler(
-            ConversationRepository conversations, ActiveFriends friends, ConversationSummaries summaries, Clock clock) {
+            ConversationRepository conversations,
+            ActiveFriends friends,
+            ConversationSummaries summaries,
+            ConversationNotificationPort notifications,
+            Clock clock) {
         this.conversations = conversations;
         this.friends = friends;
         this.summaries = summaries;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -38,6 +45,10 @@ public class OpenDirectConversationHandler implements OpenDirectConversationUseC
         DirectKey key = DirectKey.of(caller, other);
         boolean created = conversations.createDirect(key, caller, other, clock.instant());
         Conversation direct = conversations.findDirect(key).orElseThrow();
+        if (created) {
+            // CNV-04 : la directe apparaît en direct chez les deux comptes.
+            notifications.changed(direct.id(), direct.memberIds());
+        }
         return new OpenedDirect(created, summaries.of(caller, direct));
     }
 }

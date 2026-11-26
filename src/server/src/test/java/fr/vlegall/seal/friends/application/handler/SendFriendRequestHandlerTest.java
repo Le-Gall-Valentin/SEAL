@@ -34,6 +34,7 @@ class SendFriendRequestHandlerTest {
     private static final Instant NOW = Instant.parse("2026-11-23T12:00:00Z");
 
     private final List<String> calls = new ArrayList<>();
+    private final List<String> notified = new ArrayList<>();
     private boolean blocked;
     private boolean open = true;
     private boolean friends;
@@ -149,7 +150,20 @@ class SendFriendRequestHandlerTest {
                 friendships,
                 requests,
                 events,
+                InMemoryFriends.notifications(notified),
                 Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    @Test
+    @DisplayName("FRD-04 : une invitation créée est annoncée au seul destinataire ; un refus n'annonce rien")
+    void frd04CreatedInvitationIsAnnouncedToTheReceiverOnly() {
+        assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.Sent.class);
+        assertThat(notified).containsExactly("request:" + RECEIVER.value());
+
+        notified.clear();
+        open = false;
+        assertThat(handler().send(SENDER, "sarah")).isInstanceOf(InvitationOutcome.CannotInvite.class);
+        assertThat(notified).isEmpty();
     }
 
     @Test

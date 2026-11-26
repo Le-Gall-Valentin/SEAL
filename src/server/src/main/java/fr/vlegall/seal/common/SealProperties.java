@@ -14,17 +14,19 @@ import org.springframework.boot.context.properties.bind.ConstructorBinding;
  * @param security paramètres des en-têtes de sécurité
  * @param session durées de vie des sessions
  * @param mail expédition des courriels
+ * @param ws réglages de la WebSocket : intervalle de la ronde (ADR 0043, point 5 ; ADR 0044)
  * @param dataDir dossier de ce que SEAL génère lui-même, comme la clé de l'Autorité (KEY-10) : {@code /data} dans
  *     l'image (volume {@code app-data}), {@code ../data}, soit {@code src/data}, hors de Git, en local
  */
 @ConfigurationProperties("seal")
-public record SealProperties(URI origin, Security security, Session session, Mail mail, Path dataDir) {
+public record SealProperties(URI origin, Security security, Session session, Mail mail, Ws ws, Path dataDir) {
 
     public SealProperties {
         Objects.requireNonNull(origin, "seal.origin est obligatoire");
         Objects.requireNonNull(security, "seal.security est obligatoire");
         Objects.requireNonNull(session, "seal.session est obligatoire");
         Objects.requireNonNull(mail, "seal.mail est obligatoire");
+        Objects.requireNonNull(ws, "seal.ws est obligatoire");
         Objects.requireNonNull(dataDir, "seal.data-dir est obligatoire");
         // TRN-02 : une origine HTTPS canonique, sans chemin ni identifiants, sert à la fois l'API, le client et la
         // WebSocket ; elle doit être écrite comme le navigateur l'envoie dans l'en-tête Origin (hôte en minuscules,
@@ -50,18 +52,32 @@ public record SealProperties(URI origin, Security security, Session session, Mai
      * un autre dossier (KEY-10, ADR 0025 point 12).
      */
     @ConstructorBinding
-    public SealProperties(URI origin, Security security, Session session, Mail mail, String dataDir) {
+    public SealProperties(URI origin, Security security, Session session, Mail mail, Ws ws, String dataDir) {
         this(
                 origin,
                 security,
                 session,
                 mail,
+                ws,
                 Path.of(Objects.requireNonNull(dataDir, "seal.data-dir est obligatoire")));
     }
 
     /** Origine de la WebSocket sécurisée, citée dans la directive {@code connect-src} de la CSP (section 12.3). */
     public String webSocketOrigin() {
         return "wss://" + origin.getRawAuthority();
+    }
+
+    /**
+     * @param sweepDelay intervalle de la ronde des WebSockets (ADR 0043, point 5) : 10 secondes, entre une seconde et
+     *     une heure ; les tests d'intégration le portent à une heure et lancent la ronde eux-mêmes (ADR 0044)
+     */
+    public record Ws(Duration sweepDelay) {
+        public Ws {
+            Objects.requireNonNull(sweepDelay, "seal.ws.sweep-delay est obligatoire");
+            if (sweepDelay.compareTo(Duration.ofSeconds(1)) < 0 || sweepDelay.compareTo(Duration.ofHours(1)) > 0) {
+                throw new IllegalArgumentException("seal.ws.sweep-delay doit être entre 1 s et 1 h : " + sweepDelay);
+            }
+        }
     }
 
     /** @param hstsMaxAge durée de l'en-tête HSTS (TRN-03) : 300 secondes en profil demo, 1 an en profil prod */

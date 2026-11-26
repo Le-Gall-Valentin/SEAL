@@ -19,17 +19,22 @@ class FriendshipHandlersTest {
     @Test
     @DisplayName("FRD-11 : retirer un ami supprime l'amitié et journalise ; un non-ami ou soi-même, rien")
     void frd11UnfriendRemovesOnlyAnExistingFriendship() {
-        RemoveFriendHandler handler = new RemoveFriendHandler(friends.friendships(), friends.events());
+        RemoveFriendHandler handler =
+                new RemoveFriendHandler(friends.friendships(), friends.events(), friends.notifications());
         friends.friendships.put(UserPair.of(me.user(), friend.user()), InMemoryFriends.NOW);
 
         assertThat(handler.unfriend(me.user(), me.user())).isFalse();
         assertThat(handler.unfriend(me.user(), friends.person("inconnu").user()))
                 .isFalse();
         assertThat(friends.events).isEmpty();
+        assertThat(friends.notified).as("un retrait refusé n'annonce rien").isEmpty();
 
         assertThat(handler.unfriend(friend.user(), me.user())).isTrue();
         assertThat(friends.friendships).isEmpty();
         assertThat(friends.events).containsExactly("removed");
+        assertThat(friends.notified)
+                .containsExactly(
+                        "relation:" + friend.user().value() + ":" + me.user().value());
     }
 
     @Test

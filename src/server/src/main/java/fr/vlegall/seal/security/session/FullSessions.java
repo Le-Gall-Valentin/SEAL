@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.session.Session;
 
 /**
  * Lecture d'une session complète (AUTH-16, ADR 0007 point 2), écrite une seule fois : le mode sudo, la
@@ -41,6 +42,26 @@ public final class FullSessions {
             return SecurityContextHolder.getContextHolderStrategy().createEmptyContext();
         }
         return CONTEXTS.loadDeferredContext(request).get();
+    }
+
+    /** TRN-12 : le compte de la session complète que garde cette session, lue hors de toute requête ; vide sinon. */
+    public static Optional<UserId> storedUser(Session session) {
+        return storedPrincipal(session).map(SealPrincipal::userId);
+    }
+
+    /** TRN-12, ADR 0044 : le principal de la session complète que garde cette session, version du mot de passe comprise. */
+    public static Optional<SealPrincipal> storedPrincipal(Session session) {
+        if (!(session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)
+                instanceof SecurityContext stored)) {
+            return Optional.empty();
+        }
+        Authentication authentication = stored.getAuthentication();
+        if (authentication == null
+                || user(authentication).isEmpty()
+                || !(authentication.getPrincipal() instanceof SealPrincipal principal)) {
+            return Optional.empty();
+        }
+        return Optional.of(principal);
     }
 
     /** Le compte de la session complète gardée par la session de la requête ; vide sinon. */

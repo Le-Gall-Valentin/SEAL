@@ -12,5 +12,10 @@ public enum RateLimitKind {
     /** Courriel saisi : masqué s'il en a la forme, {@code ***} sinon. */
     EMAIL,
     /** Utilisateur : recopié dans {@code security_events.user_id}. */
-    USER
+    USER,
+    /**
+     * Connexion WebSocket (TRN-13) : seau propre à la connexion, hors de la table partagée ({@code RateLimiter.local}).
+     * Le compte est recopié dans {@code security_events.user_id}, un refus par compte et par période (ADR 0044).
+     */
+    CONNECTION
 }

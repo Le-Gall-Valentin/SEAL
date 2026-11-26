@@ -4,6 +4,7 @@ import fr.vlegall.seal.common.ApplicationService;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.friends.application.port.in.DeclineFriendRequestUseCase;
 import fr.vlegall.seal.friends.domain.model.RequestStatus;
+import fr.vlegall.seal.friends.domain.port.out.FriendNotificationPort;
 import fr.vlegall.seal.friends.domain.port.out.FriendRequestRepository;
 import java.time.Clock;
 import java.util.UUID;
@@ -14,11 +15,14 @@ public class DeclineFriendRequestHandler implements DeclineFriendRequestUseCase 
 
     private final OpenRequests open;
     private final FriendRequestRepository requests;
+    private final FriendNotificationPort notifications;
     private final Clock clock;
 
-    public DeclineFriendRequestHandler(OpenRequests open, FriendRequestRepository requests, Clock clock) {
+    public DeclineFriendRequestHandler(
+            OpenRequests open, FriendRequestRepository requests, FriendNotificationPort notifications, Clock clock) {
         this.open = open;
         this.requests = requests;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -28,6 +32,8 @@ public class DeclineFriendRequestHandler implements DeclineFriendRequestUseCase 
         return open.lockAddressedTo(receiver, requestId)
                 .map(request -> {
                     requests.close(request.id(), RequestStatus.DECLINED, clock.instant());
+                    // CDC 10.1, ADR 0044 : « sans notification de refus » pour l'émetteur.
+                    notifications.requestDeclined(receiver, request.sender());
                     return true;
                 })
                 .orElse(false);

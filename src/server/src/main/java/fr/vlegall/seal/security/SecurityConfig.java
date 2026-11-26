@@ -108,6 +108,10 @@ class SecurityConfig {
                         // AUTH-60 : jeton CSRF rechargé par le client.
                         .requestMatchers(HttpMethod.GET, "/api/v1/csrf")
                         .permitAll()
+                        // TRN-11, ADR 0043 : la poignée de main de /ws est jugée par FullSessionHandshakeInterceptor
+                        // (session complète, Origin exigé), qui refuse en 403 et jamais en 401.
+                        .requestMatchers(HttpMethod.GET, "/ws")
+                        .permitAll()
                         // AUTH-35, OPS-03 : fournisseurs OAuth configurés, pour l'anonyme (écrans de connexion) ou la
                         // session complète ; jamais la session restreinte (AUTH-16).
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/providers")

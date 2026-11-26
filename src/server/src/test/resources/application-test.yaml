@@ -4,3 +4,6 @@ seal:
   passwords:
     # ADR 0026 : poivre fixe des tests (les octets 0 à 31), sans valeur secrète.
     pepper: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+  ws:
+    # ADR 0044 : les tests lancent eux-mêmes la ronde, à l'horloge réglable ; la ronde de fond attend une heure.
+    sweep-delay: PT1H

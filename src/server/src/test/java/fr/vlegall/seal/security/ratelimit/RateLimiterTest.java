@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -365,5 +366,98 @@ class RateLimiterTest {
         consumeTimes(RateLimit.PASSWORD_RESETS_PER_EMAIL, EMAIL, 3);
         assertThat(refusal(() -> limiter.consume(RateLimit.PASSWORD_RESETS_PER_EMAIL, EMAIL)))
                 .isNotNull();
+    }
+
+    @Test
+    @DisplayName(
+            "TRN-13 : 30 trames par 10 secondes, dans un seau propre à la connexion ; un refus est rattaché au compte")
+    void trn13FramesPerConnection() {
+        UserId user = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000001"));
+        assertThat(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION)
+                .returns(30, RateLimit::capacity)
+                .returns(Duration.ofSeconds(10), RateLimit::period)
+                .returns(RateLimitKind.CONNECTION, RateLimit::kind);
+        LocalRateLimit first = limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, user);
+        LocalRateLimit second = limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, user);
+        for (int i = 0; i < 30; i++) {
+            first.consume();
+        }
+        second.consume();
+
+        RateLimitExceededException refused = refusal(first::consume);
+
+        assertThat(refused.retryAfter())
+                .hasValueSatisfying(wait -> assertThat(wait).isPositive());
+        SecurityEvent event = onlyRecordedEvent();
+        assertThat(event.userId()).isEqualTo(user);
+        assertThat(event.details())
+                .containsEntry("limit", "WEBSOCKET_FRAMES_PER_CONNECTION")
+                .doesNotContainKey("key");
+        assertThat(limiter.bucketCount())
+                .as("aucun seau dans la table partagée")
+                .isZero();
+    }
+
+    @Test
+    @DisplayName(
+            "TRN-13, A09, ADR 0044 (décision 9) : les refus de mille connexions d'un compte s'écrivent une fois par période")
+    void trn13ConnectionRefusalsAreJournaledOncePerAccountAndPeriod() {
+        UserId alice = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000001"));
+        UserId bob = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000002"));
+
+        for (int connection = 0; connection < 1_000; connection++) {
+            exhaust(limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, alice));
+        }
+        exhaust(limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, bob));
+        verify(journal, times(2)).recordStandalone(any());
+
+        clock.advance(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION.period());
+        exhaust(limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, alice));
+        verify(journal, times(3)).recordStandalone(any());
+    }
+
+    @Test
+    @DisplayName("TRN-13, A06 : la mémoire des refus par compte se vide une fois la période passée")
+    void trn13ConnectionJournalIsPurged() {
+        UserId alice = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000001"));
+        exhaust(limiter.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, alice));
+        assertThat(limiter.connectionJournalSize()).isEqualTo(1);
+
+        clock.advance(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION.period());
+        limiter.purgeRefilledBuckets();
+
+        assertThat(limiter.connectionJournalSize()).isZero();
+    }
+
+    /** Prend toute la capacité d'un seau local, puis un jeton de plus, refusé. */
+    private static void exhaust(LocalRateLimit limit) {
+        for (int i = 0; i < RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION.capacity(); i++) {
+            limit.consume();
+        }
+        assertThat(refusal(limit::consume)).isNotNull();
+    }
+
+    @Test
+    @DisplayName("TRN-13, A06 : des milliers de connexions ne remplissent pas la table partagée des autres limites")
+    void trn13ConnectionsNeverFillTheSharedTable() {
+        UserId user = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000001"));
+        RateLimiter small = new RateLimiter(clock, journal, 1);
+
+        for (int i = 0; i < 1_000; i++) {
+            small.local(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, user).consume();
+        }
+
+        assertThatNoException().isThrownBy(() -> small.consume(RateLimit.REGISTRATIONS_PER_IP, "203.0.113.7"));
+    }
+
+    @Test
+    @DisplayName("TRN-13 : la limite par connexion n'existe qu'en seau local, et un seau local que pour elle")
+    void trn13ConnectionLimitIsOnlyLocal() {
+        UserId user = new UserId(UUID.fromString("0192f7a1-0000-7000-8000-000000000001"));
+
+        assertThatThrownBy(() -> limiter.consume(RateLimit.WEBSOCKET_FRAMES_PER_CONNECTION, "connexion-a"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> limiter.local(RateLimit.REGISTRATIONS_PER_IP, user))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

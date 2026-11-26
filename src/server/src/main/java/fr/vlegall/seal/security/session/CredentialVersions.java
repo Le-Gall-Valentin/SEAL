@@ -12,4 +12,17 @@ public interface CredentialVersions {
 
     /** Version du mot de passe du compte ; vide s'il n'en a pas. */
     OptionalLong current(UserId user);
+
+    /**
+     * ADR 0023 : la session de ce principal est-elle encore valable ? Une session sans version gravée (OAuth) l'est
+     * toujours ; sinon sa version doit être la courante.
+     */
+    default boolean isCurrent(SealPrincipal principal) {
+        Long engraved = principal.credentialVersion();
+        if (engraved == null) {
+            return true;
+        }
+        OptionalLong current = current(principal.userId());
+        return current.isPresent() && current.getAsLong() == engraved;
+    }
 }

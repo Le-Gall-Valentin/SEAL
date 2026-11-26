@@ -69,7 +69,11 @@ class OAuthLoginSuccessHandlerTest {
                 }
             },
             new SessionEstablisher(
-                    CookieCsrfTokenRepository.withHttpOnlyFalse(), clock, user -> OptionalLong.empty(), List.of()),
+                    CookieCsrfTokenRepository.withHttpOnlyFalse(),
+                    clock,
+                    user -> OptionalLong.empty(),
+                    List.of(),
+                    event -> {}),
             new PendingOAuthSession(clock));
 
     private MockHttpServletResponse handle(Authentication authentication) throws Exception {

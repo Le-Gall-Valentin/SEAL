@@ -41,6 +41,7 @@ function apisWith(reloadCsrf: () => Promise<void>): Apis {
     renameGroup: { rename: never },
     removeMember: { exclude: never },
     leaveGroup: { leave: never },
+    realtime: { connect: () => () => undefined },
   }
 }
 
