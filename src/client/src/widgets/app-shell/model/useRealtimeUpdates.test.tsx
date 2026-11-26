@@ -2,7 +2,12 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
-import { type IRealtimeApi, RealtimeApiProvider, type RealtimeListener } from '@/entities/session'
+import {
+  type IRealtimeApi,
+  RealtimeApiProvider,
+  type RealtimeListener,
+  SessionApiProvider,
+} from '@/entities/session'
 import { ClockProvider } from '@/shared/lib'
 import { useRealtimeUpdates } from './useRealtimeUpdates'
 
@@ -36,7 +41,11 @@ async function mount() {
     return (
       <QueryClientProvider client={client}>
         <ClockProvider clock={clock}>
-          <RealtimeApiProvider api={realtime.api}>{children}</RealtimeApiProvider>
+          <SessionApiProvider
+            api={{ me: () => Promise.resolve(null), reloadCsrf: () => Promise.resolve() }}
+          >
+            <RealtimeApiProvider api={realtime.api}>{children}</RealtimeApiProvider>
+          </SessionApiProvider>
         </ClockProvider>
       </QueryClientProvider>
     )
@@ -60,7 +69,7 @@ async function mount() {
 }
 
 describe('widgets/app-shell : mises à jour en direct (FRD-04, CNV-04, TRN-15)', () => {
-  it('FRD-04 : friend.request relit les invitations sans attendre, après une action récente', async () => {
+  it('FRD-04 : friend.request relit les invitations après le court regroupement, si l’utilisateur vient d’agir', async () => {
     const { realtime, reads } = await mount()
 
     act()

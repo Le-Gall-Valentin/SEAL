@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { markConversationsStale, refetchConversations } from '@/entities/conversation'
 import { markFriendsStale, refetchFriends } from '@/entities/friend'
 import { type RealtimeEvent, useRealtime } from '@/entities/session'
@@ -14,16 +14,18 @@ import { type ActivityGate, createActivityGate, useClock } from '@/shared/lib'
 export function useRealtimeUpdates(): void {
   const client = useQueryClient()
   const clock = useClock()
+  const now = useEffectEvent(() => clock.now())
   const gate = useRef<ActivityGate | null>(null)
-  // Avant la connexion de useRealtime : les effets d'un composant partent dans l'ordre de leurs appels.
+  // Avant la connexion de useRealtime : les effets d'un composant partent dans l'ordre de leurs appels. Créée une
+  // seule fois : une garde recréée jetterait une réouverture en attente.
   useEffect(() => {
-    const created = createActivityGate({ now: () => clock.now() })
+    const created = createActivityGate({ now: () => now() })
     gate.current = created
     return () => {
       created.dispose()
       gate.current = null
     }
-  }, [clock])
+  }, [])
 
   const friends = () => {
     void markFriendsStale(client)

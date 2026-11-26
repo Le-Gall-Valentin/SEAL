@@ -67,7 +67,10 @@ export interface RealtimeOptions {
   readonly url: string
   /** Un événement validé du serveur. */
   readonly onFrame: (event: RealtimeEvent) => void
-  /** TRN-15 : chaque (re)connexion confirmée par le serveur (premier `pong`), pour relire ce qui a pu être manqué. */
+  /**
+   * TRN-15 : chaque (re)connexion confirmée par le serveur (première trame valide reçue, le `pong` du ping
+   * d'ouverture d'ordinaire), pour relire ce qui a pu être manqué.
+   */
   readonly onOpen: () => void
   readonly onEnd: (reason: RealtimeEnd) => void
   /**
@@ -257,7 +260,8 @@ export function createRealtimeConnection(options: RealtimeOptions): RealtimeConn
         ping = setInterval(sendPing, PING_INTERVAL_MS)
       },
       onMessage: (data) => {
-        if (socket === current) {
+        // Échec fermé : rien n'est remis après la fin (session.revoked) ni d'une socket remplacée.
+        if (socket === current && !ended) {
           receive(data)
         }
       },

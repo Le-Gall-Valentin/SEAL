@@ -68,4 +68,31 @@ describe('entities/session : connexion temps réel (TRN-10)', () => {
     })
     expect(first?.socket.closed).toBe(1000)
   })
+
+  it('AUTH-52, ADR 0044 (décision 2) : l’adaptateur confie la réouverture et le signal d’injoignabilité à l’écouteur', () => {
+    vi.useFakeTimers()
+    try {
+      const opened: SocketHandlers[] = []
+      const api = createRealtimeApi(
+        (_url, handlers) => {
+          opened.push(handlers)
+          return { isOpen: () => false, send: () => undefined, close: () => undefined }
+        },
+        { protocol: 'https:', host: 'seal.test' },
+      )
+      const events = listener()
+      api.connect(events)
+
+      for (let failure = 0; failure < 3; failure++) {
+        opened.at(-1)?.onClose(1006)
+        vi.advanceTimersByTime(30_000)
+        vi.mocked(events.beforeReconnect).mock.calls.at(-1)?.[0]()
+      }
+
+      expect(events.beforeReconnect).toHaveBeenCalledTimes(3)
+      expect(events.onUnreachable).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

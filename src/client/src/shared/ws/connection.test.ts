@@ -284,16 +284,47 @@ describe('shared/ws : connexion temps réel (TRN-13, TRN-14, TRN-15, ADR 0043, A
     expect(FakeSocket.all).toHaveLength(2)
   })
 
-  it('ADR 0044 (décision 2) : trois échecs sans réponse du serveur signalent la connexion injoignable, une fois', () => {
+  it('ADR 0044 (décision 2) : trois échecs de suite sans réponse du serveur signalent la connexion injoignable, une fois', () => {
     const onUnreachable = vi.fn()
     connect({ onUnreachable })
 
-    for (let failure = 0; failure < 4; failure++) {
+    last().drop(1006)
+    vi.advanceTimersByTime(30_000)
+    last().drop(1006)
+    vi.advanceTimersByTime(30_000)
+    expect(onUnreachable).not.toHaveBeenCalled()
+    last().drop(1006)
+    expect(onUnreachable).toHaveBeenCalledOnce()
+    vi.advanceTimersByTime(30_000)
+    last().drop(1006)
+
+    expect(onUnreachable).toHaveBeenCalledOnce()
+  })
+
+  it('ADR 0044 (décision 2) : les coupures d’une connexion confirmée et les refus 4429 ne comptent pas', () => {
+    const onUnreachable = vi.fn()
+    connect({ onUnreachable })
+
+    for (let drop = 0; drop < 3; drop++) {
+      last().accept()
       last().drop(1006)
       vi.advanceTimersByTime(30_000)
     }
+    last().drop(4429)
+    vi.advanceTimersByTime(30_000)
+    last().drop(4429)
 
-    expect(onUnreachable).toHaveBeenCalledOnce()
+    expect(onUnreachable).not.toHaveBeenCalled()
+  })
+
+  it('TRN-12 : après session.revoked, plus aucune trame n’atteint onFrame', () => {
+    const { options } = connect()
+    last().accept()
+
+    last().receive({ type: 'session.revoked', id: 's1', payload: {} })
+    last().receive({ type: 'friend.request', id: 's2', payload: { requestId: UUID } })
+
+    expect(options.onFrame).not.toHaveBeenCalled()
   })
 
   it('AUTH-53 : 4401 met fin à la connexion, sans la rouvrir, et fait échouer les envois en cours', async () => {

@@ -61,12 +61,9 @@ export function markFriendsStale(client: QueryClient): Promise<void> {
 }
 
 /**
- * ADR 0044 (décision 1) : relit ceux qui sont affichés et périmés ; une lecture déjà en cours sert, sans être
- * interrompue (une rafale de trames ne relance pas la lecture en boucle).
+ * ADR 0044 (décision 1) : relit ceux qui sont affichés et périmés. Une lecture déjà en cours, partie avant la trame,
+ * est relancée : son résultat serait antérieur au changement annoncé. La garde d'activité regroupe les rafales.
  */
 export function refetchFriends(client: QueryClient): Promise<void> {
-  return client.refetchQueries(
-    { queryKey: FRIENDS_ROOT_KEY, type: 'active', stale: true },
-    { cancelRefetch: false },
-  )
+  return client.refetchQueries({ queryKey: FRIENDS_ROOT_KEY, type: 'active', stale: true })
 }

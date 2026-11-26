@@ -2,21 +2,15 @@
  * Gestes qui comptent comme une action de l'utilisateur, écoutés en capture. Le défilement se compte par ses gestes
  * (molette, toucher, clavier, pointeur) et non par `scroll`, que la page émet aussi seule : un élément ajouté en tête
  * d'une liste défilée fait recaler le défilement sans personne devant l'écran (AUTH-52, audit F1). Revenir sur
- * l'onglet compte aussi (`focus`, `visibilitychange` vers visible, ADR 0044).
+ * l'onglet compte aussi : `focus` de la fenêtre elle-même (jamais celui qu'un élément reçoit, que le code peut poser)
+ * et `visibilitychange` vers visible (ADR 0044).
  */
-const ACTIVITY_EVENTS = [
-  'pointerdown',
-  'pointermove',
-  'keydown',
-  'wheel',
-  'touchstart',
-  'focus',
-] as const
+const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'] as const
 
 /** AUTH-52 : une action prolonge la session au plus une fois par minute ; la garde suit la même fenêtre. */
 const RECENT_MS = 60_000
 
-/** ADR 0044 : une rafale d'événements ne lance qu'une tâche par clé, après ce délai. */
+/** ADR 0044 (audit F10) : une rafale d'événements ne lance qu'une tâche par clé, après ce délai. */
 export const COALESCE_MS = 250
 
 export interface ActivityGate {
@@ -59,8 +53,15 @@ export function createActivityGate({
   }
   const acted = () => {
     lastAction = now()
-    if (pending.size > 0 && visible()) {
+    // Des tâches qui attendaient une action partent ; celles déjà programmées gardent leur regroupement.
+    if (pending.size > 0 && timer === null && visible()) {
       flush()
+    }
+  }
+  // Sans capture : un focus d'élément ne remonte pas jusqu'à la fenêtre, seul celui de la fenêtre arrive ici.
+  const windowFocused = (event: FocusEvent) => {
+    if (event.target === event.currentTarget) {
+      acted()
     }
   }
   const shown = () => {
@@ -72,6 +73,7 @@ export function createActivityGate({
   for (const type of ACTIVITY_EVENTS) {
     window.addEventListener(type, acted, options)
   }
+  window.addEventListener('focus', windowFocused)
   document.addEventListener('visibilitychange', shown)
 
   return {
@@ -90,6 +92,7 @@ export function createActivityGate({
       for (const type of ACTIVITY_EVENTS) {
         window.removeEventListener(type, acted, options)
       }
+      window.removeEventListener('focus', windowFocused)
       document.removeEventListener('visibilitychange', shown)
     },
   }

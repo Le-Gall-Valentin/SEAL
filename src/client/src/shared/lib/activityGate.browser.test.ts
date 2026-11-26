@@ -67,6 +67,41 @@ describe('shared/lib : garde d’activité (AUTH-52, ADR 0043 point 4, ADR 0044)
     gate.dispose()
   })
 
+  it('AUTH-52, ADR 0044 : des gestes pendant le regroupement ne le contournent pas ; une seule tâche part', () => {
+    const gate = createActivityGate({ now: () => now })
+    const first = vi.fn()
+    const last = vi.fn()
+
+    act()
+    gate.run('amis', first)
+    window.dispatchEvent(new PointerEvent('pointermove'))
+    gate.run('amis', last)
+    window.dispatchEvent(new PointerEvent('pointermove'))
+    expect(last).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(COALESCE_MS)
+
+    expect(first).not.toHaveBeenCalled()
+    expect(last).toHaveBeenCalledOnce()
+    gate.dispose()
+  })
+
+  it('AUTH-52 : un focus posé sur un élément ne compte pas comme une action ; celui de la fenêtre, si', () => {
+    const gate = createActivityGate({ now: () => now })
+    const task = vi.fn()
+    const button = document.createElement('button')
+    document.body.append(button)
+
+    gate.run('amis', task)
+    button.dispatchEvent(new FocusEvent('focus'))
+    vi.advanceTimersByTime(COALESCE_MS)
+    expect(task).not.toHaveBeenCalled()
+
+    window.dispatchEvent(new FocusEvent('focus'))
+    expect(task).toHaveBeenCalledOnce()
+    button.remove()
+    gate.dispose()
+  })
+
   it('AUTH-52, ADR 0044 : une page cachée attend ; revenir sur l’onglet vaut une action', () => {
     let visible = false
     const gate = createActivityGate({ now: () => now, visible: () => visible })

@@ -2,13 +2,17 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent } from 'react'
 import type { RealtimeEvent } from '../api/IRealtimeApi'
 import { useRealtimeApi } from './realtimePort'
-import { endSession, refreshSession } from './useCurrentAccount'
+import { useSessionApi } from './sessionApiPort'
+import { endSession, SESSION_QUERY_KEY } from './useCurrentAccount'
 
 interface RealtimeHandlers {
   readonly onEvent: (event: RealtimeEvent) => void
   readonly onOpen: () => void
-  /** ADR 0044 (décision 2) : quand rouvrir une connexion tombée ; aussitôt par défaut. */
-  readonly beforeReconnect?: (resume: () => void) => void
+  /**
+   * ADR 0044 (décision 2) : quand rouvrir une connexion tombée ; obligatoire, car une poignée de main prolonge la
+   * session (AUTH-52).
+   */
+  readonly beforeReconnect: (resume: () => void) => void
 }
 
 /**
@@ -21,12 +25,25 @@ export function useRealtime(handlers: RealtimeHandlers): void {
   const client = useQueryClient()
   const onEvent = useEffectEvent(handlers.onEvent)
   const onOpen = useEffectEvent(handlers.onOpen)
-  const beforeReconnect = useEffectEvent((resume: () => void) => {
-    if (handlers.beforeReconnect === undefined) {
-      resume()
-    } else {
-      handlers.beforeReconnect(resume)
-    }
+  const beforeReconnect = useEffectEvent(handlers.beforeReconnect)
+  const sessionApi = useSessionApi()
+  // ADR 0044 (décision 2), AUTH-53 : /me relu ; une session finie pendant la coupure (null) est terminée, et les
+  // données lues sous le compte oubliées. Une erreur réseau laisse la session : la reconnexion continue.
+  const unreachable = useEffectEvent(() => {
+    client
+      .query({
+        queryKey: SESSION_QUERY_KEY,
+        queryFn: ({ signal }) => sessionApi.me(signal),
+        staleTime: 0,
+      })
+      .then(
+        (account) => {
+          if (account === null) {
+            endSession(client)
+          }
+        },
+        () => undefined,
+      )
   })
   useEffect(
     () =>
@@ -45,9 +62,8 @@ export function useRealtime(handlers: RealtimeHandlers): void {
         beforeReconnect: (resume) => {
           beforeReconnect(resume)
         },
-        // ADR 0044 (décision 2) : /me relu ; une session finie pendant la coupure répond 401, qui la termine.
         onUnreachable: () => {
-          void refreshSession(client)
+          unreachable()
         },
       }),
     [api, client],
