@@ -98,7 +98,7 @@ class BoundSessionsTest {
     void acc01VersionIsJudgedUnderTheCurrentIdOnly() {
         full("ancien", USER);
         FakeConnection connection = connection("ancien");
-        connection.follow("nouveau");
+        connection.follow("nouveau", clock.instant());
         // Le mot de passe vient de changer en base ; la session regravée n'est pas encore écrite sous son nouvel id.
         passwordVersion = OptionalLong.of(2);
 
@@ -108,6 +108,21 @@ class BoundSessionsTest {
         assertThat(sessions.alive(connection))
                 .as("sous l'id courant, l'ancienne version ne vaut plus")
                 .isFalse();
+    }
+
+    @Test
+    @DisplayName(
+            "TRN-12, ADR 0023, ADR 0044 : passé 30 s, un renommage jamais écrit ne dispense plus du contrôle de version")
+    void trn12UnwrittenRenameIsToleratedThirtySecondsOnly() {
+        full("ancien", USER);
+        FakeConnection connection = connection("ancien");
+        connection.follow("nouveau", clock.instant());
+        passwordVersion = OptionalLong.of(2);
+        assertThat(sessions.alive(connection)).isTrue();
+
+        clock.advance(Duration.ofSeconds(30));
+
+        assertThat(sessions.alive(connection)).as("échec fermé").isFalse();
     }
 
     @Test
@@ -128,7 +143,7 @@ class BoundSessionsTest {
     void trn12RenamePendingKeepsTheConnection() {
         full("ancien", USER);
         FakeConnection connection = connection("ancien");
-        connection.follow("nouveau");
+        connection.follow("nouveau", clock.instant());
         Instant before = lastAccess("ancien");
         clock.advance(Duration.ofMinutes(2));
 
@@ -145,8 +160,8 @@ class BoundSessionsTest {
     void auth55ChainedRenamesFallBackToTheStoredId() {
         full("a0", USER);
         FakeConnection connection = connection("a0");
-        connection.follow("a1");
-        connection.follow("a2");
+        connection.follow("a1", clock.instant());
+        connection.follow("a2", clock.instant());
 
         assertThat(sessions.alive(connection)).isTrue();
         assertThat(connection.binding().formers()).containsExactly("a1", "a0");
@@ -156,7 +171,7 @@ class BoundSessionsTest {
     @DisplayName("TRN-12, ADR 0044 : une fois le nouvel identifiant en base, les anciens sont oubliés")
     void trn12ConfirmedRenameSettles() {
         FakeConnection connection = connection("a0");
-        connection.follow("a1");
+        connection.follow("a1", clock.instant());
         full("a1", USER);
 
         assertThat(sessions.alive(connection)).isTrue();

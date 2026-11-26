@@ -22,6 +22,9 @@ import org.springframework.stereotype.Component;
 @Component
 public final class BoundSessions {
 
+    /** ADR 0044 : délai laissé à une requête qui renomme la session pour l'écrire, bien au-delà de sa durée. */
+    static final Duration RENAME_GRACE = Duration.ofSeconds(30);
+
     /** AUTH-52, ADR 0043 (point 4) : une action prolonge la session au plus une fois par minute. */
     static final Duration EXTENSION_INTERVAL = Duration.ofMinutes(1);
 
@@ -63,13 +66,15 @@ public final class BoundSessions {
             return alive;
         }
         // AUTH-23 : renouvelée par une requête pas encore finie, la session garde un ancien identifiant. Sa version du
-        // mot de passe n'y est pas jugée : la requête (ACC-01) a pu valider la nouvelle version avant d'écrire la
-        // session
-        // regravée ; elle le sera sous l'identifiant courant, une fois écrit (ADR 0044).
+        // mot de passe n'y est pas jugée pendant RENAME_GRACE : la requête (ACC-01) a pu valider la nouvelle version
+        // avant d'écrire la session regravée. Passé ce délai, un renommage jamais écrit ne dispense plus de rien
+        // (échec fermé, ADR 0044).
+        Instant renamedAt = seen.renamedAt();
+        boolean renamePending = renamedAt != null && now.isBefore(renamedAt.plus(RENAME_GRACE));
         for (String former : seen.formers()) {
             Session stored = sessions.findById(former);
             if (stored != null) {
-                return alive(stored, connection, now, false);
+                return alive(stored, connection, now, !renamePending);
             }
         }
         return false;

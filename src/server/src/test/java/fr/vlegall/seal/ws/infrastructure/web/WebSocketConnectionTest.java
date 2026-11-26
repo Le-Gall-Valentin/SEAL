@@ -156,9 +156,9 @@ class WebSocketConnectionTest {
     @DisplayName("TRN-12, ADR 0044 : la connexion suit un renommage ; une confirmation périmée est sans effet")
     void trn12FollowAndStaleSettle() {
         SessionBinding seen = connection.binding();
-        connection.follow("renommee");
+        connection.follow("renommee", Instant.EPOCH);
         connection.settle(seen);
-        assertThat(connection.binding()).isEqualTo(new SessionBinding("renommee", List.of("session")));
+        assertThat(connection.binding()).isEqualTo(new SessionBinding("renommee", List.of("session"), Instant.EPOCH));
 
         connection.settle(connection.binding());
         assertThat(connection.binding()).isEqualTo(SessionBinding.of("renommee"));

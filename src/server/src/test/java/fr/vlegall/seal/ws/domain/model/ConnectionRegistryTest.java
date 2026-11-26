@@ -67,7 +67,7 @@ class ConnectionRegistryTest {
     void auth53FormerIdStillFindsTheConnection() {
         FakeConnection connection = new FakeConnection(ALICE, "avant", Instant.EPOCH);
         registry.open(connection);
-        connection.follow("apres");
+        connection.follow("apres", Instant.EPOCH);
 
         assertThat(registry.bySession("avant")).containsExactly(connection);
         assertThat(registry.bySession("apres")).containsExactly(connection);

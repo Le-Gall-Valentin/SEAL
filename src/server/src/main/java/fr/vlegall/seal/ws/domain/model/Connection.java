@@ -17,8 +17,8 @@ public interface Connection {
         return binding().current();
     }
 
-    /** TRN-12, AUTH-23 : la session a changé d'identifiant ; la connexion la suit. */
-    void follow(String renamedSessionId);
+    /** TRN-12, AUTH-23 : la session a changé d'identifiant à l'instant {@code at} ; la connexion la suit. */
+    void follow(String renamedSessionId, Instant at);
 
     /** TRN-12 : le nouvel identifiant est confirmé en base ; sans effet si la liaison a changé depuis {@code seen}. */
     void settle(SessionBinding seen);

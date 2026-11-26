@@ -12,7 +12,6 @@ import fr.vlegall.seal.ws.domain.model.ConnectionRegistry;
 import fr.vlegall.seal.ws.domain.model.FakeConnection;
 import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.time.Duration;
-import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
@@ -52,7 +51,8 @@ class SessionWatchTest {
 
         watch.renewed(new SessionRenewedEvent("avant", "apres"));
 
-        assertThat(connection.binding()).isEqualTo(new SessionBinding("apres", List.of("avant")));
+        assertThat(connection.binding().current()).isEqualTo("apres");
+        assertThat(connection.binding().formers()).containsExactly("avant");
         assertThat(connection.closed()).isEmpty();
         assertThat(unrelated.binding()).isEqualTo(SessionBinding.of("autre"));
     }
@@ -66,7 +66,8 @@ class SessionWatchTest {
         watch.renewed(new SessionRenewedEvent("a0", "a1"));
         watch.renewed(new SessionRenewedEvent("a1", "a2"));
 
-        assertThat(connection.binding()).isEqualTo(new SessionBinding("a2", List.of("a1", "a0")));
+        assertThat(connection.binding().current()).isEqualTo("a2");
+        assertThat(connection.binding().formers()).containsExactly("a1", "a0");
     }
 
     @Test

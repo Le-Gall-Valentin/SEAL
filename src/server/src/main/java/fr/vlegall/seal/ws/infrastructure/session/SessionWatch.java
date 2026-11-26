@@ -48,7 +48,8 @@ public class SessionWatch {
      */
     @EventListener
     public void renewed(SessionRenewedEvent event) {
-        registry.bySession(event.previousId()).forEach(connection -> connection.follow(event.currentId()));
+        Instant now = clock.instant();
+        registry.bySession(event.previousId()).forEach(connection -> connection.follow(event.currentId(), now));
     }
 
     /** La ronde, planifiée par {@link SessionSweepScheduling} (les tests d'intégration la lancent eux-mêmes). */

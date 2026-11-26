@@ -95,8 +95,8 @@ final class WebSocketConnection implements Connection {
     }
 
     @Override
-    public void follow(String renamedSessionId) {
-        binding.updateAndGet(current -> current.renamedTo(renamedSessionId));
+    public void follow(String renamedSessionId, Instant at) {
+        binding.updateAndGet(current -> current.renamedTo(renamedSessionId, at));
     }
 
     @Override
