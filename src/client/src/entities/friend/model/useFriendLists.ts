@@ -47,15 +47,26 @@ export function useSentRequests() {
   })
 }
 
+/** ADR 0037 (point 2) : après chaque action, les trois listes et le compteur sont relus. */
+export function invalidateFriends(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({ queryKey: FRIENDS_ROOT_KEY })
+}
+
 /**
- * ADR 0037 (point 2) : après chaque action, les trois listes et le compteur sont relus. `refetch` faux : ils sont
- * seulement périmés, relus au prochain affichage ou au retour du focus (AUTH-52, ADR 0043 point 4).
+ * ADR 0043, ADR 0044 (décision 1) : une trame ou une reconnexion rend les trois listes et le compteur périmés, sans requête ; ils sont
+ * relus au prochain affichage, au retour du focus ou par {@link refetchFriends}.
  */
-export function invalidateFriends(
-  client: QueryClient,
-  { refetch = true }: { readonly refetch?: boolean } = {},
-): Promise<void> {
-  return refetch
-    ? client.invalidateQueries({ queryKey: FRIENDS_ROOT_KEY })
-    : client.invalidateQueries({ queryKey: FRIENDS_ROOT_KEY, refetchType: 'none' })
+export function markFriendsStale(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({ queryKey: FRIENDS_ROOT_KEY, refetchType: 'none' })
+}
+
+/**
+ * ADR 0044 (décision 1) : relit ceux qui sont affichés et périmés ; une lecture déjà en cours sert, sans être
+ * interrompue (une rafale de trames ne relance pas la lecture en boucle).
+ */
+export function refetchFriends(client: QueryClient): Promise<void> {
+  return client.refetchQueries(
+    { queryKey: FRIENDS_ROOT_KEY, type: 'active', stale: true },
+    { cancelRefetch: false },
+  )
 }

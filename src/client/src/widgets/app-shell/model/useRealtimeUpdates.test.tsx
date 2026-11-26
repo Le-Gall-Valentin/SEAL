@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import { type IRealtimeApi, RealtimeApiProvider, type RealtimeListener } from '@/entities/session'
+import { ClockProvider } from '@/shared/lib'
 import { useRealtimeUpdates } from './useRealtimeUpdates'
 
 function fakeRealtime() {
@@ -25,10 +26,18 @@ async function mount() {
   const realtime = fakeRealtime()
   const client = new QueryClient()
   const reads = { friends: vi.fn(), conversations: vi.fn() }
+  const clock = {
+    at: Date.now(),
+    now() {
+      return this.at
+    },
+  }
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={client}>
-        <RealtimeApiProvider api={realtime.api}>{children}</RealtimeApiProvider>
+        <ClockProvider clock={clock}>
+          <RealtimeApiProvider api={realtime.api}>{children}</RealtimeApiProvider>
+        </ClockProvider>
       </QueryClientProvider>
     )
   }
@@ -47,7 +56,7 @@ async function mount() {
     expect(reads.friends).toHaveBeenCalledOnce()
     expect(reads.conversations).toHaveBeenCalledOnce()
   })
-  return { realtime, reads, client }
+  return { realtime, reads, client, clock }
 }
 
 describe('widgets/app-shell : mises à jour en direct (FRD-04, CNV-04, TRN-15)', () => {
@@ -87,13 +96,13 @@ describe('widgets/app-shell : mises à jour en direct (FRD-04, CNV-04, TRN-15)',
     })
   })
 
-  it('AUTH-52, ADR 0043 (point 4) : sans action récente, rien n’est relu avant la prochaine action', async () => {
-    const { realtime, reads, client } = await mount()
-    const later = Date.now() + 61_000
-    vi.spyOn(Date, 'now').mockReturnValue(later)
+  it('AUTH-52, ADR 0043 (point 4) : une action d’il y a plus d’une minute ne suffit pas ; la prochaine relit', async () => {
+    const { realtime, reads, client, clock } = await mount()
+    act()
+    clock.at += 61_000
 
     realtime.listener()?.onEvent({ type: 'friend.update', userId: 'u' })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 400))
 
     expect(reads.friends).toHaveBeenCalledOnce()
     expect(client.getQueryState(['friends', 'received'])?.isInvalidated).toBe(true)
@@ -101,6 +110,19 @@ describe('widgets/app-shell : mises à jour en direct (FRD-04, CNV-04, TRN-15)',
     await vi.waitFor(() => {
       expect(reads.friends).toHaveBeenCalledTimes(2)
     })
-    vi.restoreAllMocks()
+  })
+
+  it('AUTH-52, ADR 0044 (décision 2) : une connexion tombée ne rouvre qu’après une action récente', async () => {
+    const { realtime, clock } = await mount()
+    const resume = vi.fn()
+    act()
+    clock.at += 61_000
+
+    realtime.listener()?.beforeReconnect(resume)
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(resume).not.toHaveBeenCalled()
+
+    act()
+    expect(resume).toHaveBeenCalledOnce()
   })
 })

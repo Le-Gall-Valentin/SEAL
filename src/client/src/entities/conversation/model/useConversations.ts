@@ -32,17 +32,28 @@ export function useConversation(id: string | null) {
   })
 }
 
+/** ADR 0041 (point 8) : après chaque action, la liste et le détail sont relus. */
+export function invalidateConversations(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({ queryKey: CONVERSATIONS_ROOT_KEY })
+}
+
 /**
- * ADR 0041 (point 8) : après chaque action, la liste et le détail sont relus. `refetch` faux : ils sont seulement
- * périmés, relus au prochain affichage ou au retour du focus (AUTH-52, ADR 0043 point 4).
+ * ADR 0043, ADR 0044 (décision 1) : une trame ou une reconnexion rend la liste et le détail périmés, sans requête ; ils sont
+ * relus au prochain affichage, au retour du focus ou par {@link refetchConversations}.
  */
-export function invalidateConversations(
-  client: QueryClient,
-  { refetch = true }: { readonly refetch?: boolean } = {},
-): Promise<void> {
-  return refetch
-    ? client.invalidateQueries({ queryKey: CONVERSATIONS_ROOT_KEY })
-    : client.invalidateQueries({ queryKey: CONVERSATIONS_ROOT_KEY, refetchType: 'none' })
+export function markConversationsStale(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({ queryKey: CONVERSATIONS_ROOT_KEY, refetchType: 'none' })
+}
+
+/**
+ * ADR 0044 (décision 1) : relit ceux qui sont affichés et périmés ; une lecture déjà en cours sert, sans être
+ * interrompue (une rafale de trames ne relance pas la lecture en boucle).
+ */
+export function refetchConversations(client: QueryClient): Promise<void> {
+  return client.refetchQueries(
+    { queryKey: CONVERSATIONS_ROOT_KEY, type: 'active', stale: true },
+    { cancelRefetch: false },
+  )
 }
 
 /** La vue que rend une action (ajout, renommage) remplace le détail, sans attendre la relecture. */

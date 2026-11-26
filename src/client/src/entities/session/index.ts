@@ -2,7 +2,7 @@
 export type { Account, ISessionApi } from './api/ISessionApi'
 export { ACCOUNT_RESPONSE, sessionApi } from './api/sessionApi'
 export type { IRealtimeApi, RealtimeEvent, RealtimeListener } from './api/IRealtimeApi'
-export { realtimeApi } from './api/realtimeApi'
+export { createRealtimeApi, realtimeApi } from './api/realtimeApi'
 export { RealtimeApiProvider } from './model/realtimePort'
 export { useRealtime } from './model/useRealtime'
 export { SessionApiProvider } from './model/sessionApiPort'

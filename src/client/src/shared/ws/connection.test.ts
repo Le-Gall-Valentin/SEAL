@@ -59,6 +59,20 @@ class FakeSocket implements SocketLike {
   lastId(): string {
     return this.written().at(-1)?.id ?? ''
   }
+
+  /** Le serveur répond au dernier ping ; la connexion est alors confirmée (TRN-15). */
+  pong(): void {
+    const ping = this.written()
+      .filter((frame) => frame.type === 'ping')
+      .at(-1)
+    this.receive({ type: 'pong', id: ping?.id ?? 'x', payload: {} })
+  }
+
+  /** Ouverture confirmée par le serveur. */
+  accept(): void {
+    this.open()
+    this.pong()
+  }
 }
 
 function last(): FakeSocket {
@@ -81,7 +95,7 @@ function connect(overrides: Partial<RealtimeOptions> = {}) {
   return { options, connection: createRealtimeConnection(options) }
 }
 
-describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
+describe('shared/ws : connexion temps réel (TRN-13, TRN-14, TRN-15, ADR 0043, ADR 0044)', () => {
   beforeEach(() => {
     FakeSocket.all = []
     vi.useFakeTimers()
@@ -90,16 +104,12 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
     vi.useRealTimers()
   })
 
-  it('TRN-14 : un ping à l’ouverture, puis toutes les 25 secondes', () => {
+  it('TRN-13 : un ping à l’ouverture, puis toutes les 25 secondes', () => {
     connect()
-    last().open()
+    last().accept()
 
-    expect(
-      last()
-        .written()
-        .map((frame) => frame.type),
-    ).toEqual(['ping'])
     vi.advanceTimersByTime(25_000)
+    last().pong()
     vi.advanceTimersByTime(25_000)
 
     const pings = last().written()
@@ -110,9 +120,22 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
     })
   })
 
-  it('TRN-14 : ack et error reviennent à leur appel, par l’id', async () => {
+  it('ADR 0044 (décision 7) : un ping sans pong en 10 secondes abandonne la socket et rouvre', () => {
+    connect()
+    last().accept()
+    vi.advanceTimersByTime(25_000)
+    const silent = last()
+
+    vi.advanceTimersByTime(10_000)
+
+    expect(silent.closedWith).toBe(4000)
+    vi.advanceTimersByTime(1_000)
+    expect(FakeSocket.all).toHaveLength(2)
+  })
+
+  it('TRN-14 : l’accusé et l’erreur reviennent à leur appel, par l’id', async () => {
     const { connection } = connect()
-    last().open()
+    last().accept()
 
     const sent = connection.send('msg.send', { n: 1 })
     const firstId = last().lastId()
@@ -130,12 +153,11 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
       (error) =>
         error instanceof ApiError && error.code === 'RATE_LIMITED' && error.retryAfterSeconds === 3,
     )
-    expect(last().written().at(-1)).toMatchObject({ type: 'msg.send', payload: { n: 2 } })
   })
 
-  it('TRN-14 : sans réponse en 10 secondes, l’envoi échoue', async () => {
+  it('ADR 0043 : sans réponse en 10 secondes, l’envoi échoue', async () => {
     const { connection } = connect()
-    last().open()
+    last().accept()
 
     const sent = connection.send('msg.send', {})
     vi.advanceTimersByTime(10_000)
@@ -149,9 +171,19 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
     await expect(connection.send('msg.send', {})).rejects.toBeInstanceOf(NetworkError)
   })
 
-  it('TRN-15 : une coupure rouvre après 1, 2, 4, 8, 16 puis 30 secondes, et rappelle onOpen', () => {
-    const { options } = connect()
-    last().open()
+  it('TRN-15 : une coupure fait échouer aussitôt les envois en cours', async () => {
+    const { connection } = connect()
+    last().accept()
+    const sent = connection.send('msg.send', {})
+
+    last().drop(1006)
+
+    await expect(sent).rejects.toBeInstanceOf(NetworkError)
+  })
+
+  it('ADR 0043 (TRN-15) : une coupure rouvre après 1, 2, 4, 8, 16 puis 30 secondes', () => {
+    connect()
+    last().accept()
     const waits: number[] = []
 
     for (let attempt = 0; attempt < 7; attempt++) {
@@ -164,20 +196,27 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
       }
       waits.push(waited)
     }
-    last().open()
 
     expect(waits).toEqual([1, 2, 4, 8, 16, 30, 30])
-    expect(options.onOpen).toHaveBeenCalledTimes(2)
   })
 
-  it('TRN-15 : une trame reçue remet l’attente à une seconde', () => {
+  it('TRN-15 : onOpen part à la première réponse du serveur, pas à l’ouverture de la socket', () => {
+    const { options } = connect()
+
+    last().open()
+    expect(options.onOpen).not.toHaveBeenCalled()
+    last().pong()
+
+    expect(options.onOpen).toHaveBeenCalledOnce()
+  })
+
+  it('TRN-15 : une réponse remet l’attente à une seconde', () => {
     connect()
     last().drop(1006)
     vi.advanceTimersByTime(1_000)
     last().drop(1006)
     vi.advanceTimersByTime(2_000)
-    last().open()
-    last().receive({ type: 'pong', id: last().lastId(), payload: {} })
+    last().accept()
     const before = FakeSocket.all.length
 
     last().drop(1006)
@@ -186,9 +225,80 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
     expect(FakeSocket.all.length).toBe(before + 1)
   })
 
+  it('AUTH-52, ADR 0044 (décision 2) : la réouverture attend le feu vert de beforeReconnect', () => {
+    const resumes: (() => void)[] = []
+    connect({
+      beforeReconnect: (go) => {
+        resumes.push(go)
+      },
+    })
+    last().accept()
+
+    last().drop(1006)
+    vi.advanceTimersByTime(60_000)
+    expect(FakeSocket.all).toHaveLength(1)
+
+    expect(resumes).toHaveLength(1)
+    resumes.at(-1)?.()
+    expect(FakeSocket.all).toHaveLength(2)
+  })
+
+  it('ADR 0044 (décision 2) : un double feu vert ne rouvre qu’une connexion', () => {
+    const resumes: (() => void)[] = []
+    connect({
+      beforeReconnect: (go) => {
+        resumes.push(go)
+      },
+    })
+    last().drop(1006)
+    vi.advanceTimersByTime(1_000)
+
+    resumes.at(-1)?.()
+    resumes.at(-1)?.()
+
+    expect(FakeSocket.all).toHaveLength(2)
+  })
+
+  it('TRN-15 : close() pendant une réouverture programmée ou en attente ne rouvre jamais', () => {
+    const resumes: (() => void)[] = []
+    const { connection } = connect({
+      beforeReconnect: (go) => {
+        resumes.push(go)
+      },
+    })
+    last().drop(1006)
+    connection.close()
+    vi.advanceTimersByTime(60_000)
+    expect(FakeSocket.all).toHaveLength(1)
+
+    const other = connect({
+      beforeReconnect: (go) => {
+        resumes.push(go)
+      },
+    })
+    last().drop(1006)
+    vi.advanceTimersByTime(1_000)
+    other.connection.close()
+    resumes.at(-1)?.()
+
+    expect(FakeSocket.all).toHaveLength(2)
+  })
+
+  it('ADR 0044 (décision 2) : trois échecs sans réponse du serveur signalent la connexion injoignable, une fois', () => {
+    const onUnreachable = vi.fn()
+    connect({ onUnreachable })
+
+    for (let failure = 0; failure < 4; failure++) {
+      last().drop(1006)
+      vi.advanceTimersByTime(30_000)
+    }
+
+    expect(onUnreachable).toHaveBeenCalledOnce()
+  })
+
   it('AUTH-53 : 4401 met fin à la connexion, sans la rouvrir, et fait échouer les envois en cours', async () => {
     const { options, connection } = connect()
-    last().open()
+    last().accept()
     const pending = connection.send('msg.send', {})
 
     last().drop(4401)
@@ -201,7 +311,7 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
 
   it('TRN-12 : session.revoked met fin à la connexion une seule fois, même suivie de 4401', () => {
     const { options } = connect()
-    last().open()
+    last().accept()
 
     last().receive({ type: 'session.revoked', id: 's1', payload: {} })
     last().drop(4401)
@@ -212,7 +322,7 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
     expect(FakeSocket.all).toHaveLength(1)
   })
 
-  it('TRN-13 : 4429 trois fois de suite met fin à la connexion', () => {
+  it('TRN-13 : 4429 trois fois de suite met fin à la connexion, sans aucun rattrapage', () => {
     const { options } = connect()
 
     for (let refusal = 0; refusal < 3; refusal++) {
@@ -222,12 +332,13 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
     }
 
     expect(options.onEnd).toHaveBeenCalledExactlyOnceWith('refused')
+    expect(options.onOpen).not.toHaveBeenCalled()
     expect(FakeSocket.all).toHaveLength(3)
   })
 
   it('A10 : une trame illisible ou hors schéma n’atteint jamais onFrame ; une trame valide, si', () => {
     const { options } = connect()
-    last().open()
+    last().accept()
 
     last().receive('pas du JSON')
     last().receive({ type: 'friend.request', id: 's1', payload: { requestId: 'x' } })
@@ -240,15 +351,17 @@ describe('shared/ws : connexion temps réel (TRN-14, TRN-15)', () => {
     })
   })
 
-  it('close() ferme en 1000 et ne rouvre plus', () => {
+  it('AUTH-53 : close() ferme en 1000 et ne rouvre plus ; une ouverture tardive n’envoie rien', () => {
     const { connection } = connect()
-    last().open()
+    const socket = last()
 
     connection.close()
-    last().drop(1000)
+    socket.open()
+    socket.drop(1000)
     vi.advanceTimersByTime(60_000)
 
-    expect(last().closedWith).toBe(1000)
+    expect(socket.closedWith).toBe(1000)
+    expect(socket.sent).toHaveLength(0)
     expect(FakeSocket.all).toHaveLength(1)
   })
 })

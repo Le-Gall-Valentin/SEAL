@@ -99,4 +99,23 @@ describe('entities/session : connexion temps réel liée à la session (TRN-12)'
 
     expect(client.getQueryData(SESSION_QUERY_KEY)).toEqual({ id: 'compte' })
   })
+
+  it('ADR 0044 (décision 2) : une connexion injoignable fait relire /me ; sans garde, la réouverture est immédiate', async () => {
+    const realtime = fakeRealtime()
+    const client = new QueryClient()
+    client.setQueryData(SESSION_QUERY_KEY, { id: 'compte' })
+    await renderHook(
+      () => {
+        useRealtime({ onEvent: vi.fn(), onOpen: vi.fn() })
+      },
+      { wrapper: wrapper(client, realtime.api) },
+    )
+    const resume = vi.fn()
+
+    realtime.listeners[0]?.onUnreachable()
+    realtime.listeners[0]?.beforeReconnect(resume)
+
+    expect(client.getQueryState(SESSION_QUERY_KEY)?.isInvalidated).toBe(true)
+    expect(resume).toHaveBeenCalledOnce()
+  })
 })
