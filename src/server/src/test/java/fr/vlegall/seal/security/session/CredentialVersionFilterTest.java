@@ -6,6 +6,7 @@ import fr.vlegall.seal.common.UserId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,10 +24,13 @@ class CredentialVersionFilterTest {
 
     private final List<UserId> lookups = new ArrayList<>();
     private OptionalLong stored = OptionalLong.of(3);
-    private final CredentialVersionFilter filter = new CredentialVersionFilter(user -> {
-        lookups.add(user);
-        return stored;
-    });
+    private final List<Object> events = new ArrayList<>();
+    private final CredentialVersionFilter filter = new CredentialVersionFilter(
+            user -> {
+                lookups.add(user);
+                return stored;
+            },
+            events::add);
     private final MockHttpServletRequest request = new MockHttpServletRequest();
     private final MockHttpSession session = new MockHttpSession();
 
@@ -59,6 +63,7 @@ class CredentialVersionFilterTest {
 
         assertThat(session.isInvalid()).isFalse();
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+        assertThat(events).isEmpty();
         assertThat(chain.getRequest()).isNotNull();
         assertThat(lookups).containsExactly(USER);
     }
@@ -73,6 +78,8 @@ class CredentialVersionFilterTest {
         assertThat(session.isInvalid()).isTrue();
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         assertThat(chain.getRequest()).as("la requête continue, sans session").isNotNull();
+        // TRN-12, ADR 0045 : les WebSockets de la session tombée se ferment aussitôt.
+        assertThat(events).containsExactly(new SessionsEndedEvent(Set.of(session.getId())));
     }
 
     @Test

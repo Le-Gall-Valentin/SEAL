@@ -42,7 +42,12 @@ class SessionEstablisherTest {
     private OptionalLong storedVersion = OptionalLong.of(VERSION);
     private final List<Object> published = new ArrayList<>();
     private final SessionEstablisher sessions = new SessionEstablisher(
-            CookieCsrfTokenRepository.withHttpOnlyFalse(), clock, user -> storedVersion, List.of(), published::add);
+            CookieCsrfTokenRepository.withHttpOnlyFalse(),
+            clock,
+            user -> storedVersion,
+            List.of(),
+            published::add,
+            new SessionMigration(published::add, id -> true));
 
     /** Authentification d'une connexion réussie d'un compte actif, telle que la rend le fournisseur. */
     private static Authentication activeLogin() {
@@ -145,6 +150,41 @@ class SessionEstablisherTest {
         sessions.renew(request, new MockHttpServletResponse());
 
         assertThat(published).containsExactly(new SessionsEndedEvent(Set.of("complete")));
+    }
+
+    @Test
+    @DisplayName("AUTH-23, ADR 0045 : l'ouverture d'une session migre l'ancienne, invalidée, vers une nouvelle")
+    void auth23OpeningMigratesTheSession() {
+        MockHttpSession session = new MockHttpSession(null, "anonyme");
+        session.setAttribute("seal.test", "valeur");
+        MockHttpServletRequest request = requestWithSession(session);
+
+        sessions.open(activeLogin(), request, new MockHttpServletResponse());
+
+        assertThat(session.isInvalid()).isTrue();
+        assertThat(request.getSession(false)).isNotSameAs(session);
+        assertThat(request.getSession(false).getAttribute("seal.test")).isEqualTo("valeur");
+    }
+
+    @Test
+    @DisplayName(
+            "AUTH-32, ADR 0045 : la session rendue anonyme est migrée, avec ses attributs, sans contexte de sécurité")
+    void auth32AnonymousRenewalMigratesTheSession() {
+        MockHttpSession session = new MockHttpSession(null, "attente");
+        session.setAttribute("seal.test", "valeur");
+        MockHttpServletRequest request = requestWithSession(session);
+        sessions.open(activeLogin(), request, new MockHttpServletResponse());
+        MockHttpSession full = (MockHttpSession) request.getSession(false);
+        request.setRequestedSessionId(full.getId());
+
+        sessions.renew(request, new MockHttpServletResponse());
+
+        assertThat(full.isInvalid()).isTrue();
+        assertThat(request.getSession(false)).isNotSameAs(full);
+        assertThat(request.getSession(false).getAttribute("seal.test")).isEqualTo("valeur");
+        assertThat(request.getSession(false)
+                        .getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY))
+                .isNull();
     }
 
     @Test

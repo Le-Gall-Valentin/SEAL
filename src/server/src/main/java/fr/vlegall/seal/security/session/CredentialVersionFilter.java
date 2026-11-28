@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -23,9 +25,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public final class CredentialVersionFilter extends OncePerRequestFilter {
 
     private final CredentialVersions versions;
+    private final ApplicationEventPublisher events;
 
-    public CredentialVersionFilter(CredentialVersions versions) {
+    public CredentialVersionFilter(CredentialVersions versions, ApplicationEventPublisher events) {
         this.versions = Objects.requireNonNull(versions, "versions");
+        this.events = Objects.requireNonNull(events, "events");
     }
 
     @Override
@@ -37,7 +41,10 @@ public final class CredentialVersionFilter extends OncePerRequestFilter {
                 && !versions.isCurrent(principal)) {
             HttpSession session = request.getSession(false);
             if (session != null) {
+                String id = session.getId();
                 session.invalidate();
+                // TRN-12, ADR 0045 : les WebSockets de la session tombée se ferment aussitôt.
+                events.publishEvent(new SessionsEndedEvent(Set.of(id)));
             }
             SecurityContextHolder.clearContext();
         }

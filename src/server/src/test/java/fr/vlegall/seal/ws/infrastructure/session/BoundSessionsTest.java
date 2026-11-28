@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.session.SealAuthorities;
 import fr.vlegall.seal.security.session.SealPrincipal;
+import fr.vlegall.seal.security.session.SessionOrigin;
 import fr.vlegall.seal.support.MutableClock;
 import fr.vlegall.seal.ws.domain.model.FakeConnection;
 import fr.vlegall.seal.ws.domain.model.SessionBinding;
@@ -123,6 +124,35 @@ class BoundSessionsTest {
         clock.advance(Duration.ofSeconds(30));
 
         assertThat(sessions.alive(connection)).as("échec fermé").isFalse();
+    }
+
+    @Test
+    @DisplayName(
+            "TRN-12, ADR 0045 : pendant 30 s après un renommage, une session migrée pas encore écrite garde sa connexion")
+    void trn12MigrationGapIsToleratedThirtySecondsOnly() {
+        // La migration a supprimé l'ancienne ligne ; la nouvelle n'est écrite qu'à la fin de la requête.
+        FakeConnection connection = connection("ancien");
+        connection.follow("nouveau", clock.instant());
+
+        assertThat(sessions.alive(connection)).isTrue();
+        assertThat(sessions.userActed(connection)).isTrue();
+
+        clock.advance(Duration.ofSeconds(30));
+
+        assertThat(sessions.alive(connection)).as("échec fermé").isFalse();
+        assertThat(sessions.userActed(connection)).isFalse();
+    }
+
+    @Test
+    @DisplayName("AUTH-52, ADR 0045 : les 12 heures se comptent depuis la première session, reportée par la migration")
+    void auth52AgeCountsFromTheOrigin() {
+        MapSession migrated = full("migree", USER);
+        migrated.setAttribute(
+                SessionOrigin.ATTRIBUTE,
+                clock.instant().minus(Duration.ofHours(12)).toEpochMilli());
+        repository.save(migrated);
+
+        assertThat(sessions.alive(connection("migree"))).isFalse();
     }
 
     @Test

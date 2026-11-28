@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
  * AUTH-50 : révoque les sessions d'un compte, retrouvées en base par le nom du principal, l'identifiant du compte
  * ({@link SealPrincipal#getName()}).
  *
- * <p>Spring Session n'écrit un nouvel identifiant de session qu'à la fin de la requête : appeler {@link #revokeOthers}
- * avant de changer l'identifiant de la session courante, sinon sa ligne, qui porte encore l'ancien, serait supprimée.
+ * <p>Un renommage est une migration (ADR 0045) : l'ancienne ligne de la session courante disparaît aussitôt et la
+ * nouvelle n'est écrite qu'à la fin de la requête. {@link #revokeOthers} ne la supprime donc ni avant ni après.
  * Une révocation qui fait tomber au moins une session est journalisée (SEC-20), hors de toute transaction. Comme pour
  * un dépassement de limite (ADR 0013, point 3), un journal indisponible n'annule rien : les sessions sont déjà
  * supprimées, et l'échec est écrit en erreur (A10).

@@ -9,13 +9,13 @@ import org.jspecify.annotations.Nullable;
 /**
  * TRN-12, ADR 0044 : la session HTTP d'une connexion. {@code formers} garde les identifiants d'avant les renouvellements
  * pas encore confirmés en base, du plus récent au plus ancien : une requête qui renomme n'écrit le nouvel identifiant
- * qu'à sa fin, et une ré-authentification OAuth renomme deux fois. {@code renamedAt} date le dernier renommage pas
- * encore confirmé ; nul une fois confirmé.
+ * qu'à sa fin, et plusieurs requêtes peuvent renommer avant la ronde suivante. {@code renamedAt} date le dernier
+ * renommage pas encore confirmé ; nul une fois confirmé.
  */
 public record SessionBinding(
         String current, List<String> formers, @Nullable Instant renamedAt) {
 
-    /** Assez pour les deux renommages d'une même requête ; au-delà, les plus anciens sont oubliés. */
+    /** Assez pour les renommages qui se suivent avant une ronde ; au-delà, les plus anciens sont oubliés. */
     static final int MAX_FORMERS = 4;
 
     public SessionBinding {

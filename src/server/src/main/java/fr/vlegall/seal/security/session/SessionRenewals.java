@@ -6,8 +6,8 @@ import org.springframework.security.web.authentication.session.SessionFixationPr
 import org.springframework.stereotype.Component;
 
 /**
- * TRN-12, AUTH-55, ADR 0044 : traduit chaque renommage de session de Spring Security (le nôtre comme celui de ses
- * filtres OAuth, qui renomment avant notre gestionnaire de succès) en {@link SessionRenewedEvent}.
+ * TRN-12, AUTH-55, ADR 0044 : traduit chaque renommage de session, publié par {@link SessionMigration} (seule à
+ * renommer, ADR 0045), en {@link SessionRenewedEvent}.
  */
 @Component
 public class SessionRenewals {
