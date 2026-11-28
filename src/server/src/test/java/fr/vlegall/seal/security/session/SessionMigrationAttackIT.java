@@ -146,7 +146,7 @@ class SessionMigrationAttackIT {
 
     @Test
     @DisplayName(
-            "ADR 0032 point 7, ADR 0045 : aucun SessionManagementFilter implicite ne renomme ni n'écrit la session")
+            "AUTH-23, ADR 0032 point 7, ADR 0045 : aucun SessionManagementFilter implicite ne renomme ni n'écrit la session")
     void adr0045NoImplicitSessionManagementFilter() {
         assertThat(chains)
                 .allSatisfy(

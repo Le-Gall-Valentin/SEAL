@@ -58,8 +58,7 @@ class SessionWatchTest {
     }
 
     @Test
-    @DisplayName(
-            "AUTH-55, ADR 0044 : deux renommages dans une même requête (OAuth) se suivent, l'identifiant en base gardé")
+    @DisplayName("AUTH-55, ADR 0044 : deux renommages successifs non confirmés se suivent, l'identifiant en base gardé")
     void auth55ChainedRenamesAreFollowed() {
         FakeConnection connection = open(USER, "a0");
 

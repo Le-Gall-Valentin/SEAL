@@ -95,7 +95,8 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
             return rejection;
         }
         if (exception instanceof SessionAuthenticationException) {
-            // ADR 0045 : la session a pris fin (déconnexion, révocation) pendant le retour ; rien n'a été migré.
+            // SEC-20, AUTH-53, ADR 0045 : la session a pris fin (déconnexion, révocation) pendant le retour ; rien n'a
+            // été migré.
             return "session_ended";
         }
         if (!(exception instanceof OAuth2AuthenticationException oauth)) {

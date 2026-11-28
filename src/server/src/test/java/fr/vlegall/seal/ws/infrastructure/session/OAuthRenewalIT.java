@@ -32,7 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.json.JsonMapper;
 
-/** TRN-12, AUTH-55, ADR 0044 : une ré-authentification OAuth, qui renomme deux fois la session, garde la WebSocket. */
+/** TRN-12, AUTH-55, ADR 0044, ADR 0045 : une ré-authentification OAuth, qui migre la session une fois, garde la WebSocket. */
 @SealServerTest
 @Import(OAuthTestConfiguration.class)
 class OAuthRenewalIT {
@@ -111,7 +111,8 @@ class OAuthRenewalIT {
     }
 
     @Test
-    @DisplayName("AUTH-55, TRN-12 : une identité refusée, que Spring renomme sans nous, garde aussi la connexion")
+    @DisplayName(
+            "AUTH-55, TRN-12, ADR 0045 : une identité refusée, qui laisse la session intacte, garde aussi la connexion")
     void auth55RefusedIdentityKeepsTheConnection() throws Exception {
         AuthClient client = new AuthClient(mvc, mail);
         String run = UUID.randomUUID().toString().substring(0, 6);
