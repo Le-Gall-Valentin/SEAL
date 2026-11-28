@@ -3,6 +3,7 @@ package fr.vlegall.seal.ws.infrastructure.session;
 import fr.vlegall.seal.common.SealProperties;
 import fr.vlegall.seal.security.session.CredentialVersions;
 import fr.vlegall.seal.security.session.FullSessions;
+import fr.vlegall.seal.security.session.SessionOrigin;
 import fr.vlegall.seal.ws.domain.model.Connection;
 import fr.vlegall.seal.ws.domain.model.SessionBinding;
 import java.time.Clock;
@@ -22,7 +23,10 @@ import org.springframework.stereotype.Component;
 @Component
 public final class BoundSessions {
 
-    /** ADR 0044 : délai laissé à une requête qui renomme la session pour l'écrire, bien au-delà de sa durée. */
+    /**
+     * ADR 0044, ADR 0045 : délai laissé à une requête qui migre la session pour écrire la nouvelle, bien au-delà de sa
+     * durée.
+     */
     static final Duration RENAME_GRACE = Duration.ofSeconds(30);
 
     /** AUTH-52, ADR 0043 (point 4) : une action prolonge la session au plus une fois par minute. */
@@ -65,10 +69,11 @@ public final class BoundSessions {
             }
             return alive;
         }
-        // AUTH-23 : renouvelée par une requête pas encore finie, la session garde un ancien identifiant. Sa version du
-        // mot de passe n'y est pas jugée pendant RENAME_GRACE : la requête (ACC-01) a pu valider la nouvelle version
-        // avant d'écrire la session regravée. Passé ce délai, un renommage jamais écrit ne dispense plus de rien
-        // (échec fermé, ADR 0044).
+        // AUTH-23 : renouvelée par une requête pas encore finie, la session n'est pas encore écrite sous son nouvel
+        // identifiant. La migration supprime l'ancienne ligne avant d'annoncer le renommage (ADR 0045) ; la recherche
+        // sous les anciens identifiants reste une défense. Pendant RENAME_GRACE, la version du mot de passe n'y est
+        // pas jugée : la requête (ACC-01) a pu valider la nouvelle version avant d'écrire la session regravée. Passé ce
+        // délai, un renommage jamais écrit ne dispense plus de rien (échec fermé, ADR 0044).
         Instant renamedAt = seen.renamedAt();
         boolean renamePending = renamedAt != null && now.isBefore(renamedAt.plus(RENAME_GRACE));
         for (String former : seen.formers()) {
@@ -77,7 +82,10 @@ public final class BoundSessions {
                 return alive(stored, connection, now, !renamePending);
             }
         }
-        return false;
+        // ADR 0045 : la migration supprime l'ancienne ligne au milieu de la requête et n'écrit la nouvelle qu'à sa fin.
+        // Introuvable sous tous ses identifiants pendant RENAME_GRACE, la session n'est pas jugée ; ensuite, elle
+        // l'est.
+        return renamePending;
     }
 
     /**
@@ -108,7 +116,8 @@ public final class BoundSessions {
     private boolean alive(@Nullable Session session, Connection connection, Instant now, boolean judgeVersion) {
         return session != null
                 && now.isBefore(session.getLastAccessedTime().plus(session.getMaxInactiveInterval()))
-                && now.isBefore(session.getCreationTime().plus(absoluteTimeout))
+                // ADR 0045 : l'âge se compte depuis la première session, que chaque migration reporte.
+                && now.isBefore(SessionOrigin.createdAt(session).plus(absoluteTimeout))
                 // ADR 0023, ADR 0044 : la session garde la session complète du même compte, au mot de passe courant.
                 && FullSessions.storedPrincipal(session)
                         .filter(principal -> principal.userId().equals(connection.user()))

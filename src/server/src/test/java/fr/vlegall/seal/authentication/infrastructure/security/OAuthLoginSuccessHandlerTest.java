@@ -9,6 +9,7 @@ import fr.vlegall.seal.authentication.domain.model.OAuthLoginOutcome;
 import fr.vlegall.seal.authentication.domain.model.OAuthProvider;
 import fr.vlegall.seal.common.UserId;
 import fr.vlegall.seal.security.session.SessionEstablisher;
+import fr.vlegall.seal.security.session.SessionMigration;
 import fr.vlegall.seal.security.web.ClientRoutesController;
 import fr.vlegall.seal.support.MutableClock;
 import java.time.Instant;
@@ -73,7 +74,8 @@ class OAuthLoginSuccessHandlerTest {
                     clock,
                     user -> OptionalLong.empty(),
                     List.of(),
-                    event -> {}),
+                    event -> {},
+                    new SessionMigration(event -> {}, id -> true)),
             new PendingOAuthSession(clock));
 
     private MockHttpServletResponse handle(Authentication authentication) throws Exception {

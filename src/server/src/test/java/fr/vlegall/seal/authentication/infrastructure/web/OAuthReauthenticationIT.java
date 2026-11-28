@@ -21,11 +21,14 @@ import fr.vlegall.seal.support.OAuthTestConfiguration;
 import fr.vlegall.seal.support.RecordingMailSender;
 import fr.vlegall.seal.support.SealIntegrationTest;
 import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -141,6 +144,113 @@ class OAuthReauthenticationIT {
     }
 
     @Test
+    @DisplayName(
+            "AUTH-23, AUTH-55, ADR 0045 : après la ré-authentification OAuth, l'ancienne session n'existe plus en base")
+    void auth23OAuthReauthenticationDeletesTheOldSession() throws Exception {
+        String subject = googleSubject();
+        Cookie stale = staleSessionLinkedTo("oauthmigre", subject);
+        String oldId = new String(Base64.getDecoder().decode(stale.getValue()), StandardCharsets.UTF_8);
+
+        Started started = oauth.start("google", stale);
+        MvcResult result = oauth.callback(
+                started, fake.authorize(started.location(), GoogleAccount.verified(subject, "autre@gmail.com")));
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(302);
+        assertThat(jdbc.sql("SELECT count(*) FROM SPRING_SESSION WHERE SESSION_ID = ?")
+                        .param(oldId)
+                        .query(Long.class)
+                        .single())
+                .as("ancienne ligne")
+                .isZero();
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(stale)).andExpect(status().isUnauthorized());
+        assertThat(jdbc.sql("SELECT count(*) FROM SPRING_SESSION WHERE PRINCIPAL_NAME = ?")
+                        .param(idOf("oauthmigre").toString())
+                        .query(Long.class)
+                        .single())
+                .as("une seule session, la nouvelle")
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("AUTH-53, ADR 0045 : une déconnexion pendant une ré-authentification OAuth acceptée n'est pas perdue")
+    void auth53LogoutDuringAcceptedOAuthReauthenticationIsKept() throws Exception {
+        String subject = googleSubject();
+        Cookie stale = staleSessionLinkedTo("decoacc", subject);
+        Started started = oauth.start("google", stale);
+        String code = fake.authorize(started.location(), GoogleAccount.verified(subject, "autre@gmail.com"));
+        AtomicInteger logout = new AtomicInteger();
+        // Pendant l'échange du code, la session se déconnecte : la migration ne trouve plus sa ligne (échec fermé).
+        fake.tweakIdTokens(claims -> {
+            try {
+                logout.set(mvc.perform(client.unsafe(post("/api/v1/auth/logout"), stale, null))
+                        .andReturn()
+                        .getResponse()
+                        .getStatus());
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return claims;
+        });
+
+        MvcResult result = oauth.callback(started, code);
+
+        assertThat(logout.get()).isEqualTo(204);
+        assertThat(result.getResponse().getStatus()).isEqualTo(302);
+        assertThat(result.getResponse().getHeader("Location")).isEqualTo("/parametres?erreur=REQUEST_REJECTED");
+        Cookie expired = result.getResponse().getCookie(AuthClient.SESSION_COOKIE);
+        assertThat(expired).as("cookie expiré par Spring Session").isNotNull();
+        assertThat(expired.getMaxAge()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM SPRING_SESSION WHERE PRINCIPAL_NAME = ?")
+                        .param(idOf("decoacc").toString())
+                        .query(Long.class)
+                        .single())
+                .as("session ranimée après la déconnexion")
+                .isZero();
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(stale)).andExpect(status().isUnauthorized());
+        // SEC-20 : le refus, journalisé sans compte, dit que la session a pris fin, pas une erreur du fournisseur.
+        assertThat(jdbc.sql("SELECT details->>'cause' FROM security_events WHERE type = 'LOGIN_FAILED'"
+                                + " AND details->>'method' = 'oauth' AND ip = CAST(? AS inet)")
+                        .param(client.ip())
+                        .query(String.class)
+                        .list())
+                .containsExactly("session_ended");
+    }
+
+    @Test
+    @DisplayName("AUTH-53, ADR 0045 : une déconnexion pendant une ré-authentification OAuth refusée n'est pas perdue")
+    void auth53LogoutDuringRefusedOAuthReauthenticationIsKept() throws Exception {
+        Cookie stolen = staleSessionLinkedTo("deconnecte", googleSubject());
+        Started started = oauth.start("google", stolen);
+        String code = fake.authorize(started.location(), GoogleAccount.verified(googleSubject(), "intrus@gmail.com"));
+        AtomicInteger logout = new AtomicInteger();
+        // Pendant l'échange du code, au milieu de la requête de retour, la victime se déconnecte (AUTH-53).
+        fake.tweakIdTokens(claims -> {
+            try {
+                logout.set(mvc.perform(client.unsafe(post("/api/v1/auth/logout"), stolen, null))
+                        .andReturn()
+                        .getResponse()
+                        .getStatus());
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+            return claims;
+        });
+
+        MvcResult result = oauth.callback(started, code);
+
+        assertThat(logout.get()).as("déconnexion de la victime").isEqualTo(204);
+        assertThat(jdbc.sql("SELECT count(*) FROM SPRING_SESSION WHERE PRINCIPAL_NAME = ?")
+                        .param(idOf("deconnecte").toString())
+                        .query(Long.class)
+                        .single())
+                .as("session ranimée après la déconnexion")
+                .isZero();
+        Cookie after = result.getResponse().getCookie(AuthClient.SESSION_COOKIE);
+        mvc.perform(client.from(get("/api/v1/auth/me")).cookie(after == null ? stolen : after))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("AUTH-55, ADR 0034 : une autre identité du même fournisseur est refusée ; la session ne change pas")
     void auth55OtherIdentityIsRefused() throws Exception {
         Cookie stale = staleSessionLinkedTo("autreid", googleSubject());
@@ -151,10 +261,9 @@ class OAuthReauthenticationIT {
                 fake.authorize(started.location(), GoogleAccount.verified(googleSubject(), "intrus@gmail.com")));
 
         assertThat(result.getResponse().getHeader("Location")).isEqualTo("/parametres?erreur=REQUEST_REJECTED");
-        // Spring change l'identifiant de session dès le retour du fournisseur : le navigateur suit le nouveau cookie.
-        Cookie after = result.getResponse().getCookie(AuthClient.SESSION_COOKIE) == null
-                ? stale
-                : AuthClient.sessionOf(result);
+        // ADR 0045 : le filtre OAuth ne renomme plus ; un refus laisse la session telle quelle, sans nouveau cookie.
+        assertThat(result.getResponse().getCookie(AuthClient.SESSION_COOKIE)).isNull();
+        Cookie after = stale;
         mvc.perform(client.from(get("/api/v1/auth/me")).cookie(after))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("autreid" + run));
@@ -240,10 +349,9 @@ class OAuthReauthenticationIT {
                 started, fake.authorize(started.location(), GoogleAccount.verified(other, "autre@gmail.com")));
 
         assertThat(result.getResponse().getHeader("Location")).isEqualTo("/parametres?erreur=REQUEST_REJECTED");
-        Cookie after = result.getResponse().getCookie(AuthClient.SESSION_COOKIE) == null
-                ? stale
-                : AuthClient.sessionOf(result);
-        assertThat(emailChangeStatus(after)).isEqualTo(403);
+        // ADR 0045 : le filtre OAuth ne renomme pas ; un refus laisse la session telle quelle, sans nouveau cookie.
+        assertThat(result.getResponse().getCookie(AuthClient.SESSION_COOKIE)).isNull();
+        assertThat(emailChangeStatus(stale)).isEqualTo(403);
         assertThat(causes(idOf("victime"))).contains("reauth_identity_mismatch");
     }
 

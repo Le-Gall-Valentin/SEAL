@@ -14,6 +14,7 @@ import fr.vlegall.seal.security.web.RequestBodyLimitFilter;
 import jakarta.servlet.DispatcherType;
 import java.time.Clock;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -31,6 +32,7 @@ import org.springframework.security.config.annotation.web.configurers.oauth2.cli
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -97,7 +99,8 @@ class SecurityConfig {
             CsrfTokenRepository csrfTokens,
             CredentialVersions credentialVersions,
             Customizer<OAuth2LoginConfigurer<HttpSecurity>> oauthLogin,
-            RateLimiter limiter) {
+            RateLimiter limiter,
+            ApplicationEventPublisher events) {
         http.authorizeHttpRequests(requests -> requests
                         // Le client React compilé, servi par Spring sur l'origine unique (TRN-02).
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg")
@@ -255,6 +258,10 @@ class SecurityConfig {
                         @Override
                         public <O extends OAuth2LoginAuthenticationFilter> O postProcess(O filter) {
                             filter.setSecurityContextRepository(new RequestAttributeSecurityContextRepository());
+                            // AUTH-23, ADR 0045 (point 2) : le filtre ne renomme pas la session. SessionEstablisher la
+                            // migre, une seule fois et en dernier, si SEAL accepte l'authentification ; un refus la
+                            // laisse intacte.
+                            filter.setSessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy());
                             return filter;
                         }
                     });
@@ -266,11 +273,12 @@ class SecurityConfig {
                 .logout(LogoutConfigurer::disable)
                 // AUTH-52 : la session de plus de 12 heures est invalidée avant de charger le contexte de sécurité.
                 .addFilterBefore(
-                        new AbsoluteSessionTimeoutFilter(clock, seal.session().absoluteTimeout()),
+                        new AbsoluteSessionTimeoutFilter(clock, seal.session().absoluteTimeout(), events),
                         SecurityContextHolderFilter.class)
                 // AUTH-70, ADR 0023 : une session ouverte avec une version périmée du mot de passe tombe, juste après
                 // le chargement du contexte de sécurité.
-                .addFilterAfter(new CredentialVersionFilter(credentialVersions), SecurityContextHolderFilter.class)
+                .addFilterAfter(
+                        new CredentialVersionFilter(credentialVersions, events), SecurityContextHolderFilter.class)
                 // SEC-01 : corps borné avant toute lecture par la chaîne (jeton CSRF de formulaire compris), après les
                 // en-têtes, que le refus porte aussi. FormContentFilter, placé avant, est désactivé (application.yaml).
                 .addFilterAfter(

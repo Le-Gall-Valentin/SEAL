@@ -8,9 +8,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -20,7 +20,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextHolderStrategy;
-import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -46,18 +45,21 @@ public final class SessionEstablisher {
     private final CredentialVersions versions;
     private final List<SessionOpeningCleanup> cleanups;
     private final ApplicationEventPublisher events;
+    /** AUTH-32, ADR 0045 : seule opération de la migration dont {@link #renew} a besoin. */
+    private final Consumer<HttpServletRequest> anonymousMigration;
 
     public SessionEstablisher(
             CsrfTokenRepository csrfTokens,
             Clock clock,
             CredentialVersions versions,
             List<SessionOpeningCleanup> cleanups,
-            ApplicationEventPublisher events) {
-        // TRN-12, ADR 0044 : le renommage publie SessionFixationProtectionEvent, que SessionRenewals traduit.
-        ChangeSessionIdAuthenticationStrategy fixation = new ChangeSessionIdAuthenticationStrategy();
-        fixation.setApplicationEventPublisher(events);
+            ApplicationEventPublisher events,
+            SessionMigration migration) {
+        // AUTH-23, ADR 0045 : tout renommage est une migration, qui publie SessionFixationProtectionEvent, que
+        // SessionRenewals traduit (TRN-12, ADR 0044).
         this.renewal = new CompositeSessionAuthenticationStrategy(
-                List.of(fixation, new CsrfAuthenticationStrategy(csrfTokens)));
+                List.of(migration, new CsrfAuthenticationStrategy(csrfTokens)));
+        this.anonymousMigration = migration::migrate;
         this.csrfTokens = csrfTokens;
         this.clock = clock;
         this.versions = versions;
@@ -136,15 +138,15 @@ public final class SessionEstablisher {
     }
 
     /**
-     * AUTH-32 : nouvel identifiant de session sans authentification, pour l'inscription OAuth en attente : la session qui
-     * gardait la requête d'autorisation change d'identifiant (AUTH-23), l'ancien jeton CSRF est retiré (AUTH-60) et aucun
-     * contexte de sécurité n'y est écrit.
+     * AUTH-32 : nouvel identifiant de session sans authentification, pour l'inscription OAuth en attente : la session
+     * qui gardait la requête d'autorisation est migrée sous un nouvel identifiant (AUTH-23, ADR 0045), l'ancien jeton
+     * CSRF est retiré (AUTH-60) et aucun contexte de sécurité n'y est écrit.
      */
     public void renew(HttpServletRequest request, HttpServletResponse response) {
         HttpSession previous = request.getSession(false);
         String previousId = previous == null ? null : previous.getId();
-        Objects.requireNonNull(request.getSession(true), "session");
-        Objects.requireNonNull(request.changeSessionId(), "nouvel identifiant de session");
+        // ADR 0045 : migration, comme tout renommage ; une requête concurrente ne ranime pas l'ancienne session.
+        anonymousMigration.accept(request);
         holder.clearContext();
         // Un contexte vide retire de la session tout contexte qui s'y trouverait : l'attente reste anonyme.
         contexts.saveContext(holder.createEmptyContext(), request, response);

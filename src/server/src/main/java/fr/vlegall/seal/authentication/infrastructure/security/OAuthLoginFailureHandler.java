@@ -12,6 +12,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.session.SessionAuthenticationException;
 import org.springframework.util.StringUtils;
 
 /**
@@ -92,6 +93,10 @@ final class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
     private static String cause(HttpServletRequest request, AuthenticationException exception) {
         if (request.getAttribute(OAuthAuthorizationRequests.REJECTION) instanceof String rejection) {
             return rejection;
+        }
+        if (exception instanceof SessionAuthenticationException) {
+            // ADR 0045 : la session a pris fin (déconnexion, révocation) pendant le retour ; rien n'a été migré.
+            return "session_ended";
         }
         if (!(exception instanceof OAuth2AuthenticationException oauth)) {
             return "oauth_error";
